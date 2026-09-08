@@ -12,6 +12,8 @@ export const STAGING_DEPLOY_GUARD = Object.freeze({
   minimumFreeBytes: 10n * 1024n * 1024n * 1024n,
   intervalMs: 2500,
   operationTimeoutMs: 3000,
+  apiOperationTimeoutMs: 15000,
+  maximumApiUnverifiedMs: 45000,
   cancelOperationTimeoutMs: 15000,
 });
 
@@ -98,6 +100,18 @@ function isTerminal(record) {
 
 function isActive(record) {
   return ACTIVE_STATUSES.has(statusOf(record)) || (!isTerminal(record) && Boolean(statusOf(record)));
+}
+
+function isVerificationIntegrityFailure(error) {
+  const message = String(error instanceof Error ? error.message : error);
+  return [
+    'payload inesperado',
+    'no está relacionado con la aplicación',
+    'no coincide con',
+    'no pertenece a la aplicación',
+    'no corresponde al commit esperado',
+    'hay otro build activo',
+  ].some((fragment) => message.includes(fragment));
 }
 
 function asDeploymentRecords(payload) {
@@ -199,7 +213,7 @@ export function createCoolifyClient({
   readToken = process.env.COOLIFY_API_READ_TOKEN,
   deployToken = process.env.COOLIFY_API_DEPLOY_TOKEN,
   fetchImpl = globalThis.fetch,
-  timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
+  timeoutMs = STAGING_DEPLOY_GUARD.apiOperationTimeoutMs,
   cancelTimeoutMs = STAGING_DEPLOY_GUARD.cancelOperationTimeoutMs,
 } = {}) {
   if (!baseUrl || (!token && !readToken && !deployToken)) {
@@ -333,6 +347,8 @@ export async function watchDeployment({
   timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
   apiIntervalMs = STAGING_DEPLOY_GUARD.intervalMs,
   diskIntervalMs = STAGING_DEPLOY_GUARD.intervalMs,
+  maximumApiUnverifiedMs = STAGING_DEPLOY_GUARD.maximumApiUnverifiedMs,
+  now = nowMs,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   exec = execFileAsync,
   onCancel = () => {},
@@ -345,6 +361,9 @@ export async function watchDeployment({
   if (!client?.getDeployment || !client?.listDeployments || !client?.cancelDeployment) {
     throw new Error('Guard de staging: cliente Coolify incompleto.');
   }
+  if (!Number.isFinite(maximumApiUnverifiedMs) || maximumApiUnverifiedMs <= 0) {
+    throw new Error('Guard de staging: ventana de vigilancia API inválida.');
+  }
 
   let cancelCount = 0;
   let targetVerified = false;
@@ -352,6 +371,7 @@ export async function watchDeployment({
   let lastVerifiedRecord;
   let lastOperation;
   let lastApiOperation;
+  let lastApiVerifiedAt;
   let lastFreeBytes;
   let terminalResult;
   let finished = false;
@@ -402,6 +422,7 @@ export async function watchDeployment({
     assertNoOtherBuild(records, deploymentUuid);
     lastVerifiedRecord = listedTarget;
     targetVerified = true;
+    lastApiVerifiedAt = now();
     return listedTarget;
   };
 
@@ -421,6 +442,23 @@ export async function watchDeployment({
     freeBytes: lastFreeBytes?.toString() ?? null,
     cancelCount,
     cancellationResult,
+  });
+
+  const apiFailureEvent = ({ error, apiUnverifiedMs, terminal }) => ({
+    event: 'api_transient_failure',
+    at: new Date().toISOString(),
+    phase: lastApiOperation?.phase,
+    operation: lastApiOperation,
+    reasonCode: terminal ? 'coolify_query_unavailable' : 'coolify_query_transient_failure',
+    reason: safeDiagnosticText(error instanceof Error ? error.message : error),
+    deploymentUuid,
+    expectedCommit,
+    status: statusOf(lastVerifiedRecord),
+    sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
+    minimumFreeBytes: minimumFreeBytes.toString(),
+    freeBytes: lastFreeBytes?.toString() ?? null,
+    apiUnverifiedMs,
+    maximumApiUnverifiedMs,
   });
 
   const cancelOnce = async ({ code, message, operation = lastOperation }) => {
@@ -528,9 +566,24 @@ export async function watchDeployment({
       try {
         deployment = await verifyTarget();
       } catch (error) {
+        if (isVerificationIntegrityFailure(error)) {
+          await cancelOnce({
+            code: 'coolify_verification_integrity_error',
+            message: `fallo de integridad de consulta: ${error.message}`,
+            operation: lastApiOperation,
+          });
+          return;
+        }
+        const apiUnverifiedMs = Math.max(0, now() - lastApiVerifiedAt);
+        const terminal = apiUnverifiedMs >= maximumApiUnverifiedMs;
+        await emitDiagnostic(apiFailureEvent({ error, apiUnverifiedMs, terminal }));
+        if (!terminal) {
+          await sleep(apiIntervalMs);
+          continue;
+        }
         await cancelOnce({
-          code: 'coolify_query_error',
-          message: `fallo de consulta: ${error.message}`,
+          code: 'coolify_query_unavailable',
+          message: `sin lectura Coolify válida durante ${apiUnverifiedMs} ms: ${error.message}`,
           operation: lastApiOperation,
         });
         return;
