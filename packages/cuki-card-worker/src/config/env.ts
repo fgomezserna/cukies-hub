@@ -4,7 +4,8 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-import type { CardWorkerConfig } from '../types.js';
+import type { AssetIdentityContext, CardWorkerConfig } from '../types.js';
+import { validateAssetIdentityContext } from '../identity.js';
 
 const defaultTokenAddress = 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe';
 
@@ -67,6 +68,9 @@ const envSchema = z.object({
   CARD_WORKER_VERIFY_PUBLIC: z.string().default('true'),
   CARD_WORKER_BACKFILL_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
   CARD_WORKER_BACKFILL_MANIFEST_PATH: z.string().optional(),
+  CARD_WORKER_SOURCE_NETWORK: z.string().optional(),
+  CARD_WORKER_SOURCE_CHAIN_ID: z.coerce.number().int().positive().optional(),
+  CARD_WORKER_SOURCE_COLLECTION: z.string().optional(),
 });
 
 function parseBoolean(value: string | undefined) {
@@ -82,7 +86,22 @@ function normalizeBaseUrl(value: string | undefined, bucket: string | undefined,
   return base ? base.replace(/\/+$/, '') : null;
 }
 
-export function getCardWorkerConfig(): CardWorkerConfig {
+function resolveSourceIdentity(env: z.infer<typeof envSchema>): AssetIdentityContext | null {
+  const values = [env.CARD_WORKER_SOURCE_NETWORK, env.CARD_WORKER_SOURCE_CHAIN_ID, env.CARD_WORKER_SOURCE_COLLECTION];
+  if (values.every((value) => value === undefined)) return null;
+  if (!env.CARD_WORKER_SOURCE_NETWORK || !env.CARD_WORKER_SOURCE_COLLECTION) {
+    throw new Error('El contexto de origen requiere CARD_WORKER_SOURCE_NETWORK y CARD_WORKER_SOURCE_COLLECTION.');
+  }
+  const context: AssetIdentityContext = {
+    network: env.CARD_WORKER_SOURCE_NETWORK.trim().toUpperCase(),
+    ...(env.CARD_WORKER_SOURCE_CHAIN_ID === undefined ? {} : { chainId: env.CARD_WORKER_SOURCE_CHAIN_ID }),
+    collectionAddressNormalized: env.CARD_WORKER_SOURCE_COLLECTION.trim(),
+  };
+  validateAssetIdentityContext(context);
+  return context;
+}
+
+export function getCardWorkerConfig(sourceIdentityOverride?: AssetIdentityContext): CardWorkerConfig {
   loadCardWorkerEnvFiles();
   const env = envSchema.parse(process.env);
   const mongoUrl = env.CARD_WORKER_MONGO_URL ?? env.CHAIN_INDEXER_MONGO_URL ?? env.DATABASE_URL;
@@ -90,6 +109,9 @@ export function getCardWorkerConfig(): CardWorkerConfig {
   if (!mongoUrl) {
     throw new Error('Falta CARD_WORKER_MONGO_URL, CHAIN_INDEXER_MONGO_URL o DATABASE_URL.');
   }
+
+  const sourceIdentity = sourceIdentityOverride ?? resolveSourceIdentity(env);
+  if (sourceIdentityOverride) validateAssetIdentityContext(sourceIdentityOverride);
 
   return {
     mongoUrl,
@@ -123,5 +145,6 @@ export function getCardWorkerConfig(): CardWorkerConfig {
     backfillManifestPath: env.CARD_WORKER_BACKFILL_MANIFEST_PATH
       ? path.resolve(env.CARD_WORKER_BACKFILL_MANIFEST_PATH)
       : null,
+    sourceIdentity,
   };
 }

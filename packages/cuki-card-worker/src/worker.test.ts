@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
-import { buildCardImageLeaseFilter } from './storage/mongo.js';
+import { buildCardImageLeaseFilter, buildRenderableMetadataFilter } from './storage/mongo.js';
+import { parseIdentityArgs } from './cli-options.js';
 import {
   backfillCards,
   backfillItemNeedsResume,
@@ -26,11 +27,11 @@ const baseCuki: CukiDocument = {
   generation: 2,
 };
 
-const config = (manifestPath: string): CardWorkerConfig => ({
+const config = (manifestPath: string, sourceIdentity: CardWorkerConfig['sourceIdentity'] = null): CardWorkerConfig => ({
   mongoUrl: 'mongodb://unused', dbName: 'unused', assetsDir: '/tmp/assets', outputDir: '/tmp/output',
   pollIntervalMs: 1, maxAttempts: 2, staleLockMs: 60_000, upload: false, publicBaseUrl: null,
   publicKeyPrefix: null, s3Bucket: null, s3Region: null, s3Prefix: 'cards', s3Endpoint: null,
-  s3ForcePathStyle: false, s3Acl: null, verifyPublic: false, backfillConcurrency: 1, backfillManifestPath: manifestPath,
+  s3ForcePathStyle: false, s3Acl: null, verifyPublic: false, backfillConcurrency: 1, backfillManifestPath: manifestPath, sourceIdentity,
 });
 
 function fakeStore(overrides: Partial<CardWorkerStoreLike> = {}) {
@@ -55,19 +56,22 @@ function claimed(cuki: CukiDocument): ClaimedCuki {
   return { ...cuki, lease: { lockId: 'lease-a', leaseVersion: 1, claimedAt: new Date('2026-09-08T15:00:00.000Z'), sourceRevision: cuki.updatedAt ?? null } };
 }
 
-function generated(cuki: CukiDocument): GenerationResult {
-  return { tokenId: cuki.tokenId!, documentId: cuki._id, assetIdentity: canonicalAssetIdentity(cuki)!, outputPath: '/tmp/card.png', width: 1, height: 1, imageUrl: 'https://assets.example/card.png', s3Key: 'cards/card.png' };
+function generated(cuki: CukiDocument, identity?: CardWorkerConfig['sourceIdentity']): GenerationResult {
+  return { tokenId: cuki.tokenId!, documentId: cuki._id, assetIdentity: canonicalAssetIdentity(cuki, identity ?? undefined)!, outputPath: '/tmp/card.png', width: 1, height: 1, imageUrl: 'https://assets.example/card.png', s3Key: 'cards/card.png' };
 }
 
 function uploadStub(): NonNullable<CardWorkerDependencies['renderAndUpload']> {
-  return async (_store, cuki) => generated(cuki);
+  return async (_store, cuki, _config, identity) => generated(cuki, identity);
 }
 
 describe('identidad y censo de metadata', () => {
   it('incluye network, chainId, colección y token, con normalización por red', () => {
     assert.equal(canonicalAssetIdentity(baseCuki), 'bsc:97:0xabc:42');
     assert.notEqual(canonicalAssetIdentity(baseCuki), canonicalAssetIdentity({ ...baseCuki, collectionAddressNormalized: '0xDEF' }));
-    assert.equal(canonicalAssetIdentity({ _id: 'legacy', tokenId: '42' }, { network: 'TRON', chainId: 2, collectionAddressNormalized: 'TAbCxyz' }), 'tron:2:TAbCxyz:42');
+    assert.equal(canonicalAssetIdentity({ _id: 'legacy', tokenId: '42' }, { network: 'TRON', collectionAddressNormalized: 'TAbCxyz' }), 'tron:mainnet:TAbCxyz:42');
+    assert.equal(canonicalAssetIdentity({ _id: 'legacy', tokenId: '42', chain: 'TRON', collectionAddressNormalized: 'TAbCxyz' }), 'tron:mainnet:TAbCxyz:42');
+    assert.equal(canonicalAssetIdentity({ ...baseCuki, chainId: 56 }, { network: 'BSC', chainId: 97, collectionAddressNormalized: '0xABC' }), null);
+    assert.equal(canonicalAssetIdentity({ ...baseCuki, network: 'TRON', chain: 'BSC' }), null);
     assert.equal(canonicalAssetIdentity({ ...baseCuki, collectionAddressNormalized: undefined }), null);
     assert.equal(canonicalAssetIdentity({ ...baseCuki, tokenId: undefined }), null);
   });
@@ -76,6 +80,18 @@ describe('identidad y censo de metadata', () => {
     assert.equal(classifyCukiMetadata(baseCuki), 'renderable');
     assert.equal(classifyCukiMetadata({ ...baseCuki, generation: undefined }), 'missing_metadata');
     assert.equal(classifyCukiMetadata({ ...baseCuki, rarity: 7 }), 'unsupported_metadata');
+    assert.equal(classifyCukiMetadata({ ...baseCuki, type: 7, rarity: 3 }), 'unsupported_metadata');
+    assert.equal(classifyCukiMetadata({ ...baseCuki, skills: { generation: 0 }, generation: 2 }), 'unsupported_metadata');
+    assert.equal(classifyCukiMetadata({ ...baseCuki, type: undefined, skills: { generation: undefined }, rarity: 3, generation: 2 }), 'renderable');
+    const typeBranches = (buildRenderableMetadataFilter().$and?.[0] as { $or: unknown[] }).$or;
+    const generationBranches = (buildRenderableMetadataFilter().$and?.[1] as { $or: unknown[] }).$or;
+    assert.deepEqual(typeBranches?.[1], { type: { $exists: false }, rarity: { $in: [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'] } });
+    assert.deepEqual(generationBranches?.[1], { 'skills.generation': { $exists: false }, generation: { $in: [1, 2, '1', '2'] } });
+    assert.deepEqual(parseIdentityArgs(['backfill', '--source-network', 'TRON', '--source-collection', 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe']), {
+      positional: ['backfill'],
+      identity: { network: 'TRON', collectionAddressNormalized: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe' },
+    });
+    assert.throws(() => parseIdentityArgs(['run', '--source-network', 'TRON']), /requiere --source-network y --source-collection/);
   });
 });
 
@@ -90,6 +106,24 @@ describe('card image lease fencing', () => {
 });
 
 describe('entrypoints de backfill y proceso normal', () => {
+  it('propaga el contexto TRON explícito a censo, claim y renderer', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'cuki-worker-tron-context-'));
+    const sourceIdentity = { network: 'TRON', collectionAddressNormalized: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe' } as const;
+    const legacy = { _id: 'legacy-document', tokenId: '42', rarity: 3, generation: 2 };
+    let observedContext: CardWorkerConfig['sourceIdentity'] = null;
+    const store = fakeStore({
+      listBackfillCukies: async () => [legacy],
+      getCuki: async () => legacy,
+      claimCukiByDocumentId: async (_id, context) => { observedContext = context ?? null; return claimed(legacy); },
+    });
+    const result = await backfillCards(config(path.join(dir, 'manifest.json'), sourceIdentity), { store, skipUploadAccess: true, renderAndUpload: async (_store, cuki, _config, identity) => { observedContext = identity ?? null; return generated(cuki, identity); } });
+    const manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8')) as { initialItems: Array<{ assetIdentity: string; censusCategory: string }> };
+    assert.equal(result.status, 'complete');
+    assert.equal(manifest.initialItems[0]?.assetIdentity, 'tron:mainnet:TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe:42');
+    assert.equal(manifest.initialItems[0]?.censusCategory, 'renderable');
+    assert.deepEqual(observedContext, sourceIdentity);
+  });
+
   it('no consume intentos para metadata inválida', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'cuki-worker-invalid-'));
     const invalid = { ...baseCuki, rarity: 7 };
@@ -99,6 +133,17 @@ describe('entrypoints de backfill y proceso normal', () => {
     assert.equal(claims, 0);
     assert.equal(result.status, 'complete');
     assert.equal(result.counts.unsupported_metadata, 1);
+  });
+
+  it('pasa el contexto configurado al proceso normal antes de reclamar', async () => {
+    const sourceIdentity = { network: 'BSC', chainId: 97, collectionAddressNormalized: '0xABC' } as const;
+    const legacy = { _id: 'legacy-document', tokenId: '42', rarity: 3, generation: 2 };
+    let observedContext: CardWorkerConfig['sourceIdentity'] = null;
+    const store = fakeStore({
+      claimNextCuki: async (context) => { observedContext = context ?? null; return claimed(legacy); },
+    });
+    await processOneCard(config('/tmp/unused-manifest.json', sourceIdentity), { store, skipUploadAccess: true, renderAndUpload: uploadStub() });
+    assert.deepEqual(observedContext, sourceIdentity);
   });
 
   it('detecta un documento inicial modificado después del snapshot mediante fingerprint', async () => {

@@ -1,4 +1,5 @@
 import { getCardWorkerConfig } from './config/env.js';
+import { parseIdentityArgs } from './cli-options.js';
 import {
   generateTokenCard,
   backfillCards,
@@ -24,10 +25,9 @@ function requireTokenId(value: string | undefined) {
 }
 
 async function main() {
-  const [command = 'status', tokenId] = process.argv
-    .slice(2)
-    .filter((arg) => arg !== '--') as [Command | undefined, string | undefined];
-  const config = getCardWorkerConfig();
+  const parsed = parseIdentityArgs(process.argv.slice(2).filter((arg) => arg !== '--'));
+  const [command = 'status', tokenId] = parsed.positional as [Command | undefined, string | undefined];
+  const config = getCardWorkerConfig(parsed.identity);
 
   switch (command) {
     case 'setup':

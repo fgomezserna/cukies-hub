@@ -31,6 +31,7 @@ const config: CardWorkerConfig = {
   verifyPublic: true,
   backfillConcurrency: 2,
   backfillManifestPath: null,
+  sourceIdentity: null,
 };
 
 const renderResult: RenderResult = {

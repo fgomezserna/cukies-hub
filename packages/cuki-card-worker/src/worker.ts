@@ -21,6 +21,7 @@ import {
 import { CardWorkerStore } from './storage/index.js';
 import { canonicalAssetIdentity, cukiInputFingerprint } from './identity.js';
 import type { AssetIdentityContext } from './types.js';
+import { resolveCukiMetadata } from './metadata.js';
 export { canonicalAssetIdentity, cukiInputFingerprint } from './identity.js';
 
 export type CardWorkerStoreLike = Pick<
@@ -42,7 +43,7 @@ export type CardWorkerStoreLike = Pick<
 export type CardWorkerDependencies = {
   store?: CardWorkerStoreLike;
   skipUploadAccess?: boolean;
-  renderAndUpload?: (store: CardWorkerStoreLike, cuki: CukiDocument, config: CardWorkerConfig) => Promise<GenerationResult>;
+  renderAndUpload?: (store: CardWorkerStoreLike, cuki: CukiDocument, config: CardWorkerConfig, identity?: AssetIdentityContext) => Promise<GenerationResult>;
   writeCheckpoint?: (manifestPath: string, content: string, runId: string) => Promise<void>;
 };
 
@@ -72,8 +73,8 @@ async function ensureUploadAccess(config: CardWorkerConfig) {
   await verifyS3UploadAccess(config);
 }
 
-async function renderAndUpload(store: CardWorkerStoreLike, cuki: CukiDocument, config: CardWorkerConfig) {
-  const renderResult = await renderCukiCard(cuki, config);
+async function renderAndUpload(store: CardWorkerStoreLike, cuki: CukiDocument, config: CardWorkerConfig, identity?: AssetIdentityContext) {
+  const renderResult = await renderCukiCard(cuki, config, identity);
   return uploadRenderedCard(config, renderResult);
 }
 
@@ -95,13 +96,14 @@ export async function renderTokenCard(
   identity?: AssetIdentityContext,
 ): Promise<RenderResult> {
   return withStore(async (store, resolvedConfig) => {
-    const cuki = await store.getCukiByTokenId(tokenId, identity);
+    const sourceIdentity = identity ?? resolvedConfig.sourceIdentity ?? undefined;
+    const cuki = await store.getCukiByTokenId(tokenId, sourceIdentity);
 
     if (!cuki) {
       throw new Error(`No existe el Cuki ${tokenId} en la coleccion cukies.`);
     }
 
-    const result = await renderCukiCard(cuki, resolvedConfig);
+    const result = await renderCukiCard(cuki, resolvedConfig, sourceIdentity);
     await store.recordJob(tokenId, 'rendered_local', result);
     return result;
   }, config, dependencies);
@@ -115,14 +117,15 @@ export async function generateTokenCard(
 ): Promise<GenerationResult> {
   return withStore(async (store, resolvedConfig) => {
     if (!dependencies.skipUploadAccess) await ensureUploadAccess(resolvedConfig);
-    const cuki = await store.claimCukiByTokenId(tokenId, identity);
+    const sourceIdentity = identity ?? resolvedConfig.sourceIdentity ?? undefined;
+    const cuki = await store.claimCukiByTokenId(tokenId, sourceIdentity);
 
     if (!cuki) {
       throw new Error(`No existe el Cuki ${tokenId} o no tiene metadata renderizable.`);
     }
 
     try {
-      const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig);
+      const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig, sourceIdentity);
       await store.markGenerated(cuki, result);
       return result;
     } catch (error) {
@@ -145,14 +148,15 @@ export async function processOneCard(
   return withStore(async (store, resolvedConfig) => {
     await store.ensureIndexes();
 
-    const cuki = await store.claimNextCuki();
+    const sourceIdentity = resolvedConfig.sourceIdentity ?? undefined;
+    const cuki = await store.claimNextCuki(sourceIdentity);
 
     if (!cuki) {
       return null;
     }
 
     try {
-      const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig);
+      const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig, sourceIdentity);
       await store.markGenerated(cuki, result);
       return result;
     } catch (error) {
@@ -228,24 +232,15 @@ function hasOwnedPublicImage(value: unknown, config: CardWorkerConfig) {
 }
 
 export function classifyCukiMetadata(cuki: CukiDocument): Extract<BackfillCensusCategory, 'renderable' | 'missing_metadata' | 'unsupported_metadata'> {
-  const rawType = cuki.type ?? cuki.rarity;
-  const rawGeneration = cuki.skills?.generation ?? cuki.generation;
-  if (rawType === undefined || rawType === null || rawGeneration === undefined || rawGeneration === null) {
-    return 'missing_metadata';
-  }
-
-  const type = Number(rawType);
-  const generation = Number(rawGeneration);
-  if (!Number.isInteger(type) || type < 1 || type > 6 || !Number.isInteger(generation) || generation < 1 || generation > 2) {
-    return 'unsupported_metadata';
-  }
-
+  const metadata = resolveCukiMetadata(cuki);
+  if (metadata.status === 'missing') return 'missing_metadata';
+  if (metadata.status === 'invalid') return 'unsupported_metadata';
   return 'renderable';
 }
 
-function manifestItem(cuki: CukiDocument): BackfillManifestItem {
+function manifestItem(cuki: CukiDocument, identity?: AssetIdentityContext): BackfillManifestItem {
   const tokenId = cuki.tokenId ?? '';
-  const assetIdentity = canonicalAssetIdentity(cuki);
+  const assetIdentity = canonicalAssetIdentity(cuki, identity);
   const censusCategory = assetIdentity ? classifyCukiMetadata(cuki) : 'missing_identity';
   return {
     documentId: cuki._id,
@@ -261,7 +256,7 @@ function manifestItem(cuki: CukiDocument): BackfillManifestItem {
     previousImageUrl: typeof cuki.img === 'string' && cuki.img.trim() ? cuki.img : null,
     previousImageSha256: typeof cuki.img === 'string' ? cardContentSha256FromUrl(cuki.img) : null,
     sourceRevision: cuki.updatedAt?.toISOString() ?? null,
-    sourceFingerprint: cukiInputFingerprint(cuki),
+    sourceFingerprint: cukiInputFingerprint(cuki, identity),
     censusCategory,
     ...(censusCategory === 'renderable' ? {} : { status: censusCategory }),
   };
@@ -271,6 +266,7 @@ async function processBackfillToken(
   store: CardWorkerStoreLike,
   candidate: BackfillManifestItem,
   config: CardWorkerConfig,
+  identity: AssetIdentityContext | undefined,
   upload: CardWorkerDependencies['renderAndUpload'] = renderAndUpload,
 ) {
   if (candidate.censusCategory !== 'renderable') return { status: candidate.censusCategory } as const;
@@ -278,7 +274,7 @@ async function processBackfillToken(
   const existing = await store.getCuki(candidate.documentId);
   if (!existing) return { status: 'missing' as const };
 
-  const currentIdentity = canonicalAssetIdentity(existing);
+  const currentIdentity = canonicalAssetIdentity(existing, identity);
   if (!currentIdentity) return { status: 'missing_identity' as const };
   const currentMetadata = classifyCukiMetadata(existing);
   if (currentMetadata !== 'renderable') return { status: currentMetadata };
@@ -295,11 +291,11 @@ async function processBackfillToken(
   }
 
   for (let attempt = 0; attempt < config.maxAttempts; attempt += 1) {
-    const claimed = await store.claimCukiByDocumentId(candidate.documentId);
+    const claimed = await store.claimCukiByDocumentId(candidate.documentId, identity);
     if (!claimed) return { status: 'locked_or_exhausted' as const };
 
     try {
-      const result = await upload(store, claimed, config);
+      const result = await upload(store, claimed, config, identity);
       await store.markGenerated(claimed, result);
       return { status: 'generated' as const, result };
     } catch (error) {
@@ -352,7 +348,7 @@ export async function backfillCards(
         startedAt: new Date().toISOString(),
         cutoffAt: cutoffAt.toISOString(),
         status: 'in_progress',
-        initialItems: candidates.map(manifestItem),
+        initialItems: candidates.map((cuki) => manifestItem(cuki, resolvedConfig.sourceIdentity ?? undefined)),
         deltaItems: [],
       };
     } else {
@@ -388,7 +384,7 @@ export async function backfillCards(
           continue;
         }
         try {
-          const result = await processBackfillToken(store, candidate, resolvedConfig, dependencies.renderAndUpload);
+          const result = await processBackfillToken(store, candidate, resolvedConfig, resolvedConfig.sourceIdentity ?? undefined, dependencies.renderAndUpload);
           candidate.status = result.status;
           candidate.lastError = 'error' in result ? result.error : undefined;
         } catch (error) {
@@ -425,7 +421,7 @@ export async function backfillCards(
     const initialByDocumentId = new Map(manifest.initialItems.map((item) => [item.documentId, item]));
     for (const cuki of current) {
       const changedAfterCutoff = cuki.updatedAt && cuki.updatedAt > new Date(manifest.cutoffAt);
-      const item = manifestItem(cuki);
+      const item = manifestItem(cuki, resolvedConfig.sourceIdentity ?? undefined);
       const baseline = initialByDocumentId.get(cuki._id);
       const sourceChanged = baseline
         ? baseline.sourceFingerprint

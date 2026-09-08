@@ -3,8 +3,9 @@ import path from 'node:path';
 
 import Jimp from 'jimp';
 
-import type { CardWorkerConfig, CukiDocument, CukiSkills, RenderResult } from './types.js';
+import type { AssetIdentityContext, CardWorkerConfig, CukiDocument, CukiSkills, RenderResult } from './types.js';
 import { canonicalAssetIdentity } from './identity.js';
+import { resolveCukiMetadata } from './metadata.js';
 
 const idFontsByGeneration = new Map<number, string>([
   [1, 'fonts/Mitr/Regular/Purple/20/Xg_2ExwkkfDZg3xOD9D_QPn9.ttf.fnt'],
@@ -38,16 +39,6 @@ function asNumber(value: unknown, fallback = 0) {
   return fallback;
 }
 
-function requiredNumber(value: unknown, fieldName: string) {
-  const parsed = asNumber(value, Number.NaN);
-
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`El Cuki no tiene un valor valido para ${fieldName}.`);
-  }
-
-  return parsed;
-}
-
 async function assertReadable(filePath: string, description: string) {
   try {
     await fs.access(filePath);
@@ -64,7 +55,7 @@ function outputPath(config: CardWorkerConfig, tokenId: string) {
   return path.join(config.outputDir, `${tokenId}.png`);
 }
 
-export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfig): Promise<RenderResult> {
+export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfig, identity?: AssetIdentityContext): Promise<RenderResult> {
   const documentId = cuki._id;
   const tokenId = cuki.tokenId?.trim();
 
@@ -72,14 +63,16 @@ export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfi
     throw new Error('El documento de Cuki no tiene tokenId canónico.');
   }
 
-  const assetIdentity = canonicalAssetIdentity(cuki);
+  const assetIdentity = canonicalAssetIdentity(cuki, identity);
   if (!assetIdentity) {
     throw new Error(`El documento ${documentId} no tiene identidad canónica red/chainId/colección/token.`);
   }
 
   const skills = cuki.skills ?? {};
-  const generation = requiredNumber(skills.generation ?? cuki.generation, 'skills.generation/generation');
-  const type = requiredNumber(cuki.type ?? cuki.rarity, 'type/rarity');
+  const metadata = resolveCukiMetadata(cuki);
+  if (metadata.status === 'missing') throw new Error('El Cuki no tiene metadata completa para renderizar.');
+  if (metadata.status === 'invalid') throw new Error('El Cuki tiene metadata inválida para renderizar.');
+  const { generation, type } = metadata.value;
   const idFontRelativePath = idFontsByGeneration.get(generation);
 
   if (!idFontRelativePath) {

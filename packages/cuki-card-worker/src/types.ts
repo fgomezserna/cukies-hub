@@ -38,7 +38,7 @@ export type CukiDocument = {
 
 export type AssetIdentityContext = {
   network: string;
-  chainId: number;
+  chainId?: number;
   collectionAddressNormalized: string;
 };
 
@@ -83,6 +83,7 @@ export type CardWorkerConfig = {
   verifyPublic: boolean;
   backfillConcurrency: number;
   backfillManifestPath: string | null;
+  sourceIdentity: AssetIdentityContext | null;
 };
 
 export type RenderResult = {

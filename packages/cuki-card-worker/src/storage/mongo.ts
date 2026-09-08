@@ -12,6 +12,23 @@ import type {
 } from '../types.js';
 import { canonicalAssetIdentity, validateAssetIdentityContext } from '../identity.js';
 
+const validTypeValues = [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'];
+const validGenerationValues = [1, 2, '1', '2'];
+
+export function buildRenderableMetadataFilter(): Filter<CukiDocument> {
+  return {
+    $and: [
+      { $or: [{ type: { $in: validTypeValues } }, { type: { $exists: false }, rarity: { $in: validTypeValues } }] },
+      {
+        $or: [
+          { 'skills.generation': { $in: validGenerationValues } },
+          { 'skills.generation': { $exists: false }, generation: { $in: validGenerationValues } },
+        ],
+      },
+    ],
+  };
+}
+
 export function buildCardImageLeaseFilter(documentId: string, lease: CardImageLease): Filter<CukiDocument> {
   return {
     _id: documentId,
@@ -96,23 +113,30 @@ export class CardWorkerStore {
   }
 
   private renderableMetadataFilter(): Filter<CukiDocument> {
-    const typeValues = [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'];
-    const generationValues = [1, 2, '1', '2'];
-    return {
-      $and: [
-        { $or: [{ type: { $in: typeValues } }, { rarity: { $in: typeValues } }] },
-        { $or: [{ 'skills.generation': { $in: generationValues } }, { generation: { $in: generationValues } }] },
-      ],
-    };
+    return buildRenderableMetadataFilter();
   }
 
   private canonicalIdentityFilter(): Filter<CukiDocument> {
     return {
       $and: [
         { tokenId: { $type: 'string', $ne: '' } },
-        { $or: [{ chainId: { $type: 'int' } }, { chainId: { $type: 'long' } }, { chainId: { $type: 'double' } }] },
         { collectionAddressNormalized: { $type: 'string', $ne: '' } },
-        { $or: [{ network: { $type: 'string', $ne: '' } }, { chain: { $type: 'string', $ne: '' } }] },
+        {
+          $or: [
+            {
+              $and: [
+                { $or: [{ network: 'BSC' }, { network: 'bsc' }, { chain: 'BSC' }, { chain: 'bsc' }] },
+                { $or: [{ chainId: { $type: 'int' } }, { chainId: { $type: 'long' } }, { chainId: { $type: 'double' } }] },
+              ],
+            },
+            {
+              $and: [
+                { $or: [{ network: 'TRON' }, { network: 'tron' }, { chain: 'TRON' }, { chain: 'tron' }] },
+                { chainId: { $exists: false } },
+              ],
+            },
+          ],
+        },
       ],
     };
   }
@@ -182,10 +206,10 @@ export class CardWorkerStore {
     return { ...updated, lease } satisfies ClaimedCuki;
   }
 
-  async claimNextCuki() {
+  async claimNextCuki(context?: AssetIdentityContext) {
     const candidateFilter: Filter<CukiDocument> = {
       $and: [
-        this.claimFilter(),
+        this.claimFilter(undefined, context),
         {
           $or: [
             { needsImage: true },
@@ -199,11 +223,23 @@ export class CardWorkerStore {
         },
       ],
     };
-    return this.claim(candidateFilter, { timeStamp: 1, _id: 1 });
+    if (!context) return this.claim(candidateFilter, { timeStamp: 1, _id: 1 });
+    validateAssetIdentityContext(context);
+    const candidates = await this.cukies().find(candidateFilter).sort({ timeStamp: 1, _id: 1 }).toArray();
+    for (const candidate of candidates) {
+      if (!canonicalAssetIdentity(candidate, context)) continue;
+      const claimed = await this.claimCukiByDocumentId(candidate._id, context);
+      if (claimed) return claimed;
+    }
+    return null;
   }
 
   async claimCukiByDocumentId(documentId: string, legacyContext?: AssetIdentityContext) {
     if (legacyContext) validateAssetIdentityContext(legacyContext);
+    if (legacyContext) {
+      const current = await this.getCuki(documentId);
+      if (!current || !canonicalAssetIdentity(current, legacyContext)) return null;
+    }
     return this.claim(this.claimFilter(documentId, legacyContext));
   }
 
