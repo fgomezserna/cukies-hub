@@ -36,9 +36,9 @@ pnpm cards:dev
 - `CARD_WORKER_S3_ENDPOINT`: opcional para S3-compatible.
 - `CARD_WORKER_S3_FORCE_PATH_STYLE`: `true` para endpoints compatibles.
 - `CARD_WORKER_S3_ACL`: ACL opcional del objeto; en staging se usa `private` y el bucket concede solo lectura publica.
-- `CARD_WORKER_VERIFY_PUBLIC`: comprueba `HEAD` público, MIME, longitud y caché después de cada upload; default `true`.
+- `CARD_WORKER_VERIFY_PUBLIC`: comprueba mediante `GET` público el PNG completo, MIME, longitud, hash y caché después de cada upload; default `true`.
 - `CARD_WORKER_BACKFILL_CONCURRENCY`: concurrencia acotada del backfill; default `2`.
-- `CARD_WORKER_BACKFILL_MANIFEST_PATH`: ruta opcional para guardar el manifiesto sanitizado del lote.
+- `CARD_WORKER_BACKFILL_MANIFEST_PATH`: ruta obligatoria para `backfill`; guarda el run durable, checkpoints, inventario inicial y delta de reconciliación.
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`: credenciales S3.
 
 Cada PNG se publica bajo una clave inmutable `<prefix>/<tokenId-base64url>/<sha256>.png` y con `Cache-Control: public, max-age=31536000, immutable`. Una regeneracion con contenido distinto cambia la URL antes de actualizar Mongo, por lo que CDN y clientes no pueden mezclar la card nueva con una version cacheada anterior.
@@ -55,6 +55,6 @@ Cada PNG se publica bajo una clave inmutable `<prefix>/<tokenId-base64url>/<sha2
 
 `render-token` genera una card local y registra un job `rendered_local`, pero no toca `cukies.img` ni estados finales. `generate-token` genera un token concreto y, si `CARD_WORKER_UPLOAD=true`, sube y actualiza Mongo.
 
-`backfill` captura un manifiesto ordenado por `_id` y un cutoff al inicio, regenera o verifica todos los candidatos del snapshot, usa locks temporales, reintentos y concurrencia acotada, y solo actualiza Mongo después de comprobar la URL pública. Es reanudable: una URL del destino que responda correctamente se cuenta como `alreadyValid`.
+`backfill` captura un manifiesto ordenado por `_id` y un cutoff al inicio, conserva una identidad explícita (`documentId`, `tokenId` visible y `assetIdentity` canónica), clasifica también metadata ausente o fuera de rango, y escribe checkpoints atómicos. Es reanudable: sólo un lease con propietario, versión y revisión de origen puede finalizar un documento; una URL del destino que responda correctamente se cuenta como `alreadyValid`. Los candidatos bloqueados, agotados o fallidos dejan el run incompleto y se reintentan en la siguiente ejecución. Los documentos creados o modificados después del cutoff entran en `deltaItems` sin sobrescribir el inventario inicial.
 
 Los documentos del indexador nuevo pueden exponer `rarity` y `generation` a partir del evento canónico `CukieMetadataConfigured`; el renderer los adapta a la forma legacy sin inventar ni persistir atributos derivados.
