@@ -1004,6 +1004,18 @@ a Mongo; la recuperacion de infraestructura se coordina con esa tarea. Su
 diagnostico confirma `/srv` al 100% (175G, sin espacio libre), con Mongo
 `WiredTiger errno 28 / No space left on device` y `WT_PANIC`. La causa de
 esta caida de infraestructura se distingue del defecto de historial.
+Tras la recuperacion, Mongo Stage, Coolify DB e indexador estan healthy y
+la API responde 200; se observan 23G libres (87% usado). Cancelar el deploy
+`p4sso0c00wo8gk0ocgkc4484` libera aproximadamente 1G; no se atribuyen a esa
+accion los otros 25G observados antes. No se han borrado datos ni ejecutado
+prune. El plan final del script `849a9c1` se repite con exito: cinco
+correcciones y cero ambiguedades. Se mantiene el gate false hasta disponer
+de margen de build, codigo correcto servido, apply y verificacion.
+La [PR #329](https://github.com/fgomezserna/cukies-hub/pull/329) contiene
+el arreglo revisado. Para el rollout se prepara serializacion de builds
+con `COMPOSE_PARALLEL_LIMIT=1` en app28 y un guard cada 2–3 segundos que
+cancela por debajo de 10GiB libres. El preflight y la ventana unica se
+coordinan con el operador de infraestructura; sin nuevo deploy aun.
 
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 
