@@ -2,10 +2,11 @@
 
 Estado del documento: fuente unica del estado vigente; vivo y versionado.
 
-Ultima actualizacion: 2026-09-07.
+Ultima actualizacion: 2026-09-08.
 
-Contexto de esta actualizacion: correccion de producto del 2026-09-07 y
-contraste focalizado de la evidencia disponible. Las decisiones explicitas
+Contexto de esta actualizacion: auditoria UX del 2026-09-08, conservando la
+correccion de producto del 2026-09-07 y el contraste focalizado de la evidencia
+disponible. Las decisiones explicitas
 del usuario fijan el alcance; su confirmacion de funcionamiento queda registrada
 como tal. La evidencia nueva se fecha y cualquier contradiccion se reconcilia.
 La comprobacion remota de economia fechada el 2026-09-07 a las 11:44 se
@@ -73,7 +74,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | 2A-C | **EVENTOS Y WORKER INTEGRADOS EN STAGING**: 14 contratos legacy y 10 perfiles nuevos cubiertos (75 + 87 relaciones contrato/evento); replay de breeding, CAS bridge y aislamiento verificados. 14/14 fuentes contrastadas live y pasada TRON 40/40 sin 429 con delay 2 s. Marketplace conjunto y UX siguen pendientes. | [PR #319](https://github.com/fgomezserna/cukies-hub/pull/319) integrada en `7d0d1ce`, codigo `fa708fd`; [validacion y limites](legacy-marketplace/evidence/2026-09-07-indexer-validation.json); 2026-09-07. Pruebas: indexer 84/84, Stage/Compose 63/63, produccion 14/14, typecheck/build correctos. | Resolver RPC de archivo BSC antes del backfill, provisionar destino dedicado, activar y reconciliar datos. Despues integrar lista/filtros/acciones segun [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). Dapp Stage `7d0d1ce` verificada por health; rollout del indexador normal requirio completar identidades PRESALE/REWARDS (ver [configuracion](deployment-environments.md)). El worker legacy sigue inactivo y no se afirma paridad; main `fb2b190`. |
 | 3 | **EN STAGING, EN PRUEBAS**: Cukie Master, creditos, pools, prestamos y rewards. | Confirmacion de producto; 2026-09-07; smoke 11:44 UTC como evidencia fechada. | Registrar resultados de consumo/caducidad de creditos, stake/unstake, prestamos, cierres, reparto e idempotencia; completar los flujos pendientes segun esas pruebas. |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
-| 5 | **SECUENCIADO TRAS LA UX FUNCIONAL LEGACY/V2**: menu, sidebar, dashboard inicial, perfil, avatar y notificaciones. | Decision de producto; 2026-09-07. | Primero eventos/workers y flujos completos; despues reorganizar navegacion y dashboard segun acciones y estados reales. |
+| 5 | **AUDITORIA UX REALIZADA; REDISEÑO PROPUESTO, SIN IMPLEMENTAR**: sidebar, menu movil, navegacion, pantallas, perfil, avatar y notificaciones. | 2026-09-08 CEST (07-09 UTC), Stage app 28 `ed2d50d`; 27 rutas leidas con sesion, escritorio/movil y contraste de codigo. [Hallazgos y propuesta](uki-dapp-sitemap.md). | Primero coherencia de estados/reglas y mensajes reales; completar flujos legacy con datos reconciliados; despues integrar navegacion/dashboard/cuenta propuestos. El punto sigue abierto; no hay nueva implementacion ni validacion transaccional por esta auditoria. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
 | post1-2 | **ANTES DEL 15 · MIGRACION LEGACY**: Cukie Points y crias siguen ligados al bloque de migracion; no son activos POST-15. | Decision de producto; 2026-09-07. | Inventario y migracion validada; no ejecutar pausa/corte en este seguimiento. |
 | post3-9 | Alcance conservado como inventario posterior, sin afirmar codigo definitivo ni cierre. | Registro historico; 2026-09-07. | Mantener scope y esperar decision/evidencia especifica. |
@@ -796,22 +797,53 @@ no declaran el programa publicado ni autorizan claim.
 
 ## 5. Dashboard y arquitectura del sitio
 
-Fuente de arquitectura: `docs/uki-dapp-sitemap.md` y
-`docs/uki-ux-state-matrix.md`.
+Fuente de arquitectura y auditoria: [uki-dapp-sitemap.md](uki-dapp-sitemap.md).
+Criterios por escenario: [uki-ux-state-matrix.md](uki-ux-state-matrix.md).
 
 Incluye landing publica, vesting, dashboard, Cukie Master, Cukies, Marketplace,
 Cukie Pool, Treasure Hunt, rankings y rewards. El dashboard no debe inventar
 datos: diferencia `ready`, `partial`, `stale`, `unavailable` y estados vacios.
 
-La revision solicitada cubre menu y sidebar (orden, agrupacion, ruta activa y
-movil), zona de perfil (cuenta, wallet y accesos), avatar y sus estados de
-carga/error, y notificaciones (visibilidad, leidas/no leidas y destino). Registrar
-por hallazgo ruta, escenario, captura y correccion; revisar tambien consistencia
-entre landing, dashboard y juego, navegacion con teclado y controles tactiles.
+### Auditoria del 2026-09-08
+
+Observado en `https://cukieshub.eurekand.com`, app 28, SHA
+`ed2d50da47ef5eeef83162b9cfda9e247821c930`, con `/api/health` en `ok`.
+Fecha local 8 de septiembre CEST, durante la noche del 7 de septiembre UTC.
+Dos agentes Luna auditaron codigo y el coordinador contrasto 27 rutas en Edge,
+con sesion existente, escritorio y viewport CSS movil 391 x 844. No hubo
+firmas, partidas, claims, cambios de cuenta ni operaciones sobre activos.
+
+Hallazgos principales:
+
+- Resumen existe pero no tiene entrada en el sidebar; Ajustes y las herramientas
+  legacy carecen de un acceso contextual suficiente.
+- Campana con mensaje fijo de mision y contador inventado; avatar de ejemplo,
+  perfil del torneo y ajustes generales forman recorridos distintos.
+- Menu movil de la app cierra al navegar y con Escape, pero oculta el cierre
+  visible y no devuelve el foco al activador. El menu publico si tiene cierre
+  visible y retorno de foco correcto. No se observo overflow horizontal a 391 px.
+- Master, Creditos, coleccion y Pool muestran estados cuyo alcance no se explica
+  de forma coherente. Se registra la contradiccion UX, sin adjudicar que saldo
+  economico es correcto ni convertir la migracion pendiente en una regresion.
+- Como jugar y Reglas contienen explicaciones distintas del reparto; la ayuda
+  conserva una nota interna. En Stage, portada/resumen e inicio del juego no
+  comunican consistentemente torneo historico frente a modo semanal.
+- Marketplace conjunto, fichas accesibles y herramientas de coleccion siguen
+  ligados a completar la UX legacy/v2 sobre datos reconciliados.
+
+La propuesta conserva los flujos utiles de Premios, Embajadores, recuperacion
+del Pool y pestanas del juego. Incluye mapa por pantalla, prioridades, fuentes
+y criterios de aceptacion. **Auditoria no equivale a rediseño implementado ni
+a punto cerrado.** No cambia el estado confirmado de A/B/C ni de produccion.
+Los documentos anteriores se han reconciliado; dejan de proponer rutas/API
+inexistentes como si fueran el flujo actual.
 
 Stage:
 
-- [ ] Recorrido movil `390x844` y escritorio por todas las rutas.
+- [x] Auditoria de lectura de las 27 rutas indicadas y revision de wrappers y
+  variantes en codigo; capturas en la tarea. Movil CSS `391x844` y escritorio.
+- [ ] Validacion del rediseño aprobado en escritorio/movil, todas las variantes
+  de wallet, teclado/lector de pantalla y flujos transaccionales.
 - [ ] Verificar enlaces permanentes de recovery, wallet incorrecta, chain
   incorrecta, datos stale y modulos apagados.
 - [ ] Contrastar conteos con APIs/indexador y no con mocks.
@@ -907,3 +939,4 @@ los adelanta ni declara resueltos.
 | 2026-08-31 | Cerrado localmente el gate de aprobación de pagos: el publisher ya no puede autoautorizar drafts ni ejecutar destinos de sistema sin revisión manual inmutable. | Commit `2c2e71c`; publisher `40/40`, DApp `213/213` (`1703` tests), indexador `60/60` más economy `18/18`, contratos rewards `25/25`, guard Stage `70/70`, typecheck/lint y `staging:reward-approval:verify-mongo` OK en chain `97`. El setup local de índices no se ejecutó por límite del revisor de uso; queda como primer paso al desplegar. Sin push, despliegue ni cambios en `main`. |
 | 2026-09-01 | Cerrado anticipadamente el torneo Stage, sellados y publicados los snapshots provisional/final y activada de hecho la ruta posterior de partidas por creditos. | Corte `2026-09-01T11:33:00Z`, bloque Testnet `128479727`, commit desplegado `7078ee5`, settlement `3` intentos/`0` elegibles, pool `52.600 UKI`, UI `Finalizadas` verificada y smoke economico `500 -> 490 -> 480` con dos partidas de coste `10`, ranking y sources de rewards. `main` y produccion no se modificaron. |
 | 2026-09-07 | Reconciliado el estado con producto: A operativo; B torneo lanzamiento activo; C resuelto; legacy con Points/crias antes del 15; 3 en pruebas Stage; 4 en main pendiente de publicar; 5 revision UX. | Secciones A/B/D, evidencia on-chain con bloques/tx, API publica de torneo y `output/verification/pancake-mainnet-20260907.json`. |
+| 2026-09-08 | Auditoria UX del punto 5: 27 rutas leidas en Stage, propuesta de navegacion y mapa por pantalla; se conservan los estados de producto de los demas puntos. | Stage `ed2d50d`, capturas/lecturas Edge en la tarea, `docs/uki-dapp-sitemap.md` y `docs/uki-ux-state-matrix.md`. Solo documentacion; sin rediseño implementado, firmas ni despliegue. |
