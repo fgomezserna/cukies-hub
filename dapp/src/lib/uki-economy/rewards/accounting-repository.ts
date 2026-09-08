@@ -467,6 +467,24 @@ export function createMongoRewardAccountingRepository(
         units: number;
       }>([
         { $match: { status: "open", periodId: { $regex: `${suffix}$` } } },
+        {
+          $lookup: {
+            from: "competition_credit_incidents",
+            let: { creditRunId: "$runId" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ["$runId", "$$creditRunId"] },
+                  type: "credit_reconciliation_mismatch",
+                  status: "open",
+                },
+              },
+              { $project: { _id: 1 } },
+            ],
+            as: "openCreditIntegrityIncidents",
+          },
+        },
+        { $match: { openCreditIntegrityIncidents: { $size: 0 } } },
         { $group: { _id: "$walletNormalized", units: { $sum: "$credits" } } },
         { $sort: { _id: 1 } },
       ], options).toArray();

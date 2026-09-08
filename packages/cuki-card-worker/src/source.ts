@@ -1,10 +1,12 @@
 import type { Filter } from 'mongodb';
 
 import type {
+  AssetIdentityContext,
   CardWorkerConfig,
   CardWorkerSourceFormat,
   CukiDocument,
 } from './types.js';
+import { canonicalAssetIdentity, validateAssetIdentityContext } from './identity.js';
 
 export const LEGACY_STAGING_DB_NAME = 'cukies-legacy-staging';
 
@@ -49,6 +51,12 @@ function normalizedNetwork(value: unknown) {
 
 function contextForNetwork(network: string) {
   return network === 'BSC' ? LEGACY_SOURCE_CONTEXTS.BSC : LEGACY_SOURCE_CONTEXTS.TRON;
+}
+
+export function legacySourceIdentityForNetwork(network: string): AssetIdentityContext {
+  const context = contextForNetwork(network);
+  validateAssetIdentityContext(context);
+  return context;
 }
 
 function sameLegacyCollection(network: string, value: unknown) {
@@ -96,7 +104,7 @@ export function normalizeCukiSourceDocument(
     throw new CukiSourceValidationError(`Legacy TRON no admite chainId EVM para ${tokenId}.`);
   }
 
-  return {
+  const normalized = {
     ...document,
     tokenId,
     network,
@@ -105,6 +113,21 @@ export function normalizeCukiSourceDocument(
     collectionAddressNormalized: context.collectionAddressNormalized,
     sourceValidationError: undefined,
   };
+  if (!canonicalAssetIdentity(normalized, context)) {
+    throw new CukiSourceValidationError(`Legacy identidad canónica inválida para ${tokenId}.`);
+  }
+  return normalized;
+}
+
+export function normalizeCukiSourceForRead(document: CukiDocument, sourceFormat: CardWorkerSourceFormat) {
+  try {
+    return normalizeCukiSourceDocument(document, sourceFormat);
+  } catch (error) {
+    return {
+      ...document,
+      sourceValidationError: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function sourceIdCandidates(value: unknown) {
@@ -141,7 +164,6 @@ export function sourceTokenIdFilter(
 export function sourceCandidateFilter(sourceFormat: CardWorkerSourceFormat): Filter<CukiDocument> {
   if (sourceFormat === 'indexed') return {};
   return {
-    network: { $in: ['BSC', 'bsc', 'TRON', 'tron'] },
     $or: [
       { _id: { $type: 'number' } },
       { _id: { $type: 'string', $regex: /^(0|[1-9][0-9]*)$/ } },

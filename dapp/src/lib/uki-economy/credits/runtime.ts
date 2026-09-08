@@ -466,6 +466,14 @@ export async function runCompetitionCreditRuntimeTick(input: {
         });
         if (!period) {
           const waitingPeriod = currentCompetitionCreditPeriod(snapshotNow, rule);
+          const watermarkNow = validClockDate(clock);
+          lease = await coordinator.renew(lease, watermarkNow, config.leaseMs);
+          await services.refreshSourceWatermark({
+            route,
+            expectedRuleVersion: rule.version,
+            ruleAt: waitingPeriod.cutoff,
+            now: watermarkNow,
+          });
           routeResults.push({
             route,
             status: 'waiting',

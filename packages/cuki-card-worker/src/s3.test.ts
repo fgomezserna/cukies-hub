@@ -33,6 +33,7 @@ const config: CardWorkerConfig = {
   backfillManifestPath: null,
   sourceFormat: 'indexed',
   legacyStagingEnabled: false,
+  sourceIdentity: null,
 };
 
 const renderResult: RenderResult = {

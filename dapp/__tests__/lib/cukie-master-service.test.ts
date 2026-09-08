@@ -473,6 +473,25 @@ describe('Cukie Master canonical sources', () => {
     expect(restaked.uki.presaleLockedRaw).toBe('0');
   });
 
+  it('binds an NFT route reduction to the latest confirmed withdrawal evidence', async () => {
+    const { repo, state } = memoryRepository();
+    state.nftPoints.set('0xabc', 2);
+    repo.findLatestNftChainEvidence = async () => ({
+      eventId: 'withdrawal:confirmed',
+      blockNumber: 250,
+      blockHash: `0x${'b'.repeat(64)}`,
+      blockTimestamp: new Date(now.getTime() + 250_000),
+    });
+
+    const sources = await readCukieMasterSources(repo, '0xABC', '0xabc', now);
+
+    expect(sources.nft.originalCukiePoints).toBe(2);
+    expect(sources.nft.effectiveChainEvidence).toMatchObject({
+      eventId: 'withdrawal:confirmed',
+      blockNumber: 250,
+    });
+  });
+
   it('does not require vesting for referral-only rows but fails closed for a direct buyer', async () => {
     const { repo, state } = memoryRepository();
     state.presale.set('0xsponsor', { _id: 'sponsor-row' });

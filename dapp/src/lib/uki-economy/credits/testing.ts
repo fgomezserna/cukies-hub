@@ -13,6 +13,7 @@ import {
   safeCompetitionCreditSettlementPeriodScopeId,
   stableCreditHash,
 } from "./rules";
+import { isBlockingCreditIncident } from "./integrity";
 import {
   CREDIT_RULE_SCOPE,
   CREDIT_SOURCE_WATERMARK_ID,
@@ -305,7 +306,7 @@ export class MemoryCompetitionCreditRepository
       openIntegrityIncidents:
         this.state.openIntegrityIncidents +
         this.state.incidents.filter(
-          (item) => item.status === "open" && item.route === route
+          (item) => isBlockingCreditIncident(item, route, cutoff)
         ).length,
       maturedQualifyingSlots: this.state.slots.filter(
         (slot) =>

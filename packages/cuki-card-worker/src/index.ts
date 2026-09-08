@@ -1,5 +1,17 @@
 export { getCardWorkerConfig, loadCardWorkerEnvFiles, packageRoot } from './config/env.js';
 export { renderCukiCard } from './renderer.js';
+export { canonicalAssetIdentity, validateAssetIdentityContext } from './identity.js';
+export {
+  assertCardWorkerSourceConfig,
+  LEGACY_SOURCE_CONTEXTS,
+  LEGACY_STAGING_DB_NAME,
+  normalizeCukiSourceDocument,
+  normalizeCukiSourceForRead,
+  sourceCandidateFilter,
+  sourceDocumentFilter,
+  sourceTokenIdFilter,
+} from './source.js';
+export { parseIdentityArgs } from './cli-options.js';
 export {
   assertS3UploadConfig,
   cardContentSha256FromUrl,
@@ -10,15 +22,6 @@ export {
 } from './s3.js';
 export { CardWorkerStore } from './storage/index.js';
 export {
-  assertCardWorkerSourceConfig,
-  LEGACY_SOURCE_CONTEXTS,
-  LEGACY_STAGING_DB_NAME,
-  normalizeCukiSourceDocument,
-  sourceCandidateFilter,
-  sourceDocumentFilter,
-  sourceTokenIdFilter,
-} from './source.js';
-export {
   backfillCards,
   generateTokenCard,
   getCardWorkerStatus,
@@ -27,9 +30,11 @@ export {
   runCardWorker,
   setupCardWorker,
 } from './worker.js';
+export type { CardWorkerDependencies, CardWorkerStoreLike } from './worker.js';
 export type {
   CardWorkerConfig,
   CardWorkerSourceFormat,
+  AssetIdentityContext,
   CukiDocument,
   CukiSkills,
   GenerationResult,

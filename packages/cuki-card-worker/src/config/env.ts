@@ -4,8 +4,9 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-import { assertCardWorkerSourceConfig, LEGACY_STAGING_DB_NAME } from '../source.js';
-import type { CardWorkerConfig } from '../types.js';
+import type { AssetIdentityContext, CardWorkerConfig, CardWorkerSourceFormat } from '../types.js';
+import { validateAssetIdentityContext } from '../identity.js';
+import { assertCardWorkerSourceConfig } from '../source.js';
 
 const defaultTokenAddress = 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe';
 
@@ -68,6 +69,9 @@ const envSchema = z.object({
   CARD_WORKER_VERIFY_PUBLIC: z.string().default('true'),
   CARD_WORKER_BACKFILL_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
   CARD_WORKER_BACKFILL_MANIFEST_PATH: z.string().optional(),
+  CARD_WORKER_SOURCE_NETWORK: z.string().optional(),
+  CARD_WORKER_SOURCE_CHAIN_ID: z.coerce.number().int().positive().optional(),
+  CARD_WORKER_SOURCE_COLLECTION: z.string().optional(),
   CARD_WORKER_SOURCE_FORMAT: z.enum(['indexed', 'legacy']).default('indexed'),
   CARD_WORKER_LEGACY_STAGING_ENABLED: z.string().default('false'),
 });
@@ -85,7 +89,22 @@ function normalizeBaseUrl(value: string | undefined, bucket: string | undefined,
   return base ? base.replace(/\/+$/, '') : null;
 }
 
-export function getCardWorkerConfig(): CardWorkerConfig {
+function resolveSourceIdentity(env: z.infer<typeof envSchema>): AssetIdentityContext | null {
+  const values = [env.CARD_WORKER_SOURCE_NETWORK, env.CARD_WORKER_SOURCE_CHAIN_ID, env.CARD_WORKER_SOURCE_COLLECTION];
+  if (values.every((value) => value === undefined)) return null;
+  if (!env.CARD_WORKER_SOURCE_NETWORK || !env.CARD_WORKER_SOURCE_COLLECTION) {
+    throw new Error('El contexto de origen requiere CARD_WORKER_SOURCE_NETWORK y CARD_WORKER_SOURCE_COLLECTION.');
+  }
+  const context: AssetIdentityContext = {
+    network: env.CARD_WORKER_SOURCE_NETWORK.trim().toUpperCase(),
+    ...(env.CARD_WORKER_SOURCE_CHAIN_ID === undefined ? {} : { chainId: env.CARD_WORKER_SOURCE_CHAIN_ID }),
+    collectionAddressNormalized: env.CARD_WORKER_SOURCE_COLLECTION.trim(),
+  };
+  validateAssetIdentityContext(context);
+  return context;
+}
+
+export function getCardWorkerConfig(sourceIdentityOverride?: AssetIdentityContext): CardWorkerConfig {
   loadCardWorkerEnvFiles();
   const env = envSchema.parse(process.env);
   const mongoUrl = env.CARD_WORKER_MONGO_URL ?? env.CHAIN_INDEXER_MONGO_URL ?? env.DATABASE_URL;
@@ -94,9 +113,19 @@ export function getCardWorkerConfig(): CardWorkerConfig {
     throw new Error('Falta CARD_WORKER_MONGO_URL, CHAIN_INDEXER_MONGO_URL o DATABASE_URL.');
   }
 
-  const config = {
+  const sourceFormat = env.CARD_WORKER_SOURCE_FORMAT as CardWorkerSourceFormat;
+  const legacyStagingEnabled = parseBoolean(env.CARD_WORKER_LEGACY_STAGING_ENABLED);
+  const sourceIdentity = sourceFormat === 'legacy'
+    ? null
+    : sourceIdentityOverride ?? resolveSourceIdentity(env);
+  if (sourceIdentityOverride) validateAssetIdentityContext(sourceIdentityOverride);
+
+  const dbName = env.CARD_WORKER_DB_NAME ?? env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new';
+  assertCardWorkerSourceConfig({ sourceFormat, legacyStagingEnabled, dbName });
+
+  return {
     mongoUrl,
-    dbName: env.CARD_WORKER_DB_NAME ?? env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new',
+    dbName,
     assetsDir: env.CARD_WORKER_ASSETS_DIR
       ? path.resolve(env.CARD_WORKER_ASSETS_DIR)
       : path.join(packageRoot(), 'assets'),
@@ -126,13 +155,8 @@ export function getCardWorkerConfig(): CardWorkerConfig {
     backfillManifestPath: env.CARD_WORKER_BACKFILL_MANIFEST_PATH
       ? path.resolve(env.CARD_WORKER_BACKFILL_MANIFEST_PATH)
       : null,
-    sourceFormat: env.CARD_WORKER_SOURCE_FORMAT,
-    legacyStagingEnabled: parseBoolean(env.CARD_WORKER_LEGACY_STAGING_ENABLED),
+    sourceFormat,
+    legacyStagingEnabled,
+    sourceIdentity,
   };
-
-  if (config.sourceFormat === 'legacy' && config.dbName !== LEGACY_STAGING_DB_NAME) {
-    throw new Error(`CARD_WORKER_SOURCE_FORMAT=legacy exige CARD_WORKER_DB_NAME=${LEGACY_STAGING_DB_NAME}.`);
-  }
-  assertCardWorkerSourceConfig(config);
-  return config;
 }

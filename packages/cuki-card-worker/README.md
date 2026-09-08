@@ -39,8 +39,11 @@ pnpm cards:dev
 - `CARD_WORKER_VERIFY_PUBLIC`: comprueba mediante `GET` público el PNG completo, MIME, longitud, hash y caché después de cada upload; default `true`.
 - `CARD_WORKER_BACKFILL_CONCURRENCY`: concurrencia acotada del backfill; default `2`.
 - `CARD_WORKER_BACKFILL_MANIFEST_PATH`: ruta obligatoria para `backfill`; guarda el run durable, checkpoints, inventario inicial y delta de reconciliación.
-- `CARD_WORKER_SOURCE_FORMAT`: `indexed` por defecto. `legacy` sólo habilita el adaptador explícito de `cukies-legacy-staging`.
-- `CARD_WORKER_LEGACY_STAGING_ENABLED`: debe ser `true` junto con `CARD_WORKER_SOURCE_FORMAT=legacy`; el guard rechaza cualquier DB distinta de `cukies-legacy-staging`.
+- `CARD_WORKER_SOURCE_FORMAT`: `indexed` por defecto. Usa `legacy` sólo para leer el Mongo legacy de staging mediante el servicio opt-in protegido.
+- `CARD_WORKER_LEGACY_STAGING_ENABLED`: debe ser `true` junto con `CARD_WORKER_SOURCE_FORMAT=legacy`; el worker rechaza cualquier DB distinta de `cukies-legacy-staging`.
+- `CARD_WORKER_SOURCE_NETWORK`: contexto explícito de origen (`BSC` o `TRON`) para documentos legacy sin identidad materializada.
+- `CARD_WORKER_SOURCE_CHAIN_ID`: obligatorio para `BSC`; no se admite para `TRON`, cuya red canónica es `mainnet`.
+- `CARD_WORKER_SOURCE_COLLECTION`: colección canónica del contexto de origen. En TRON se conserva la dirección Base58 con sus mayúsculas.
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`: credenciales S3.
 
 Cada PNG se publica bajo una clave inmutable `<prefix>/<tokenId-base64url>/<sha256>.png` y con `Cache-Control: public, max-age=31536000, immutable`. Una regeneracion con contenido distinto cambia la URL antes de actualizar Mongo, por lo que CDN y clientes no pueden mezclar la card nueva con una version cacheada anterior.
@@ -59,12 +62,8 @@ Cada PNG se publica bajo una clave inmutable `<prefix>/<tokenId-base64url>/<sha2
 
 `backfill` captura un manifiesto ordenado por `_id` y un cutoff al inicio, conserva una identidad explícita (`documentId`, `tokenId` visible y `assetIdentity` canónica), clasifica también metadata ausente o fuera de rango, y escribe checkpoints atómicos. Es reanudable: sólo un lease con propietario, versión y revisión de origen puede finalizar un documento; una URL del destino que responda correctamente se cuenta como `alreadyValid`. Los candidatos bloqueados, agotados o fallidos dejan el run incompleto y se reintentan en la siguiente ejecución. Los documentos creados o modificados después del cutoff entran en `deltaItems` sin sobrescribir el inventario inicial.
 
+El contexto también puede pasarse al CLI con `--source-network`, `--source-chain-id` (solo BSC) y `--source-collection`; se valida antes de abrir el store y se propaga a censo, claims, renderer y manifiesto. Un token-only sin identidad completa o con una coincidencia ambigua se rechaza.
+
+En modo `legacy`, el adaptador trata `_id` decimal como token ID, conserva el `_id` original para claims y resuelve por documento la identidad BSC `chainId=56` o TRON mainnet. Rechaza ObjectId, IDs no decimales, conflictos de red/colección/chain y metadata inválida antes de consumir intentos. No activa el indexador legacy ni importa documentos al esquema nuevo.
+
 Los documentos del indexador nuevo pueden exponer `rarity` y `generation` a partir del evento canónico `CukieMetadataConfigured`; el renderer los adapta a la forma legacy sin inventar ni persistir atributos derivados.
-
-## Fuente legacy staging
-
-El perfil Compose `legacy-card-worker` está apagado por defecto. Se ejecuta sólo con `CARD_WORKER_SOURCE_FORMAT=legacy`, `CARD_WORKER_LEGACY_STAGING_ENABLED=true`, `CARD_WORKER_LEGACY_MONGO_URL` apuntando a la fuente staging y `CARD_WORKER_LEGACY_DB_NAME=cukies-legacy-staging`. El guard rechaza producción y no permite usar `cukieshub-new-staging` en este modo.
-
-El adaptador valida cada documento antes de leerlo para render, reclamarlo o incluirlo en el censo: `_id` debe ser el entero decimal real usado como `tokenId`, `network` debe resolver a BSC 56/TOKEN o TRON mainnet/TOKEN, y cualquier `tokenId`, `chainId` o colección declarados en conflicto invalida el candidato. El `_id` original se conserva para leases, fencing y actualización; no se importan ni normalizan masivamente documentos al arrancar.
-
-La proyección futura debe reutilizar `packages/chain-indexer/src/legacy/importer.ts` para copiar `img` ya actualizado por identidad inequívoca. Esa propagación sólo toca campos de imagen; no crea ni reescribe estado económico. Las 18 fixtures BSC97 permanecen en `cukieshub-new-staging` y usan su worker indexado separado.

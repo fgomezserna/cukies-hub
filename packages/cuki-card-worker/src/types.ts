@@ -33,13 +33,17 @@ export type CukiDocument = {
   cardImageUrl?: string | null;
   cardGeneratedAt?: Date;
   timeStamp?: number;
-  updatedAt?: Date;
+  updatedAt?: Date | null;
   sourceValidationError?: string;
 };
 
-export type CukiDocumentId = string | number;
-
 export type CardWorkerSourceFormat = 'indexed' | 'legacy';
+
+export type AssetIdentityContext = {
+  network: string;
+  chainId?: number;
+  collectionAddressNormalized: string;
+};
 
 export type CardImageLease = {
   lockId: string;
@@ -51,8 +55,8 @@ export type CardImageLease = {
 export type ClaimedCuki = CukiDocument & { lease: CardImageLease };
 
 export type BackfillCensusCategory =
-  | 'invalid_identity'
   | 'renderable'
+  | 'missing_identity'
   | 'missing_metadata'
   | 'unsupported_metadata'
   | 'missing'
@@ -84,11 +88,12 @@ export type CardWorkerConfig = {
   backfillManifestPath: string | null;
   sourceFormat: CardWorkerSourceFormat;
   legacyStagingEnabled: boolean;
+  sourceIdentity: AssetIdentityContext | null;
 };
 
 export type RenderResult = {
   tokenId: string;
-  documentId?: string;
+  documentId?: string | number;
   assetIdentity?: string;
   outputPath: string;
   width: number;

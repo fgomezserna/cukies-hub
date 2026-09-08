@@ -9,9 +9,11 @@ import {
   currentCompetitionCreditPeriod,
   validCreditWallet,
 } from './rules';
+import { isBlockingCreditIncident } from './integrity';
 import type {
   CompetitionCreditRule,
   CreditAccountPeriod,
+  CreditIntegrityIncident,
   CreditPoolConfiguration,
   CreditPoolPeriod,
   CreditSnapshotSlot,
@@ -89,11 +91,30 @@ export async function getCompetitionCreditWalletStatus(
     }).limit(3).toArray(),
     Promise.all(routes.map(async (route) => ({
       route,
-      count: await db.collection('competition_credit_incidents').countDocuments({
-        status: 'open',
-        route,
-        $or: [{ walletNormalized }, { walletNormalized: null }],
-      }, { limit: 1 }),
+      count: await db.collection<CreditIntegrityIncident>('competition_credit_incidents')
+        .find({
+          status: 'open',
+          route,
+          $or: [{ walletNormalized }, { walletNormalized: null }],
+        }, {
+          projection: {
+            _id: 0,
+            type: 1,
+            status: 1,
+            runId: 1,
+            route: 1,
+            periodId: 1,
+            reasonCodes: 1,
+            evidenceHash: 1,
+            containment: 1,
+            selectorCutoff: 1,
+            planHash: 1,
+          },
+        })
+        .toArray()
+        .then((incidents) => incidents.filter((incident) =>
+          isBlockingCreditIncident(incident, route, period.cutoff)
+        ).length),
     }))),
     db.collection('competition_credit_reservations').countDocuments({
       walletNormalized,

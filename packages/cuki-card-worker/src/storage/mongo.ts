@@ -2,16 +2,35 @@ import crypto from 'node:crypto';
 
 import { Db, MongoClient, type Filter } from 'mongodb';
 
-import {
-  assertCardWorkerSourceConfig,
-  normalizeCukiSourceDocument,
-  sourceCandidateFilter,
-  sourceDocumentFilter,
-  sourceTokenIdFilter,
-} from '../source.js';
-import type { CardImageLease, CardWorkerConfig, ClaimedCuki, CukiDocument, CukiDocumentId, GenerationResult } from '../types.js';
+import type {
+  AssetIdentityContext,
+  CardImageLease,
+  CardWorkerConfig,
+  ClaimedCuki,
+  CukiDocument,
+  GenerationResult,
+} from '../types.js';
+import { canonicalAssetIdentity, validateAssetIdentityContext } from '../identity.js';
+import { assertCardWorkerSourceConfig, normalizeCukiSourceDocument, normalizeCukiSourceForRead, sourceCandidateFilter, sourceDocumentFilter, sourceTokenIdFilter } from '../source.js';
 
-export function buildCardImageLeaseFilter(documentId: CukiDocumentId, lease: CardImageLease): Filter<CukiDocument> {
+const validTypeValues = [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'];
+const validGenerationValues = [1, 2, '1', '2'];
+
+export function buildRenderableMetadataFilter(): Filter<CukiDocument> {
+  return {
+    $and: [
+      { $or: [{ type: { $in: validTypeValues } }, { type: { $exists: false }, rarity: { $in: validTypeValues } }] },
+      {
+        $or: [
+          { 'skills.generation': { $in: validGenerationValues } },
+          { 'skills.generation': { $exists: false }, generation: { $in: validGenerationValues } },
+        ],
+      },
+    ],
+  };
+}
+
+export function buildCardImageLeaseFilter(documentId: string | number, lease: CardImageLease): Filter<CukiDocument> {
   return {
     _id: documentId,
     cardImageStatus: 'processing',
@@ -63,43 +82,60 @@ export class CardWorkerStore {
     ]);
   }
 
-  async getCuki(documentId: string) {
+  async getCuki(documentId: string | number) {
     const document = await this.cukies().findOne(sourceDocumentFilter(documentId, this.config.sourceFormat));
-    return document ? normalizeCukiSourceDocument(document, this.config.sourceFormat) : null;
+    return document ? normalizeCukiSourceForRead(document, this.config.sourceFormat) : null;
   }
 
-  async getCukiByTokenId(tokenId: string) {
-    const document = await this.cukies().findOne(sourceTokenIdFilter(tokenId, this.config.sourceFormat));
-    return document ? normalizeCukiSourceDocument(document, this.config.sourceFormat) : null;
+  private async findCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    if (context) validateAssetIdentityContext(context);
+    const candidates = await this.cukies().find(sourceTokenIdFilter(tokenId, this.config.sourceFormat)).toArray();
+    const matching = candidates.filter((candidate) => {
+      let normalized: CukiDocument;
+      try {
+        normalized = normalizeCukiSourceDocument(candidate, this.config.sourceFormat);
+      } catch {
+        return false;
+      }
+      if (normalized.tokenId && normalized.tokenId !== tokenId) return false;
+      const identity = canonicalAssetIdentity(
+        context && !normalized.tokenId ? { ...normalized, tokenId } : normalized,
+        context,
+      );
+      if (!identity) return false;
+      if (!context) return true;
+      const expected = canonicalAssetIdentity({
+        _id: normalized._id,
+        tokenId,
+        ...context,
+      });
+      return identity === expected;
+    });
+    if (matching.length > 1) {
+      throw new Error(`El token ${tokenId} es ambiguo: exige red, chainId y colección.`);
+    }
+    return matching[0] ? normalizeCukiSourceDocument(matching[0], this.config.sourceFormat) : null;
+  }
+
+  async getCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    return this.findCukiByTokenId(tokenId, context);
   }
 
   private renderableMetadataFilter(): Filter<CukiDocument> {
-    return {
-      $and: [
-        { $or: [{ type: { $exists: true, $ne: null } }, { rarity: { $exists: true, $ne: null } }] },
-        {
-          $or: [
-            { 'skills.generation': { $exists: true, $ne: null } },
-            { generation: { $exists: true, $ne: null } },
-          ],
-        },
-      ],
-    };
+    return buildRenderableMetadataFilter();
   }
 
-  private claimFilter(tokenId?: string): Filter<CukiDocument> {
+  private claimFilter(tokenId?: string | number, _legacyContext?: AssetIdentityContext, expected?: CukiDocument): Filter<CukiDocument> {
     const metadataFilter = this.renderableMetadataFilter();
-    const sourceFilters = tokenId
-      ? [
-          sourceCandidateFilter(this.config.sourceFormat),
-          sourceDocumentFilter(tokenId, this.config.sourceFormat),
-        ]
-      : [sourceCandidateFilter(this.config.sourceFormat)];
+    const revisionFilter: Filter<CukiDocument>[] = expected
+      ? [expected.updatedAt ? { updatedAt: expected.updatedAt } : { $or: [{ updatedAt: { $exists: false } }, { updatedAt: null }] }]
+      : [];
 
     return {
+      ...(tokenId ? { _id: tokenId } : {}),
       $and: [
-        ...sourceFilters,
         ...(metadataFilter.$and ?? []),
+        ...revisionFilter,
         {
           $or: [
             { cardImageAttempts: { $exists: false } },
@@ -147,8 +183,6 @@ export class CardWorkerStore {
 
     if (!updated) return null;
 
-    const normalized = normalizeCukiSourceDocument(updated, this.config.sourceFormat);
-
     const lease: CardImageLease = {
       lockId,
       leaseVersion: updated.cardImageLeaseVersion ?? 1,
@@ -156,13 +190,13 @@ export class CardWorkerStore {
       sourceRevision: updated.cardImageLeaseSourceRevision ?? null,
     };
 
-    return { ...normalized, lease } satisfies ClaimedCuki;
+    return { ...normalizeCukiSourceDocument(updated, this.config.sourceFormat), lease } satisfies ClaimedCuki;
   }
 
-  async claimNextCuki() {
+  async claimNextCuki(context?: AssetIdentityContext) {
     const candidateFilter: Filter<CukiDocument> = {
       $and: [
-        this.claimFilter(),
+        this.claimFilter(undefined, context),
         {
           $or: [
             { needsImage: true },
@@ -176,51 +210,42 @@ export class CardWorkerStore {
         },
       ],
     };
-    if (this.config.sourceFormat === 'indexed') {
-      const claimed = await this.claim(candidateFilter, { timeStamp: 1, _id: 1 });
-      return claimed;
-    }
-
-    const candidates = await this.cukies()
-      .find(candidateFilter)
-      .sort({ timeStamp: 1, _id: 1 })
-      .limit(100)
-      .toArray();
-    for (const candidate of candidates) {
+    if (context) validateAssetIdentityContext(context);
+    const candidates = this.cukies().find({ ...sourceCandidateFilter(this.config.sourceFormat), $and: candidateFilter.$and })
+      .sort({ timeStamp: 1, _id: 1 }).batchSize(50);
+    for await (const candidate of candidates) {
+      let normalized: CukiDocument;
       try {
-        normalizeCukiSourceDocument(candidate, this.config.sourceFormat);
+        normalized = normalizeCukiSourceDocument(candidate, this.config.sourceFormat);
       } catch {
         continue;
       }
-      const claimed = await this.claim(this.claimFilter(String(candidate._id)));
+      if (!canonicalAssetIdentity(normalized, context)) continue;
+      const claimed = await this.claimCukiByDocumentId(candidate._id, context);
       if (claimed) return claimed;
     }
     return null;
   }
 
-  async claimCukiByDocumentId(documentId: string) {
-    const filter = this.claimFilter(documentId);
-    const existing = await this.cukies().findOne(filter);
-    if (!existing) return null;
-    normalizeCukiSourceDocument(existing, this.config.sourceFormat);
-    return this.claim(filter);
+  async claimCukiByDocumentId(documentId: string | number, legacyContext?: AssetIdentityContext) {
+    if (legacyContext) validateAssetIdentityContext(legacyContext);
+    const current = await this.getCuki(documentId);
+    if (!current || current.sourceValidationError || !canonicalAssetIdentity(current, legacyContext)) return null;
+    return this.claim(this.claimFilter(documentId, legacyContext, current));
   }
 
-  async claimCukiByTokenId(tokenId: string) {
-    const filter = this.claimFilter(tokenId);
-    const existing = await this.cukies().findOne(filter);
-    if (!existing) return null;
-    normalizeCukiSourceDocument(existing, this.config.sourceFormat);
-    return this.claim(filter);
+  async claimCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    const candidate = await this.findCukiByTokenId(tokenId, context);
+    return candidate ? this.claimCukiByDocumentId(candidate._id, context) : null;
   }
 
-  async claimCukiById(documentId: string) {
+  async claimCukiById(documentId: string | number) {
     return this.claimCukiByDocumentId(documentId);
   }
 
   async listBackfillCukies() {
-    const documents = await this.cukies()
-      .find({})
+    return this.cukies()
+      .find(sourceCandidateFilter(this.config.sourceFormat))
       .project<CukiDocument>({
         _id: 1,
         tokenId: 1,
@@ -240,18 +265,9 @@ export class CardWorkerStore {
         updatedAt: 1,
       })
       .sort({ _id: 1 })
-      .toArray();
-
-    return documents.map((document) => {
-      try {
-        return normalizeCukiSourceDocument(document, this.config.sourceFormat);
-      } catch (error) {
-        return {
-          ...document,
-          sourceValidationError: error instanceof Error ? error.message : String(error),
-        } satisfies CukiDocument;
-      }
-    });
+      .batchSize(50)
+      .toArray()
+      .then((documents) => documents.map((document) => normalizeCukiSourceForRead(document, this.config.sourceFormat)));
   }
 
   private leaseFilter(claimed: ClaimedCuki): Filter<CukiDocument> {
@@ -281,7 +297,7 @@ export class CardWorkerStore {
       throw new Error(`No se pudo confirmar la publicación de la card ${claimed._id}: el lease ya no es válido o el documento cambió.`);
     }
 
-    await this.recordJob(String(claimed._id), 'generated', result);
+    await this.recordJob(claimed._id, 'generated', result);
   }
 
   async markFailed(claimed: ClaimedCuki, error: unknown) {
@@ -305,10 +321,10 @@ export class CardWorkerStore {
       throw new Error(`No se pudo registrar el fallo de la card ${claimed._id}: el lease ya no es válido.`);
     }
 
-    await this.recordJob(String(claimed._id), 'failed', { error: message });
+    await this.recordJob(claimed._id, 'failed', { error: message });
   }
 
-  async recordJob(documentId: string, status: string, payload: Record<string, unknown>) {
+  async recordJob(documentId: string | number, status: string, payload: Record<string, unknown>) {
     await this.jobs().insertOne({
       documentId,
       tokenId: payload.tokenId ?? documentId,

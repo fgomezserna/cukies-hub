@@ -128,12 +128,25 @@ describe("Mongo reward accounting repository", () => {
       ambassadorWalletNormalized: null,
     }]);
 
-    const pipeline = aggregate.mock.calls[0]?.[0];
+    const pipeline = aggregate.mock.calls[0]?.[0] as Array<Record<string, unknown>>;
     expect(pipeline).toEqual(expect.arrayContaining([
       { $match: { status: "open", periodId: { $regex: "2026-08-20T14:00:00\\.000Z$" } } },
+      expect.objectContaining({ $lookup: expect.objectContaining({
+        from: "competition_credit_incidents", let: { creditRunId: "$runId" },
+        as: "openCreditIntegrityIncidents",
+        pipeline: expect.arrayContaining([{ $match: {
+          $expr: { $eq: ["$runId", "$$creditRunId"] },
+          type: "credit_reconciliation_mismatch", status: "open",
+        } }]),
+      }) }),
+      { $match: { openCreditIntegrityIncidents: { $size: 0 } } },
       { $group: { _id: "$walletNormalized", units: { $sum: "$credits" } } },
     ]));
-    expect(JSON.stringify(pipeline)).not.toMatch(/cukie.?master|entitlement/i);
+    const lookupIndex = pipeline.findIndex((stage) => "$lookup" in stage);
+    const exclusionIndex = pipeline.findIndex((stage) => stage.$match && typeof stage.$match === "object" && "openCreditIntegrityIncidents" in stage.$match);
+    expect(lookupIndex).toBeLessThan(exclusionIndex);
+    expect(exclusionIndex).toBeLessThan(pipeline.findIndex((stage) => "$group" in stage));
+    expect(JSON.stringify(pipeline)).not.toMatch(/cukie.?master|entitlement|"route"|localField|foreignField/i);
   });
 
   it("conserva snapshots ambassador distintos por partida durante el mismo dia", async () => {
