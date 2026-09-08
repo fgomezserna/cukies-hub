@@ -56,12 +56,21 @@ describe('legacy source adapter', () => {
   });
 
   it('queries the original legacy id while keeping indexed behavior unchanged', () => {
-    assert.deepEqual(sourceDocumentFilter('1000000000000', 'legacy'), {
+    assert.deepEqual(sourceDocumentFilter('1000000000000', 'legacy'), { _id: '1000000000000' });
+    assert.deepEqual(sourceTokenIdFilter('1000000000000', 'legacy'), {
       $or: [{ _id: '1000000000000' }, { _id: 1_000_000_000_000 }],
     });
     assert.deepEqual(sourceTokenIdFilter('42', 'indexed'), {
       $or: [{ tokenId: '42' }, { _id: '42' }],
     });
+  });
+
+  it('rejects explicit network/chain conflicts before replacing chain, while allowing chain omission', () => {
+    assert.doesNotThrow(() => normalizeCukiSourceDocument({ ...baseLegacy, chain: undefined }, 'legacy'));
+    assert.throws(
+      () => normalizeCukiSourceDocument({ ...baseLegacy, network: 'BSC', chain: 'TRON' }, 'legacy'),
+      /identidad canónica inválida/,
+    );
   });
 });
 

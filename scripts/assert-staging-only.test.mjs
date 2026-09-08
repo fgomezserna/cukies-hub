@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 import {
@@ -206,6 +207,73 @@ test('uses service scopes without requiring unrelated credentials', () => {
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
   }, 'economy-scheduler').scope, 'economy-scheduler');
 });
+
+function legacyCardWorkerEnvironment(overrides = {}) {
+  return stagingEnvironment({
+    CARD_WORKER_SOURCE_FORMAT: 'legacy',
+    CARD_WORKER_LEGACY_STAGING_ENABLED: 'true',
+    CARD_WORKER_MONGO_URL: 'mongodb://legacy-worker:redacted@mongo:27017/cukies-legacy-staging?authSource=admin',
+    CARD_WORKER_DB_NAME: 'cukies-legacy-staging',
+    CARD_WORKER_S3_BUCKET: 'cukies-cards-staging',
+    CARD_WORKER_PUBLIC_BASE_URL: 'https://assets-staging.cukies.world',
+    ...overrides,
+  });
+}
+
+function runLegacyGuard(environment) {
+  return spawnSync(
+    process.execPath,
+    [new URL('./assert-staging-only.mjs', import.meta.url).pathname, '--scope', 'cuki-card-worker'],
+    {
+      env: {
+        ...process.env,
+        CARD_WORKER_UPLOAD: 'false',
+        CARD_WORKER_S3_REGION: '',
+        AWS_ACCESS_KEY_ID: '',
+        AWS_SECRET_ACCESS_KEY: '',
+        AWS_REGION: '',
+        ...environment,
+      },
+      encoding: 'utf8',
+    },
+  );
+}
+
+test('el CLI guard real acepta el perfil legacy valido sin exigir credenciales si upload esta apagado', () => {
+  const result = runLegacyGuard(legacyCardWorkerEnvironment());
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /"scope": "cuki-card-worker"/);
+  assert.match(result.stdout, /"cardWorkerDatabaseName": "cukies-legacy-staging"/);
+});
+
+test('el guard exige credenciales legacy solo al activar upload', () => {
+  const missing = runLegacyGuard(legacyCardWorkerEnvironment({ CARD_WORKER_UPLOAD: 'true' }));
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /AWS_ACCESS_KEY_ID is required/);
+
+  const valid = runLegacyGuard(legacyCardWorkerEnvironment({
+    CARD_WORKER_UPLOAD: 'true',
+    CARD_WORKER_S3_REGION: 'us-east-1',
+    AWS_ACCESS_KEY_ID: 'legacy-access-present',
+    AWS_SECRET_ACCESS_KEY: 'legacy-secret-present',
+  }));
+  assert.equal(valid.status, 0, valid.stderr);
+});
+
+for (const [name, override, expectedMessage] of [
+  ['DB indexed', { CARD_WORKER_DB_NAME: 'cukieshub-new-staging' }, 'cukies-legacy-staging'],
+  ['mode indexed', { CARD_WORKER_SOURCE_FORMAT: 'indexed' }, 'CARD_WORKER_DB_NAME must equal cukieshub-new-staging'],
+  ['wrong legacy URI', { CARD_WORKER_MONGO_URL: 'mongodb://legacy-worker:redacted@mongo:27017/cukieshub-new-staging?authSource=admin' }, 'CARD_WORKER_MONGO_URL must target database cukies-legacy-staging'],
+  ['legacy gate disabled', { CARD_WORKER_LEGACY_STAGING_ENABLED: 'false' }, 'CARD_WORKER_LEGACY_STAGING_ENABLED must equal true'],
+  ['wrong bucket', { CARD_WORKER_S3_BUCKET: 'other-bucket' }, 'CARD_WORKER_S3_BUCKET must equal cukies-cards-staging'],
+  ['wrong origin', { CARD_WORKER_PUBLIC_BASE_URL: 'https://assets.example' }, 'CARD_WORKER_PUBLIC_BASE_URL must equal https://assets-staging.cukies.world'],
+]) {
+  test(`el CLI guard real rechaza ${name}`, () => {
+    const result = runLegacyGuard(legacyCardWorkerEnvironment(override));
+    assert.notEqual(result.status, 0);
+    assert.ok(result.stderr.includes(expectedMessage), result.stderr);
+  });
+}
 
 test('rejects unknown service scopes', () => {
   assert.throws(

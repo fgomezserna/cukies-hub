@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
+import { ObjectId } from 'mongodb';
+
 import { buildCardImageLeaseFilter, buildRenderableMetadataFilter } from './storage/mongo.js';
 import { parseIdentityArgs } from './cli-options.js';
 import {
@@ -33,6 +35,13 @@ const config = (manifestPath: string, sourceIdentity: CardWorkerConfig['sourceId
   publicKeyPrefix: null, s3Bucket: null, s3Region: null, s3Prefix: 'cards', s3Endpoint: null,
   s3ForcePathStyle: false, s3Acl: null, verifyPublic: false, backfillConcurrency: 1, backfillManifestPath: manifestPath,
   sourceFormat: 'indexed', legacyStagingEnabled: false, sourceIdentity,
+});
+
+const legacyConfig = (manifestPath: string): CardWorkerConfig => ({
+  ...config(manifestPath),
+  dbName: 'cukies-legacy-staging',
+  sourceFormat: 'legacy',
+  legacyStagingEnabled: true,
 });
 
 function fakeStore(overrides: Partial<CardWorkerStoreLike> = {}) {
@@ -134,6 +143,41 @@ describe('entrypoints de backfill y proceso normal', () => {
     assert.equal(claims, 0);
     assert.equal(result.status, 'complete');
     assert.equal(result.counts.unsupported_metadata, 1);
+  });
+
+  it('incluye ids inválidos/ObjectId en manifest y counts como missing_identity sin claims', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'cuki-worker-invalid-ids-'));
+    const objectId = new ObjectId();
+    const invalidString = { _id: 'not-a-token', network: 'BSC', rarity: 3, generation: 2 } as CukiDocument;
+    let listCalls = 0;
+    let claims = 0;
+    const store = fakeStore({
+      listBackfillCukies: async () => {
+        listCalls += 1;
+        return [
+          { _id: new ObjectId(objectId.toHexString()), network: 'BSC', rarity: 3, generation: 2 } as unknown as CukiDocument,
+          invalidString,
+        ];
+      },
+      claimCukiByDocumentId: async () => { claims += 1; return null; },
+    });
+
+    const result = await backfillCards(legacyConfig(path.join(dir, 'manifest.json')), {
+      store,
+      skipUploadAccess: true,
+      renderAndUpload: uploadStub(),
+    });
+    const manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8')) as {
+      initialItems: Array<{ censusCategory: string; sourceValidationError?: string }>;
+    };
+
+    assert.equal(claims, 0);
+    assert.equal(listCalls, 2);
+    assert.equal(result.totalCandidates, 2);
+    assert.equal(result.deltaCandidates, 0);
+    assert.equal(result.counts.missing_identity, 2);
+    assert.equal(manifest.initialItems.length, 2);
+    assert.ok(manifest.initialItems.every((item) => item.censusCategory === 'missing_identity' && item.sourceValidationError));
   });
 
   it('pasa el contexto configurado al proceso normal antes de reclamar', async () => {

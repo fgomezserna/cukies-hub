@@ -132,7 +132,7 @@ export class CardWorkerStore {
       : [];
 
     return {
-      ...(tokenId ? { _id: tokenId } : {}),
+      ...(tokenId !== undefined ? { _id: tokenId } : {}),
       $and: [
         ...(metadataFilter.$and ?? []),
         ...revisionFilter,
@@ -245,7 +245,7 @@ export class CardWorkerStore {
 
   async listBackfillCukies() {
     return this.cukies()
-      .find(sourceCandidateFilter(this.config.sourceFormat))
+      .find({})
       .project<CukiDocument>({
         _id: 1,
         tokenId: 1,
@@ -263,6 +263,7 @@ export class CardWorkerStore {
         cardImageAttempts: 1,
         cardImageLockedAt: 1,
         updatedAt: 1,
+        sourceValidationError: 1,
       })
       .sort({ _id: 1 })
       .batchSize(50)

@@ -66,4 +66,6 @@ El contexto también puede pasarse al CLI con `--source-network`, `--source-chai
 
 En modo `legacy`, el adaptador trata `_id` decimal como token ID, conserva el `_id` original para claims y resuelve por documento la identidad BSC `chainId=56` o TRON mainnet. Rechaza ObjectId, IDs no decimales, conflictos de red/colección/chain y metadata inválida antes de consumir intentos. No activa el indexador legacy ni importa documentos al esquema nuevo.
 
+El perfil Compose `legacy-card-worker` fija `cukies-legacy-staging`, el bucket `cukies-cards-staging` y el origen `https://assets-staging.cukies.world`. Usa credenciales propias `CARD_WORKER_LEGACY_S3_ACCESS_KEY_ID` y `CARD_WORKER_LEGACY_S3_SECRET_ACCESS_KEY`, con región `CARD_WORKER_LEGACY_S3_REGION`; sus permisos exclusivos de staging deben comprobarse antes de la publicación. El censo incluye también los documentos inválidos como `missing_identity` y conserva `sourceValidationError` en el manifiesto. La lectura por ID documental mantiene su tipo exacto; la búsqueda CLI por token detecta coincidencias ambiguas entre IDs numéricos y de texto.
+
 Los documentos del indexador nuevo pueden exponer `rarity` y `generation` a partir del evento canónico `CukieMetadataConfigured`; el renderer los adapta a la forma legacy sin inventar ni persistir atributos derivados.

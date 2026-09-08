@@ -172,6 +172,7 @@ export async function processOneCard(
 
 type BackfillManifestItem = {
   documentId: string | number;
+  documentKey?: string;
   tokenId: string;
   assetIdentity: string;
   legacyDocumentId: string | number;
@@ -187,6 +188,7 @@ type BackfillManifestItem = {
   sourceFingerprint?: string;
   censusCategory: BackfillCensusCategory;
   status?: BackfillCensusCategory;
+  sourceValidationError?: string;
   lastError?: string;
   checkedAt?: string;
 };
@@ -238,12 +240,36 @@ export function classifyCukiMetadata(cuki: CukiDocument): Extract<BackfillCensus
   return 'renderable';
 }
 
+function documentIdentityKey(value: unknown) {
+  if (typeof value === 'string') return `string:${value}`;
+  if (typeof value === 'number') return `number:${String(value)}`;
+  if (value && typeof value === 'object' && 'toHexString' in value && typeof value.toHexString === 'function') {
+    return `objectId:${value.toHexString()}`;
+  }
+  return `object:${JSON.stringify(value)}`;
+}
+
+function manifestDocumentKey(item: Pick<BackfillManifestItem, 'documentId' | 'documentKey'>) {
+  return item.documentKey ?? documentIdentityKey(item.documentId);
+}
+
+function legacyManifestAlias(item: Pick<BackfillManifestItem, 'documentId' | 'documentKey'>) {
+  if (item.documentKey || typeof item.documentId !== 'string' || !/^[0-9a-f]{24}$/i.test(item.documentId)) {
+    return null;
+  }
+  // Old manifests serialized an ObjectId as its hex string before documentKey existed.
+  return `objectId:${item.documentId.toLowerCase()}`;
+}
+
 function manifestItem(cuki: CukiDocument, identity?: AssetIdentityContext): BackfillManifestItem {
   const tokenId = cuki.tokenId ?? '';
   const assetIdentity = canonicalAssetIdentity(cuki, identity);
-  const censusCategory = assetIdentity && !cuki.sourceValidationError ? classifyCukiMetadata(cuki) : 'missing_identity';
+  const sourceValidationError = cuki.sourceValidationError
+    ?? (assetIdentity ? undefined : 'No se pudo resolver la identidad canónica del documento.');
+  const censusCategory = assetIdentity && !sourceValidationError ? classifyCukiMetadata(cuki) : 'missing_identity';
   return {
     documentId: cuki._id,
+    documentKey: documentIdentityKey(cuki._id),
     tokenId,
     assetIdentity: assetIdentity ?? '',
     legacyDocumentId: cuki._id,
@@ -258,6 +284,7 @@ function manifestItem(cuki: CukiDocument, identity?: AssetIdentityContext): Back
     sourceRevision: cuki.updatedAt?.toISOString() ?? null,
     sourceFingerprint: cukiInputFingerprint(cuki, identity),
     censusCategory,
+    ...(sourceValidationError ? { sourceValidationError } : {}),
     ...(censusCategory === 'renderable' ? {} : { status: censusCategory }),
   };
 }
@@ -414,22 +441,29 @@ export async function backfillCards(
     }
 
     const current = await store.listBackfillCukies();
-    const initialIds = new Set(manifest.initialItems.map((item) => item.documentId));
     const knownDeltaIds = new Set(
-      manifest.deltaItems.map((item) => `${item.documentId}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`),
+      manifest.deltaItems.map((item) => `${manifestDocumentKey(item)}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`),
     );
-    const initialByDocumentId = new Map(manifest.initialItems.map((item) => [item.documentId, item]));
+    const initialByDocumentId = new Map(manifest.initialItems.map((item) => [manifestDocumentKey(item), item]));
+    const legacyInitialAliases = new Map(
+      manifest.initialItems.flatMap((item) => {
+        const alias = legacyManifestAlias(item);
+        return alias ? [[alias, item] as const] : [];
+      }),
+    );
     for (const cuki of current) {
       const changedAfterCutoff = cuki.updatedAt && cuki.updatedAt > new Date(manifest.cutoffAt);
       const item = manifestItem(cuki, resolvedConfig.sourceIdentity ?? undefined);
-      const baseline = initialByDocumentId.get(cuki._id);
+      const currentDocumentKey = documentIdentityKey(cuki._id);
+      const baseline = initialByDocumentId.get(currentDocumentKey)
+        ?? legacyInitialAliases.get(currentDocumentKey);
       const sourceChanged = baseline
         ? baseline.sourceFingerprint
           ? baseline.sourceFingerprint !== item.sourceFingerprint
           : Boolean(changedAfterCutoff)
         : true;
-      if ((!initialIds.has(cuki._id) || sourceChanged) && !knownDeltaIds.has(`${item.documentId}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`)) {
-        const key = `${item.documentId}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`;
+      if ((!baseline || sourceChanged) && !knownDeltaIds.has(`${currentDocumentKey}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`)) {
+        const key = `${currentDocumentKey}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`;
         if (!knownDeltaIds.has(key)) manifest.deltaItems.push(item);
       }
     }

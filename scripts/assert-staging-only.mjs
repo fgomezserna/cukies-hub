@@ -271,18 +271,46 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
   }
 
   if (scope === 'full' || scope === 'cuki-card-worker') {
-    cardWorkerDatabaseName = requireExact(
-      environment,
-      'CARD_WORKER_DB_NAME',
-      STAGING_TARGET.indexerDatabaseName,
-      failures,
-    );
-    cardWorkerMongoDatabaseName = requireMongoDatabase(
-      environment,
-      'CARD_WORKER_MONGO_URL',
-      STAGING_TARGET.indexerDatabaseName,
-      failures,
-    );
+    const sourceFormat = environment.CARD_WORKER_SOURCE_FORMAT?.trim() || 'indexed';
+    if (sourceFormat === 'legacy') {
+      requireExact(environment, 'CARD_WORKER_SOURCE_FORMAT', 'legacy', failures);
+      requireExact(environment, 'CARD_WORKER_LEGACY_STAGING_ENABLED', 'true', failures);
+      cardWorkerDatabaseName = requireExact(
+        environment,
+        'CARD_WORKER_DB_NAME',
+        STAGING_TARGET.legacyDatabaseName,
+        failures,
+      );
+      cardWorkerMongoDatabaseName = requireMongoDatabase(
+        environment,
+        'CARD_WORKER_MONGO_URL',
+        STAGING_TARGET.legacyDatabaseName,
+        failures,
+      );
+      requireExact(environment, 'CARD_WORKER_S3_BUCKET', 'cukies-cards-staging', failures);
+      requireExact(environment, 'CARD_WORKER_PUBLIC_BASE_URL', 'https://assets-staging.cukies.world', failures);
+      if (environment.CARD_WORKER_UPLOAD?.trim() === 'true') {
+        required(environment, 'CARD_WORKER_S3_REGION', failures);
+        required(environment, 'AWS_ACCESS_KEY_ID', failures);
+        required(environment, 'AWS_SECRET_ACCESS_KEY', failures);
+      }
+    } else {
+      if (sourceFormat !== 'indexed') {
+        failures.push('CARD_WORKER_SOURCE_FORMAT must equal indexed or legacy');
+      }
+      cardWorkerDatabaseName = requireExact(
+        environment,
+        'CARD_WORKER_DB_NAME',
+        STAGING_TARGET.indexerDatabaseName,
+        failures,
+      );
+      cardWorkerMongoDatabaseName = requireMongoDatabase(
+        environment,
+        'CARD_WORKER_MONGO_URL',
+        STAGING_TARGET.indexerDatabaseName,
+        failures,
+      );
+    }
   }
 
   if (scope === 'cukies-bridge-relayer') {

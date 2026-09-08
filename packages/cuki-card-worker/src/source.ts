@@ -104,19 +104,22 @@ export function normalizeCukiSourceDocument(
     throw new CukiSourceValidationError(`Legacy TRON no admite chainId EVM para ${tokenId}.`);
   }
 
-  const normalized = {
+  const identityDocument = {
     ...document,
     tokenId,
     network,
-    chain: network,
     ...('chainId' in context ? { chainId: context.chainId } : { chainId: undefined }),
     collectionAddressNormalized: context.collectionAddressNormalized,
-    sourceValidationError: undefined,
   };
-  if (!canonicalAssetIdentity(normalized, context)) {
+  if (!canonicalAssetIdentity(identityDocument, context)) {
     throw new CukiSourceValidationError(`Legacy identidad canónica inválida para ${tokenId}.`);
   }
-  return normalized;
+
+  return {
+    ...identityDocument,
+    chain: network,
+    sourceValidationError: undefined,
+  };
 }
 
 export function normalizeCukiSourceForRead(document: CukiDocument, sourceFormat: CardWorkerSourceFormat) {
@@ -146,11 +149,8 @@ export function sourceDocumentFilter(
   documentId: string | number,
   sourceFormat: CardWorkerSourceFormat,
 ): Filter<CukiDocument> {
-  if (sourceFormat === 'indexed') return { _id: documentId };
-  const candidates = sourceIdCandidates(documentId);
-  return candidates.length === 1
-    ? { _id: candidates[0] }
-    : { $or: candidates.map((_id) => ({ _id })) };
+  void sourceFormat;
+  return { _id: documentId };
 }
 
 export function sourceTokenIdFilter(
@@ -158,7 +158,10 @@ export function sourceTokenIdFilter(
   sourceFormat: CardWorkerSourceFormat,
 ): Filter<CukiDocument> {
   if (sourceFormat === 'indexed') return { $or: [{ tokenId }, { _id: tokenId }] };
-  return sourceDocumentFilter(tokenId, sourceFormat);
+  const candidates = sourceIdCandidates(tokenId);
+  return candidates.length === 1
+    ? { _id: candidates[0] }
+    : { $or: candidates.map((_id) => ({ _id })) };
 }
 
 export function sourceCandidateFilter(sourceFormat: CardWorkerSourceFormat): Filter<CukiDocument> {

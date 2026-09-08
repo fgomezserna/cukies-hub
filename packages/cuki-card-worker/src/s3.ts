@@ -8,6 +8,8 @@ import Jimp from 'jimp';
 import type { CardWorkerConfig, GenerationResult, PublicCardVerification, RenderResult } from './types.js';
 
 export const IMMUTABLE_CARD_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const LEGACY_STAGING_S3_BUCKET = 'cukies-cards-staging';
+const LEGACY_STAGING_PUBLIC_BASE_URL = 'https://assets-staging.cukies.world';
 
 export function assertS3UploadConfig(config: CardWorkerConfig) {
   if (!config.s3Bucket) {
@@ -20,6 +22,15 @@ export function assertS3UploadConfig(config: CardWorkerConfig) {
 
   if (!config.publicBaseUrl) {
     throw new Error('Falta CARD_WORKER_PUBLIC_BASE_URL o bucket/region para construir la URL publica.');
+  }
+
+  if (config.sourceFormat === 'legacy') {
+    if (config.s3Bucket !== LEGACY_STAGING_S3_BUCKET) {
+      throw new Error(`La fuente legacy sólo permite el bucket ${LEGACY_STAGING_S3_BUCKET}.`);
+    }
+    if (config.publicBaseUrl !== LEGACY_STAGING_PUBLIC_BASE_URL) {
+      throw new Error(`La fuente legacy sólo permite el origen ${LEGACY_STAGING_PUBLIC_BASE_URL}.`);
+    }
   }
 }
 
