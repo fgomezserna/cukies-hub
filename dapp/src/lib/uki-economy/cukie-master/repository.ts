@@ -113,6 +113,10 @@ function firstEnvironmentValue(...names: string[]) {
   return undefined;
 }
 
+function exactAddressRegex(address: string) {
+  return new RegExp(`^${address}$`, 'i');
+}
+
 function expectedContractConfig(input: {
   chainId: 56 | 97;
   address?: string;
@@ -657,6 +661,8 @@ export interface CukieMasterRepository {
   findEvent(idempotencyKey: string): Promise<CukieMasterPositionEvent | null>;
   insertEvent(event: CukieMasterPositionEvent): Promise<void>;
   findProjectedChainEvidence(eventId: string): Promise<CukieMasterChainEvidence | null>;
+  /** Latest projected custodial event affecting this wallet's NFT entitlement. */
+  findLatestNftChainEvidence?(walletNormalized: string): Promise<CukieMasterChainEvidence | null>;
   findPresaleParticipant(walletNormalized: string): Promise<PresaleParticipantRawDocument | null>;
   findUkiStakingPosition(walletNormalized: string): Promise<UkiStakingPositionRawDocument | null>;
   findPresaleVestingPosition(
@@ -843,6 +849,64 @@ export function createMongoCukieMasterRepository(
       if (Number.isNaN(blockTimestamp.getTime())) return null;
       return {
         eventId,
+        blockNumber: Number(event.blockNumber),
+        blockHash: event.blockHash.toLowerCase(),
+        blockTimestamp,
+      };
+    },
+    async findLatestNftChainEvidence(walletNormalized) {
+      const expectedChainId = expectedBscChainId();
+      const expectedVault = expectedChainId
+        ? expectedNftContractConfigs(expectedChainId).CUKIE_MASTER_NFT_VAULT?.contractAddress
+        : undefined;
+      if (!expectedChainId || !expectedVault) return null;
+      const checkpoint = await db.collection<{
+        _id: string;
+        safeBlockNumber?: unknown;
+        safeBlockHash?: unknown;
+        checkedAt?: unknown;
+      }>('chain_bsc_checkpoints').findOne({ _id: 'canonical-safe' }, options);
+      if (
+        !checkpoint
+        || !Number.isSafeInteger(checkpoint.safeBlockNumber)
+        || Number(checkpoint.safeBlockNumber) < 0
+        || typeof checkpoint.safeBlockHash !== 'string'
+        || !/^0x[0-9a-f]{64}$/i.test(checkpoint.safeBlockHash)
+        || !(checkpoint.checkedAt instanceof Date)
+        || Number.isNaN(checkpoint.checkedAt.getTime())
+      ) return null;
+      const filter: Record<string, unknown> = {
+        chain: 'BSC',
+        chainId: expectedChainId,
+        status: 'projected',
+        contractAlias: 'CUKIE_MASTER_NFT_VAULT',
+        eventName: { $in: ['CukieMasterDeposited', 'CukieMasterWithdrawn'] },
+        'normalized.beneficiaryNormalized': walletNormalized,
+        blockNumber: { $lte: Number(checkpoint.safeBlockNumber) },
+      };
+      filter.contractAddress = exactAddressRegex(expectedVault);
+      const event = await db.collection<{
+        _id: string;
+        blockNumber?: unknown;
+        blockHash?: unknown;
+        timestampMs?: unknown;
+      }>('chain_events').findOne(
+        filter,
+        { ...options, sort: { blockNumber: -1, logIndex: -1, _id: -1 } },
+      );
+      if (
+        !event
+        || !Number.isSafeInteger(event.blockNumber)
+        || Number(event.blockNumber) < 0
+        || typeof event.blockHash !== 'string'
+        || !/^0x[0-9a-f]{64}$/i.test(event.blockHash)
+        || !Number.isSafeInteger(event.timestampMs)
+        || Number(event.timestampMs) < 0
+      ) return null;
+      const blockTimestamp = new Date(Number(event.timestampMs));
+      if (Number.isNaN(blockTimestamp.getTime())) return null;
+      return {
+        eventId: event._id,
         blockNumber: Number(event.blockNumber),
         blockHash: event.blockHash.toLowerCase(),
         blockTimestamp,
