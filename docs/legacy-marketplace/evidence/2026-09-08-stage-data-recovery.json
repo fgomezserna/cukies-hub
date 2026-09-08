@@ -1,9 +1,9 @@
 {
-  "observedAt": "2026-09-08T12:34:00Z",
+  "observedAt": "2026-09-08T12:57:09.436429+00:00",
   "environment": "staging",
   "applicationId": 28,
   "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
-  "servedCommit": "26dd9908bc363c8eb9352aae974cca28d52c8916",
+  "servedCommit": "16e7f075adaf9bc26f0ed69a4344a2e466fc992c",
   "uiPatchDeployed": true,
   "mainChanged": false,
   "diagnosis": {
@@ -162,7 +162,7 @@
     "mainServedCommit": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e"
   },
   "poolFollowUp": {
-    "status": "implemented and validated locally; deployment pending",
+    "status": "deployed and verified with signed wallet",
     "rootCause": "Vault source selects all cursor events then requires exactly seven functional cursors; four administrative events cause cardinality failure",
     "requiredCursorCount": 7,
     "actualCursorCount": 11,
@@ -173,7 +173,6 @@
       "Unpaused"
     ],
     "expectedAvailableAssets": 9,
-    "pending": "Filter required event manifest before limit; deploy and verify authenticated Pool",
     "validation": {
       "dappLint": "passed",
       "dappTypecheck": "passed",
@@ -181,6 +180,35 @@
       "dappSuites": 215,
       "dappBuild": "passed",
       "focusedTests": 14
+    },
+    "pullRequest": 323,
+    "codeCommit": "1836eae17598cade54fc2f594aba882017a9824e",
+    "servedCommit": "16e7f075adaf9bc26f0ed69a4344a2e466fc992c",
+    "deployment": "agw4kgccgkk88wko4g8o0g4g",
+    "deploymentFinishedAt": "2026-09-08T12:54:18Z",
+    "authenticatedUi": {
+      "availableAssets": 9,
+      "originalsAvailable": 3,
+      "secondGenerationAvailable": 6,
+      "depositedInPool": 0,
+      "syncWarning": false,
+      "depositActionsVisible": 9
+    },
+    "sourceVerifiedAt": "2026-09-08T12:56:17.375Z",
+    "sourceVerification": {
+      "allVaultCursors": 11,
+      "requiredCursorCount": 7,
+      "requiredCursorEventsPresent": true,
+      "latestLoopEndedAt": "2026-09-08T12:55:59.440Z",
+      "checkpointSafeBlock": 129834702,
+      "pendingEvents": 0,
+      "deadLetters": 0,
+      "openIncidents": 0,
+      "freshnessGuardPasses": true,
+      "masterOpenPositions": 3,
+      "poolOpenPositions": 0,
+      "activeLocks": 0,
+      "expectedAvailableAfterMasterExclusion": 9
     }
   }
 }
