@@ -1,10 +1,10 @@
 {
-  "observedAt": "2026-09-08T10:31:00Z",
+  "observedAt": "2026-09-08T12:34:00Z",
   "environment": "staging",
   "applicationId": 28,
   "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
-  "servedCommit": "ed2d50da47ef5eeef83162b9cfda9e247821c930",
-  "uiPatchDeployed": false,
+  "servedCommit": "26dd9908bc363c8eb9352aae974cca28d52c8916",
+  "uiPatchDeployed": true,
   "mainChanged": false,
   "diagnosis": {
     "failure": "BSC testnet RPC receipt and historical log failures stalled shared event ingestion",
@@ -72,10 +72,8 @@
     "backendVerifiedAt": "2026-09-08T09:47:49Z"
   },
   "notYetVerified": [
-    "Post-deploy route health with corrected cursor queries",
-    "Cukie Master UKI slot deactivation",
-    "Current credit period reconciliation without duplicated grants",
-    "Authenticated UI after application patch deployment"
+    "Post-fix Cukie Pool source readiness and nine available NFTs",
+    "Full legacy transaction flows and BSC mainnet archive backfill"
   ],
   "tracking": "docs/antes-del-15-seguimiento.md",
   "recalculation": {
@@ -123,5 +121,66 @@
     "postDeployStillRequired": true,
     "codeCommit": "5fbe10610fa4cdf9c1110c022e668b54002812dd"
   },
-  "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/322"
+  "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/322",
+  "postDeployment": {
+    "deployment": "oo00cw8k08cg8c4koc8w4kkg",
+    "finishedAt": "2026-09-08T12:28:12Z",
+    "pullRequest": 322,
+    "mergeCommit": "26dd9908bc363c8eb9352aae974cca28d52c8916",
+    "master": {
+      "ukiActive": 0,
+      "nftActive": 5,
+      "nftCustodialPositions": 3,
+      "rarityPoints": 27,
+      "creditsPerDistribution": 500
+    },
+    "credits": {
+      "activeSlots": 5,
+      "nextPersonal": 110,
+      "nextPool": 390,
+      "runtime": "success",
+      "duplicateAccountPeriodKeys": 0,
+      "duplicateRunItemKeys": 0
+    },
+    "unstakeJob": {
+      "status": "completed",
+      "attempts": 13,
+      "updatedAt": "2026-09-08T12:31:12Z"
+    },
+    "signedUi": {
+      "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+      "masterAndCreditsAgree": true,
+      "collection": {
+        "total": 12,
+        "wallet": 9,
+        "master": 3,
+        "pool": 0
+      },
+      "masterNftCards": 6,
+      "masterNftSyncWarning": false
+    },
+    "mainServedCommit": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e"
+  },
+  "poolFollowUp": {
+    "status": "implemented and validated locally; deployment pending",
+    "rootCause": "Vault source selects all cursor events then requires exactly seven functional cursors; four administrative events cause cardinality failure",
+    "requiredCursorCount": 7,
+    "actualCursorCount": 11,
+    "extraEvents": [
+      "OwnershipTransferStarted",
+      "OwnershipTransferred",
+      "Paused",
+      "Unpaused"
+    ],
+    "expectedAvailableAssets": 9,
+    "pending": "Filter required event manifest before limit; deploy and verify authenticated Pool",
+    "validation": {
+      "dappLint": "passed",
+      "dappTypecheck": "passed",
+      "dappTests": 1716,
+      "dappSuites": 215,
+      "dappBuild": "passed",
+      "focusedTests": 14
+    }
+  }
 }

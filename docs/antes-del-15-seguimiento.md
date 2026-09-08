@@ -75,7 +75,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | 2A-C | **EVENTOS Y WORKER INTEGRADOS EN STAGING**: 14 contratos legacy y 10 perfiles nuevos cubiertos (75 + 87 relaciones contrato/evento); replay de breeding, CAS bridge y aislamiento verificados. 14/14 fuentes contrastadas live y pasada TRON 40/40 sin 429 con delay 2 s. Marketplace conjunto y UX siguen pendientes. | [PR #319](https://github.com/fgomezserna/cukies-hub/pull/319) integrada en `7d0d1ce`, codigo `fa708fd`; [validacion y limites](legacy-marketplace/evidence/2026-09-07-indexer-validation.json); 2026-09-07. Pruebas: indexer 84/84, Stage/Compose 63/63, produccion 14/14, typecheck/build correctos. | Resolver RPC de archivo BSC antes del backfill, provisionar destino dedicado, activar y reconciliar datos. Despues integrar lista/filtros/acciones segun [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). Dapp Stage `7d0d1ce` verificada por health; rollout del indexador normal requirio completar identidades PRESALE/REWARDS (ver [configuracion](deployment-environments.md)). El worker legacy sigue inactivo y no se afirma paridad; main `fb2b190`. |
 | 3 | **EN STAGING, EN PRUEBAS**: Cukie Master, creditos, pools, prestamos y rewards. | Confirmacion de producto; 2026-09-07; smoke 11:44 UTC como evidencia fechada. | Registrar resultados de consumo/caducidad de creditos, stake/unstake, prestamos, cierres, reparto e idempotencia; completar los flujos pendientes segun esas pruebas. |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
-| 5 | **IMPLEMENTADO LOCAL Y VALIDADO; PENDIENTE PUBLICAR**: navegacion, cuenta, estados de datos, juego y catalogo conjunto. RPC Stage recuperado; correccion de health preparada. | 2026-09-08, [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), codigo `5fbe106`; 215 suites / 1.715 tests dapp, lint, typecheck y build OK. Stage sigue sirviendo `ed2d50d`. [Auditoria](uki-dapp-sitemap.md), [evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json), [incidente #321](https://github.com/fgomezserna/cukies-hub/issues/321). | Merge y despliegue app 28 autorizados por el usuario el 8/09; verificar baja del cupo UKI, cinco NFT y creditos con sesion firmada. Los 77 cursores y checkpoint ya estan al dia; health anterior aun omite eventos por limite de consulta. Punto abierto; main sin cambios de esta tarea. |
+| 5 | **PUBLICADO EN STAGING; POOL EN CORRECCION**: navegacion, cuenta, Master/creditos, juego y catalogo conjunto publicados. Master y Creditos coinciden para la wallet QA. | 2026-09-08 12:34 UTC, [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), Stage `26dd990`, deploy `oo00cw8k08cg8c4koc8w4kkg` terminado 12:28. Sesion firmada: 0 UKI + 5 NFT, reparto 500 (110 jugar/390 pool); job unstake completado 12:31:12, sin duplicados en claves de periodos/items. [Auditoria](uki-dapp-sitemap.md), [evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Publicar correccion residual del Pool: consulta 11 cursores y exige 7; comprobar 9 NFT disponibles y fuente ready. Sigue abierta la validacion integral de variantes/transacciones UX. Main conserva `fb2b190`. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
 | post1-2 | **ANTES DEL 15 · MIGRACION LEGACY**: Cukie Points y crias siguen ligados al bloque de migracion; no son activos POST-15. | Decision de producto; 2026-09-07. | Inventario y migracion validada; no ejecutar pausa/corte en este seguimiento. |
 | post3-9 | Alcance conservado como inventario posterior, sin afirmar codigo definitivo ni cierre. | Registro historico; 2026-09-07. | Mantener scope y esperar decision/evidencia especifica. |
@@ -895,11 +895,31 @@ establece que futuras peticiones de implementar/corregir incluyen esos pasos
 y la comprobacion publicada. La regla operativa queda en `AGENTS.md`;
 produccion conserva su autorizacion independiente.
 
-Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), con merge/despliegue autorizado:
+La PR #322 se integra en `26dd990` y el despliegue
+`oo00cw8k08cg8c4koc8w4kkg` termina a las 12:28:12 UTC. Health publico y
+contenedores confirman la nueva version. A las 12:31:12 el job de unstake
+termina (13 intentos) sin reencolar manualmente: cero cupos UKI y cinco NFT,
+respaldados por tres posiciones custodiales y 27 puntos. Master y Creditos,
+con la misma sesion firmada, coinciden en cinco activos y reparto 500
+(110 jugar, 390 pool); los seis Originales se muestran sin aviso de carga.
+El runtime de creditos termina correctamente y no hay duplicados en las
+claves de cuentas por periodo ni items de ejecucion comprobados. Los saldos
+emitidos se conservan con su caducidad. Main sigue en `fb2b190`.
+
+La comprobacion descubre un defecto residual del Pool: selecciona 11 cursores
+del vault y exige exactamente los siete funcionales. Los cuatro eventos
+administrativos provocan `unavailable` y fuerzan inventario vacio aunque hay
+nueve disponibles (coleccion: 12, tres en Master, cero en Pool). La correccion
+filtra el manifiesto antes del limite y conserva los guards; su despliegue y
+comprobacion firmada siguen pendientes en esta observacion. Parche local
+validado: 14 tests focales y gates dapp completos (lint, typecheck, 215 suites /
+1.716 tests y build correctos).
+
+Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 
 | Puntos UX | Cambio o comprobacion | Estado / limite |
 | --- | --- | --- |
-| UX-01 | Fuente, proyeccion y saldo emitido separados; descarte de respuestas de otra wallet; refresco de creditos conservando borradores | Parche y regresiones pasados; backfill recuperado. Health y cupos deben verificarse tras publicar la seleccion del manifiesto |
+| UX-01 | Fuente, proyeccion y saldo emitido separados; descarte de respuestas de otra wallet; refresco de creditos conservando borradores | Publicado y verificado con sesion QA: 0 UKI + 5 NFT y 500 creditos, fuentes frescas y job completado. Queda correccion residual del manifiesto del Pool |
 | UX-02/08 | Reglas y fase de torneo coherentes; acceso de juego pendiente cuando falta autoridad | Tests focales; Sybil Slayer lint, typecheck y build OK el 8/09 (warnings de lint); sin pruebas de compra/partida real |
 | UX-03/04/05/06/12 | Inicio y Resumen, grupos de sidebar, cuenta/avatar/ajustes, retirada de campana estatica, cierre y foco movil | IAB local `320x568`: cierre por Escape devuelve foco; ultimo enlace accesible y foco en MAIN; sin desbordamiento. Destino hash probado tras cierre Radix: foco en MAIN, cancelacion conserva activador |
 | UX-07 | Resumen compacto; prioridad de CTA de Juegos en movil | Dashboard compacto; CTA Juegos visible sin scroll en IAB 391x844 y 320x568 |
