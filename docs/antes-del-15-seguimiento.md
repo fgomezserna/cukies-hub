@@ -1011,11 +1011,25 @@ accion los otros 25G observados antes. No se han borrado datos ni ejecutado
 prune. El plan final del script `849a9c1` se repite con exito: cinco
 correcciones y cero ambiguedades. Se mantiene el gate false hasta disponer
 de margen de build, codigo correcto servido, apply y verificacion.
-La [PR #329](https://github.com/fgomezserna/cukies-hub/pull/329) contiene
-el arreglo revisado. Para el rollout se prepara serializacion de builds
+La [PR #329](https://github.com/fgomezserna/cukies-hub/pull/329) se integra
+en staging `92eb725` a las 16:30:11 UTC. Para el rollout se prepara serializacion de builds
 con `COMPOSE_PARALLEL_LIMIT=1` en app28 y un guard cada 2–3 segundos que
 cancela por debajo de 10GiB libres. El preflight y la ventana unica se
-coordinan con el operador de infraestructura; sin nuevo deploy aun.
+coordinan con el operador de infraestructura. El primer intento de ese SHA,
+`zgwww40k4k8wks4s0gcgco40`, queda cancelado por el guard a las 16:59:02 UTC
+con mas de 26 GiB libres, antes de sustituir el runtime. No se considera
+desplegado ni se ha aplicado la reparacion de Mongo.
+
+La revision economica confirma ocho `credit_pool_positions` abiertas,
+390 por cada corte erroneo. Aunque los lotes caduquen, esas posiciones son
+fuente de `listCreditContributors` para futuros premios. Se observan cero
+cierres, allocations, batches y proofs; las dos fuentes de partidas existentes
+usan creditos propios de periodos anteriores. Los gates de accounting y
+publicacion de rewards ya estaban desactivados y se conservan asi. Se prepara
+una exclusion por incidentes de integridad abiertos, conservando posiciones,
+runs, lotes y ledger: bloquear solo las posiciones romperia su reconciliacion
+con los runs abiertos. La aplicacion de incidentes y su efecto real quedan
+pendientes de verificacion; no se presenta el helper inicial como operativo.
 
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 

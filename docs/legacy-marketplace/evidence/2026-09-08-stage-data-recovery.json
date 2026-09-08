@@ -341,7 +341,25 @@
       "normalExpiryMinutes": 30,
       "status": "14:00 expired; 14:30 pending normal expiry while scheduler paused",
       "ledgerPolicy": "Preserve actual emissions and ledger; append canonical slot history corrections, then verify normal expiry and zero new QA grants.",
-      "recordedAt": "2026-09-08T15:16:05.669233+00:00"
+      "recordedAt": "2026-09-08T15:16:05.669233+00:00",
+      "rewardPropagation": {
+        "checkedAt": "2026-09-08T16:41:00Z",
+        "poolPositions": 8,
+        "poolCreditsPerAffectedRun": 390,
+        "materializedDailyClosures": 0,
+        "materializedWeeklyClosures": 0,
+        "accountingAllocations": 0,
+        "allocations": 0,
+        "claimBatches": 0,
+        "claimProofs": 0,
+        "weeklyGameSources": 2,
+        "weeklySourcesScope": "own credit, before 14:00; no link to erroneous pool grants",
+        "runtimeRewardGates": "false pre-existing; unchanged",
+        "futureRisk": "open pool positions remain a reward contributor source after lot expiry",
+        "proposedContainment": "append two integrity incidents and exclude runs with open credit_reconciliation_mismatch incidents in reward contributor selection; preserve existing financial records",
+        "applied": false,
+        "evidence": "/tmp/cukies-pool-rewards-impact-batch-result.json"
+      }
     },
     "repairCandidate": {
       "codeCommit": "0464fd8793c09b663e9e03ed8ad1815f9cde19a0a0",
@@ -382,7 +400,10 @@
           "safeBlockNumber": 129858936,
           "safeBlockHash": "0x747009100bb573545f270b140f55ea455819ca3fa17349ffc5fb3589c011ab44"
         }
-      }
+      },
+      "mergedCommit": "92eb725b78b596d77ad3ec1d8081a48515ebd36b",
+      "mergedAt": "2026-09-08T16:30:11Z",
+      "deployed": false
     },
     "infrastructureInterruption": {
       "recordedAt": "2026-09-08T15:40:08.619231+00:00",
@@ -419,7 +440,16 @@
       "guard": "sample disk every 2-3s; cancel if free space below 10GiB",
       "status": "approved; awaiting operator preflight before one controlled deployment",
       "creditsGate": "false until repaired history and correct deployed code verified",
-      "assetsWorker": "contained by deployment operator; backfill not part of this repair"
+      "assetsWorker": "contained by deployment operator; backfill not part of this repair",
+      "latestAttempt": {
+        "deploymentUuid": "zgwww40k4k8wks4s0gcgco40",
+        "commit": "92eb725b78b596d77ad3ec1d8081a48515ebd36b",
+        "status": "cancelled-by-user",
+        "cancelledAt": "2026-09-08T16:59:02Z",
+        "reportedDiskFree": "greater than 26 GiB throughout",
+        "runtimeReplaced": false,
+        "reason": "guard cancellation; precise probe failure under investigation by sole operator"
+      }
     }
   }
 }
