@@ -4,7 +4,6 @@ import type { Db, Filter } from 'mongodb';
 
 import { ukiNftVaults, type UkiNftVaultPublicConfig } from '@/lib/contracts/uki-nft-vaults';
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
-import { normalizeLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
 import {
   buildCukiesAssetId,
   normalizeCukiesInventoryDocument,
@@ -222,10 +221,7 @@ export async function listMyCukieCollectionFromDb(input: {
     return {
       assetId,
       tokenId: id,
-      imageUrl: normalizeLegacyMarketplaceNftImageUrl(
-        id,
-        typeof document.img === 'string' ? document.img : null,
-      ),
+      imageUrl: normalized.imageUrl ?? null,
       network: typeof document.network === 'string' ? document.network : null,
       origin: typeof document.origin === 'string' ? document.origin : null,
       generation: normalized.generation,

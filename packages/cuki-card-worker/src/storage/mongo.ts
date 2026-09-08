@@ -2,9 +2,16 @@ import crypto from 'node:crypto';
 
 import { Db, MongoClient, type Filter } from 'mongodb';
 
-import type { CardImageLease, CardWorkerConfig, ClaimedCuki, CukiDocument, GenerationResult } from '../types.js';
+import {
+  assertCardWorkerSourceConfig,
+  normalizeCukiSourceDocument,
+  sourceCandidateFilter,
+  sourceDocumentFilter,
+  sourceTokenIdFilter,
+} from '../source.js';
+import type { CardImageLease, CardWorkerConfig, ClaimedCuki, CukiDocument, CukiDocumentId, GenerationResult } from '../types.js';
 
-export function buildCardImageLeaseFilter(documentId: string, lease: CardImageLease): Filter<CukiDocument> {
+export function buildCardImageLeaseFilter(documentId: CukiDocumentId, lease: CardImageLease): Filter<CukiDocument> {
   return {
     _id: documentId,
     cardImageStatus: 'processing',
@@ -21,6 +28,7 @@ export class CardWorkerStore {
   private config: CardWorkerConfig;
 
   constructor(config: CardWorkerConfig) {
+    assertCardWorkerSourceConfig(config);
     this.config = config;
     this.client = new MongoClient(config.mongoUrl);
     this.db = this.client.db(config.dbName);
@@ -56,11 +64,13 @@ export class CardWorkerStore {
   }
 
   async getCuki(documentId: string) {
-    return this.cukies().findOne({ _id: documentId });
+    const document = await this.cukies().findOne(sourceDocumentFilter(documentId, this.config.sourceFormat));
+    return document ? normalizeCukiSourceDocument(document, this.config.sourceFormat) : null;
   }
 
   async getCukiByTokenId(tokenId: string) {
-    return this.cukies().findOne({ $or: [{ tokenId }, { _id: tokenId }] });
+    const document = await this.cukies().findOne(sourceTokenIdFilter(tokenId, this.config.sourceFormat));
+    return document ? normalizeCukiSourceDocument(document, this.config.sourceFormat) : null;
   }
 
   private renderableMetadataFilter(): Filter<CukiDocument> {
@@ -79,10 +89,16 @@ export class CardWorkerStore {
 
   private claimFilter(tokenId?: string): Filter<CukiDocument> {
     const metadataFilter = this.renderableMetadataFilter();
+    const sourceFilters = tokenId
+      ? [
+          sourceCandidateFilter(this.config.sourceFormat),
+          sourceDocumentFilter(tokenId, this.config.sourceFormat),
+        ]
+      : [sourceCandidateFilter(this.config.sourceFormat)];
 
     return {
-      ...(tokenId ? { _id: tokenId } : {}),
       $and: [
+        ...sourceFilters,
         ...(metadataFilter.$and ?? []),
         {
           $or: [
@@ -131,6 +147,8 @@ export class CardWorkerStore {
 
     if (!updated) return null;
 
+    const normalized = normalizeCukiSourceDocument(updated, this.config.sourceFormat);
+
     const lease: CardImageLease = {
       lockId,
       leaseVersion: updated.cardImageLeaseVersion ?? 1,
@@ -138,7 +156,7 @@ export class CardWorkerStore {
       sourceRevision: updated.cardImageLeaseSourceRevision ?? null,
     };
 
-    return { ...updated, lease } satisfies ClaimedCuki;
+    return { ...normalized, lease } satisfies ClaimedCuki;
   }
 
   async claimNextCuki() {
@@ -158,22 +176,42 @@ export class CardWorkerStore {
         },
       ],
     };
-    return this.claim(candidateFilter, { timeStamp: 1, _id: 1 });
+    if (this.config.sourceFormat === 'indexed') {
+      const claimed = await this.claim(candidateFilter, { timeStamp: 1, _id: 1 });
+      return claimed;
+    }
+
+    const candidates = await this.cukies()
+      .find(candidateFilter)
+      .sort({ timeStamp: 1, _id: 1 })
+      .limit(100)
+      .toArray();
+    for (const candidate of candidates) {
+      try {
+        normalizeCukiSourceDocument(candidate, this.config.sourceFormat);
+      } catch {
+        continue;
+      }
+      const claimed = await this.claim(this.claimFilter(String(candidate._id)));
+      if (claimed) return claimed;
+    }
+    return null;
   }
 
   async claimCukiByDocumentId(documentId: string) {
-    return this.claim(this.claimFilter(documentId));
+    const filter = this.claimFilter(documentId);
+    const existing = await this.cukies().findOne(filter);
+    if (!existing) return null;
+    normalizeCukiSourceDocument(existing, this.config.sourceFormat);
+    return this.claim(filter);
   }
 
   async claimCukiByTokenId(tokenId: string) {
-    const base = this.claimFilter();
-    return this.claim({
-      ...base,
-      $and: [
-        ...(base.$and ?? []),
-        { $or: [{ tokenId }, { _id: tokenId }] },
-      ],
-    });
+    const filter = this.claimFilter(tokenId);
+    const existing = await this.cukies().findOne(filter);
+    if (!existing) return null;
+    normalizeCukiSourceDocument(existing, this.config.sourceFormat);
+    return this.claim(filter);
   }
 
   async claimCukiById(documentId: string) {
@@ -181,7 +219,7 @@ export class CardWorkerStore {
   }
 
   async listBackfillCukies() {
-    return this.cukies()
+    const documents = await this.cukies()
       .find({})
       .project<CukiDocument>({
         _id: 1,
@@ -203,6 +241,17 @@ export class CardWorkerStore {
       })
       .sort({ _id: 1 })
       .toArray();
+
+    return documents.map((document) => {
+      try {
+        return normalizeCukiSourceDocument(document, this.config.sourceFormat);
+      } catch (error) {
+        return {
+          ...document,
+          sourceValidationError: error instanceof Error ? error.message : String(error),
+        } satisfies CukiDocument;
+      }
+    });
   }
 
   private leaseFilter(claimed: ClaimedCuki): Filter<CukiDocument> {
@@ -232,7 +281,7 @@ export class CardWorkerStore {
       throw new Error(`No se pudo confirmar la publicación de la card ${claimed._id}: el lease ya no es válido o el documento cambió.`);
     }
 
-    await this.recordJob(claimed._id, 'generated', result);
+    await this.recordJob(String(claimed._id), 'generated', result);
   }
 
   async markFailed(claimed: ClaimedCuki, error: unknown) {
@@ -256,7 +305,7 @@ export class CardWorkerStore {
       throw new Error(`No se pudo registrar el fallo de la card ${claimed._id}: el lease ya no es válido.`);
     }
 
-    await this.recordJob(claimed._id, 'failed', { error: message });
+    await this.recordJob(String(claimed._id), 'failed', { error: message });
   }
 
   async recordJob(documentId: string, status: string, payload: Record<string, unknown>) {

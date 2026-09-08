@@ -8,7 +8,6 @@ import {
   type CukiesInventoryDocument,
   type NftAssetLockDocument,
 } from '@/lib/nft-inventory';
-import { normalizeLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
 
 import { SchemaNotReadyError } from '../errors';
 import { economyCycleDurationMs, loadEconomyCycleCalendar } from '../cycle-calendar';
@@ -935,10 +934,7 @@ export async function listAvailableCukiePoolVaultAssets(
       chainId: config.chainId,
       collectionAddress: item.collection,
       tokenId: item.normalized.tokenId!,
-      imageUrl: normalizeLegacyMarketplaceNftImageUrl(
-        item.normalized.tokenId!,
-        typeof item.document.img === 'string' ? item.document.img : null,
-      ),
+      imageUrl: item.normalized.imageUrl ?? null,
       generation: item.normalized.generation as CukiePoolGeneration,
       rarity: item.normalized.rarity as CukiePoolRarity,
       custody: 'wallet' as const,

@@ -31,6 +31,8 @@ const config: CardWorkerConfig = {
   verifyPublic: true,
   backfillConcurrency: 2,
   backfillManifestPath: null,
+  sourceFormat: 'indexed',
+  legacyStagingEnabled: false,
 };
 
 const renderResult: RenderResult = {

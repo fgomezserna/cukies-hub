@@ -16,6 +16,7 @@ const guardedWorkers = [
   'cukie-pool-scheduler',
   'weekly-ranking-scheduler',
   'cuki-card-worker',
+  'cuki-card-worker-legacy',
 ];
 
 const sharedDappRuntimeWorkers = [
@@ -82,6 +83,17 @@ for (const serviceName of guardedWorkers) {
     );
   });
 }
+
+test('legacy card worker is opt-in, staging-only and cannot target indexed fixtures', () => {
+  const definition = serviceDefinition('cuki-card-worker-legacy');
+
+  assert.match(definition, /    profiles:\n      - legacy-card-worker/);
+  assert.ok(definition.includes('CARD_WORKER_SOURCE_FORMAT: legacy'));
+  assert.ok(definition.includes('CARD_WORKER_LEGACY_STAGING_ENABLED: ${CARD_WORKER_LEGACY_STAGING_ENABLED:-false}'));
+  assert.ok(definition.includes('CARD_WORKER_DB_NAME: ${CARD_WORKER_LEGACY_DB_NAME:-cukies-legacy-staging}'));
+  assert.ok(definition.includes('CARD_WORKER_MONGO_URL: ${CARD_WORKER_LEGACY_MONGO_URL:-${CUKIES_DATABASE_URL}}'));
+  assert.ok(definition.includes('assert-staging-only.mjs --scope cuki-card-worker'));
+});
 
 test('chain-indexer reports health from its staging Mongo connection', () => {
   const definition = serviceDefinition('chain-indexer');

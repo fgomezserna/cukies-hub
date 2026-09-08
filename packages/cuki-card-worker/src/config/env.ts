@@ -4,6 +4,7 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
+import { assertCardWorkerSourceConfig, LEGACY_STAGING_DB_NAME } from '../source.js';
 import type { CardWorkerConfig } from '../types.js';
 
 const defaultTokenAddress = 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe';
@@ -67,6 +68,8 @@ const envSchema = z.object({
   CARD_WORKER_VERIFY_PUBLIC: z.string().default('true'),
   CARD_WORKER_BACKFILL_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
   CARD_WORKER_BACKFILL_MANIFEST_PATH: z.string().optional(),
+  CARD_WORKER_SOURCE_FORMAT: z.enum(['indexed', 'legacy']).default('indexed'),
+  CARD_WORKER_LEGACY_STAGING_ENABLED: z.string().default('false'),
 });
 
 function parseBoolean(value: string | undefined) {
@@ -91,7 +94,7 @@ export function getCardWorkerConfig(): CardWorkerConfig {
     throw new Error('Falta CARD_WORKER_MONGO_URL, CHAIN_INDEXER_MONGO_URL o DATABASE_URL.');
   }
 
-  return {
+  const config = {
     mongoUrl,
     dbName: env.CARD_WORKER_DB_NAME ?? env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new',
     assetsDir: env.CARD_WORKER_ASSETS_DIR
@@ -123,5 +126,13 @@ export function getCardWorkerConfig(): CardWorkerConfig {
     backfillManifestPath: env.CARD_WORKER_BACKFILL_MANIFEST_PATH
       ? path.resolve(env.CARD_WORKER_BACKFILL_MANIFEST_PATH)
       : null,
+    sourceFormat: env.CARD_WORKER_SOURCE_FORMAT,
+    legacyStagingEnabled: parseBoolean(env.CARD_WORKER_LEGACY_STAGING_ENABLED),
   };
+
+  if (config.sourceFormat === 'legacy' && config.dbName !== LEGACY_STAGING_DB_NAME) {
+    throw new Error(`CARD_WORKER_SOURCE_FORMAT=legacy exige CARD_WORKER_DB_NAME=${LEGACY_STAGING_DB_NAME}.`);
+  }
+  assertCardWorkerSourceConfig(config);
+  return config;
 }

@@ -1,5 +1,6 @@
 import type { ClientSession, Db } from 'mongodb';
 
+import { normalizeLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
 
 import {
@@ -70,6 +71,7 @@ export type NftAssetActiveLock = {
 export type NormalizedNftAsset = {
   assetId: string;
   tokenId: string | null;
+  imageUrl?: string | null;
   network: NftAssetNetwork;
   ownerWallet: string | null;
   ownerNormalized: string | null;
@@ -523,6 +525,9 @@ export function normalizeCukiesInventoryDocument(
   return {
     assetId: buildCukiesAssetId(document),
     tokenId,
+    imageUrl: tokenId
+      ? normalizeLegacyMarketplaceNftImageUrl(tokenId, toStringOrNull(document.img))
+      : null,
     network,
     ownerWallet,
     ownerNormalized,

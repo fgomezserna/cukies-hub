@@ -802,6 +802,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       CARD_WORKER_MONGO_URL: ${CARD_WORKER_MONGO_URL:-${DATABASE_URL}}
       CARD_WORKER_DB_NAME: ${CARD_WORKER_DB_NAME:-cukieshub-new}
+      CARD_WORKER_SOURCE_FORMAT: indexed
+      CARD_WORKER_LEGACY_STAGING_ENABLED: "false"
       CARD_WORKER_UPLOAD: ${CARD_WORKER_UPLOAD:-false}
       CARD_WORKER_PUBLIC_BASE_URL: ${CARD_WORKER_PUBLIC_BASE_URL}
       CARD_WORKER_PUBLIC_KEY_PREFIX: ${CARD_WORKER_PUBLIC_KEY_PREFIX:-}
@@ -818,6 +820,49 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION:-${CARD_WORKER_S3_REGION}}
     restart: unless-stopped
+    networks:
+      - coolify
+
+  cuki-card-worker-legacy:
+    profiles:
+      - legacy-card-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CUKIES_SERVICE: cuki-card-worker
+    environment:
+      CUKIES_SERVICE: cuki-card-worker
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
+      STAGING_ONLY_GUARD: ${STAGING_ONLY_GUARD:?Set STAGING_ONLY_GUARD=true for staging}
+      COOLIFY_BRANCH: ${COOLIFY_BRANCH:?Coolify must expose the staging branch}
+      COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
+      DATABASE_URL: ${DATABASE_URL}
+      CARD_WORKER_MONGO_URL: ${CARD_WORKER_LEGACY_MONGO_URL:-${CUKIES_DATABASE_URL}}
+      CARD_WORKER_DB_NAME: ${CARD_WORKER_LEGACY_DB_NAME:-cukies-legacy-staging}
+      CARD_WORKER_SOURCE_FORMAT: legacy
+      CARD_WORKER_LEGACY_STAGING_ENABLED: ${CARD_WORKER_LEGACY_STAGING_ENABLED:-false}
+      CARD_WORKER_UPLOAD: ${CARD_WORKER_UPLOAD:-false}
+      CARD_WORKER_PUBLIC_BASE_URL: ${CARD_WORKER_PUBLIC_BASE_URL}
+      CARD_WORKER_PUBLIC_KEY_PREFIX: ${CARD_WORKER_PUBLIC_KEY_PREFIX:-}
+      CARD_WORKER_VERIFY_PUBLIC: ${CARD_WORKER_VERIFY_PUBLIC:-true}
+      CARD_WORKER_BACKFILL_CONCURRENCY: ${CARD_WORKER_BACKFILL_CONCURRENCY:-2}
+      CARD_WORKER_BACKFILL_MANIFEST_PATH: ${CARD_WORKER_BACKFILL_MANIFEST_PATH:-}
+      CARD_WORKER_S3_BUCKET: ${CARD_WORKER_S3_BUCKET}
+      CARD_WORKER_S3_REGION: ${CARD_WORKER_S3_REGION}
+      CARD_WORKER_S3_PREFIX: ${CARD_WORKER_S3_PREFIX}
+      CARD_WORKER_S3_ENDPOINT: ${CARD_WORKER_S3_ENDPOINT:-}
+      CARD_WORKER_S3_FORCE_PATH_STYLE: ${CARD_WORKER_S3_FORCE_PATH_STYLE:-false}
+      CARD_WORKER_S3_ACL: ${CARD_WORKER_S3_ACL:-public-read}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION:-${CARD_WORKER_S3_REGION}}
+    command:
+      - sh
+      - -c
+      - node scripts/assert-staging-only.mjs --scope cuki-card-worker && exec scripts/docker-start.sh
+    restart: "no"
     networks:
       - coolify
 

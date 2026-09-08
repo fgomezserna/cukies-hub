@@ -10,6 +10,15 @@ export {
 } from './s3.js';
 export { CardWorkerStore } from './storage/index.js';
 export {
+  assertCardWorkerSourceConfig,
+  LEGACY_SOURCE_CONTEXTS,
+  LEGACY_STAGING_DB_NAME,
+  normalizeCukiSourceDocument,
+  sourceCandidateFilter,
+  sourceDocumentFilter,
+  sourceTokenIdFilter,
+} from './source.js';
+export {
   backfillCards,
   generateTokenCard,
   getCardWorkerStatus,
@@ -20,6 +29,7 @@ export {
 } from './worker.js';
 export type {
   CardWorkerConfig,
+  CardWorkerSourceFormat,
   CukiDocument,
   CukiSkills,
   GenerationResult,

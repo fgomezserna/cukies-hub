@@ -166,10 +166,7 @@ function positionMedia(
   return {
     identity: `${collectionAddress}:${tokenId}`,
     media: {
-      imageUrl: normalizeLegacyMarketplaceNftImageUrl(
-        tokenId,
-        typeof document.img === 'string' ? document.img : null,
-      ),
+      imageUrl: normalized.imageUrl ?? null,
       generation,
       rarity,
     } satisfies CukiePoolPositionMedia,

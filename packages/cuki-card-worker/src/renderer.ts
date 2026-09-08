@@ -4,6 +4,7 @@ import path from 'node:path';
 import Jimp from 'jimp';
 
 import type { CardWorkerConfig, CukiDocument, CukiSkills, RenderResult } from './types.js';
+import { normalizeCukiSourceDocument } from './source.js';
 
 const idFontsByGeneration = new Map<number, string>([
   [1, 'fonts/Mitr/Regular/Purple/20/Xg_2ExwkkfDZg3xOD9D_QPn9.ttf.fnt'],
@@ -64,16 +65,17 @@ function outputPath(config: CardWorkerConfig, tokenId: string) {
 }
 
 export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfig): Promise<RenderResult> {
-  const documentId = cuki._id;
-  const tokenId = cuki.tokenId ?? cuki._id;
+  const sourceDocument = normalizeCukiSourceDocument(cuki, config.sourceFormat);
+  const documentId = String(sourceDocument._id);
+  const tokenId = sourceDocument.tokenId ?? String(sourceDocument._id);
 
   if (!tokenId) {
     throw new Error('El documento de Cuki no tiene _id ni tokenId.');
   }
 
-  const skills = cuki.skills ?? {};
-  const generation = requiredNumber(skills.generation ?? cuki.generation, 'skills.generation/generation');
-  const type = requiredNumber(cuki.type ?? cuki.rarity, 'type/rarity');
+  const skills = sourceDocument.skills ?? {};
+  const generation = requiredNumber(skills.generation ?? sourceDocument.generation, 'skills.generation/generation');
+  const type = requiredNumber(sourceDocument.type ?? sourceDocument.rarity, 'type/rarity');
   const idFontRelativePath = idFontsByGeneration.get(generation);
 
   if (!idFontRelativePath) {
@@ -139,7 +141,7 @@ export async function renderCukiCard(cuki: CukiDocument, config: CardWorkerConfi
   return {
     tokenId,
     documentId,
-    assetIdentity: canonicalAssetIdentity(cuki),
+    assetIdentity: canonicalAssetIdentity(sourceDocument),
     outputPath: renderedOutputPath,
     width: image.bitmap.width,
     height: image.bitmap.height,

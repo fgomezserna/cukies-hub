@@ -128,6 +128,8 @@ type BackfillManifestItem = {
   chain?: string;
   chainId?: number;
   collectionAddressNormalized?: string;
+  previousImageUrl: string | null;
+  previousImageSha256: string | null;
   previousImageHost: string | null;
   sourceRevision: string | null;
   censusCategory: BackfillCensusCategory;
@@ -176,7 +178,8 @@ function hasOwnedPublicImage(value: unknown, config: CardWorkerConfig) {
     && value.startsWith(`${config.publicBaseUrl}/`);
 }
 
-export function classifyCukiMetadata(cuki: CukiDocument): Extract<BackfillCensusCategory, 'renderable' | 'missing_metadata' | 'unsupported_metadata'> {
+export function classifyCukiMetadata(cuki: CukiDocument): Extract<BackfillCensusCategory, 'invalid_identity' | 'renderable' | 'missing_metadata' | 'unsupported_metadata'> {
+  if (cuki.sourceValidationError) return 'invalid_identity';
   const rawType = cuki.type ?? cuki.rarity;
   const rawGeneration = cuki.skills?.generation ?? cuki.generation;
   if (rawType === undefined || rawType === null || rawGeneration === undefined || rawGeneration === null) {
@@ -192,7 +195,10 @@ export function classifyCukiMetadata(cuki: CukiDocument): Extract<BackfillCensus
   return 'renderable';
 }
 
-export function canonicalAssetIdentity(cuki: CukiDocument) {
+export function canonicalAssetIdentity(cuki: CukiDocument, sourceFormat: CardWorkerConfig['sourceFormat'] = 'indexed') {
+  if (sourceFormat === 'legacy' && cuki.sourceValidationError) {
+    return `invalid:document:${String(cuki._id)}`;
+  }
   const tokenId = cuki.tokenId ?? cuki._id;
   const network = (cuki.network ?? cuki.chain ?? 'unknown').trim().toLowerCase() || 'unknown';
   const collection = (cuki.collectionAddressNormalized ?? 'unknown').trim().toLowerCase() || 'unknown';
@@ -201,18 +207,22 @@ export function canonicalAssetIdentity(cuki: CukiDocument) {
 }
 
 function manifestItem(cuki: CukiDocument): BackfillManifestItem {
-  const tokenId = cuki.tokenId ?? cuki._id;
+  const tokenId = cuki.tokenId ?? String(cuki._id);
   const censusCategory = classifyCukiMetadata(cuki);
   return {
-    documentId: cuki._id,
+    documentId: String(cuki._id),
     tokenId,
-    assetIdentity: canonicalAssetIdentity(cuki),
-    legacyDocumentId: cuki._id,
+    assetIdentity: censusCategory === 'invalid_identity'
+      ? `invalid:document:${String(cuki._id)}`
+      : canonicalAssetIdentity(cuki),
+    legacyDocumentId: String(cuki._id),
     legacyTokenId: tokenId,
     network: cuki.network,
     chain: cuki.chain,
     chainId: cuki.chainId,
     collectionAddressNormalized: cuki.collectionAddressNormalized,
+    previousImageUrl: typeof cuki.img === 'string' && cuki.img.trim() ? cuki.img.trim() : null,
+    previousImageSha256: typeof cuki.img === 'string' ? cardContentSha256FromUrl(cuki.img) : null,
     previousImageHost: imageHost(cuki.img),
     sourceRevision: cuki.updatedAt?.toISOString() ?? null,
     censusCategory,
@@ -292,7 +302,7 @@ export async function backfillCards(config = getCardWorkerConfig()) {
         startedAt: new Date().toISOString(),
         cutoffAt: cutoffAt.toISOString(),
         status: 'in_progress',
-        initialItems: candidates.map(manifestItem),
+        initialItems: candidates.map((candidate) => manifestItem(candidate)),
         deltaItems: [],
       };
     } else {
@@ -351,7 +361,8 @@ export async function backfillCards(config = getCardWorkerConfig()) {
     const knownDeltaIds = new Set(manifest.deltaItems.map((item) => `${item.documentId}:${item.sourceRevision ?? 'none'}`));
     for (const cuki of current) {
       const changedAfterCutoff = cuki.updatedAt && cuki.updatedAt > new Date(manifest.cutoffAt);
-      if ((!initialIds.has(cuki._id) || changedAfterCutoff) && !processedDocumentIds.has(cuki._id)) {
+      const documentId = String(cuki._id);
+      if ((!initialIds.has(documentId) || changedAfterCutoff) && !processedDocumentIds.has(documentId)) {
         const item = manifestItem(cuki);
         const key = `${item.documentId}:${item.sourceRevision ?? 'none'}`;
         if (!knownDeltaIds.has(key)) manifest.deltaItems.push(item);
