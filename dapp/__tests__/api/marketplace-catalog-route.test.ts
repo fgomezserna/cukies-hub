@@ -1,0 +1,166 @@
+jest.mock('@/lib/legacy-marketplace/data', () => ({
+  listLegacyMarketplaceCukies: jest.fn(),
+}));
+jest.mock('@/lib/uki-marketplace', () => ({
+  listPublicUkiMarketplacePage: jest.fn(),
+}));
+
+import { NextRequest } from 'next/server';
+
+import { GET } from '@/app/api/marketplace/v1/catalog/route';
+import { listLegacyMarketplaceCukies } from '@/lib/legacy-marketplace/data';
+import { listPublicUkiMarketplacePage } from '@/lib/uki-marketplace';
+
+const legacyList = listLegacyMarketplaceCukies as jest.Mock;
+const ukiList = listPublicUkiMarketplacePage as jest.Mock;
+
+const facets = {
+  states: [],
+  networks: [],
+  types: [],
+  generations: [],
+};
+
+function legacyItem(tokenId: string, timestamp: number, network = 'BSC') {
+  return { tokenId, timestamp, network, type: '1', skills: { generation: 1 } };
+}
+
+function ukiItem(tokenId: string, listedAt: string, orderId = tokenId) {
+  return {
+    orderId: `0x${orderId.padStart(64, '0')}`,
+    chainId: 97,
+    marketplaceAddress: '0x0000000000000000000000000000000000001001',
+    collectionAddress: '0x0000000000000000000000000000000000001002',
+    tokenId,
+    seller: '0x00000000000000000000000000000000000000aa',
+    ukiPriceRaw: '1000000000000000000',
+    expiresAt: '2027-01-01T00:00:00.000Z',
+    nonceRaw: '1',
+    feeBps: 100,
+    status: 'active',
+    attentionReason: null,
+    buyer: null,
+    paymentToken: null,
+    paymentAmountRaw: null,
+    feeAmountRaw: null,
+    listedAt,
+    soldAt: null,
+    cancelledAt: null,
+    expiredAt: null,
+    invalidatedAt: null,
+    catalogCursor: `cursor-${tokenId}`,
+  };
+}
+
+function request(query: string) {
+  return new NextRequest(`http://localhost/api/marketplace/v1/catalog?${query}`);
+}
+
+describe('/api/marketplace/v1/catalog', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    legacyList.mockResolvedValue({
+      source: 'mongo',
+      items: [],
+      total: 0,
+      offset: 0,
+      limit: 24,
+      facets,
+    });
+    ukiList.mockResolvedValue({ orders: [], nextCursor: null, hasMore: false });
+  });
+
+  it('avanza por páginas reales sin duplicar ni omitir más de cien resultados', async () => {
+    const legacy = Array.from({ length: 130 }, (_, index) =>
+      legacyItem(String(index + 1), 2_000_000_000 - index),
+    );
+    const uki = [
+      ukiItem('900', '2025-01-01T00:00:00.000Z'),
+      ukiItem('901', '2025-01-01T00:00:00.000Z'),
+    ];
+    legacyList.mockImplementation(async ({ offset, limit }: { offset: number; limit: number }) => ({
+      source: 'mongo',
+      items: legacy.slice(offset, offset + limit),
+      total: legacy.length,
+      offset,
+      limit,
+      facets,
+    }));
+    ukiList.mockResolvedValue({
+      orders: uki,
+      nextCursor: 'cursor-901',
+      hasMore: false,
+    });
+
+    const seen: string[] = [];
+    let query = 'scope=all&limit=24';
+    for (let page = 0; page < 8; page += 1) {
+      const response = await GET(request(query));
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      seen.push(...body.data.items.map((entry: { source: string; item: { tokenId: string } }) => `${entry.source}:${entry.item.tokenId}`));
+      if (!body.data.hasMore) break;
+      query = new URLSearchParams({
+        scope: 'all',
+        limit: '24',
+        legacyOffset: String(body.data.cursors.legacyOffset),
+        ...(body.data.cursors.ukiCursor ? { ukiCursor: body.data.cursors.ukiCursor } : {}),
+      }).toString();
+    }
+
+    expect(seen).toHaveLength(132);
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(seen).toContain('legacy:130');
+    expect(seen).toContain('uki:900');
+    expect(seen).toContain('uki:901');
+  });
+
+  it('mantiene el orden de cada fuente en empates y busca UKI antes de paginar', async () => {
+    const first = legacyItem('9', 1_700_000_000);
+    const second = legacyItem('1', 1_700_000_000);
+    legacyList.mockResolvedValue({ source: 'mongo', items: [first, second], total: 2, offset: 0, limit: 24, facets });
+    ukiList.mockImplementation(async ({ search }: { search?: string }) => ({
+      orders: search === 'wallet' ? [ukiItem('77', '2023-11-14T22:13:20.000Z')] : [],
+      nextCursor: null,
+      hasMore: false,
+    }));
+
+    const response = await GET(request('scope=all&limit=24&search=wallet'));
+    const body = await response.json();
+    expect(body.data.items.map((entry: { source: string; item: { tokenId: string } }) => `${entry.source}:${entry.item.tokenId}`)).toEqual([
+      'legacy:9',
+      'legacy:1',
+      'uki:77',
+    ]);
+    expect(ukiList).toHaveBeenCalledWith({ limit: 24, cursor: undefined, search: 'wallet' });
+  });
+
+  it('conserva una fuente cuando la otra falla y comunica fallo total', async () => {
+    legacyList.mockResolvedValue({ source: 'mongo', items: [legacyItem('1', 2_000_000_000)], total: 1, offset: 0, limit: 24, facets });
+    ukiList.mockRejectedValue(new Error('UKI down'));
+    const partial = await GET(request('scope=all&limit=24'));
+    const partialBody = await partial.json();
+    expect(partialBody.data.sources).toEqual({ legacy: 'ready', uki: 'unavailable' });
+    expect(partialBody.data.items).toHaveLength(1);
+
+    legacyList.mockRejectedValue(new Error('Legacy down'));
+    const unavailable = await GET(request('scope=all&limit=24'));
+    const unavailableBody = await unavailable.json();
+    expect(unavailableBody.data.sources).toEqual({ legacy: 'unavailable', uki: 'unavailable' });
+    expect(unavailableBody.data.items).toEqual([]);
+  });
+
+  it('rechaza ordenar precios sin una moneda única y conserva filtros Legacy válidos', async () => {
+    expect((await GET(request('scope=all&sort=price-asc'))).status).toBe(400);
+
+    await GET(request('scope=legacy&network=BSC&type=2&generation=1&sort=price-asc'));
+    expect(legacyList).toHaveBeenCalledWith(expect.objectContaining({
+      network: 'BSC',
+      type: '2',
+      generation: '1',
+      sort: 'price-asc',
+      marketplaceOnly: true,
+    }));
+    expect(ukiList).not.toHaveBeenCalled();
+  });
+});

@@ -17,8 +17,8 @@ export function CukiePointsPageShell() {
               CukiePoints
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Comprueba que tus wallets tienen los puntos esperados antes y
-              despues de mint, breeding o acciones de marketplace.
+              Consulta los puntos ganados y utilizados antes y después de mint,
+              crías o acciones del marketplace.
             </p>
             <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
               {[
@@ -26,7 +26,10 @@ export function CukiePointsPageShell() {
                 [Network, 'Lectura BSC y TRON'],
                 [Database, 'Actividad global auditable'],
               ].map(([Icon, label]) => (
-                <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+                <div
+                  key={String(label)}
+                  className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2"
+                >
                   <Icon className="h-3.5 w-3.5 text-lilac-200" />
                   <span>{label as string}</span>
                 </div>
@@ -46,7 +49,7 @@ export function CukiePointsPageShell() {
               href="/breeding"
               className="inline-flex items-center gap-2 rounded-[8px] border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-300/15"
             >
-              Breeding
+              Crías
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>

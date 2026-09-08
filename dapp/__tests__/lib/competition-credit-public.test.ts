@@ -45,4 +45,30 @@ describe('competition credit public status conflicts', () => {
       code: 'CONFLICT', details: { reason: 'CREDIT_PROJECTION_DUPLICATE_ROUTES' },
     });
   });
+
+  it('does not report stale source watermarks as current grant eligibility', async () => {
+    mockCollections({
+      economy_rule_versions: [testCompetitionCreditRule()],
+      competition_credit_source_watermarks: [
+        {
+          _id: 'cukie-master-slots:uki',
+          route: 'uki',
+          status: 'healthy',
+          observedThrough: new Date('2026-09-07T08:00:00.000Z'),
+        },
+        {
+          _id: 'cukie-master-slots:nft',
+          route: 'nft',
+          status: 'healthy',
+          observedThrough: new Date('2026-09-07T08:00:00.000Z'),
+        },
+      ],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.grants).toMatchObject({ healthy: false, openIncidents: 0 });
+    expect(status.routes.nft.grants).toMatchObject({ healthy: false, openIncidents: 0 });
+    expect(status.grants.healthy).toBe(false);
+  });
 });

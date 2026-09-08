@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Coins,
@@ -29,6 +29,7 @@ import { shortWallet } from './format';
 
 type PointsNetworkFilter = 'ALL' | 'BSC' | 'TRON';
 type PointsScope = 'wallet' | 'global';
+type PointsFeedStatus = 'loading' | 'ready' | 'empty' | 'unavailable';
 
 type TronPointsSnapshot = {
   balance: string | null;
@@ -49,7 +50,24 @@ function formatPointValue(value?: bigint | number | string | null) {
   if (typeof value === 'bigint') return value.toLocaleString('en-US');
 
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric.toLocaleString('en-US') : String(value);
+  return Number.isFinite(numeric)
+    ? numeric.toLocaleString('en-US')
+    : String(value);
+}
+
+function formatIndexedPointValue(
+  value: bigint | number | string | null | undefined,
+  source: LegacyCukiePointsResponse['source'] | undefined,
+) {
+  if (source === 'empty') return 'No disponible';
+  return formatPointValue(value);
+}
+
+function getPointTypeLabel(value: string) {
+  if (value === 'ALL') return 'Todas';
+  if (value === 'Unstake') return 'Retirada';
+  if (value === 'Breeding') return 'Crías';
+  return value;
 }
 
 function formatPointDate(timestamp: number | null) {
@@ -78,7 +96,9 @@ function TransactionRow({ item }: { item: LegacyCukiePointsTransaction }) {
       <span className="min-w-0 truncate font-mono text-xs text-slate-400">
         {shortWallet(item.address)}
       </span>
-      <span className="text-xs text-slate-400">{formatPointDate(item.date)}</span>
+      <span className="text-xs text-slate-400">
+        {formatPointDate(item.date)}
+      </span>
       {item.explorerUrl ? (
         <a
           href={item.explorerUrl}
@@ -109,9 +129,16 @@ export function CukiePointsClient() {
   const [type, setType] = useState('ALL');
   const [pointsData, setPointsData] =
     useState<LegacyCukiePointsResponse | null>(null);
+  const [pointsFeedStatus, setPointsFeedStatus] =
+    useState<PointsFeedStatus>('loading');
   const [isLoadingPoints, setIsLoadingPoints] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [pointsError, setPointsError] = useState<string | null>(null);
+  const [pointsDataStale, setPointsDataStale] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const pointsDataRef = useRef<LegacyCukiePointsResponse | null>(null);
+  const pointsRequestRef = useRef(0);
+  const tronRequestRef = useRef(0);
   const [tronSnapshot, setTronSnapshot] = useState<TronPointsSnapshot>({
     balance: null,
     total: null,
@@ -120,7 +147,10 @@ export function CukiePointsClient() {
   });
 
   const connectedWallets = useMemo(
-    () => [address, tronAddress].filter((wallet): wallet is string => Boolean(wallet)),
+    () =>
+      [address, tronAddress].filter((wallet): wallet is string =>
+        Boolean(wallet),
+      ),
     [address, tronAddress],
   );
   const effectiveScope: PointsScope =
@@ -133,7 +163,8 @@ export function CukiePointsClient() {
     args: address ? [address] : undefined,
     chainId: 56,
     query: {
-      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled && Boolean(address),
+      enabled:
+        legacyMarketplaceRuntime.legacyMainnetEnabled && Boolean(address),
     },
   });
   const { data: bscTotal } = useReadContract({
@@ -165,10 +196,12 @@ export function CukiePointsClient() {
   });
 
   const refreshTronSnapshot = useCallback(async () => {
+    const requestId = tronRequestRef.current + 1;
+    tronRequestRef.current = requestId;
     if (
-      !legacyMarketplaceRuntime.legacyMainnetEnabled
-      || !tronAddress
-      || !window.tronWeb
+      !legacyMarketplaceRuntime.legacyMainnetEnabled ||
+      !tronAddress ||
+      !window.tronWeb
     ) {
       setTronSnapshot({
         balance: null,
@@ -181,12 +214,9 @@ export function CukiePointsClient() {
 
     try {
       const [balance, total, emitted, burned] = await Promise.all([
-        readLegacyTronContract<unknown>(
-          window.tronWeb,
-          'points',
-          'getPoints',
-          [tronAddress],
-        ),
+        readLegacyTronContract<unknown>(window.tronWeb, 'points', 'getPoints', [
+          tronAddress,
+        ]),
         readLegacyTronContract<unknown>(
           window.tronWeb,
           'points',
@@ -203,6 +233,7 @@ export function CukiePointsClient() {
           'getTotalPointsBurned',
         ),
       ]);
+      if (requestId !== tronRequestRef.current) return;
       setTronSnapshot({
         balance: formatPointValue(String(balance)),
         total: formatPointValue(String(total)),
@@ -210,6 +241,7 @@ export function CukiePointsClient() {
         burned: formatPointValue(String(burned)),
       });
     } catch (error) {
+      if (requestId !== tronRequestRef.current) return;
       setStatus(getErrorMessage(error));
     }
   }, [tronAddress]);
@@ -234,52 +266,98 @@ export function CukiePointsClient() {
   );
 
   const refreshPoints = useCallback(async () => {
+    const requestId = pointsRequestRef.current + 1;
+    pointsRequestRef.current = requestId;
+    const previousData = pointsDataRef.current;
     setIsLoadingPoints(true);
-    setStatus(null);
+    setPointsError(null);
 
     try {
       const response = await fetch(
         `/api/cukies/points?${buildPointsQuery(0)}`,
-        { cache: 'no-store' },
+        {
+          cache: 'no-store',
+        },
       );
       if (!response.ok) {
         throw new Error('No se ha podido cargar CukiePoints.');
       }
       const payload = (await response.json()) as LegacyCukiePointsResponse;
-      setPointsData(payload);
+      if (requestId !== pointsRequestRef.current) return;
+      if (payload.source === 'empty') {
+        if (!previousData) {
+          setPointsData(payload);
+          pointsDataRef.current = payload;
+        }
+        setPointsFeedStatus('unavailable');
+        setPointsDataStale(Boolean(previousData));
+      } else {
+        setPointsData(payload);
+        pointsDataRef.current = payload;
+        setPointsFeedStatus(payload.items.length > 0 ? 'ready' : 'empty');
+        setPointsDataStale(false);
+      }
     } catch (error) {
-      setStatus(getErrorMessage(error));
-      setPointsData(null);
+      if (requestId !== pointsRequestRef.current) return;
+      setPointsError(getErrorMessage(error));
+      setPointsFeedStatus(
+        previousData
+          ? previousData.items.length > 0
+            ? 'ready'
+            : 'empty'
+          : 'unavailable',
+      );
+      setPointsDataStale(Boolean(previousData));
     } finally {
-      setIsLoadingPoints(false);
+      if (requestId === pointsRequestRef.current) setIsLoadingPoints(false);
     }
   }, [buildPointsQuery]);
 
   const loadMorePoints = useCallback(async () => {
     if (!pointsData || pointsData.items.length >= pointsData.total) return;
 
+    const requestId = pointsRequestRef.current;
+    const queryKey = buildPointsQuery(pointsData.items.length).toString();
     setIsLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/cukies/points?${buildPointsQuery(pointsData.items.length)}`,
+        `/api/cukies/points?${queryKey}`,
         { cache: 'no-store' },
       );
       if (!response.ok) {
         throw new Error('No se han podido cargar mas movimientos.');
       }
       const payload = (await response.json()) as LegacyCukiePointsResponse;
-      setPointsData({
+      if (
+        requestId !== pointsRequestRef.current
+        || queryKey !== buildPointsQuery(pointsData.items.length).toString()
+      ) return;
+      if (payload.source === 'empty') {
+        setPointsError('No se ha podido verificar más actividad de Cukie Points.');
+        setPointsDataStale(true);
+        return;
+      }
+      const nextData = {
         ...payload,
         items: [...pointsData.items, ...payload.items],
-      });
+      };
+      setPointsData(nextData);
+      pointsDataRef.current = nextData;
     } catch (error) {
-      setStatus(getErrorMessage(error));
+      if (requestId === pointsRequestRef.current) {
+        setPointsError(getErrorMessage(error));
+        setPointsDataStale(true);
+      }
     } finally {
-      setIsLoadingMore(false);
+      if (requestId === pointsRequestRef.current) setIsLoadingMore(false);
     }
   }, [buildPointsQuery, pointsData]);
 
   useEffect(() => {
+    setPointsData(null);
+    pointsDataRef.current = null;
+    setPointsFeedStatus('loading');
+    setPointsDataStale(false);
     void refreshPoints();
   }, [refreshPoints]);
 
@@ -294,7 +372,14 @@ export function CukiePointsClient() {
         .map((facet) => facet.value)
         .filter((value) => value.length > 0) ?? [];
 
-    return ['ALL', ...Array.from(new Set(indexedTypes.length > 0 ? indexedTypes : ['Breeding', 'Unstake']))];
+    return [
+      'ALL',
+      ...Array.from(
+        new Set(
+          indexedTypes.length > 0 ? indexedTypes : ['Breeding', 'Unstake'],
+        ),
+      ),
+    ];
   }, [pointsSummary]);
   const canLoadMore = Boolean(
     pointsData && pointsData.items.length < pointsData.total,
@@ -313,37 +398,44 @@ export function CukiePointsClient() {
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-4">
             <Wallet className="mb-4 h-5 w-5 text-lilac-200" />
             <p className="text-xs uppercase tracking-wide text-slate-500">
-              BSC wallet balance
+              Saldo BSC de tu wallet
             </p>
             <p className="mt-2 font-mono text-3xl font-bold text-white">
-              {isLoadingBscBalance ? '-' : formatPointValue(bscBalance as bigint)}
+              {isLoadingBscBalance
+                ? '-'
+                : formatPointValue(bscBalance as bigint)}
             </p>
             <p className="mt-2 text-xs text-slate-400">
-              {address ? shortWallet(address) : 'Conecta EVM desde el header'}
+              {address ? shortWallet(address) : 'Conecta tu wallet BSC'}
             </p>
           </div>
 
           <div className="rounded-[8px] border border-white/10 bg-black/30 p-4">
             <Network className="mb-4 h-5 w-5 text-emerald-200" />
             <p className="text-xs uppercase tracking-wide text-slate-500">
-              TRON wallet balance
+              Saldo TRON de tu wallet
             </p>
             <p className="mt-2 font-mono text-3xl font-bold text-white">
               {tronSnapshot.balance ?? '-'}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-              <span>{tronAddress ? shortWallet(tronAddress) : 'TronLink no conectado'}</span>
-              {legacyMarketplaceRuntime.legacyMainnetEnabled && !isTronConnected && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void connectTron()}
-                  disabled={!isTronInstalled}
-                  className="h-7 border-emerald-300/25 bg-emerald-300/10 px-2 text-xs text-emerald-100 hover:bg-emerald-300/20"
-                >
-                  Connect
-                </Button>
-              )}
+              <span>
+                {tronAddress
+                  ? shortWallet(tronAddress)
+                  : 'TronLink no conectado'}
+              </span>
+              {legacyMarketplaceRuntime.legacyMainnetEnabled &&
+                !isTronConnected && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void connectTron()}
+                    disabled={!isTronInstalled}
+                    className="h-7 border-emerald-300/25 bg-emerald-300/10 px-2 text-xs text-emerald-100 hover:bg-emerald-300/20"
+                  >
+                    Conectar TRON
+                  </Button>
+                )}
             </div>
           </div>
         </div>
@@ -352,29 +444,35 @@ export function CukiePointsClient() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">
-                Total CukiePoints
+                Total Cukie Points de esta consulta
               </p>
               <p className="mt-1 font-headline text-2xl font-bold text-white">
-                {formatPointValue(pointsSummary?.totalPoints)}
+                {formatIndexedPointValue(
+                  pointsSummary?.totalPoints,
+                  pointsData?.source,
+                )}
               </p>
             </div>
             <Database className="h-5 w-5 text-lilac-200" />
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-              <p className="text-slate-500">Rows</p>
+              <p className="text-slate-500">Movimientos</p>
               <p className="mt-1 font-mono font-semibold text-white">
-                {formatPointValue(pointsSummary?.totalTransactions)}
+                {formatIndexedPointValue(
+                  pointsSummary?.totalTransactions,
+                  pointsData?.source,
+                )}
               </p>
             </div>
             <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-              <p className="text-slate-500">BSC total</p>
+              <p className="text-slate-500">Total BSC</p>
               <p className="mt-1 font-mono font-semibold text-white">
                 {formatPointValue(bscTotal as bigint)}
               </p>
             </div>
             <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-              <p className="text-slate-500">TRON total</p>
+              <p className="text-slate-500">Total TRON</p>
               <p className="mt-1 font-mono font-semibold text-white">
                 {tronSnapshot.total ?? '-'}
               </p>
@@ -387,7 +485,7 @@ export function CukiePointsClient() {
         <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
           <Sparkles className="mb-3 h-4 w-4 text-lilac-200" />
           <p className="text-xs uppercase tracking-wide text-slate-500">
-            BSC emitted
+            Emitidos BSC
           </p>
           <p className="mt-1 font-mono font-semibold text-white">
             {formatPointValue(bscEmitted as bigint)}
@@ -396,7 +494,7 @@ export function CukiePointsClient() {
         <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
           <Flame className="mb-3 h-4 w-4 text-amber-200" />
           <p className="text-xs uppercase tracking-wide text-slate-500">
-            BSC burned
+            Quemados BSC
           </p>
           <p className="mt-1 font-mono font-semibold text-white">
             {formatPointValue(bscBurned as bigint)}
@@ -405,7 +503,7 @@ export function CukiePointsClient() {
         <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
           <Sparkles className="mb-3 h-4 w-4 text-emerald-200" />
           <p className="text-xs uppercase tracking-wide text-slate-500">
-            TRON emitted
+            Emitidos TRON
           </p>
           <p className="mt-1 font-mono font-semibold text-white">
             {tronSnapshot.emitted ?? '-'}
@@ -414,7 +512,7 @@ export function CukiePointsClient() {
         <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
           <Flame className="mb-3 h-4 w-4 text-rose-200" />
           <p className="text-xs uppercase tracking-wide text-slate-500">
-            TRON burned
+            Quemados TRON
           </p>
           <p className="mt-1 font-mono font-semibold text-white">
             {tronSnapshot.burned ?? '-'}
@@ -426,10 +524,11 @@ export function CukiePointsClient() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-4">
           <div>
             <h2 className="font-headline text-2xl font-bold text-white">
-              Points activity
+              Actividad de Cukie Points
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Movimientos recientes de puntos.
+              Tus movimientos aparecen primero; la actividad global es
+              secundaria.
             </p>
           </div>
           <Button
@@ -443,9 +542,31 @@ export function CukiePointsClient() {
             ) : (
               <RefreshCcw className="mr-2 h-4 w-4" />
             )}
-            Refresh
+            {pointsError ? 'Reintentar' : 'Actualizar'}
           </Button>
         </div>
+
+        {pointsError && (
+          <div
+            role="status"
+            className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100"
+          >
+            <span>
+              {pointsDataStale
+                ? `${pointsError} Se muestra la última lectura disponible.`
+                : pointsError}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isLoadingPoints}
+              onClick={() => void refreshPoints()}
+              className="border-amber-200/30 bg-amber-200/10 text-amber-50"
+            >
+              Reintentar
+            </Button>
+          </div>
+        )}
 
         <div className="grid gap-3 border-b border-white/10 p-4 lg:grid-cols-[auto_auto_auto_1fr]">
           <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
@@ -460,7 +581,7 @@ export function CukiePointsClient() {
                     : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                {item === 'wallet' ? 'My wallets' : 'Global'}
+                {item === 'wallet' ? 'Mis wallets' : 'Global'}
               </button>
             ))}
           </div>
@@ -477,7 +598,7 @@ export function CukiePointsClient() {
                     : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                {item}
+                {item === 'ALL' ? 'Todas' : item}
               </button>
             ))}
           </div>
@@ -494,7 +615,7 @@ export function CukiePointsClient() {
                     : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                {item}
+                {getPointTypeLabel(item)}
               </button>
             ))}
           </div>
@@ -507,15 +628,15 @@ export function CukiePointsClient() {
         </div>
 
         <div className="hidden border-b border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[8rem_7rem_8rem_minmax(0,1fr)_8rem_2rem]">
-          <span>Type</span>
-          <span>Points</span>
-          <span>Network</span>
+          <span>Tipo</span>
+          <span>Puntos</span>
+          <span>Red</span>
           <span>Wallet</span>
-          <span>Date</span>
+          <span>Fecha</span>
           <span>Tx</span>
         </div>
 
-        {isLoadingPoints ? (
+        {isLoadingPoints && !pointsData ? (
           <div className="grid gap-2 p-4">
             {Array.from({ length: 5 }).map((_, index) => (
               <div
@@ -523,6 +644,12 @@ export function CukiePointsClient() {
                 className="h-12 rounded-[8px] border border-white/10 bg-white/[0.03]"
               />
             ))}
+          </div>
+        ) : pointsFeedStatus === 'unavailable' &&
+          (!pointsData || pointsData.source === 'empty') ? (
+          <div className="p-6 text-sm text-amber-100">
+            No se puede verificar la actividad de Cukie Points ahora. Tus
+            métricas no se han convertido en cero.
           </div>
         ) : pointsData && pointsData.items.length > 0 ? (
           <div>
@@ -543,24 +670,27 @@ export function CukiePointsClient() {
                   {isLoadingMore && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  Load more
+                  Cargar más movimientos
                 </Button>
               </div>
             )}
           </div>
-        ) : (
+        ) : pointsFeedStatus === 'empty' ? (
           <div className="p-6 text-sm text-slate-400">
-            No CukiePoints activity found for these filters.
+            No hay actividad de Cukie Points para estos filtros.
           </div>
+        ) : null}
+        {isLoadingPoints && pointsData && (
+          <p className="border-t border-white/10 px-4 py-2 text-xs text-slate-500">
+            Actualizando esta consulta…
+          </p>
         )}
       </section>
-
       {status && (
         <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">
           {status}
         </div>
       )}
-
     </div>
   );
 }

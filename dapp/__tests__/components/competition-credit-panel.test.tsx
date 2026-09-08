@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { CompetitionCreditPanel } from '@/components/cukie-master/credit-panel';
 import { useAuth } from '@/providers/auth-provider';
@@ -55,6 +55,7 @@ function statusResponse() {
           reservedCredits: 10,
           spentCredits: 10,
           poolDepositedCredits: 20,
+          expiredCredits: 45,
           blocked: false,
         },
         pool: { availableCredits: 400, reservedCredits: 10, blocked: false },
@@ -120,6 +121,10 @@ function statusResponse() {
 }
 
 describe('CompetitionCreditPanel', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue(authValue());
@@ -142,6 +147,7 @@ describe('CompetitionCreditPanel', () => {
     expect(screen.getByText('Próxima caducidad')).toBeInTheDocument();
     const [currentPoolBalance] = screen.getAllByText('Aportados al pool');
     expect(currentPoolBalance.parentElement).toHaveTextContent('20');
+    expect(screen.getAllByText('Caducados')[0].parentElement).toHaveTextContent('45');
     expect(screen.queryByText('credits-v1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {
       name: 'Aumentar aportación al pool de UKI, cupo 1',
@@ -203,7 +209,7 @@ describe('CompetitionCreditPanel', () => {
     const nftIncrease = screen.getByLabelText('Aumentar aportación al pool de Cukies, cupo 1');
     expect(ukiIncrease).toBeEnabled();
     expect(nftIncrease).toBeDisabled();
-    expect(screen.getByText(/asignación de tus cupos de Cukies está temporalmente pausada/i)).toBeInTheDocument();
+    expect(screen.getByText(/vigencia actual de tus cupos de Cukies está pendiente/i)).toBeInTheDocument();
 
     fireEvent.click(ukiIncrease);
     const saveButton = screen.getByRole('button', { name: 'Guardar 1 cambio' });
@@ -215,6 +221,186 @@ describe('CompetitionCreditPanel', () => {
       slotId: 'slot-1',
       poolCreditsPerSlot: 30,
     });
+  });
+
+  it('mantiene el último estado confirmado como pendiente cuando ninguna fuente está actualizada', async () => {
+    const staleStatus = statusResponse();
+    const body = await staleStatus.json();
+    body.data.grants.healthy = false;
+    body.data.routes.uki.grants.healthy = false;
+    body.data.routes.nft.grants.healthy = false;
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findAllByText('Pendiente')).toHaveLength(2);
+    expect(screen.getByText(/vigencia actual de tus cupos UKI y tus cupos de Cukies está pendiente/i)).toBeInTheDocument();
+    expect(screen.queryByText('Repartes 100 créditos entre tus cupos activos.')).not.toBeInTheDocument();
+  });
+
+  it('refresca al recuperar el foco y cada 30 segundos sin pisar un draft', async () => {
+    jest.useFakeTimers();
+    const refreshedResponse = statusResponse();
+    const refreshed = await refreshedResponse.json();
+    refreshed.data.balance.expiredCredits = 99;
+    fetchMock
+      .mockResolvedValueOnce(statusResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => refreshed })
+      .mockResolvedValueOnce({ ok: true, json: async () => refreshed });
+
+    render(<CompetitionCreditPanel />);
+    await screen.findByRole('heading', { name: 'Historial de créditos' });
+    fireEvent.click(screen.getByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' }));
+
+    fireEvent.focus(window);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: 'Guardar 1 cambio' })).toBeEnabled();
+    await waitFor(() => expect(screen.getAllByText('99')[0]).toBeInTheDocument());
+
+    await act(async () => {
+      jest.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('conserva la página abierta del historial durante un refresco en foco', async () => {
+    const initialResponse = statusResponse();
+    const initial = await initialResponse.json();
+    initial.data.history.hasMore = true;
+    const olderResponse = statusResponse();
+    const older = await olderResponse.json();
+    older.data.history.page = 1;
+    older.data.history.hasMore = false;
+    older.data.history.entries = [{
+      ...older.data.history.entries[0],
+      eventId: 'grant:own:older',
+      amountCredits: 40,
+    }];
+    const refreshedResponse = statusResponse();
+    const refreshed = await refreshedResponse.json();
+    refreshed.data.history.hasMore = true;
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => initial })
+      .mockResolvedValueOnce({ ok: true, json: async () => older })
+      .mockResolvedValueOnce({ ok: true, json: async () => refreshed });
+
+    render(<CompetitionCreditPanel />);
+    await screen.findByRole('button', { name: 'Cargar movimientos anteriores' });
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar movimientos anteriores' }));
+    expect(await screen.findByText('+40')).toBeInTheDocument();
+
+    fireEvent.focus(window);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(screen.getByText('+40')).toBeInTheDocument();
+  });
+
+  it('no solapa refrescos de foco mientras la petición anterior sigue abierta', async () => {
+    let resolveRefresh: ((value: unknown) => void) | undefined;
+    fetchMock
+      .mockResolvedValueOnce(statusResponse())
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }));
+
+    render(<CompetitionCreditPanel />);
+    await screen.findByRole('heading', { name: 'Historial de créditos' });
+    fireEvent.focus(window);
+    fireEvent.focus(window);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    resolveRefresh?.(statusResponse());
+    await waitFor(() => expect(screen.getByText('Tu reparto está guardado.')).toBeInTheDocument());
+  });
+
+  it('fuerza una lectura posterior al guardado aunque haya un GET de foco en vuelo', async () => {
+    let resolveRefresh: ((value: unknown) => void) | undefined;
+    const savedResponse = statusResponse();
+    const saved = await savedResponse.json();
+    saved.data.configurations[0].poolCreditsPerSlot = 30;
+    fetchMock
+      .mockResolvedValueOnce(statusResponse())
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'ok' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => saved });
+
+    render(<CompetitionCreditPanel />);
+    await screen.findByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' });
+    fireEvent.focus(window);
+    fireEvent.click(screen.getByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar 1 cambio' }));
+
+    await waitFor(() => expect(screen.getByText(/Reparto guardado\. Se aplicará/i)).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    resolveRefresh?.(statusResponse());
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByRole('button', { name: 'Guardar 1 cambio' })).not.toBeInTheDocument();
+  });
+
+  it('descarta una respuesta tardía al cambiar de wallet y reinicia operaciones locales', async () => {
+    let resolveFirst: ((value: unknown) => void) | undefined;
+    fetchMock
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveFirst = resolve;
+      }))
+      .mockResolvedValueOnce(statusResponse());
+
+    const view = render(<CompetitionCreditPanel />);
+    mockUseAuth.mockReturnValue({
+      ...authValue(),
+      user: { walletAddress: '0x2222222222222222222222222222222222222222' } as User,
+    });
+    view.rerender(<CompetitionCreditPanel />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await screen.findByText('Lo que ya tienes hoy');
+    resolveFirst?.(statusResponse());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getAllByText('80').length).toBeGreaterThan(0);
+  });
+
+  it('muestra asignación parcial por fuente cuando una ruta es desconocida', async () => {
+    const partialResponse = statusResponse();
+    const partial = await partialResponse.json();
+    const partialRoutes = partial.data.routes as Partial<typeof partial.data.routes>;
+    delete partialRoutes.nft;
+    partial.data.routes = partialRoutes as typeof partial.data.routes;
+    partial.data.configurations.push({
+      slotId: 'slot-nft-1',
+      route: 'nft',
+      ordinal: 1,
+      status: 'active',
+      poolCreditsPerSlot: 0,
+      effectiveCutoff: '2026-07-11T12:00:00.000Z',
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => partial });
+
+    render(<CompetitionCreditPanel />);
+
+    await screen.findByText(/Cukies sin confirmar; mostramos solo la parte confirmada/i);
+    expect(screen.queryByText('Repartes 200 créditos entre tus cupos activos.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Aumentar aportación al pool de UKI, cupo 1')).toBeEnabled();
+    expect(screen.getByLabelText('Aumentar aportación al pool de Cukies, cupo 1')).toBeDisabled();
+  });
+
+  it('no presenta ausencia de cupos mientras ambas fuentes siguen desconocidas', async () => {
+    const pendingResponse = statusResponse();
+    const original = await pendingResponse.json();
+    const pending = {
+      ...original,
+      data: { ...original.data, routes: {}, configurations: [] },
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => pending });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/Todavía no podemos confirmar tus cupos/i)).toBeInTheDocument();
+    expect(screen.getByText(/sigue pendiente/i)).toBeInTheDocument();
+    expect(screen.queryByText('Todavía no tienes cupos configurables')).not.toBeInTheDocument();
   });
 
   it('aplica un reparto visual a todos los cupos sin desplegables', async () => {

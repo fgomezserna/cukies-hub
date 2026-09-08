@@ -62,7 +62,8 @@ type OnChainBreed = {
 
 const bscTokenAddress = legacyMarketplaceContracts.bsc.contracts.token;
 const bscPointsAddress = legacyMarketplaceContracts.bsc.contracts.points;
-const bscBreedingAddress = legacyMarketplaceContracts.bsc.contracts.breedingPoints;
+const bscBreedingAddress =
+  legacyMarketplaceContracts.bsc.contracts.breedingPoints;
 const tronBreedingAddress =
   legacyMarketplaceContracts.tron.contracts.breedingPoints;
 
@@ -82,7 +83,9 @@ function formatPoints(value?: bigint | number | string | null) {
   if (typeof value === 'bigint') return value.toLocaleString('en-US');
 
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric.toLocaleString('en-US') : String(value);
+  return Number.isFinite(numeric)
+    ? numeric.toLocaleString('en-US')
+    : String(value);
 }
 
 function normalizeBreedTuple(
@@ -162,13 +165,13 @@ function CandidateCard({
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
           <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
-            Breed {cuki.skills.breeder ?? 0}
+            Cría {cuki.skills.breeder ?? 0}
           </span>
           <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
-            Life {cuki.skills.life ?? 0}
+            Vida {cuki.skills.life ?? 0}
           </span>
           <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
-            Kids {cuki.childrenCount ?? 0}
+            Hijos {cuki.childrenCount ?? 0}
           </span>
         </div>
       </div>
@@ -196,24 +199,26 @@ function BreedCard({
             Breed #{breed.id}
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            {breed.birthNetwork} · parents #{breed.parents[0]} and #
+            {breed.birthNetwork} · padres #{breed.parents[0]} y #
             {breed.parents[1]}
           </p>
         </div>
         <span className="rounded-full border border-lilac-300/25 bg-lilac-300/10 px-3 py-1 text-xs font-semibold text-lilac-100">
-          {breed.completed ? 'Completed' : canOpen ? 'Ready' : 'Active'}
+          {breed.completed ? 'Completada' : canOpen ? 'Lista' : 'Activa'}
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
         <div className="rounded-[8px] border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Start</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">
+            Inicio
+          </p>
           <p className="mt-1 font-semibold text-white">
             {formatLegacyDate(breed.breedStart)}
           </p>
         </div>
         <div className="rounded-[8px] border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Finish</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Fin</p>
           <p className="mt-1 font-semibold text-white">
             {formatLegacyDate(breed.breedFinish)}
           </p>
@@ -230,7 +235,7 @@ function BreedCard({
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
             <p className="text-xs text-slate-400">
-              {Math.round(progress)}% breeding progress
+              {Math.round(progress)}% de progreso
             </p>
             {canOpen && onOpen && (
               <Button
@@ -239,7 +244,7 @@ function BreedCard({
                 className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
               >
                 <Baby className="mr-2 h-4 w-4" />
-                Open Cukie
+                Abrir Cukie
               </Button>
             )}
           </div>
@@ -256,17 +261,24 @@ function CompletedCukiCard({ cuki }: { cuki: LegacyMarketplaceCukiItem }) {
       className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-lilac-300/35 hover:bg-lilac-300/10"
     >
       <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
-        <CukiImage src={cuki.imageUrl} alt={getCukiDisplayName(cuki)} sizes="96px" />
+        <CukiImage
+          src={cuki.imageUrl}
+          alt={getCukiDisplayName(cuki)}
+          sizes="96px"
+        />
       </div>
       <div className="min-w-0">
         <p className="truncate font-headline text-lg font-bold text-white">
           {getCukiDisplayName(cuki)}
         </p>
         <p className="mt-1 text-xs text-slate-400">
-          {cuki.birthNetwork ?? cuki.network} · Gen {cuki.skills.generation ?? '-'}
+          {cuki.birthNetwork ?? cuki.network} · Gen{' '}
+          {cuki.skills.generation ?? '-'}
         </p>
         <p className="mt-3 text-xs text-slate-500">
-          Parents {cuki.parents.map((parent) => `#${parent.tokenId}`).join(' · ') || '-'}
+          Padres{' '}
+          {cuki.parents.map((parent) => `#${parent.tokenId}`).join(' · ') ||
+            '-'}
         </p>
       </div>
     </Link>
@@ -290,10 +302,16 @@ export function BreedingClient({
   const [network, setNetwork] = useState<BreedingNetwork>('BSC');
   const [tab, setTab] = useState<BreedingTab>(initialTab);
   const [candidates, setCandidates] = useState<LegacyMarketplaceCukiItem[]>([]);
-  const [completedCukies, setCompletedCukies] = useState<LegacyMarketplaceCukiItem[]>([]);
+  const [completedCukies, setCompletedCukies] = useState<
+    LegacyMarketplaceCukiItem[]
+  >([]);
   const [activeBreeds, setActiveBreeds] = useState<OnChainBreed[]>([]);
-  const [parent1, setParent1] = useState<LegacyMarketplaceCukiItem | null>(null);
-  const [parent2, setParent2] = useState<LegacyMarketplaceCukiItem | null>(null);
+  const [parent1, setParent1] = useState<LegacyMarketplaceCukiItem | null>(
+    null,
+  );
+  const [parent2, setParent2] = useState<LegacyMarketplaceCukiItem | null>(
+    null,
+  );
   const [tronMaxBreeds, setTronMaxBreeds] = useState<number | null>(null);
   const [tronPoints, setTronPoints] = useState<string | null>(null);
   const [tronCost, setTronCost] = useState<string | null>(null);
@@ -360,10 +378,13 @@ export function BreedingClient({
   const cost =
     network === 'BSC'
       ? formatPoints(bscCost as bigint | undefined)
-      : (tronCost ?? '-');
+      : tronCost ?? '-';
   const points =
-    network === 'BSC' ? formatPoints(bscPoints as bigint | undefined) : (tronPoints ?? '-');
-  const approved = network === 'BSC' ? Boolean(bscApproved) : tronApproved === true;
+    network === 'BSC'
+      ? formatPoints(bscPoints as bigint | undefined)
+      : tronPoints ?? '-';
+  const approved =
+    network === 'BSC' ? Boolean(bscApproved) : tronApproved === true;
   const summaryCards: Array<{
     label: string;
     value: string | number;
@@ -371,12 +392,12 @@ export function BreedingClient({
   }> = [
     {
       label: 'Wallet',
-      value: owner ? shortWallet(owner) : 'Not connected',
+      value: owner ? shortWallet(owner) : 'Sin conexión',
       Icon: Wallet,
     },
-    { label: 'Network', value: network, Icon: Network },
-    { label: 'Points', value: points, Icon: Sparkles },
-    { label: 'Max breeds', value: maxBreeds ?? '-', Icon: Dna },
+    { label: 'Red', value: network, Icon: Network },
+    { label: 'Puntos', value: points, Icon: Sparkles },
+    { label: 'Máximo de crías', value: maxBreeds ?? '-', Icon: Dna },
   ];
 
   const refreshCandidates = useCallback(async () => {
@@ -393,14 +414,14 @@ export function BreedingClient({
         maxBreeds: String(maxBreeds),
         limit: '60',
       });
-      const response = await fetch(
-        `/api/cukies/breeding/candidates?${query}`,
-        { cache: 'no-store' },
-      );
+      const response = await fetch(`/api/cukies/breeding/candidates?${query}`, {
+        cache: 'no-store',
+      });
       if (!response.ok) {
         throw new Error('No se han podido cargar candidatos de breeding.');
       }
-      const payload = (await response.json()) as LegacyBreedingCandidatesResponse;
+      const payload =
+        (await response.json()) as LegacyBreedingCandidatesResponse;
       setCandidates(payload.items);
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -411,8 +432,8 @@ export function BreedingClient({
   }, [maxBreeds, network, owner]);
 
   const refreshCompleted = useCallback(async () => {
-    const wallets = [address, tronAddress].filter(
-      (wallet): wallet is string => Boolean(wallet),
+    const wallets = [address, tronAddress].filter((wallet): wallet is string =>
+      Boolean(wallet),
     );
 
     if (wallets.length === 0) {
@@ -427,10 +448,9 @@ export function BreedingClient({
     for (const wallet of wallets) query.append('wallet', wallet);
 
     try {
-      const response = await fetch(
-        `/api/cukies/breeding/completed?${query}`,
-        { cache: 'no-store' },
-      );
+      const response = await fetch(`/api/cukies/breeding/completed?${query}`, {
+        cache: 'no-store',
+      });
       if (!response.ok) {
         throw new Error('No se han podido cargar los bred Cukies.');
       }
@@ -445,11 +465,12 @@ export function BreedingClient({
   const fetchBscActiveBreeds = useCallback(async () => {
     if (!address) return [];
 
-    const ids = (await readLegacyBscContract<readonly bigint[]>(
-      'breedingPoints',
-      'getAllBreedsOwner',
-      [address],
-    )) ?? [];
+    const ids =
+      (await readLegacyBscContract<readonly bigint[]>(
+        'breedingPoints',
+        'getAllBreedsOwner',
+        [address],
+      )) ?? [];
 
     const breeds = await Promise.all(
       ids.map(async (id) =>
@@ -523,12 +544,9 @@ export function BreedingClient({
           'breedingPoints',
           'getMaxBreedsByCukie',
         ),
-        readLegacyTronContract<unknown>(
-          window.tronWeb,
-          'points',
-          'getPoints',
-          [tronAddress],
-        ),
+        readLegacyTronContract<unknown>(window.tronWeb, 'points', 'getPoints', [
+          tronAddress,
+        ]),
         readLegacyTronContract<unknown>(
           window.tronWeb,
           'token',
@@ -688,7 +706,7 @@ export function BreedingClient({
       );
       setParent1(null);
       setParent2(null);
-      setStatus('Breeding iniciado. Refresca Active breeds en unos segundos.');
+      setStatus('Cría iniciada. Actualiza Crías activas en unos segundos.');
       void refreshCandidates();
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -716,7 +734,10 @@ export function BreedingClient({
         'breedingPoints',
         'breed',
         [breed.id],
-        { feeLimit: 800_000_000, shouldPollResponse: false },
+        {
+          feeLimit: 800_000_000,
+          shouldPollResponse: false,
+        },
       );
       setStatus('Cukie abierto. Refresca completed breeds en unos segundos.');
       void refreshActiveBreeds();
@@ -773,9 +794,9 @@ export function BreedingClient({
 
         <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
           {[
-            ['start', 'Start'],
-            ['active', 'Active'],
-            ['completed', 'Completed'],
+            ['start', 'Iniciar'],
+            ['active', 'Activas'],
+            ['completed', 'Completadas'],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -803,9 +824,7 @@ export function BreedingClient({
             <p className="text-xs uppercase tracking-wide text-slate-500">
               {label}
             </p>
-            <p className="mt-1 truncate font-semibold text-white">
-              {value}
-            </p>
+            <p className="mt-1 truncate font-semibold text-white">{value}</p>
           </div>
         ))}
       </div>
@@ -815,18 +834,28 @@ export function BreedingClient({
           {network === 'BSC' ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span>
-                Conecta una wallet EVM y usa BNB Smart Chain para breeding.
+                {!isConnected
+                  ? 'Conecta una wallet EVM para cargar tus padres.'
+                  : 'La wallet está en una red incorrecta. Usa BNB Smart Chain para continuar.'}
               </span>
               {isConnected && chainId !== 56 && (
                 <Button onClick={() => switchChain({ chainId: 56 })}>
-                  Switch to BSC
+                  Cambiar a BSC
                 </Button>
               )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>Conecta TronLink para breeding en TRON.</span>
-              <Button onClick={() => void ensureTron()}>Connect TronLink</Button>
+              <span>
+                {!isTronInstalled
+                  ? 'TronLink no está disponible en este navegador.'
+                  : !isTronConnected
+                  ? 'Conecta TronLink para cargar tus padres en TRON.'
+                  : 'La fuente de candidatos TRON no está disponible ahora.'}
+              </span>
+              <Button onClick={() => void ensureTron()}>
+                Conectar TronLink
+              </Button>
             </div>
           )}
         </div>
@@ -838,9 +867,9 @@ export function BreedingClient({
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-headline text-2xl font-bold text-white">
-                  Select parents
+                  Selecciona los padres
                 </h2>
-              <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-slate-400">
                   Elige dos Cukies disponibles de tu wallet.
                 </p>
               </div>
@@ -855,7 +884,7 @@ export function BreedingClient({
                 ) : (
                   <RefreshCcw className="mr-2 h-4 w-4" />
                 )}
-                Refresh
+                Actualizar
               </Button>
             </div>
 
@@ -875,9 +904,13 @@ export function BreedingClient({
                 ))
               ) : (
                 <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                  {owner
-                    ? 'No hay Cukies disponibles para breeding en esta wallet/red.'
-                    : 'Conecta una wallet para cargar candidatos.'}
+                  {!owner
+                    ? 'Conecta una wallet para cargar candidatos.'
+                    : !ready
+                    ? network === 'BSC' && chainId !== 56
+                      ? 'La wallet está conectada a una red incorrecta.'
+                      : 'La fuente de candidatos no está disponible hasta conectar la red seleccionada.'
+                    : 'No hay Cukies disponibles para cría en esta wallet/red.'}
                 </div>
               )}
             </div>
@@ -886,7 +919,7 @@ export function BreedingClient({
           <aside className="grid content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
             <div>
               <h2 className="font-headline text-2xl font-bold text-white">
-                Breeding desk
+                Resumen de cría
               </h2>
               <p className="mt-1 text-sm text-slate-400">
                 Revisa padres, coste y confirma el breeding.
@@ -899,17 +932,17 @@ export function BreedingClient({
                 className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3"
               >
                 <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Parent {index + 1}
+                  Padre {index + 1}
                 </p>
                 <p className="mt-1 font-semibold text-white">
-                  {parent ? getCukiDisplayName(parent) : 'Not selected'}
+                  {parent ? getCukiDisplayName(parent) : 'Sin seleccionar'}
                 </p>
               </div>
             ))}
 
             <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">
-                Required points
+                Puntos necesarios
               </p>
               <p className="mt-1 font-mono text-lg font-semibold text-white">
                 {parentsSelected ? cost : '-'}
@@ -924,7 +957,7 @@ export function BreedingClient({
                 className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
               >
                 <Check className="mr-2 h-4 w-4" />
-                Approve breeding
+                Aprobar cría
               </Button>
             )}
 
@@ -934,7 +967,7 @@ export function BreedingClient({
               className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
             >
               <Heart className="mr-2 h-4 w-4" />
-              Start breeding
+              Iniciar cría
             </Button>
           </aside>
         </div>
@@ -944,7 +977,7 @@ export function BreedingClient({
         <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-headline text-2xl font-bold text-white">
-              Active breeds
+              Crías activas
             </h2>
             <Button
               variant="outline"
@@ -957,7 +990,7 @@ export function BreedingClient({
               ) : (
                 <RefreshCcw className="mr-2 h-4 w-4" />
               )}
-              Refresh
+              Actualizar
             </Button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -972,7 +1005,7 @@ export function BreedingClient({
               ))
             ) : (
               <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                No active breeds loaded for this network.
+                No hay crías activas cargadas para esta red.
               </div>
             )}
           </div>
@@ -983,7 +1016,7 @@ export function BreedingClient({
         <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-headline text-2xl font-bold text-white">
-              Completed breeds
+              Crías completadas
             </h2>
             <Button
               variant="outline"
@@ -991,7 +1024,7 @@ export function BreedingClient({
               className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh
+              Actualizar
             </Button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -1001,7 +1034,7 @@ export function BreedingClient({
               ))
             ) : (
               <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                No completed breeds loaded for connected wallets.
+                No hay crías completadas para las wallets conectadas.
               </div>
             )}
           </div>
@@ -1013,7 +1046,6 @@ export function BreedingClient({
           {status}
         </div>
       )}
-
     </div>
   );
 }

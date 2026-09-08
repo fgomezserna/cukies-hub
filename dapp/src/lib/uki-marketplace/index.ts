@@ -1,5 +1,6 @@
 export {
   listPublicUkiMarketplaceOrders,
+  listPublicUkiMarketplacePage,
   listSellerUkiMarketplaceOrders,
   type UkiMarketplaceServiceDependencies,
 } from './service';

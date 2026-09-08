@@ -2,11 +2,25 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { useTreasureHuntCompetitionOverview } from '@/hooks/use-treasure-hunt-competition-overview';
 
+let mockAuthState = { user: null as { id?: string; walletAddress?: string } | null, isLoading: false };
+
+jest.mock('@/providers/auth-provider', () => ({
+  useAuth: () => mockAuthState,
+}));
+
 function jsonResponse(value: unknown) {
   return Promise.resolve(new Response(JSON.stringify(value), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   }));
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
 
 function statusResponse(disqualified: boolean) {
@@ -93,6 +107,10 @@ const leaderboardResponse = {
 };
 
 describe('useTreasureHuntCompetitionOverview', () => {
+  beforeEach(() => {
+    mockAuthState = { user: null, isLoading: false };
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -163,5 +181,61 @@ describe('useTreasureHuntCompetitionOverview', () => {
     await waitFor(() => expect(result.current.status?.eligibility?.attemptsRemaining).toBe(9));
 
     expect(statusReads).toBeGreaterThanOrEqual(2);
+  });
+
+  it('deduplica dos consumidores de la misma identidad sin compartir respuestas entre wallets', async () => {
+    mockAuthState = { user: { id: 'user-a', walletAddress: '0xAa' }, isLoading: false };
+    const pendingA = deferred<Response>();
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      if (String(input) === '/api/games/treasure-hunt/competition') return pendingA.promise;
+      return jsonResponse(leaderboardResponse);
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const first = renderHook(() => useTreasureHuntCompetitionOverview({
+      includeLeaderboard: false,
+      autoRefreshMs: 0,
+    }));
+    const second = renderHook(() => useTreasureHuntCompetitionOverview({
+      includeLeaderboard: false,
+      autoRefreshMs: 0,
+    }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    first.unmount();
+    pendingA.resolve(new Response(JSON.stringify(statusResponse(false)), { status: 200 }));
+    await waitFor(() => expect(second.result.current.status?.participant?.alias).toBe('CukiePlayer'));
+  });
+
+  it('descarta la respuesta de una wallet anterior cuando la identidad cambia durante la petición', async () => {
+    mockAuthState = { user: { id: 'user-a', walletAddress: '0xAa' }, isLoading: false };
+    const pendingA = deferred<Response>();
+    const pendingB = deferred<Response>();
+    let statusRequests = 0;
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      if (String(input) !== '/api/games/treasure-hunt/competition') return jsonResponse(leaderboardResponse);
+      statusRequests += 1;
+      return statusRequests === 1 ? pendingA.promise : pendingB.promise;
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const view = renderHook(() => useTreasureHuntCompetitionOverview({
+      includeLeaderboard: false,
+      autoRefreshMs: 0,
+    }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    mockAuthState = { user: { id: 'user-b', walletAddress: '0xBb' }, isLoading: false };
+    view.rerender();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    pendingA.resolve(new Response(JSON.stringify(statusResponse(false)), { status: 200 }));
+    await act(async () => undefined);
+    expect(view.result.current.status).toBeNull();
+
+    const responseB = statusResponse(false);
+    responseB.participant = { ...responseB.participant, alias: 'Wallet B' };
+    pendingB.resolve(new Response(JSON.stringify(responseB), { status: 200 }));
+    await waitFor(() => expect(view.result.current.status?.participant?.alias).toBe('Wallet B'));
   });
 });

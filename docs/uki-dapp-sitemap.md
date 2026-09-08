@@ -95,7 +95,8 @@ son las descritas arriba y no una prueba adicional del backend.
 
 ## Arquitectura propuesta
 
-Propuesta de navegación, pendiente de aprobación e implementación. Conserva las
+Propuesta de navegación aprobada por el usuario el 8 de septiembre. Su estado
+de implementación se mantiene en el seguimiento único. Conserva las
 rutas existentes y el significado aprobado de Inicio. Los grupos sirven a
 tareas reales, no añaden pantallas intermedias obligatorias.
 

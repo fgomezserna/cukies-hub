@@ -214,17 +214,32 @@ async function runForever() {
       const projected = await projectOnce(store, config.projectBatchSize);
       const endedAt = now();
 
-      await store.recordRun({
-        type: 'loop',
-        startedAt,
-        endedAt,
-        durationMs: endedAt.getTime() - startedAt.getTime(),
-        bsc,
-        tron,
-        projected,
-      });
+      if (bsc.outcome === 'incomplete') {
+        await store.recordRun({
+          type: 'loop-error',
+          startedAt,
+          endedAt,
+          durationMs: endedAt.getTime() - startedAt.getTime(),
+          error: bsc.errors.map((item) => `${item.cursorId}: ${item.error}`).join(' | '),
+          failedContractAliases: bsc.failedContractAliases,
+          bsc,
+          tron,
+          projected,
+        });
+        log('loop incomplete', { bsc, tron, projected });
+      } else {
+        await store.recordRun({
+          type: 'loop',
+          startedAt,
+          endedAt,
+          durationMs: endedAt.getTime() - startedAt.getTime(),
+          bsc,
+          tron,
+          projected,
+        });
 
-      log('loop ok', { bsc, tron, projected });
+        log('loop ok', { bsc, tron, projected });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       log('loop error', { error: message });

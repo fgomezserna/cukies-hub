@@ -9,16 +9,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Bell, Wallet, UserRound, LogOut, PanelLeft } from 'lucide-react';
+import { Wallet, UserRound, LogOut, PanelLeft, Settings2 } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/providers/auth-provider';
@@ -48,6 +42,16 @@ const getRank = (xp: number): string => {
   const userRank = ranks.find(rank => xp >= rank.xp);
   return userRank ? userRank.name : 'Sin rango';
 };
+
+export function getAvatarFallback(username: string | null | undefined, walletAddress: string | null | undefined) {
+  const usernameValue = username?.trim();
+  if (usernameValue && !/^0x[a-f\d]{6,}$/i.test(usernameValue)) {
+    return usernameValue.slice(0, 2).toUpperCase();
+  }
+
+  const walletValue = walletAddress?.trim();
+  return walletValue ? walletValue.slice(-2).toUpperCase() : 'CW';
+}
 
 interface HeaderProps {
   hideDisconnectedWalletTrigger?: boolean;
@@ -198,45 +202,6 @@ export default function Header({
           isGameOverlay && 'pointer-events-auto gap-2',
         )}
       >
-        {user && !isGameOverlay && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative rounded-full group hover:bg-lilac-400/10 transition-all duration-300">
-                <Bell className="group-hover:text-lilac-300 transition-colors" />
-                <span className="absolute top-1 right-1 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lilac-300 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-lilac-300"></span>
-                </span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 border-2 border-lilac-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-lilac-400/10" align="end">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-foreground">Notificaciones</CardTitle>
-                  <CardDescription>Tienes 1 mensaje sin leer.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-                  <div className="flex items-start gap-4 p-3 rounded-lg bg-lilac-400/5 border border-lilac-400/10">
-                      <Avatar className="h-10 w-10 border-2 border-lilac-300/30">
-                          <AvatarImage src="https://placehold.co/100x100.png" alt="Avatar" data-ai-hint="logo icon"/>
-                          <AvatarFallback className="bg-gradient-to-br from-lilac-300 to-lilac-400 text-white font-bold">HL</AvatarFallback>
-                      </Avatar>
-                      <div className="grid gap-1">
-                          <p className="text-sm font-medium text-foreground">Bienvenido a Cukies World</p>
-                          <p className="text-sm text-muted-foreground">Completa tu primera misión para ganar puntos extra.</p>
-                      </div>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-lilac-400/30 bg-lilac-400/10 hover:bg-lilac-400/20 hover:border-lilac-300/50 transition-all duration-300"
-                    asChild
-                  >
-                    <Link href="/quests">Ver todo</Link>
-                  </Button>
-                </CardContent>
-            </PopoverContent>
-          </Popover>
-        )}
-
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -254,9 +219,9 @@ export default function Header({
                     isGameOverlay && 'h-11 w-11',
                   )}
                 >
-                  <AvatarImage src={user.profilePictureUrl ?? "https://placehold.co/100x100.png"} alt={user.username ?? "user"} data-ai-hint="profile avatar" />
+                  <AvatarImage src={user.profilePictureUrl || undefined} alt={user.username ?? "Avatar de cuenta"} />
                   <AvatarFallback className="bg-gradient-to-br from-lilac-300 to-lilac-400 text-white font-bold">
-                    {user.username?.slice(0,1).toUpperCase() ?? "U"}
+                    {getAvatarFallback(user.username, user.walletAddress)}
                   </AvatarFallback>
                 </Avatar>
                 {isGameOverlay ? (
@@ -283,16 +248,29 @@ export default function Header({
                 </div>
               </div>
               <DropdownMenuSeparator className="bg-lilac-400/20" />
-              <DropdownMenuItem disabled className="opacity-50">
-                <Wallet className="mr-3 h-4 w-4 text-gray-400" />
-                <span>Mi wallet</span>
-              </DropdownMenuItem>
+              <div className="flex items-start gap-3 px-3 py-2 text-sm text-muted-foreground">
+                <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-lilac-300" aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="block font-medium text-foreground">Wallet conectada</span>
+                  <span className="block truncate font-mono text-xs" title={user.walletAddress}>
+                    {user.walletAddress.slice(0, 8)}…{user.walletAddress.slice(-6)}
+                  </span>
+                </span>
+              </div>
               <DropdownMenuItem asChild className="hover:bg-lilac-400/10 transition-colors">
                 <Link href={isGameOverlay ? '/games/treasure-hunt/profile' : '/profile'}>
                   <UserRound className="mr-3 h-4 w-4 text-lilac-300" />
-                  <span>Mi perfil</span>
+                  <span>{isGameOverlay ? 'Alias de competición' : 'Mi cuenta'}</span>
                 </Link>
               </DropdownMenuItem>
+              {!isGameOverlay && (
+                <DropdownMenuItem asChild className="hover:bg-lilac-400/10 transition-colors">
+                  <Link href="/settings">
+                    <Settings2 className="mr-3 h-4 w-4 text-lilac-300" />
+                    <span>Ajustes de perfil</span>
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator className="bg-lilac-400/20" />
               <DropdownMenuItem 
                 onClick={() => disconnect()} 

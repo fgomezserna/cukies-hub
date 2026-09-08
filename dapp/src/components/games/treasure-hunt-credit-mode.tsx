@@ -163,6 +163,11 @@ export function TreasureHuntCreditModeSidebar({
   );
   const disabled = connectedUnavailable || (access.walletConnected && !access.canPlay);
   const isPoolGame = access.creditSource === 'pool';
+  const modeLabel = isPoolGame
+    ? 'Competición semanal'
+    : access.creditSource === 'own'
+      ? 'Partida individual'
+      : 'Acceso con créditos';
   const actionLabel = !access.walletConnected
     ? 'Conectar wallet para jugar'
     : access.isLoading
@@ -187,7 +192,7 @@ export function TreasureHuntCreditModeSidebar({
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#0d0914]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--uki-lilac)]">
-        {isPoolGame ? 'Competición semanal' : 'Partida individual'}
+        {modeLabel}
       </p>
       <h2 className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]">
         Juega con créditos
@@ -247,7 +252,7 @@ export function TreasureHuntCreditModeSidebar({
 
       {access.walletConnected && !access.isLoading && !access.isError && !access.blocked && !access.canPlay ? (
         <p role="status" className="mt-3 text-center text-xs font-semibold leading-relaxed text-[#969994]">
-          Necesitas créditos disponibles para iniciar. Puedes conservar más en el próximo reparto diario.
+          Necesitas créditos disponibles para iniciar. No se iniciará ni cobrará una partida mientras el saldo sea insuficiente.
         </p>
       ) : null}
 

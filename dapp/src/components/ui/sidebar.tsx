@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
+import { PanelLeft, X } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import * as SeparatorPrimitive from "@radix-ui/react-separator"
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -56,6 +57,8 @@ type SidebarContext = {
   setOpen: (open: boolean) => void
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
+  setMobileNavigationFocus: (focus: (() => void) | null) => void
+  restoreMobileFocus: () => void
   isMobile: boolean
   toggleSidebar: () => void
 }
@@ -93,6 +96,8 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
+    const mobileReturnFocusRef = React.useRef<HTMLElement | null>(null)
+    const mobileNavigationFocusRef = React.useRef<(() => void) | null>(null)
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
@@ -127,11 +132,46 @@ const SidebarProvider = React.forwardRef<
     )
 
     // Helper to toggle the sidebar.
+    const rememberMobileFocus = React.useCallback(() => {
+      if (typeof document === "undefined") return
+      const activeElement = document.activeElement
+      mobileReturnFocusRef.current = activeElement instanceof HTMLElement
+        ? activeElement
+        : null
+    }, [])
+
+    const setMobileNavigationFocus = React.useCallback((focus: (() => void) | null) => {
+      mobileNavigationFocusRef.current = focus
+    }, [])
+
+    const restoreMobileFocus = React.useCallback(() => {
+      const navigationFocus = mobileNavigationFocusRef.current
+      mobileNavigationFocusRef.current = null
+
+      if (navigationFocus) {
+        navigationFocus()
+        return
+      }
+
+      mobileReturnFocusRef.current?.focus()
+    }, [])
+
+    const setOpenMobileWithFocus = React.useCallback(
+      (value: boolean | ((value: boolean) => boolean)) => {
+        const nextOpen = typeof value === "function" ? value(openMobile) : value
+
+        if (nextOpen) rememberMobileFocus()
+
+        setOpenMobile(nextOpen)
+      },
+      [openMobile, rememberMobileFocus],
+    )
+
     const toggleSidebar = React.useCallback(() => {
       return isMobile
-        ? setOpenMobile((open) => !open)
+        ? setOpenMobileWithFocus((open) => !open)
         : setOpen((open) => !open)
-    }, [isMobile, setOpen, setOpenMobile])
+    }, [isMobile, setOpen, setOpenMobileWithFocus])
 
     // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
@@ -160,10 +200,12 @@ const SidebarProvider = React.forwardRef<
         setOpen,
         isMobile,
         openMobile,
-        setOpenMobile,
+        setOpenMobile: setOpenMobileWithFocus,
+        setMobileNavigationFocus,
+        restoreMobileFocus,
         toggleSidebar,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [state, open, setOpen, isMobile, openMobile, setOpenMobileWithFocus, setMobileNavigationFocus, restoreMobileFocus, toggleSidebar]
     )
 
     return (
@@ -212,7 +254,7 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile, restoreMobileFocus } = useSidebar()
 
     if (collapsible === "none") {
       return (
@@ -236,6 +278,10 @@ const Sidebar = React.forwardRef<
             data-sidebar="sidebar"
             data-mobile="true"
             className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault()
+              restoreMobileFocus()
+            }}
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -247,7 +293,23 @@ const Sidebar = React.forwardRef<
             <SheetDescription className="sr-only">
               Accesos a las áreas operativas de Cukies World.
             </SheetDescription>
-            <div className="flex h-full w-full flex-col">{children}</div>
+            <div className="flex h-full w-full flex-col">
+              <div className="flex min-h-14 items-center justify-between border-b border-sidebar-border px-4">
+                <span className="text-sm font-semibold text-sidebar-foreground">Menú principal</span>
+                <SheetClose asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="min-h-11 gap-2 px-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    aria-label="Cerrar menú"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                    <span>Cerrar menú</span>
+                  </Button>
+                </SheetClose>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+            </div>
           </SheetContent>
         </Sheet>
       )
@@ -320,7 +382,7 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">Alternar barra lateral</span>
     </Button>
   )
 })
@@ -336,10 +398,10 @@ const SidebarRail = React.forwardRef<
     <button
       ref={ref}
       data-sidebar="rail"
-      aria-label="Toggle Sidebar"
+      aria-label="Alternar barra lateral"
       tabIndex={-1}
       onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      title="Alternar barra lateral"
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
         "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",

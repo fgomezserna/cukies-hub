@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle,
   Coin,
@@ -51,10 +51,11 @@ type CreditStatus = {
     reservedCredits: number;
     spentCredits: number;
     poolDepositedCredits: number;
+    expiredCredits: number;
     blocked: boolean;
   };
   pool: { availableCredits: number; reservedCredits: number; blocked: boolean };
-  routes: Record<'uki' | 'nft', CreditRouteStatus>;
+  routes: Partial<Record<'uki' | 'nft', CreditRouteStatus>>;
   configurations: CreditConfiguration[];
   activeReservations: number;
   grants: { healthy: boolean; sourceObservedThrough: string | null; openIncidents: number };
@@ -102,62 +103,172 @@ export function CompetitionCreditPanel() {
   const [history, setHistory] = useState<CreditHistoryData | null>(null);
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState(false);
+  const requestIdRef = useRef(0);
+  const loadSequenceRef = useRef(0);
+  const activeLoadRef = useRef<{ requestId: number; sequence: number } | null>(null);
+  const saveOperationRef = useRef(0);
+  const historyOperationRef = useRef(0);
+  const statusRef = useRef<CreditStatus | null>(null);
+  const draftsRef = useRef<Record<string, number>>({});
+  const historyRef = useRef<CreditHistoryData | null>(null);
 
-  const load = useCallback(async (signal?: AbortSignal, silent = false) => {
+  useEffect(() => {
+    statusRef.current = status;
+    draftsRef.current = drafts;
+  }, [drafts, status]);
+
+  const load = useCallback(async (
+    signal?: AbortSignal,
+    silent = false,
+    expectedRequestId = requestIdRef.current,
+    options: { force?: boolean; preserveDrafts?: boolean } = {},
+  ) => {
     if (!walletAddress) return;
-    if (!silent) setState('loading');
-    const response = await fetch(
-      `/api/economy/v1/credits?walletAddress=${encodeURIComponent(walletAddress)}`,
-      { cache: 'no-store', credentials: 'same-origin', signal },
+    if (activeLoadRef.current?.requestId === expectedRequestId && !options.force) return;
+    const requestedWallet = walletAddress;
+    const loadSequence = loadSequenceRef.current + 1;
+    loadSequenceRef.current = loadSequence;
+    activeLoadRef.current = { requestId: expectedRequestId, sequence: loadSequence };
+    const isCurrentRequest = () => (
+      requestIdRef.current === expectedRequestId
+      && walletAddress === requestedWallet
+      && activeLoadRef.current?.sequence === loadSequence
+      && !signal?.aborted
     );
-    const body = await response.json() as { data?: CreditStatus };
-    if (!response.ok || !body.data) throw new Error('CREDIT_STATUS_UNAVAILABLE');
-    setStatus(body.data);
-    setHistory(body.data.history);
-    setHistoryLoadError(false);
-    setDrafts(Object.fromEntries(
-      body.data.configurations.map((configuration) => [
-        configuration.slotId,
-        configuration.poolCreditsPerSlot,
-      ]),
-    ));
-    setState('ready');
+    try {
+      if (!silent) setState('loading');
+      const response = await fetch(
+        `/api/economy/v1/credits?walletAddress=${encodeURIComponent(walletAddress)}`,
+        { cache: 'no-store', credentials: 'same-origin', signal },
+      );
+      const body = await response.json() as { data?: CreditStatus };
+      if (!response.ok || !body.data) throw new Error('CREDIT_STATUS_UNAVAILABLE');
+      if (!isCurrentRequest()) return;
+
+      const previousStatus = statusRef.current;
+      const currentDrafts = draftsRef.current;
+      const previousConfigurations = new Map(
+        previousStatus?.configurations.map((configuration) => [configuration.slotId, configuration]) ?? [],
+      );
+      const nextDrafts = Object.fromEntries(body.data.configurations.map((configuration) => {
+        const previousConfiguration = previousConfigurations.get(configuration.slotId);
+        const hasUnsavedDraft = options.preserveDrafts !== false
+          && previousConfiguration
+          && currentDrafts[configuration.slotId] !== previousConfiguration.poolCreditsPerSlot;
+        return [
+          configuration.slotId,
+          hasUnsavedDraft
+            ? currentDrafts[configuration.slotId]
+            : configuration.poolCreditsPerSlot,
+        ];
+      }));
+
+      const incomingHistory = body.data.history;
+      const previousHistory = historyRef.current;
+      const nextHistory = silent
+        && options.preserveDrafts !== false
+        && previousHistory?.available
+        && incomingHistory.available
+        && previousHistory.page > 0
+        ? (() => {
+            const eventIds = new Set(incomingHistory.entries.map((entry) => entry.eventId));
+            return {
+              ...incomingHistory,
+              page: previousHistory.page,
+              hasMore: previousHistory.hasMore,
+              entries: [
+                ...incomingHistory.entries,
+                ...previousHistory.entries.filter((entry) => !eventIds.has(entry.eventId)),
+              ],
+            };
+          })()
+        : incomingHistory;
+
+      statusRef.current = body.data;
+      draftsRef.current = nextDrafts;
+      historyRef.current = nextHistory;
+      setStatus(body.data);
+      setHistory(nextHistory);
+      setHistoryLoadError(false);
+      setDrafts(nextDrafts);
+      setState('ready');
+    } finally {
+      if (activeLoadRef.current?.sequence === loadSequence) activeLoadRef.current = null;
+    }
   }, [walletAddress]);
 
   useEffect(() => {
     if (authLoading) return;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    saveOperationRef.current += 1;
+    historyOperationRef.current += 1;
+    setIsSaving(false);
+    setIsLoadingMoreHistory(false);
+    statusRef.current = null;
+    draftsRef.current = {};
+    historyRef.current = null;
+    setStatus(null);
+    setHistory(null);
+    setDrafts({});
+    setHistoryLoadError(false);
     if (!walletAddress) {
-      setStatus(null);
-      setHistory(null);
       setState('idle');
       return;
     }
     const controller = new AbortController();
-    load(controller.signal).catch((error: unknown) => {
+    load(controller.signal, false, requestId).catch((error: unknown) => {
       if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (requestIdRef.current !== requestId) return;
       setStatus(null);
       setHistory(null);
       setState('unavailable');
     });
-    return () => controller.abort();
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      void load(undefined, true, requestId).catch(() => undefined);
+    };
+    const interval = window.setInterval(refresh, 30_000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      saveOperationRef.current += 1;
+      historyOperationRef.current += 1;
+      setIsSaving(false);
+      setIsLoadingMoreHistory(false);
+      if (requestIdRef.current === requestId) requestIdRef.current += 1;
+    };
   }, [authLoading, load, walletAddress]);
 
+  const routeState = useMemo(() => {
+    const getRouteState = (route: 'uki' | 'nft'): 'healthy' | 'blocked' | 'unknown' => {
+      const source = status?.routes[route];
+      if (
+        !source
+        || typeof source.grants?.healthy !== 'boolean'
+        || typeof source.balance?.blocked !== 'boolean'
+        || typeof source.pool?.blocked !== 'boolean'
+      ) return 'unknown';
+      if (source.grants.healthy && !source.balance.blocked && !source.pool.blocked) return 'healthy';
+      return 'blocked';
+    };
+    return { uki: getRouteState('uki'), nft: getRouteState('nft') };
+  }, [status]);
+
   const routeAvailability = useMemo(() => ({
-    uki: Boolean(
-      status?.routes.uki.grants.healthy
-      && !status.routes.uki.balance.blocked
-      && !status.routes.uki.pool.blocked,
-    ),
-    nft: Boolean(
-      status?.routes.nft.grants.healthy
-      && !status.routes.nft.balance.blocked
-      && !status.routes.nft.pool.blocked,
-    ),
-  }), [status]);
+    uki: routeState.uki === 'healthy',
+    nft: routeState.nft === 'healthy',
+  }), [routeState]);
 
   const unavailableRoutes = useMemo(() => (
-    (['uki', 'nft'] as const).filter((route) => !routeAvailability[route])
-  ), [routeAvailability]);
+    (['uki', 'nft'] as const).filter((route) => routeState[route] !== 'healthy')
+  ), [routeState]);
+
+  const unknownRoutes = useMemo(() => (
+    (['uki', 'nft'] as const).filter((route) => routeState[route] === 'unknown')
+  ), [routeState]);
 
   const changedConfigurations = useMemo(() => (
     status?.configurations.filter((configuration) => (
@@ -167,8 +278,10 @@ export function CompetitionCreditPanel() {
   ), [drafts, routeAvailability, status]);
 
   const creditableConfigurations = useMemo(() => (
-    status?.configurations.filter((configuration) => configuration.status !== 'qualifying') ?? []
-  ), [status]);
+    status?.configurations.filter((configuration) => (
+      routeAvailability[configuration.route] && configuration.status !== 'qualifying'
+    )) ?? []
+  ), [routeAvailability, status]);
 
   const nextAllocation = useMemo(() => {
     if (!status) return { generated: 0, forPlaying: 0, forPool: 0 };
@@ -181,6 +294,24 @@ export function CompetitionCreditPanel() {
       };
     }, { generated: 0, forPlaying: 0, forPool: 0 });
   }, [creditableConfigurations, drafts, status]);
+  const nextAllocationPending = Boolean(
+    status
+    && status.configurations.length > 0
+    && unavailableRoutes.length === 2,
+  );
+  const nextAllocationPartial = Boolean(
+    status
+    && status.configurations.length > 0
+    && !nextAllocationPending
+    && unavailableRoutes.length > 0,
+  );
+
+  const allocationSourceMessage = useMemo(() => {
+    if (!status || status.configurations.length === 0 || unavailableRoutes.length === 0) return null;
+    const labels = unavailableRoutes.map((route) => route === 'uki' ? 'UKI' : 'Cukies');
+    const stateLabel = unknownRoutes.length > 0 ? 'sin confirmar' : 'bloqueada';
+    return `${labels.join(' y ')} ${stateLabel}; mostramos solo la parte confirmada.`;
+  }, [status, unavailableRoutes, unknownRoutes]);
 
   function updateDraft(slotId: string, value: number) {
     if (!status || isSaving) return;
@@ -207,10 +338,20 @@ export function CompetitionCreditPanel() {
 
   async function saveAll() {
     if (!walletAddress || !status || isSaving || changedConfigurations.length === 0) return;
+    const requestId = requestIdRef.current;
+    const requestedWallet = walletAddress;
+    const operationId = saveOperationRef.current + 1;
+    saveOperationRef.current = operationId;
+    const isCurrentRequest = () => (
+      requestIdRef.current === requestId
+      && saveOperationRef.current === operationId
+      && walletAddress === requestedWallet
+    );
     setIsSaving(true);
     setSaveResult('idle');
     try {
       for (const configuration of changedConfigurations) {
+        if (!isCurrentRequest()) return;
         const poolCreditsPerSlot = drafts[configuration.slotId];
         if (
           !Number.isInteger(poolCreditsPerSlot)
@@ -234,18 +375,28 @@ export function CompetitionCreditPanel() {
         });
         if (!response.ok) throw new Error('CREDIT_CONFIG_REJECTED');
       }
-      await load(undefined, true);
-      setSaveResult('saved');
+      await load(undefined, true, requestId, { force: true, preserveDrafts: false });
+      if (isCurrentRequest()) setSaveResult('saved');
     } catch {
-      await load(undefined, true).catch(() => undefined);
-      setSaveResult('error');
+      if (!isCurrentRequest()) return;
+      await load(undefined, true, requestId, { force: true, preserveDrafts: false }).catch(() => undefined);
+      if (isCurrentRequest()) setSaveResult('error');
     } finally {
-      setIsSaving(false);
+      if (isCurrentRequest()) setIsSaving(false);
     }
   }
 
   async function loadMoreHistory() {
     if (!walletAddress || !history?.available || !history.hasMore || isLoadingMoreHistory) return;
+    const requestId = requestIdRef.current;
+    const requestedWallet = walletAddress;
+    const operationId = historyOperationRef.current + 1;
+    historyOperationRef.current = operationId;
+    const isCurrentRequest = () => (
+      requestIdRef.current === requestId
+      && historyOperationRef.current === operationId
+      && walletAddress === requestedWallet
+    );
     setIsLoadingMoreHistory(true);
     setHistoryLoadError(false);
     try {
@@ -259,21 +410,27 @@ export function CompetitionCreditPanel() {
       if (!response.ok || !nextHistory?.available || nextHistory.page !== nextPage) {
         throw new Error('CREDIT_HISTORY_UNAVAILABLE');
       }
+      if (!isCurrentRequest()) return;
       setHistory((current) => {
-        if (!current?.available) return nextHistory;
+        if (!current?.available) {
+          historyRef.current = nextHistory;
+          return nextHistory;
+        }
         const eventIds = new Set(current.entries.map((entry) => entry.eventId));
-        return {
+        const merged = {
           ...nextHistory,
           entries: [
             ...current.entries,
             ...nextHistory.entries.filter((entry) => !eventIds.has(entry.eventId)),
           ],
         };
+        historyRef.current = merged;
+        return merged;
       });
     } catch {
-      setHistoryLoadError(true);
+      if (isCurrentRequest()) setHistoryLoadError(true);
     } finally {
-      setIsLoadingMoreHistory(false);
+      if (isCurrentRequest()) setIsLoadingMoreHistory(false);
     }
   }
 
@@ -285,10 +442,10 @@ export function CompetitionCreditPanel() {
             <div className="max-w-2xl">
               <p className="uki-label">Tu reparto diario</p>
               <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
-                Conecta tu wallet para ver tus créditos
+                Conecta o firma tu wallet para ver tus créditos
               </h2>
               <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                Te mostraremos el saldo disponible y los cupos que puedes repartir entre juego y pool.
+                Identifica tu wallet para consultar el saldo y repartir créditos entre juego y pool.
               </p>
             </div>
             <LandingWalletConnectButton
@@ -362,25 +519,37 @@ export function CompetitionCreditPanel() {
               <CurrentBalance label="En partidas" value={status.balance.reservedCredits} />
               <CurrentBalance label="Ya usados" value={status.balance.spentCredits} />
               <CurrentBalance label="Aportados al pool" value={status.balance.poolDepositedCredits} />
+              <CurrentBalance label="Caducados" value={status.balance.expiredCredits} />
             </div>
 
             {unavailableRoutes.length > 0 ? (
               <div className="mt-5 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
                 <Warning className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" weight="bold" />
                 <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-                  La asignación de {unavailableRoutes.map((route) => (
+                  La vigencia actual de {unavailableRoutes.map((route) => (
                     route === 'uki' ? 'tus cupos UKI' : 'tus cupos de Cukies'
-                  )).join(' y ')} está temporalmente pausada. El resto de tus cupos sigue disponible.
+                  )).join(' y ')} está pendiente de confirmación. Mostramos el último estado confirmado y no aceptamos cambios hasta recibir una fuente actualizada. Los créditos ya emitidos conservan su fecha de caducidad.
                 </p>
               </div>
             ) : null}
 
             {status.configurations.length === 0 ? (
               <div className="mt-6 border-t border-white/10 py-8">
-                <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no tienes cupos configurables</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
-                  Cuando actives tu primer cupo podrás decidir aquí cómo usar sus créditos diarios.
-                </p>
+                {unknownRoutes.length > 0 ? (
+                  <>
+                    <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no podemos confirmar tus cupos</p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                      La fuente de {unknownRoutes.map(routeLabel).join(' y ')} sigue pendiente. Mostraremos la configuración cuando termine la comprobación.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no tienes cupos configurables</p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                      Cuando actives tu primer cupo podrás decidir aquí cómo usar sus créditos diarios.
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.6fr)]">
@@ -390,16 +559,20 @@ export function CompetitionCreditPanel() {
                     <AllocationSummary
                       icon={<GameController className="h-6 w-6" weight="fill" />}
                       label="Para jugar"
-                      value={nextAllocation.forPlaying}
+                      value={nextAllocationPending ? 'Pendiente' : nextAllocation.forPlaying}
                     />
                     <AllocationSummary
                       icon={<Trophy className="h-6 w-6" weight="fill" />}
                       label="Al pool de créditos"
-                      value={nextAllocation.forPool}
+                      value={nextAllocationPending ? 'Pendiente' : nextAllocation.forPool}
                     />
                   </div>
                   <p className="mt-4 border-t border-white/10 pt-4 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                    Repartes {nextAllocation.generated} créditos entre tus cupos activos.
+                    {nextAllocationPending
+                      ? 'La próxima asignación queda pendiente de confirmar la fuente de cupos.'
+                      : nextAllocationPartial
+                        ? `Asignación parcial: ${allocationSourceMessage}`
+                      : `Repartes ${nextAllocation.generated} créditos entre tus cupos activos.`}
                   </p>
 
                   <div className="mt-5 grid gap-2" aria-label="Aplicar un reparto a todos los cupos disponibles">
@@ -467,7 +640,9 @@ export function CompetitionCreditPanel() {
                                 Cupo {configuration.ordinal} · {routeLabel(configuration.route)}
                               </p>
                               <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                                {canConfigureRoute ? slotStatusLabel(configuration.status) : 'Cambios pausados'}
+                                {canConfigureRoute
+                                  ? slotStatusLabel(configuration.status)
+                                  : 'Último estado confirmado · vigencia pendiente'}
                               </p>
                             </div>
                           </div>
@@ -566,7 +741,12 @@ export function CompetitionCreditPanel() {
           isLoadingMore={isLoadingMoreHistory}
           loadMoreError={historyLoadError}
           onLoadMore={loadMoreHistory}
-          onRetry={() => load(undefined, true).catch(() => setHistoryLoadError(true))}
+          onRetry={() => {
+            const requestId = requestIdRef.current;
+            void load(undefined, true, requestId).catch(() => {
+              if (requestIdRef.current === requestId) setHistoryLoadError(true);
+            });
+          }}
         />
       ) : null}
     </div>
@@ -589,7 +769,7 @@ function AllocationSummary({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: number;
+  value: number | string;
 }) {
   return (
     <div className="flex items-center gap-3">

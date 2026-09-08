@@ -12,6 +12,8 @@ export interface UkiMarketplaceRepository {
     marketplaceAddress: `0x${string}`;
     now: Date;
     limit: number;
+    after?: { listedAt: Date; id: string };
+    search?: string;
   }): Promise<IndexedUkiMarketplaceOrder[]>;
   listSellerOrders(input: {
     chainId: 56 | 97;
@@ -27,10 +29,14 @@ async function ordersCollection() {
 }
 
 export class MongoUkiMarketplaceRepository implements UkiMarketplaceRepository {
-  private readonly collectionFactory: () => Promise<Collection<IndexedUkiMarketplaceOrder>>;
+  private readonly collectionFactory: () => Promise<
+    Collection<IndexedUkiMarketplaceOrder>
+  >;
 
   constructor(
-    collectionFactory: () => Promise<Collection<IndexedUkiMarketplaceOrder>> = ordersCollection,
+    collectionFactory: () => Promise<
+      Collection<IndexedUkiMarketplaceOrder>
+    > = ordersCollection,
   ) {
     this.collectionFactory = collectionFactory;
   }
@@ -40,17 +46,49 @@ export class MongoUkiMarketplaceRepository implements UkiMarketplaceRepository {
     marketplaceAddress: `0x${string}`;
     now: Date;
     limit: number;
+    after?: { listedAt: Date; id: string };
+    search?: string;
   }) {
     const collection = await this.collectionFactory();
+    const filter: Record<string, unknown> = {
+      chainId: input.chainId,
+      marketplaceAddressNormalized: input.marketplaceAddress,
+      status: 'active',
+      expiresAt: { $gt: input.now },
+    };
+    if (input.after) {
+      filter.$or = [
+        { listedAt: { $lt: input.after.listedAt } },
+        { listedAt: input.after.listedAt, _id: { $lt: input.after.id } },
+      ];
+    }
+    const search = input.search?.trim();
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$and = [
+        {
+          $or: [
+            { tokenId: { $regex: escaped, $options: 'i' } },
+            {
+              sellerNormalized: {
+                $regex: escaped.toLowerCase(),
+                $options: 'i',
+              },
+            },
+            {
+              collectionAddressNormalized: {
+                $regex: escaped.toLowerCase(),
+                $options: 'i',
+              },
+            },
+          ],
+        },
+      ];
+    }
     return collection
-      .find({
-        chainId: input.chainId,
-        marketplaceAddressNormalized: input.marketplaceAddress,
-        status: 'active',
-        expiresAt: { $gt: input.now },
-      })
+      .find(filter)
       .sort({ listedAt: -1, _id: -1 })
-      .limit(Math.min(input.limit * 3, 150))
+      .limit(input.limit)
       .toArray();
   }
 

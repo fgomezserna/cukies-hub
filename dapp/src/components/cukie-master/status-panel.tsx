@@ -126,14 +126,16 @@ function slotCounts(route: PublicRoute) {
   );
 }
 
-function visibleRouteSlots(route: PublicRoute) {
+function visibleRouteSlots(route: PublicRoute): number | null {
   if (route.source.complete) {
     return route.balanceQualifiedSlots
       ?? route.previewSlots
       ?? route.position?.allocatedSlots
-      ?? 0;
+      ?? null;
   }
-  return route.position?.allocatedSlots ?? 0;
+  // An incomplete source is not a zero balance. The API deliberately hides
+  // stale projections until the chain/indexer evidence is complete.
+  return null;
 }
 
 function summarySlotCounts(route: PublicRoute) {
@@ -351,22 +353,43 @@ export function CukieMasterStatusPanel({
     qualifying: slotCounts(status.routes.uki).qualifying + slotCounts(status.routes.nft).qualifying,
     grace: slotCounts(status.routes.uki).grace + slotCounts(status.routes.nft).grace,
   } : null;
+  const sourcesComplete = Boolean(
+    status?.routes.uki.source.complete && status?.routes.nft.source.complete,
+  );
+  const projectionsMaterialized = Boolean(
+    sourcesComplete
+    && !status?.routes.uki.synchronizing
+    && !status?.routes.nft.synchronizing,
+  );
   const visibleAllocatedSlots = status
     ? (status.routes.uki.position?.allocatedSlots ?? 0)
       + (status.routes.nft.position?.allocatedSlots ?? 0)
     : 0;
-  const visibleOverviewSlots = status
-    ? visibleRouteSlots(status.routes.uki) + visibleRouteSlots(status.routes.nft)
-    : 0;
+  const visibleRouteSlotValues = status
+    ? [visibleRouteSlots(status.routes.uki), visibleRouteSlots(status.routes.nft)]
+    : [];
+  const visibleOverviewSlots = visibleRouteSlotValues.every((value) => value !== null)
+    ? visibleRouteSlotValues.reduce((total, value) => total + (value ?? 0), 0)
+    : null;
   const overviewHeading = state === 'ready' || state === 'stale'
-    ? visibleOverviewSlots > 0
+    ? sourcesComplete && !projectionsMaterialized
+      ? visibleOverviewSlots === null
+        ? 'Estamos confirmando tus cupos'
+        : `${visibleOverviewSlots} ${visibleOverviewSlots === 1 ? 'cupo potencial' : 'cupos potenciales'} detectados`
+      : visibleOverviewSlots === null
+      ? 'No podemos confirmar tus cupos todavía'
+      : visibleOverviewSlots > 0
       ? `Tienes ${visibleOverviewSlots} ${visibleOverviewSlots === 1 ? 'cupo' : 'cupos'} Cukie Master`
       : 'Consigue tu primer cupo'
     : state === 'loading'
       ? 'Estamos comprobando tu posición'
       : 'Comprueba tu posición';
   const overviewDescription = state === 'ready' || state === 'stale'
-    ? visibleOverviewSlots > 0
+    ? sourcesComplete && !projectionsMaterialized
+      ? 'La fuente ya está disponible, pero el estado de tus cupos aún se está materializando. El potencial detectado no cuenta como activo hasta completar la proyección.'
+      : visibleOverviewSlots === null
+      ? 'No hemos podido actualizar tus cupos. Puedes consultar tu staking mientras recuperamos los datos. Volveremos a intentarlo automáticamente.'
+      : visibleOverviewSlots > 0
       ? 'Aquí ves qué cupos ya cuentan, cuáles están validándose y qué puedes hacer ahora.'
       : 'Puedes conseguir cupos depositando UKI o usando tus Cukies Originales.'
     : 'Conecta y firma tu wallet para ver tus cupos, créditos y siguiente acción.';
@@ -438,7 +461,7 @@ export function CukieMasterStatusPanel({
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-                No podemos verificar tu estado económico ahora mismo. No mostramos cifras sin confirmar y reintentaremos automáticamente.
+                No podemos actualizar tus cupos ahora mismo. Puedes consultar tu staking mientras recuperamos los datos. Volveremos a intentarlo automáticamente.
               </p>
             </div>
             <button
@@ -473,20 +496,20 @@ export function CukieMasterStatusPanel({
             <div className="mt-6 grid min-w-0 gap-3 sm:grid-cols-3">
               <StatusMetric
                 label="Cupos activos"
-                value={`${totalCounts.active}/${status.totals.maxPotentialSlots}`}
-                helper={`${visibleAllocatedSlots} asignados entre las dos rutas`}
+                value={projectionsMaterialized ? `${totalCounts.active}/${status.totals.maxPotentialSlots}` : 'No disponible'}
+                helper={projectionsMaterialized ? `${visibleAllocatedSlots} asignados entre las dos rutas` : 'Esperando la materialización del estado confirmado'}
                 tone="lilac"
               />
               <StatusMetric
                 label="En validación"
-                value={String(totalCounts.qualifying)}
-                helper="Pendientes del siguiente periodo elegible"
+                value={projectionsMaterialized ? String(totalCounts.qualifying) : 'No disponible'}
+                helper={projectionsMaterialized ? 'Pendientes del siguiente periodo elegible' : 'Esperando la materialización del estado confirmado'}
               />
               <StatusMetric
                 label="En gracia"
-                value={String(totalCounts.grace)}
-                helper="Cupos que aún puedes conservar ajustando activos"
-                tone={totalCounts.grace > 0 ? 'warning' : 'neutral'}
+                value={projectionsMaterialized ? String(totalCounts.grace) : 'No disponible'}
+                helper={projectionsMaterialized ? 'Cupos que aún puedes conservar ajustando activos' : 'Esperando la materialización del estado confirmado'}
+                tone={projectionsMaterialized && totalCounts.grace > 0 ? 'warning' : 'neutral'}
               />
             </div>
 
@@ -560,7 +583,8 @@ function CukieMasterOverviewSkeleton() {
 function CukieMasterOverview({ status }: { status: PublicStatus }) {
   const ukiSlots = visibleRouteSlots(status.routes.uki);
   const nftSlots = visibleRouteSlots(status.routes.nft);
-  const totalSlots = ukiSlots + nftSlots;
+  const totalSlots = ukiSlots !== null && nftSlots !== null ? ukiSlots + nftSlots : null;
+  const sourcesComplete = status.routes.uki.source.complete && status.routes.nft.source.complete;
   const ukiCounts = summarySlotCounts(status.routes.uki);
   const nftCounts = summarySlotCounts(status.routes.nft);
   const counts = {
@@ -568,15 +592,36 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
     qualifying: ukiCounts.qualifying + nftCounts.qualifying,
     grace: ukiCounts.grace + nftCounts.grace,
   };
-  const dailyCredits = counts.active * CUKIE_MASTER_DAILY_CREDITS_PER_SLOT;
   const isSynchronizing = Boolean(
     status.routes.uki.synchronizing || status.routes.nft.synchronizing,
   );
+  const projectionsMaterialized = sourcesComplete && !isSynchronizing;
+  const dailyCredits = projectionsMaterialized ? counts.active * CUKIE_MASTER_DAILY_CREDITS_PER_SLOT : null;
   const preserveDeficit = status.routes.uki.deficitToPreserveSlots
     ?? status.routes.nft.deficitToPreserveSlots;
   const nextUkiDeficit = status.routes.uki.deficitToNextSlot;
 
   const nextAction = (() => {
+    if (!sourcesComplete) {
+      return {
+        eyebrow: 'Comprobación pendiente',
+        title: 'No podemos confirmar tus cupos todavía',
+        description: 'No hemos podido actualizar tus cupos. Puedes consultar tu staking mientras recuperamos los datos. Volveremos a intentarlo automáticamente.',
+        primary: { href: '#uki-staking', label: 'Ver staking UKI' },
+        secondary: { href: '#cukie-master-nft-staking', label: 'Ver mis Cukies' },
+        warning: true,
+      };
+    }
+    if (isSynchronizing) {
+      return {
+        eyebrow: 'Actualizando',
+        title: 'Estamos confirmando tus últimos cambios',
+        description: 'Mostramos el potencial detectado mientras se materializa el estado de tus cupos. No repitas ninguna operación; el resumen se actualizará automáticamente.',
+        primary: { href: '#uki-staking', label: 'Ver staking UKI' },
+        secondary: { href: '#cukie-master-nft-staking', label: 'Ver mis Cukies' },
+        warning: false,
+      };
+    }
     if (counts.grace > 0) {
       return {
         eyebrow: 'Necesita atención',
@@ -589,16 +634,6 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
           : { href: '#uki-staking', label: 'Gestionar staking UKI' },
         secondary: { href: '/credits', label: 'Ver mis créditos' },
         warning: true,
-      };
-    }
-    if (isSynchronizing) {
-      return {
-        eyebrow: 'Actualizando',
-        title: 'Estamos confirmando tus últimos cambios',
-        description: 'No repitas ninguna operación. Tu resumen se actualizará automáticamente cuando termine la comprobación.',
-        primary: { href: '#uki-staking', label: 'Ver staking UKI' },
-        secondary: { href: '#cukie-master-nft-staking', label: 'Ver mis Cukies' },
-        warning: false,
       };
     }
     if (totalSlots === 0) {
@@ -621,7 +656,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
         warning: false,
       };
     }
-    if (totalSlots >= status.totals.maxPotentialSlots) {
+    if (totalSlots !== null && totalSlots >= status.totals.maxPotentialSlots) {
       return {
         eyebrow: 'Máximo alcanzado',
         title: 'Ya tienes todos tus cupos disponibles',
@@ -657,9 +692,9 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
                 De dónde vienen tus cupos
               </h3>
             </div>
-            <p className="shrink-0 font-headline text-3xl font-black tabular-nums text-[var(--uki-lilac)]">
-              {totalSlots}
-              <span className="ml-1.5 text-sm font-bold text-[var(--uki-muted)]">de {status.totals.maxPotentialSlots}</span>
+            <p className="min-w-0 max-w-[48%] text-right font-headline text-xl font-black tabular-nums text-[var(--uki-lilac)] sm:max-w-none sm:text-3xl">
+              {totalSlots === null ? 'No disponible' : totalSlots}
+              {totalSlots !== null ? <span className="ml-1.5 text-sm font-bold text-[var(--uki-muted)]">de {status.totals.maxPotentialSlots}</span> : null}
             </p>
           </div>
 
@@ -672,13 +707,13 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
         <div className="grid min-w-0 divide-y divide-white/10 overflow-hidden rounded-[10px] border border-white/10 bg-black/20 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-1 lg:divide-x-0 lg:divide-y">
           <OverviewMetric
             label="Estado actual"
-            value={`${counts.active} activos`}
-            helper={`${counts.qualifying} validando · ${counts.grace} en gracia`}
+            value={projectionsMaterialized ? `${counts.active} activos` : 'No disponible'}
+            helper={projectionsMaterialized ? `${counts.qualifying} validando · ${counts.grace} en gracia` : 'Esperando la materialización del estado confirmado'}
           />
           <OverviewMetric
             label="Créditos diarios"
-            value={dailyCredits.toLocaleString('es-ES')}
-            helper={`${CUKIE_MASTER_DAILY_CREDITS_PER_SLOT} por cada cupo activo`}
+            value={dailyCredits === null ? 'No disponible' : dailyCredits.toLocaleString('es-ES')}
+            helper={dailyCredits === null ? 'Se mostrará cuando las fuentes estén disponibles' : `${CUKIE_MASTER_DAILY_CREDITS_PER_SLOT} por cada cupo activo`}
           />
         </div>
       </div>
@@ -712,9 +747,9 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
   );
 }
 
-function SlotSource({ source, value }: { source: RouteKey; value: number }) {
+function SlotSource({ source, value }: { source: RouteKey; value: number | null }) {
   const maxSlots = MAX_ROUTE_SLOTS;
-  const normalizedValue = Math.min(maxSlots, Math.max(0, value));
+  const normalizedValue = value === null ? null : Math.min(maxSlots, Math.max(0, value));
   const isUki = source === 'uki';
   const Icon = isUki ? Coins : Diamond;
   const label = isUki ? 'Con UKI' : 'Con Cukies Originales';
@@ -728,26 +763,30 @@ function SlotSource({ source, value }: { source: RouteKey; value: number }) {
           </span>
           <p className="truncate text-sm font-black text-[var(--uki-cream)]">{label}</p>
         </div>
-        <p className="shrink-0 font-headline text-xl font-black tabular-nums text-[var(--uki-cream)]">
-          {normalizedValue}<span className="ml-1 text-xs font-bold text-[var(--uki-muted)]">de {maxSlots}</span>
+        <p className="min-w-0 text-right font-headline text-lg font-black tabular-nums text-[var(--uki-cream)] sm:text-xl">
+          {normalizedValue === null ? 'No disponible' : normalizedValue}<span className="ml-1 text-xs font-bold text-[var(--uki-muted)]">{normalizedValue === null ? '' : `de ${maxSlots}`}</span>
         </p>
       </div>
-      <span
-        role="progressbar"
-        aria-label={`${label}: ${normalizedValue} de ${maxSlots} cupos`}
-        aria-valuemin={0}
-        aria-valuemax={maxSlots}
-        aria-valuenow={normalizedValue}
-        className="mt-3 grid grid-cols-5 gap-1.5"
-      >
-        {Array.from({ length: maxSlots }, (_, index) => (
-          <span
-            key={index}
-            aria-hidden="true"
-            className={`h-1.5 rounded-full ${index < normalizedValue ? 'bg-[var(--uki-lilac)]' : 'bg-white/10'}`}
-          />
-        ))}
-      </span>
+      {normalizedValue === null ? (
+        <p className="mt-3 text-xs font-semibold text-amber-200">Esperando confirmación de la fuente</p>
+      ) : (
+        <span
+          role="progressbar"
+          aria-label={`${label}: ${normalizedValue} de ${maxSlots} cupos`}
+          aria-valuemin={0}
+          aria-valuemax={maxSlots}
+          aria-valuenow={normalizedValue}
+          className="mt-3 grid grid-cols-5 gap-1.5"
+        >
+          {Array.from({ length: maxSlots }, (_, index) => (
+            <span
+              key={index}
+              aria-hidden="true"
+              className={`h-1.5 rounded-full ${index < normalizedValue ? 'bg-[var(--uki-lilac)]' : 'bg-white/10'}`}
+            />
+          ))}
+        </span>
+      )}
     </div>
   );
 }
@@ -776,10 +815,14 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
     ? route.balanceQualifiedSlots
       ?? route.previewSlots
       ?? route.position?.allocatedSlots
-      ?? 0
-    : 0;
-  const deficit = route.deficitToPreserveSlots ?? route.deficitToNextSlot;
-  const nextStep = displayedSlots >= MAX_ROUTE_SLOTS
+      ?? null
+    : null;
+  const deficit = route.source.complete
+    ? route.deficitToPreserveSlots ?? route.deficitToNextSlot
+    : null;
+  const nextStep = displayedSlots === null
+    ? 'No podemos confirmar tus cupos hasta recuperar la fuente de UKI.'
+    : displayedSlots >= MAX_ROUTE_SLOTS
     ? 'Has alcanzado el máximo de 5 Cukie Masters mediante UKI.'
     : deficit
       ? `Te faltan ${requirementLabel(deficit)} para desbloquear tu próximo Cukie Master.`
@@ -806,7 +849,7 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
         />
         <StatusMetric
           label="Tus Cukie Masters"
-          value={`${displayedSlots}/${MAX_ROUTE_SLOTS}`}
+          value={displayedSlots === null ? 'No disponible' : `${displayedSlots}/${MAX_ROUTE_SLOTS}`}
           helper="Preventa pendiente + staking · máximo 5"
           tone="lilac"
         />
@@ -815,19 +858,19 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
       <div className="mt-4 rounded-[8px] border border-white/10 bg-black/20 p-4">
         <div className="flex items-center justify-between gap-4 text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
           <span>Tu progreso</span>
-          <span>{displayedSlots} de {MAX_ROUTE_SLOTS}</span>
+          <span>{displayedSlots === null ? 'No disponible' : `${displayedSlots} de ${MAX_ROUTE_SLOTS}`}</span>
         </div>
         <span
           role="progressbar"
           aria-label="Progreso Cukie Master por UKI"
           aria-valuemin={0}
           aria-valuemax={MAX_ROUTE_SLOTS}
-          aria-valuenow={displayedSlots}
+          {...(displayedSlots === null ? {} : { 'aria-valuenow': displayedSlots })}
           className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
         >
           <span
             className="block h-full rounded-full bg-[var(--uki-lilac)]"
-            style={{ width: `${Math.min(100, displayedSlots * 20)}%` }}
+            style={{ width: displayedSlots === null ? '0%' : `${Math.min(100, displayedSlots * 20)}%` }}
           />
         </span>
         <p className="mt-3 text-sm font-semibold text-[var(--uki-text)]">{nextStep}</p>
@@ -863,7 +906,9 @@ function StatusMetric({
 
 function RouteTab({ value, label, route }: { value: RouteKey; label: string; route: PublicRoute }) {
   const allocated = route.position?.allocatedSlots ?? 0;
-  const displayed = route.synchronizing ? route.previewSlots ?? 0 : allocated;
+  const displayed = !route.source.complete
+    ? null
+    : route.synchronizing ? route.previewSlots ?? null : allocated;
   const counts = slotCounts(route);
   return (
     <TabsTrigger
@@ -880,10 +925,12 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
             : <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />}
         </span>
         <span className="mt-2 flex items-end justify-between gap-3">
-          <span className="font-headline text-2xl font-black text-[var(--uki-gold)]">{displayed}/{MAX_ROUTE_SLOTS}</span>
+          <span className="font-headline text-2xl font-black text-[var(--uki-gold)]">{displayed === null ? 'No disponible' : `${displayed}/${MAX_ROUTE_SLOTS}`}</span>
           <span className="text-xs font-semibold text-[var(--uki-muted)]">
-            {route.synchronizing
-              ? `${displayed} detectados · sincronizando`
+            {!route.source.complete
+              ? 'Esperando confirmación'
+              : route.synchronizing
+              ? displayed === null ? 'Materialización pendiente' : `${displayed} detectados · sincronizando`
               : `${counts.active} activos · ${counts.qualifying} validando`}
           </span>
         </span>
@@ -892,11 +939,13 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
           aria-label={`Progreso ${label}`}
           aria-valuemin={0}
           aria-valuemax={MAX_ROUTE_SLOTS}
-          aria-valuenow={displayed}
-          aria-valuetext={`${displayed} de ${MAX_ROUTE_SLOTS} cupos${route.synchronizing ? ' detectados, sincronizando' : ''}`}
+          {...(displayed === null ? {} : { 'aria-valuenow': displayed })}
+            aria-valuetext={displayed === null
+            ? 'Cupos no disponibles; esperando confirmación'
+            : `${displayed} de ${MAX_ROUTE_SLOTS} cupos${route.synchronizing ? ' detectados, sincronizando' : ''}`}
           className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
         >
-          <span className="block h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: `${Math.min(100, displayed * 20)}%` }} />
+          <span className="block h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: displayed === null ? '0%' : `${Math.min(100, displayed * 20)}%` }} />
         </span>
       </span>
     </TabsTrigger>
@@ -914,7 +963,11 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h4 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">{label}</h4>
             <span className="w-fit rounded-full border border-white/10 px-3 py-1 text-xs font-black uppercase text-[var(--uki-muted)]">
-              {counts.active} activos · {counts.qualifying} en validación · {counts.grace} en gracia
+              {!route.source.complete
+                ? 'Estado pendiente de confirmación'
+                : route.synchronizing
+                  ? 'Materialización pendiente'
+                  : `${counts.active} activos · ${counts.qualifying} en validación · ${counts.grace} en gracia`}
             </span>
           </div>
 
@@ -943,7 +996,11 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
               ) : (
                 <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Puntos que ya cuentan</p>
-                  <p className="mt-2 text-2xl font-black text-[var(--uki-gold)]">{route.source.originalCukiePoints ?? 0} puntos</p>
+                  <p className="mt-2 text-2xl font-black text-[var(--uki-gold)]">
+                    {typeof route.source.originalCukiePoints === 'number'
+                      ? `${route.source.originalCukiePoints} puntos`
+                      : 'No disponible'}
+                  </p>
                 </div>
               )}
             </>

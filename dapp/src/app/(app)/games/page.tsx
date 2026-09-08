@@ -53,18 +53,18 @@ export default function GamesPage() {
         </p>
       </header>
 
-      <section aria-labelledby="featured-game-title" className="pt-7">
+      <section aria-labelledby="featured-game-title" className="pt-5 sm:pt-7">
         <div className="grid overflow-hidden rounded-[20px] border border-[var(--uki-lilac)]/30 bg-[#09060f] shadow-[0_26px_80px_rgba(0,0,0,0.36)] lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="relative min-h-[22rem] overflow-hidden lg:min-h-[34rem]">
+          <div className="relative order-2 min-h-[13rem] overflow-hidden sm:min-h-[18rem] lg:order-1 lg:min-h-[34rem]">
             <Image src={featuredGame.imageUrl} alt="Escena de Treasure Hunt" fill priority sizes="(min-width: 1024px) 58vw, 100vw" className="object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#09060f]/70 via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-transparent lg:to-[#09060f]" />
           </div>
 
-          <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-10">
+          <div className="order-1 flex flex-col justify-center p-5 sm:p-8 lg:order-2 lg:p-10">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--uki-lilac)]">Recomendado para empezar</p>
-            <h2 id="featured-game-title" className="mt-3 font-headline text-4xl font-black leading-none text-[var(--uki-cream)] sm:text-5xl">{featuredGame.name}</h2>
-            <p className="mt-4 text-base font-semibold leading-relaxed text-[var(--uki-text)]">{featuredGame.description}</p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <h2 id="featured-game-title" className="mt-2 font-headline text-3xl font-black leading-none text-[var(--uki-cream)] sm:mt-3 sm:text-5xl">{featuredGame.name}</h2>
+            <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:mt-4 sm:text-base">{featuredGame.description}</p>
+            <div className="mt-5 flex flex-col gap-3 sm:mt-7 sm:flex-row">
               <Link href={featuredGame.href} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 font-headline text-sm font-black uppercase tracking-[0.08em] text-[#09060f] transition hover:brightness-110">
                 Jugar ahora
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />

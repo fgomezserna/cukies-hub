@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   SidebarProvider,
@@ -8,6 +8,8 @@ import {
   SidebarHeader,
   SidebarContent,
   SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -30,6 +32,7 @@ import Image from 'next/image';
 import CukieLogoFirst from '@/assets/Cukie_logo_first.png';
 import { usePathname } from 'next/navigation';
 import { useMobileGameShell } from '@/hooks/use-mobile-game-shell';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
@@ -53,15 +56,16 @@ const SidebarLogo = () => {
 
 const SidebarNavigationLink = React.forwardRef<
   HTMLAnchorElement,
-  React.ComponentProps<typeof Link>
->(({ onClick, ...props }, ref) => {
-  const { setOpenMobile } = useSidebar();
+  React.ComponentProps<typeof Link> & { onMobileNavigate?: () => void }
+>(({ onClick, onMobileNavigate, ...props }, ref) => {
+  const { isMobile, setMobileNavigationFocus, setOpenMobile } = useSidebar();
 
   return (
     <Link
       ref={ref}
       onClick={(event) => {
         onClick?.(event);
+        if (isMobile) setMobileNavigationFocus(onMobileNavigate ?? null);
         setOpenMobile(false);
       }}
       {...props}
@@ -73,77 +77,76 @@ SidebarNavigationLink.displayName = 'SidebarNavigationLink';
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const isMobileGameShell = useMobileGameShell();
+  const isMobile = useIsMobile();
   const isGamesSection = pathname.startsWith('/games');
   const isTreasureHunt = pathname.startsWith('/games/treasure-hunt');
   const isTreasureHuntGameView = pathname === '/games/treasure-hunt';
   const isMobileTreasureHunt =
     isMobileGameShell && isTreasureHuntGameView;
   const isMarketplaceSection = pathname.startsWith('/marketplace');
+  const mainRef = useRef<HTMLElement>(null);
 
-  const navigationItems = [
+  const focusMainAfterMobileNavigation = React.useCallback(() => {
+    mainRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const navigationGroups = [
     {
-      href: '/',
-      label: 'Inicio',
-      Icon: LayoutDashboard,
-      active: false,
+      label: 'Acceso principal',
+      items: [
+        { href: '/', label: 'Inicio', Icon: LayoutDashboard, active: false },
+        { href: '/dashboard', label: 'Resumen', Icon: LayoutDashboard, active: pathname === '/dashboard' },
+        { href: '/games', label: 'Jugar', Icon: Gamepad2, active: isGamesSection },
+      ],
     },
     {
-      href: '/games',
-      label: 'Jugar',
-      Icon: Gamepad2,
-      active: isGamesSection,
+      label: 'Recursos',
+      items: [
+        { href: '/cukie-master', label: 'Cukie Master', Icon: Crown, active: pathname.startsWith('/cukie-master') },
+        { href: '/credits', label: 'Créditos', Icon: Coins, active: pathname.startsWith('/credits') },
+        { href: '/cukie-hodler#mi-cukie-pool', label: 'Pool de Cukies', Icon: Layers3, active: pathname.startsWith('/cukie-hodler') },
+      ],
     },
     {
-      href: '/cukie-master',
-      label: 'Cukie Master',
-      Icon: Crown,
-      active: pathname.startsWith('/cukie-master'),
+      label: 'Colección',
+      items: [
+        { href: '/cukies', label: 'Mis Cukies', Icon: Cookie, active: pathname.startsWith('/cukies') },
+        { href: '/marketplace', label: 'Marketplace', Icon: Store, active: pathname.startsWith('/marketplace') },
+      ],
     },
     {
-      href: '/credits',
-      label: 'Créditos',
-      Icon: Coins,
-      active: pathname.startsWith('/credits'),
+      label: 'Cobros',
+      items: [
+        { href: '/premios', label: 'Premios', Icon: Gift, active: pathname.startsWith('/premios') },
+        { href: '/vesting', label: 'Vesting', Icon: LockKeyhole, active: pathname === '/vesting' },
+      ],
     },
     ...(isAmbassadorsPubliclyListed()
       ? [{
-          href: '/embajadores',
-          label: 'Embajadores',
-          Icon: UsersRound,
-          active: pathname.startsWith('/embajadores'),
+          label: 'Invitaciones',
+          items: [{ href: '/embajadores', label: 'Embajadores', Icon: UsersRound, active: pathname.startsWith('/embajadores') }],
         }]
       : []),
     {
-      href: '/cukie-hodler#mi-cukie-pool',
-      label: 'Pool de Cukies',
-      Icon: Layers3,
-      active: pathname.startsWith('/cukie-hodler'),
-    },
-    {
-      href: '/cukies',
-      label: 'Mis Cukies',
-      Icon: Cookie,
-      active: pathname.startsWith('/cukies'),
-    },
-    {
-      href: '/marketplace',
-      label: 'Marketplace',
-      Icon: Store,
-      active: pathname.startsWith('/marketplace'),
-    },
-    {
-      href: '/premios',
-      label: 'Premios',
-      Icon: Gift,
-      active: pathname.startsWith('/premios'),
-    },
-    {
-      href: '/vesting',
-      label: 'Vesting',
-      Icon: LockKeyhole,
-      active: pathname === '/vesting',
+      label: 'Cuenta y ayuda',
+      items: [
+        { href: '/como-jugar', label: 'Como jugar', Icon: Gamepad2, active: pathname.startsWith('/como-jugar') },
+      ],
     },
   ];
+
+  const hasMountedPathRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasMountedPathRef.current) {
+      hasMountedPathRef.current = true;
+      return;
+    }
+
+    if (isMobile) {
+      mainRef.current?.focus({ preventScroll: true });
+    }
+  }, [isMobile, pathname]);
 
   return (
     <div className="relative flex h-screen h-dvh min-h-0 w-full overflow-hidden bg-[#0b0810]">
@@ -159,27 +162,37 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             <SidebarLogo />
           </SidebarHeader>
           <SidebarContent className="bg-transparent py-4">
-            <SidebarGroup className="px-3 py-0">
-              <SidebarMenu className="space-y-1.5">
-                {navigationItems.map(({ href, label, Icon, active }) => (
-                  <SidebarMenuItem key={href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      tooltip={label}
-                      className="group min-h-10 rounded-lg border border-transparent text-white/70 transition-colors hover:border-lilac-300/20 hover:bg-lilac-400/10 hover:text-white data-[active=true]:border-lilac-300/30 data-[active=true]:bg-lilac-400/15 data-[active=true]:text-white"
-                    >
-                      <SidebarNavigationLink href={href}>
-                        <Icon className="h-4 w-4 shrink-0 text-lilac-300 transition-colors group-hover:text-lilac-200" />
-                        <span className="font-semibold group-data-[collapsible=icon]:hidden">
-                          {label}
-                        </span>
-                      </SidebarNavigationLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
+            {navigationGroups.map(({ label, items }) => (
+              <SidebarGroup key={label} className="px-3 py-0">
+                <SidebarGroupLabel className="px-3 pb-1 pt-3 text-[0.65rem] font-black uppercase tracking-[0.16em] text-white/40 group-data-[collapsible=icon]:hidden">
+                  {label}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="space-y-1.5">
+                    {items.map(({ href, label: itemLabel, Icon, active }) => (
+                      <SidebarMenuItem key={href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={active}
+                          tooltip={itemLabel}
+                          className="group min-h-11 rounded-lg border border-transparent text-white/70 transition-colors hover:border-lilac-300/20 hover:bg-lilac-400/10 hover:text-white data-[active=true]:border-lilac-300/30 data-[active=true]:bg-lilac-400/15 data-[active=true]:text-white"
+                        >
+                          <SidebarNavigationLink
+                            href={href}
+                            onMobileNavigate={focusMainAfterMobileNavigation}
+                          >
+                            <Icon className="h-4 w-4 shrink-0 text-lilac-300 transition-colors group-hover:text-lilac-200" />
+                            <span className="font-semibold group-data-[collapsible=icon]:hidden">
+                              {itemLabel}
+                            </span>
+                          </SidebarNavigationLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
           </SidebarContent>
         </Sidebar>
         )}
@@ -235,8 +248,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           ) : null}
           <main
             data-app-main
+            data-testid="app-main"
+            ref={mainRef}
+            tabIndex={-1}
             className={cn(
-              'relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8',
+              'relative z-10 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 outline-none sm:p-6 lg:p-8',
               isTreasureHunt && 'h-full overflow-hidden p-0 sm:p-0 lg:p-0',
             )}
           >

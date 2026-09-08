@@ -239,12 +239,14 @@ function CompetitionSpotlight() {
   const isPersonalStatusLoading = isConnected && isLoading;
   const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
   const phase = status?.phase ?? 'unconfigured';
+  const isClosed = phase === 'closed';
   const prizePool = leaderboardMeta?.poolUkiRaw
     ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw, 1)
     : copy.loading;
   const attempts = eligibility
     ? eligibility.attemptsRemaining.toLocaleString(locale === 'es' ? 'es-ES' : 'en-GB')
     : copy.connect;
+  const attemptsLabel = phase === 'closed' ? copy.historicalAttempts : copy.attempts;
   const counted = eligibility
     ? `${eligibility.disqualified ? 0 : eligibility.topAttemptsCount}/${maxAttempts}`
     : `—/${maxAttempts}`;
@@ -274,7 +276,7 @@ function CompetitionSpotlight() {
                 {copy.title}
               </h2>
               <p className="mt-5 max-w-[38rem] text-base font-semibold leading-relaxed text-[var(--uki-text)]">
-                {copy.text}
+                {isClosed ? copy.closedText : copy.text}
               </p>
               <CompetitionCountdown locale={locale} phase={phase} campaign={campaign} />
 
@@ -291,7 +293,7 @@ function CompetitionSpotlight() {
               ) : null}
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <LandingButton href="/games/treasure-hunt">{copy.play}</LandingButton>
+                <LandingButton href="/games/treasure-hunt">{isClosed ? copy.closedPlay : copy.play}</LandingButton>
                 <LandingButton href="/games/treasure-hunt/rankings" variant="secondary">
                   {copy.rankings}
                 </LandingButton>
@@ -301,7 +303,7 @@ function CompetitionSpotlight() {
             <dl className="grid gap-px overflow-hidden rounded-[12px] border border-white/15 bg-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.32)]">
               {[
                 [copy.prize, isLoading && !leaderboardMeta ? copy.loading : prizePool],
-                [copy.attempts, isPersonalStatusLoading ? copy.loading : attempts],
+                [attemptsLabel, isPersonalStatusLoading ? copy.loading : attempts],
                 [copy.counted, isPersonalStatusLoading ? copy.loading : counted],
               ].map(([label, value]) => (
                 <div key={label} className="bg-[#081614]/95 px-5 py-5 sm:px-6">

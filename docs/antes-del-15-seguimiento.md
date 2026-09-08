@@ -4,7 +4,8 @@ Estado del documento: fuente unica del estado vigente; vivo y versionado.
 
 Ultima actualizacion: 2026-09-08.
 
-Contexto de esta actualizacion: auditoria UX del 2026-09-08, conservando la
+Contexto de esta actualizacion: implementacion autorizada de la auditoria UX y
+diagnostico de actualizacion de datos del 2026-09-08, conservando la
 correccion de producto del 2026-09-07 y el contraste focalizado de la evidencia
 disponible. Las decisiones explicitas
 del usuario fijan el alcance; su confirmacion de funcionamiento queda registrada
@@ -74,7 +75,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | 2A-C | **EVENTOS Y WORKER INTEGRADOS EN STAGING**: 14 contratos legacy y 10 perfiles nuevos cubiertos (75 + 87 relaciones contrato/evento); replay de breeding, CAS bridge y aislamiento verificados. 14/14 fuentes contrastadas live y pasada TRON 40/40 sin 429 con delay 2 s. Marketplace conjunto y UX siguen pendientes. | [PR #319](https://github.com/fgomezserna/cukies-hub/pull/319) integrada en `7d0d1ce`, codigo `fa708fd`; [validacion y limites](legacy-marketplace/evidence/2026-09-07-indexer-validation.json); 2026-09-07. Pruebas: indexer 84/84, Stage/Compose 63/63, produccion 14/14, typecheck/build correctos. | Resolver RPC de archivo BSC antes del backfill, provisionar destino dedicado, activar y reconciliar datos. Despues integrar lista/filtros/acciones segun [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). Dapp Stage `7d0d1ce` verificada por health; rollout del indexador normal requirio completar identidades PRESALE/REWARDS (ver [configuracion](deployment-environments.md)). El worker legacy sigue inactivo y no se afirma paridad; main `fb2b190`. |
 | 3 | **EN STAGING, EN PRUEBAS**: Cukie Master, creditos, pools, prestamos y rewards. | Confirmacion de producto; 2026-09-07; smoke 11:44 UTC como evidencia fechada. | Registrar resultados de consumo/caducidad de creditos, stake/unstake, prestamos, cierres, reparto e idempotencia; completar los flujos pendientes segun esas pruebas. |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
-| 5 | **AUDITORIA UX REALIZADA; REDISEÑO PROPUESTO, SIN IMPLEMENTAR**: sidebar, menu movil, navegacion, pantallas, perfil, avatar y notificaciones. | 2026-09-08 CEST (07-09 UTC), Stage app 28 `ed2d50d`; 27 rutas leidas con sesion, escritorio/movil y contraste de codigo. [Hallazgos y propuesta](uki-dapp-sitemap.md). | Primero coherencia de estados/reglas y mensajes reales; completar flujos legacy con datos reconciliados; despues integrar navegacion/dashboard/cuenta propuestos. El punto sigue abierto; no hay nueva implementacion ni validacion transaccional por esta auditoria. |
+| 5 | **IMPLEMENTADO LOCAL Y VALIDADO; PENDIENTE PUBLICAR**: navegacion, cuenta, estados de datos, juego y catalogo conjunto. RPC Stage recuperado; correccion de health preparada. | 2026-09-08, branch `codex/ux-data-consistency`; 215 suites / 1.715 tests dapp, lint, typecheck y build OK. Stage sigue sirviendo `ed2d50d`. [Auditoria](uki-dapp-sitemap.md), [evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json), [incidente #321](https://github.com/fgomezserna/cukies-hub/issues/321). | Integrar con autorizacion de merge y desplegar app 28; verificar baja del cupo UKI, cinco NFT y creditos con sesion firmada. Los 77 cursores y checkpoint ya estan al dia; health anterior aun omite eventos por limite de consulta. Punto abierto; main sin cambios de esta tarea. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
 | post1-2 | **ANTES DEL 15 · MIGRACION LEGACY**: Cukie Points y crias siguen ligados al bloque de migracion; no son activos POST-15. | Decision de producto; 2026-09-07. | Inventario y migracion validada; no ejecutar pausa/corte en este seguimiento. |
 | post3-9 | Alcance conservado como inventario posterior, sin afirmar codigo definitivo ni cierre. | Registro historico; 2026-09-07. | Mantener scope y esperar decision/evidencia especifica. |
@@ -837,6 +838,70 @@ y criterios de aceptacion. **Auditoria no equivale a rediseño implementado ni
 a punto cerrado.** No cambia el estado confirmado de A/B/C ni de produccion.
 Los documentos anteriores se han reconciliado; dejan de proponer rutas/API
 inexistentes como si fueran el flujo actual.
+
+### Implementacion y datos: 8 de septiembre
+
+El usuario autoriza aplicar la propuesta y aporta capturas de Master con cero
+cupos, NFT/Pool sincronizando y un cupo UKI que permanece activo tras retirar.
+La comprobacion remota encuentra el proceso healthy pero iteraciones fallidas
+por RPC (503/403, recibos ausentes e historico podado). Los cursores Staked y
+Unstaked siguen en `129722220`, actualizados el 7 a las 22:52 UTC. El backend
+conserva 20.500 UKI; la lectura de contrato y la pantalla de staking muestran
+cero. El runtime de creditos bloquea por `SOURCE_UNHEALTHY`,
+`CANONICAL_CHECKPOINT_UNHEALTHY` e `INDEXER_RUN_UNHEALTHY`.
+
+Se ha validado otro RPC de BSC Testnet desde el contenedor: diez identidades
+de contrato correctas y un evento Staked conocido recuperado. Se configura
+en Coolify app 28. El despliegue `roowww4o00g0goc0gkooscwg` del mismo `ed2d50d`
+termina a las 09:40 UTC. Runtime contrastado con RPC Sentio, rango 100.000 y
+poll 10 segundos (guard Stage activo). El backend recupera a las 09:47 UTC
+el unstake `0xc149213fe36b229a3a46214609bae5773b2d33986165fe44d05ac7ac9c2f9e09`,
+bloque `129802234`, confirmado on-chain a las 08:52:04: saldo UKI cero.
+A las 10:20 UTC, los 77 cursores configurados alcanzan el bloque actual
+y el checkpoint canonico se actualiza a `129813877`. Esto recupera el
+historico, pero no certifica aun Master/creditos/inventario. Esta accion no publica todavia el
+parche local. Se conservan cursores, posiciones y ledger:
+no hay reset, salto de bloques ni revocacion de creditos emitidos.
+
+La salida de UKI deja de dar cupos cuando ya no cumple el requisito; los
+creditos concedidos mantienen su caducidad. La gracia corresponde a cambios
+del requisito, no a retrasos del indexador. Los cambios locales distinguen
+vigencia pendiente, saldo emitido/caducado y datos desconocidos; el refresco
+debe conservar repartos en edicion y descartar respuestas de otra sesion.
+
+Evidencia operativa: [recuperacion Stage del 8 de septiembre](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json).
+No contiene credenciales ni sustituye este seguimiento. Tras confirmar el checkpoint fresco, a las 10:20:58 UTC se adelanta solo
+el trabajo UKI fallido de la wallet de QA (sin borrar intentos ni modificar
+saldos). El runtime vuelve a rechazarlo a las 10:21:33: `RECALCULATION_FAILED`.
+Los cupos materializados siguen siendo cinco NFT y uno UKI. El RCA posterior
+confirma un defecto de consulta: health UKI encuentra 14 cursores y toma solo
+5 sin orden; health NFT custodial encuentra 13 y toma solo 7. Tras incorporar
+nuevos eventos, esos limites dejan fuera `UKI_STAKING:Unstaked`,
+`VESTING_VAULT:VestingCreated/TokensReleased` y
+`TOKEN_V2:Transfer/CukieMetadataConfigured`, aunque existen y estan al dia.
+No hay incidentes de integridad ni dead letters. El cursor obsoleto no causa
+el bloqueo. Se corrige seleccionando el manifiesto requerido antes del limite,
+sin relajar identidad/frescura. La baja del cupo debe comprobarse tras publicar
+el parche; no se certifica por la consulta corregida en aislamiento.
+
+Validacion final local del 8/09: `pnpm dapp lint`, `typecheck`, `test --runInBand`
+(215 suites, 1.715 tests) y `pnpm build:dapp` OK. Sybil Slayer: lint (warnings),
+typecheck y build OK. Chain indexer: 86 tests pasados, una integracion Mongo
+opt-in omitida; typecheck y build OK. Diff sin errores. Ninguno de estos checks
+sustituye la validacion firmada y economica posterior al despliegue.
+
+Alcance local del lote `codex/ux-data-consistency` (sin publicar):
+
+| Puntos UX | Cambio o comprobacion | Estado / limite |
+| --- | --- | --- |
+| UX-01 | Fuente, proyeccion y saldo emitido separados; descarte de respuestas de otra wallet; refresco de creditos conservando borradores | Parche y regresiones pasados; backfill recuperado. Health y cupos deben verificarse tras publicar la seleccion del manifiesto |
+| UX-02/08 | Reglas y fase de torneo coherentes; acceso de juego pendiente cuando falta autoridad | Tests focales; Sybil Slayer lint, typecheck y build OK el 8/09 (warnings de lint); sin pruebas de compra/partida real |
+| UX-03/04/05/06/12 | Inicio y Resumen, grupos de sidebar, cuenta/avatar/ajustes, retirada de campana estatica, cierre y foco movil | IAB local `320x568`: cierre por Escape devuelve foco; ultimo enlace accesible y foco en MAIN; sin desbordamiento. Destino hash probado tras cierre Radix: foco en MAIN, cancelacion conserva activador |
+| UX-07 | Resumen compacto; prioridad de CTA de Juegos en movil | Dashboard compacto; CTA Juegos visible sin scroll en IAB 391x844 y 320x568 |
+| UX-09 | Catalogo conjunto Legacy/UKI, identidad por cadena/coleccion y navegacion paginada | Catalogo conjunto con cursor UKI y offset Legacy, tests de union >100, empates y fuentes parciales. UKI limita filtros a ID/wallet y orden reciente |
+| UX-10/11 | Ficha, tools de coleccion y estados de Bridge/Points/Crias | Parche local; sin certificacion de todos los flujos transaccionales legacy |
+| UX-13 | Vesting comparte vista y no muestra calendario personal sin asignacion | Parche local y tests focales; sin claim real |
+| UX-14 | Idioma de las superficies publicadas y ayuda de monedas/red de compra | Compra usa monedas de swapConfig y red objetivo; ES/EN de portada coherentes. App publicada en castellano; formularios antiguos sin consumidores no reactivados |
 
 Stage:
 

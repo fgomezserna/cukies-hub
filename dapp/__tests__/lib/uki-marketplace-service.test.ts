@@ -7,6 +7,7 @@ jest.mock('@/lib/uki-marketplace/live', () => ({
 }));
 
 import {
+  listPublicUkiMarketplacePage,
   listPublicUkiMarketplaceOrders,
   listSellerUkiMarketplaceOrders,
   UkiMarketplaceUnavailableError,
@@ -169,6 +170,119 @@ describe('UKI marketplace Stage service', () => {
     await expect(
       listPublicUkiMarketplaceOrders({}, context.dependencies),
     ).rejects.toBeInstanceOf(UkiMarketplaceUnavailableError);
+  });
+
+  it('avanza el cursor después de candidatos live inválidos sin duplicar la página', async () => {
+    const invalid = order('b');
+    const validOne = order('c', { listedAt: new Date('2026-08-30T09:00:00.000Z') });
+    const validTwo = order('d', { listedAt: new Date('2026-08-30T08:00:00.000Z') });
+    const context = dependencies({
+      publicOrders: [invalid, validOne, validTwo],
+      inspections: new Map([
+        [invalid.orderId, inspection({ contractState: 5, ownerNormalized: buyer })],
+        [validOne.orderId, inspection()],
+        [validTwo.orderId, inspection()],
+      ]),
+    });
+    context.repository.listPublicCandidates
+      .mockImplementationOnce(async () => [invalid, validOne])
+      .mockImplementationOnce(async () => [validTwo]);
+
+    const result = await listPublicUkiMarketplacePage({ limit: 2 }, context.dependencies);
+
+    expect(result.orders.map(({ orderId }) => orderId)).toEqual([validOne.orderId, validTwo.orderId]);
+    expect(result.nextCursor).toBeTruthy();
+    expect(context.repository.listPublicCandidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('continúa con el cursor cuando agota el presupuesto de lotes antes de un anuncio válido', async () => {
+    const invalid = Array.from({ length: 193 }, (_, index) =>
+      order((index + 1).toString(16).padStart(2, '0')),
+    );
+    const valid = order('fff', { listedAt: new Date('2026-08-29T08:00:00.000Z') });
+    const context = dependencies({
+      inspections: new Map([
+        ...invalid.map((candidate) => [candidate.orderId, inspection({ contractState: 5, ownerNormalized: buyer })] as const),
+        [valid.orderId, inspection()],
+      ]),
+    });
+    let call = 0;
+    context.repository.listPublicCandidates.mockImplementation(async ({ limit }: { limit: number }) => {
+      if (call < 8) {
+        const batch = invalid.slice(call * limit, (call + 1) * limit);
+        call += 1;
+        return batch;
+      }
+      call += 1;
+      return [valid];
+    });
+
+    const first = await listPublicUkiMarketplacePage({ limit: 24 }, context.dependencies);
+    expect(first.orders).toEqual([]);
+    expect(first.hasMore).toBe(true);
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await listPublicUkiMarketplacePage(
+      { limit: 24, cursor: first.nextCursor ?? undefined },
+      context.dependencies,
+    );
+    expect(second.orders.map(({ orderId }) => orderId)).toEqual([valid.orderId]);
+    expect(second.hasMore).toBe(false);
+    expect(call).toBe(9);
+  });
+
+  it('conserva la continuación después de más de ocho candidatos inválidos entre páginas', async () => {
+    const first = order('10');
+    const invalid = Array.from({ length: 8 }, (_, index) =>
+      order((0x20 + index).toString(16)),
+    );
+    const second = order('30', {
+      listedAt: new Date('2026-08-30T09:00:00.000Z'),
+    });
+    const context = dependencies({
+      inspections: new Map([
+        [first.orderId, inspection()],
+        ...invalid.map((candidate) => [
+          candidate.orderId,
+          inspection({ contractState: 5, ownerNormalized: buyer }),
+        ] as const),
+        [second.orderId, inspection()],
+      ]),
+    });
+    let call = 0;
+    context.repository.listPublicCandidates.mockImplementation(async () => {
+      if (call === 0) {
+        call += 1;
+        return [first];
+      }
+      if (call <= invalid.length) {
+        const candidate = invalid[call - 1];
+        call += 1;
+        return [candidate];
+      }
+      if (call === 10) {
+        call += 1;
+        return [];
+      }
+      call += 1;
+      return [second];
+    });
+
+    const firstPage = await listPublicUkiMarketplacePage(
+      { limit: 1 },
+      context.dependencies,
+    );
+    expect(firstPage.orders.map(({ orderId }) => orderId)).toEqual([first.orderId]);
+    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.nextCursor).toBeTruthy();
+
+    const secondPage = await listPublicUkiMarketplacePage(
+      { limit: 1, cursor: firstPage.nextCursor ?? undefined },
+      context.dependencies,
+    );
+    expect(secondPage.orders.map(({ orderId }) => orderId)).toEqual([second.orderId]);
+    expect(secondPage.hasMore).toBe(false);
+    expect(context.repository.listPublicCandidates).toHaveBeenCalledTimes(11);
   });
 
   it('shows approval loss as requires_attention only in the authenticated seller view', async () => {

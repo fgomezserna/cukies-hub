@@ -39,7 +39,7 @@ function config(overrides: Partial<IndexerConfig> = {}): IndexerConfig {
 
 function fakeStore(
   cursor: Partial<ChainCursor> | null = null,
-  options: { failCursorUpdate?: boolean } = {},
+  options: { failCursorUpdate?: boolean; failCutoffResolution?: boolean } = {},
 ) {
   const updates: Array<{
     config: ContractEventConfig;
@@ -67,6 +67,10 @@ function fakeStore(
       operations.push('checkpoint');
       checkpoints.push(input);
     },
+    listUnresolvedCompetitionCreditCutoffs: async () => {
+      if (options.failCutoffResolution) throw new Error('cutoff lookup failed');
+      return [];
+    },
     reconcileVerifiedUkiStakingBootstrap: async (input: unknown) => {
       operations.push('staking-bootstrap');
       stakingBootstraps.push(input);
@@ -80,6 +84,7 @@ function rpc(input: {
   host: string;
   latestBlock?: bigint;
   logs?: unknown[];
+  onGetLogs?: (input: { address: string; fromBlock: bigint; toBlock: bigint }) => Promise<unknown[]> | unknown[];
   onGetBlock?: (blockNumber: bigint) => Promise<{ hash: `0x${string}`; timestamp: bigint }>;
   blockCalls?: bigint[];
   logCalls?: Array<{ fromBlock: bigint; toBlock: bigint }>;
@@ -99,8 +104,9 @@ function rpc(input: {
     client: {
       getChainId: async () => input.chainId ?? 56,
       getBlockNumber: async () => input.latestBlock ?? BigInt(120),
-      getLogs: async ({ fromBlock, toBlock }: { fromBlock: bigint; toBlock: bigint }) => {
+      getLogs: async ({ address, fromBlock, toBlock }: { address: string; fromBlock: bigint; toBlock: bigint }) => {
         input.logCalls?.push({ fromBlock, toBlock });
+        if (input.onGetLogs) return input.onGetLogs({ address, fromBlock, toBlock });
         return input.logs ?? [];
       },
       getBlock: async ({ blockNumber }: { blockNumber: bigint }) => {
@@ -169,6 +175,78 @@ test('watermark follows the last traversed range block and falls back for its ti
   })));
 });
 
+test('isolates a historical event failure while an independent contract advances', async () => {
+  const presaleAddress = PRESALE_ADDRESS.toLowerCase();
+  const stakingAddress = `0x${'3'.repeat(40)}`;
+  const client = rpc({
+    host: 'primary.test',
+    onGetLogs: ({ address }) => {
+      if (address.toLowerCase() === presaleAddress) throw new Error('historical logs pruned');
+      return [];
+    },
+  });
+  const { store, updates, checkpoints } = fakeStore();
+
+  const result = await ingestBscOnce(store, config({
+    contractAliases: ['PRESALE', 'UKI_STAKING'],
+    ukiStakingAddress: stakingAddress,
+    ukiStakingStartBlock: 100,
+  }), { rpcClients: [client] });
+
+  assert.equal(result.outcome, 'incomplete');
+  assert.deepEqual(result.failedContractAliases, ['PRESALE']);
+  assert.ok(result.errors.some((error) => error.contractAlias === 'PRESALE'));
+  assert.ok(updates.some(({ config: item }) => item.contractAlias === 'UKI_STAKING'));
+  assert.equal(updates.some(({ config: item }) => item.contractAlias === 'PRESALE'), false);
+  assert.deepEqual(checkpoints, []);
+});
+
+test('keeps cutoff-resolution failure incomplete without blocking contract ingestion', async () => {
+  const client = rpc({ host: 'primary.test' });
+  const { store, updates, checkpoints } = fakeStore(null, { failCutoffResolution: true });
+
+  const result = await ingestBscOnce(store, config(), { rpcClients: [client] });
+
+  assert.equal(result.outcome, 'incomplete');
+  assert.match(result.errors[0]?.error ?? '', /cutoff lookup failed/);
+  assert.equal(updates.length, PRESALE_EVENT_COUNT);
+  assert.deepEqual(checkpoints, []);
+});
+
+test('does not ingest an alias whose configured identity is invalid', async () => {
+  const tokenV2Address = `0x${'7'.repeat(40)}` as const;
+  const tokenBytecode = '0x60016000' as const;
+  const client = rpc({
+    host: 'testnet.test',
+    chainId: 97,
+    bytecode: tokenBytecode,
+    receipt: { contractAddress: tokenV2Address, blockNumber: 106n, status: 'success' },
+    logs: [{
+      transactionHash: '0xabc', blockHash: '0xdef', blockNumber: 106n, logIndex: 0, args: {},
+    }],
+  });
+  const { store, updates, eventBatches } = fakeStore();
+
+  const result = await ingestBscOnce(store, config({
+    bscExpectedChainId: 97,
+    contractAliases: ['TOKEN_V2', 'PRESALE'],
+    tokenV2Address,
+    tokenV2StartBlock: 106,
+    verifiedBscContracts: {
+      TOKEN_V2: {
+        alias: 'TOKEN_V2', chainId: 97, address: tokenV2Address, startBlock: 106,
+        deploymentBlock: 106, deploymentTxHash: `0x${'8'.repeat(64)}`,
+        runtimeCodeHash: `0x${'f'.repeat(64)}`, configHash: `0x${'9'.repeat(64)}`,
+      },
+    },
+  }), { rpcClients: [client] });
+
+  assert.equal(result.outcome, 'incomplete');
+  assert.deepEqual(result.failedContractAliases, ['TOKEN_V2']);
+  assert.equal(updates.some(({ config: item }) => item.contractAlias === 'PRESALE'), true);
+  assert.equal(eventBatches.flat().some((event) => (event as { contractAlias?: string }).contractAlias === 'TOKEN_V2'), false);
+});
+
 test('reuses an event block timestamp when the range watermark is the same block', async () => {
   const blockCalls: bigint[] = [];
   const client = rpc({
@@ -235,10 +313,9 @@ test('does not publish a checkpoint when cursor persistence fails', async () => 
   const client = rpc({ host: 'primary.test' });
   const { store, checkpoints } = fakeStore({ nextBlock: 111 }, { failCursorUpdate: true });
 
-  await assert.rejects(
-    ingestBscOnce(store, config(), { rpcClients: [client] }),
-    /cursor update failed/,
-  );
+  const result = await ingestBscOnce(store, config(), { rpcClients: [client] });
+  assert.equal(result.outcome, 'incomplete');
+  assert.match(result.errors[0]?.error ?? '', /cursor update failed/);
   assert.deepEqual(checkpoints, []);
 });
 
@@ -288,15 +365,14 @@ test('legacy ingestion rejects a missing per-alias start block instead of using 
   const client = rpc({ host: 'mainnet.test' });
   const { store } = fakeStore();
 
-  await assert.rejects(
-    ingestBscOnce(store, config({
-      runtimeScope: 'legacy',
-      contractAliases: ['TOKEN'],
-      tokenAddress: TOKEN_ADDRESS,
-      legacyStartBlocks: {},
-    }), { rpcClients: [client] }),
-    /TOKEN legacy exige un bloque inicial explícito/,
-  );
+  const result = await ingestBscOnce(store, config({
+    runtimeScope: 'legacy',
+    contractAliases: ['TOKEN'],
+    tokenAddress: TOKEN_ADDRESS,
+    legacyStartBlocks: {},
+  }), { rpcClients: [client] });
+  assert.equal(result.outcome, 'incomplete');
+  assert.match(result.errors[0]?.error ?? '', /TOKEN legacy exige un bloque inicial explícito/);
 });
 
 test('skips an RPC from a different chain before reading blocks', async () => {
@@ -449,8 +525,7 @@ test('rejects a UKI contract when its live runtime hash differs from the pinned 
   });
   const { store, updates, stakingBootstraps } = fakeStore();
 
-  await assert.rejects(
-    ingestBscOnce(store, config({
+  const result = await ingestBscOnce(store, config({
       bscExpectedChainId: 97,
       contractAliases: ['UKI_STAKING'],
       ukiStakingAddress: address,
@@ -467,9 +542,9 @@ test('rejects a UKI contract when its live runtime hash differs from the pinned 
           configHash: `0x${'5'.repeat(64)}`,
         },
       },
-    }), { rpcClients: [client] }),
-    /runtimeCodeHash/,
-  );
+    }), { rpcClients: [client] });
+  assert.equal(result.outcome, 'incomplete');
+  assert.match(result.errors[0]?.error ?? '', /runtimeCodeHash/);
   assert.deepEqual(updates, []);
   assert.deepEqual(stakingBootstraps, []);
 });
@@ -489,8 +564,7 @@ test('rejects a UKI contract when the deployment receipt points to another addre
   });
   const { store, updates } = fakeStore();
 
-  await assert.rejects(
-    ingestBscOnce(store, config({
+  const result = await ingestBscOnce(store, config({
       bscExpectedChainId: 97,
       contractAliases: ['UKI_STAKING'],
       ukiStakingAddress: address,
@@ -507,9 +581,9 @@ test('rejects a UKI contract when the deployment receipt points to another addre
           configHash: `0x${'5'.repeat(64)}`,
         },
       },
-    }), { rpcClients: [client] }),
-    /receipt de despliegue/,
-  );
+    }), { rpcClients: [client] });
+  assert.equal(result.outcome, 'incomplete');
+  assert.match(result.errors[0]?.error ?? '', /receipt de despliegue/);
   assert.deepEqual(updates, []);
 });
 
@@ -528,8 +602,7 @@ test('does not seal an existing UKI cursor whose coverage starts after deploymen
     processedFromTimestampMs: 1_060_000,
   });
 
-  await assert.rejects(
-    ingestBscOnce(store, config({
+  const result = await ingestBscOnce(store, config({
       bscExpectedChainId: 97,
       contractAliases: ['UKI_STAKING'],
       ukiStakingAddress: address,
@@ -546,9 +619,9 @@ test('does not seal an existing UKI cursor whose coverage starts after deploymen
           configHash: `0x${'5'.repeat(64)}`,
         },
       },
-    }), { rpcClients: [client] }),
-    /no demuestra cobertura desde el bloque de despliegue/,
-  );
+    }), { rpcClients: [client] });
+  assert.equal(result.outcome, 'incomplete');
+  assert.match(result.errors[0]?.error ?? '', /no demuestra cobertura desde el bloque de despliegue/);
   assert.deepEqual(updates, []);
 });
 
@@ -603,7 +676,9 @@ test('refuses fast production pools and unsupported testnet durations before sea
   ];
   for (const { chainId, duration } of cases) {
     const fixture = poolVaultFixture(chainId, duration);
-    await assert.rejects(ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] }), /duracion no permitida/);
+    const result = await ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] });
+    assert.equal(result.outcome, 'incomplete');
+    assert.match(result.errors[0]?.error ?? '', /duracion no permitida/);
     assert.equal(fixture.contractReadCalls.length, 1);
     assert.deepEqual(fixture.updates, []);
     assert.deepEqual(fixture.eventBatches, []);
@@ -613,7 +688,9 @@ test('refuses fast production pools and unsupported testnet durations before sea
 
 test('requires a successful pool getter and never invents a default when RPC cannot read it', async () => {
   const fixture = poolVaultFixture(97);
-  await assert.rejects(ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] }), /PERIOD_DURATION getter unavailable/);
+  const result = await ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] });
+  assert.equal(result.outcome, 'incomplete');
+  assert.match(result.errors[0]?.error ?? '', /PERIOD_DURATION getter unavailable/);
   assert.equal(fixture.contractReadCalls.length, 1);
   assert.deepEqual(fixture.updates, []);
   assert.deepEqual(fixture.checkpoints, []);

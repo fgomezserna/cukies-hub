@@ -32,6 +32,9 @@ export function CukiCard({ cuki }: CukiCardProps) {
         <div className="absolute left-3 top-3 rounded-full border border-black/30 bg-black/70 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
           {cuki.network}
         </div>
+        <div className="absolute left-3 top-12 rounded-full border border-amber-200/30 bg-amber-200/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-100 backdrop-blur">
+          Legacy
+        </div>
         <div className="absolute right-3 top-3 rounded-full border border-lilac-300/25 bg-lilac-300/15 px-2.5 py-1 text-xs font-semibold text-lilac-100 backdrop-blur">
           {getStateLabel(cuki.state)}
         </div>

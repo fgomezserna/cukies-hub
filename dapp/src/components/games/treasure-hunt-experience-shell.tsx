@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import Header from '@/components/layout/header';
+import { useTreasureHuntCreditAccess } from '@/hooks/use-treasure-hunt-credit-access';
+import { useTreasureHuntCompetitionOverview } from '@/hooks/use-treasure-hunt-competition-overview';
 import { cn } from '@/lib/utils';
 
 const GAME_ROOT = '/games/treasure-hunt';
@@ -31,10 +33,50 @@ export default function TreasureHuntExperienceShell({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
+  const { status, isLoading: isCompetitionLoading } = useTreasureHuntCompetitionOverview({
+    includeLeaderboard: false,
+  });
+  const creditAccess = useTreasureHuntCreditAccess();
   const contentViewportRef = useRef<HTMLDivElement>(null);
   const persistentGameRef = useRef<HTMLDivElement>(null);
   const isGameViewActive = pathname === GAME_ROOT;
   const [hasMountedGame, setHasMountedGame] = useState(isGameViewActive);
+  const statusLabel = (() => {
+    if (isCompetitionLoading || (status?.phase === 'closed' && creditAccess.isLoading)) return 'Comprobando';
+    if (status?.phase === 'closed') {
+      if (!creditAccess.walletConnected) return 'Conecta wallet';
+      if (creditAccess.isError || creditAccess.blocked || !creditAccess.ready) return 'Acceso pendiente';
+      return creditAccess.canPlay ? 'Disponible' : 'Sin créditos';
+    }
+    if (status?.phase === 'active') {
+      const eligibility = status.eligibility;
+      if (!eligibility) return 'Comprobando';
+      return !eligibility.ready || eligibility.disqualified || eligibility.attemptsRemaining <= 0
+        ? 'No disponible'
+        : 'Disponible';
+    }
+    if (status?.phase === 'scheduled') return 'Próximamente';
+    return status?.phase === 'disabled' ? 'Inactiva' : 'Comprobando';
+  })();
+  const statusDetail = status?.phase === 'closed'
+    ? creditAccess.isLoading
+      ? 'Comprobando el saldo de créditos antes de iniciar.'
+      : !creditAccess.walletConnected
+        ? 'Conecta tu wallet para consultar el saldo de créditos.'
+        : creditAccess.isError || creditAccess.blocked || !creditAccess.ready
+          ? 'El Hub no ha podido confirmar el acceso con créditos todavía. Revisa el aviso del panel antes de iniciar.'
+        : creditAccess.canPlay
+          ? 'Modo de créditos disponible.'
+          : 'Necesitas saldo suficiente para iniciar; no se cobrará una partida bloqueada.'
+    : status?.phase === 'active'
+      ? !status.eligibility
+        ? 'Comprobando los intentos confirmados de esta wallet.'
+        : status.eligibility.attemptsRemaining <= 0
+          ? 'La edición vigente no tiene intentos para esta wallet.'
+          : 'La edición vigente usa los intentos confirmados de esta wallet.'
+      : status?.phase === 'scheduled'
+        ? 'La competición todavía no ha comenzado.'
+        : 'Consulta el estado de la competición antes de iniciar.';
 
   useEffect(() => {
     const viewport = contentViewportRef.current;
@@ -75,6 +117,34 @@ export default function TreasureHuntExperienceShell({
     frame.addEventListener('load', notifyVisibility);
     return () => frame.removeEventListener('load', notifyVisibility);
   }, [hasMountedGame, isGameViewActive]);
+
+  useEffect(() => {
+    if (!hasMountedGame) return undefined;
+
+    const frame = persistentGameRef.current?.querySelector('iframe');
+    if (!frame) return undefined;
+
+    const notifyAccess = () => {
+      try {
+        const targetOrigin = new URL(frame.src, window.location.href).origin;
+        frame.contentWindow?.postMessage(
+          {
+            type: 'TREASURE_HUNT_ACCESS_PRESENTATION',
+            available: statusLabel === 'Disponible',
+            statusLabel,
+            detail: statusDetail,
+          },
+          targetOrigin,
+        );
+      } catch {
+        // The iframe load event retries once the configured game URL is available.
+      }
+    };
+
+    notifyAccess();
+    frame.addEventListener('load', notifyAccess);
+    return () => frame.removeEventListener('load', notifyAccess);
+  }, [hasMountedGame, statusDetail, statusLabel]);
 
   return (
     <section
@@ -118,13 +188,21 @@ export default function TreasureHuntExperienceShell({
                 <h1 className="font-headline text-2xl font-black tracking-[-0.03em] text-[#f3efe7] sm:text-3xl lg:text-[2.2rem]">
                   Treasure Hunt
                 </h1>
-                <span className="hidden items-center gap-2 rounded-[5px] border border-[#29c894]/30 bg-[#0b1c17] px-2.5 py-1 text-xs font-semibold text-[#61e598] lg:inline-flex">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#61e598]" />
-                  Disponible
+                <span className={cn(
+                  'hidden items-center gap-2 rounded-[5px] px-2.5 py-1 text-xs font-semibold lg:inline-flex',
+                  statusLabel === 'Disponible'
+                    ? 'border border-[#29c894]/30 bg-[#0b1c17] text-[#61e598]'
+                    : 'border border-[#be8c2d]/35 bg-[#2b2107]/45 text-[#edc27a]',
+                )}>
+                  <span className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    statusLabel === 'Disponible' ? 'bg-[#61e598]' : 'bg-[#edc27a]',
+                  )} />
+                  {statusLabel}
                 </span>
               </div>
               <p className="mt-1.5 max-w-[44rem] text-xs leading-5 text-[#aaa8a2] sm:text-sm">
-                Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.
+                {statusDetail} Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.
               </p>
             </div>
           </div>

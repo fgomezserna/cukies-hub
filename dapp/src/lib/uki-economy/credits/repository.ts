@@ -8,6 +8,7 @@ import {
   SchemaNotReadyError,
 } from "../errors";
 import {
+  expectedBscCursorFilter,
   stakingBalancesMatchState,
   vestingLedgerMatchesPositions,
 } from "../cukie-master/repository";
@@ -776,13 +777,10 @@ export function createMongoCompetitionCreditRepository(
         db
           .collection("chain_cursors")
           .find(
-            {
-              chain: "BSC",
-              contractAlias: { $in: aliases },
-            },
+            expectedBscCursorFilter(expectedCursorIds),
             options
           )
-          .limit(100)
+          .limit(expectedCursorIds.length + 1)
           .toArray(),
         db.collection("chain_dead_letters").countDocuments(
           {

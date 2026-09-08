@@ -1,5 +1,12 @@
 import Link from 'next/link';
-import { ArrowRightLeft, ArrowUpRight, CheckCircle2, Network, Wallet } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  ArrowUpRight,
+  CheckCircle2,
+  Cookie,
+  Network,
+  Wallet,
+} from 'lucide-react';
 
 import { BridgeClient } from '@/components/legacy-marketplace/bridge-client';
 
@@ -26,7 +33,10 @@ export function BridgePageShell() {
                 [Wallet, 'Confirma wallet destino'],
                 [CheckCircle2, 'Aprueba y ejecuta bridge'],
               ].map(([Icon, label]) => (
-                <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+                <div
+                  key={String(label)}
+                  className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2"
+                >
                   <Icon className="h-3.5 w-3.5 text-emerald-200" />
                   <span>{label as string}</span>
                 </div>
@@ -35,6 +45,13 @@ export function BridgePageShell() {
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">
+            <Link
+              href="/cukies"
+              className="inline-flex items-center gap-2 rounded-[8px] border border-white/15 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-white transition hover:border-lilac-200/60"
+            >
+              <Cookie className="h-4 w-4" />
+              Mis Cukies
+            </Link>
             <Link
               href="/marketplace"
               className="inline-flex items-center gap-2 rounded-[8px] border border-lilac-300/30 bg-lilac-300/10 px-3 py-2 text-sm font-semibold text-lilac-100 transition hover:border-lilac-200/60 hover:bg-lilac-300/15"
@@ -46,7 +63,7 @@ export function BridgePageShell() {
               href="/breeding"
               className="inline-flex items-center gap-2 rounded-[8px] border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/60 hover:bg-emerald-300/15"
             >
-              Breeding
+              Crías
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>

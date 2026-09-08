@@ -84,14 +84,11 @@ describe('AppLayout launch navigation', () => {
     });
   });
 
-  it('muestra una navegación plana orientada a tareas', () => {
+  it('muestra una navegación agrupada orientada a tareas', () => {
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
-    expect(screen.getByRole('link', { name: 'Inicio' })).toHaveAttribute(
-      'href',
-      '/',
-    );
     expect(screen.getByRole('link', { name: 'Volver a la landing' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Resumen' })).toHaveAttribute('href', '/dashboard');
     expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute(
       'href',
       '/games',
@@ -123,23 +120,11 @@ describe('AppLayout launch navigation', () => {
     );
     expect(screen.getByRole('link', { name: 'Vesting' })).toHaveAttribute('href', '/vesting');
 
-    for (const hiddenLabel of [
-      'Resumen',
-      'Recursos',
-      'Activos',
-      'Recompensas',
-      'Externo',
-      'Ranking',
-      'Preventa UKI',
-      'Juegos',
-      'Misiones',
-      'Puntos',
-      'Indexer',
-      'Twitter',
-      'Telegram',
-      'Discord',
-    ]) {
-      expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Inicio' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Como jugar' })).toHaveAttribute('href', '/como-jugar');
+
+    for (const groupLabel of ['Acceso principal', 'Recursos', 'Colección', 'Cobros', 'Invitaciones', 'Cuenta y ayuda']) {
+      expect(screen.getByText(groupLabel)).toBeInTheDocument();
     }
 
     expect(document.querySelector('[data-app-ambient-effects]')).not.toBeInTheDocument();
@@ -159,7 +144,6 @@ describe('AppLayout launch navigation', () => {
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
     expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute('data-active', 'true');
-    expect(screen.queryByRole('link', { name: 'Ranking' })).not.toBeInTheDocument();
   });
 
   it('keeps the app header on mobile rankings but reserves immersive mode for the game', () => {
@@ -169,12 +153,12 @@ describe('AppLayout launch navigation', () => {
 
     const view = render(<AppLayout><div>Ranking</div></AppLayout>);
 
-    expect(screen.getByRole('button', { name: 'Toggle Sidebar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Alternar barra lateral' })).toBeInTheDocument();
 
     mockUsePathname.mockReturnValue('/games/treasure-hunt');
     view.rerender(<AppLayout><div>Juego</div></AppLayout>);
 
-    expect(screen.queryByRole('button', { name: 'Toggle Sidebar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Alternar barra lateral' })).not.toBeInTheDocument();
   });
 
   it('closes the mobile navigation after choosing a destination', async () => {
@@ -183,13 +167,60 @@ describe('AppLayout launch navigation', () => {
 
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle Sidebar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
     expect(await screen.findByRole('dialog', { name: 'Navegación principal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: 'Cukie Master' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Navegación principal' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('devuelve el foco al activador al cerrar el menú móvil', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    mockUsePathname.mockReturnValue('/dashboard');
+
+    render(<AppLayout><div>Contenido</div></AppLayout>);
+
+    const trigger = screen.getByRole('button', { name: 'Alternar barra lateral' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cerrar menú' }));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(trigger);
+    });
+  });
+
+  it('dirige el foco al contenido al cambiar de ruta desde el menú móvil', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    mockUsePathname.mockReturnValue('/dashboard');
+
+    const view = render(<AppLayout><div>Contenido</div></AppLayout>);
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Cukie Master' }));
+
+    mockUsePathname.mockReturnValue('/cukie-master');
+    view.rerender(<AppLayout><div>Destino</div></AppLayout>);
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByTestId('app-main'));
+    });
+  });
+
+  it('dirige el foco al contenido al elegir un ancla de la ruta actual', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    mockUsePathname.mockReturnValue('/cukie-hodler');
+
+    render(<AppLayout><div>Contenido</div></AppLayout>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Pool de Cukies' }));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByTestId('app-main'));
     });
   });
 

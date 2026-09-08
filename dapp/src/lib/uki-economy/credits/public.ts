@@ -31,6 +31,16 @@ function exactDate(value: unknown, label: string) {
   return new Date(value.getTime());
 }
 
+function sourceWatermarkIsFresh(
+  observedThrough: Date | undefined,
+  now: Date,
+  freshnessMs: number,
+) {
+  if (!(observedThrough instanceof Date) || Number.isNaN(observedThrough.getTime())) return false;
+  const timestamp = observedThrough.getTime();
+  return timestamp <= now.getTime() && timestamp >= now.getTime() - freshnessMs;
+}
+
 export async function getCompetitionCreditWalletStatus(
   walletAddress: string,
   nowInput = new Date(),
@@ -135,6 +145,9 @@ export async function getCompetitionCreditWalletStatus(
     const pool = pools.find((candidate) => candidate.route === route);
     const watermark = watermarks.find((candidate) => candidate.route === route);
     const openIncidents = routeIncidentCounts.find((candidate) => candidate.route === route)?.count ?? 0;
+    const observedThrough = watermark?.observedThrough instanceof Date
+      ? new Date(watermark.observedThrough.getTime())
+      : null;
     return [route, {
       balance: account ? {
         grantedCredits: exactCredits(account.grantedCredits, `${route}.grantedCredits`),
@@ -151,10 +164,10 @@ export async function getCompetitionCreditWalletStatus(
         blocked: pool.blocked === true,
       } : { availableCredits: 0, reservedCredits: 0, blocked: false },
       grants: {
-        healthy: watermark?.status === 'healthy' && openIncidents === 0,
-        sourceObservedThrough: watermark?.observedThrough instanceof Date
-          ? new Date(watermark.observedThrough.getTime())
-          : null,
+        healthy: watermark?.status === 'healthy'
+          && sourceWatermarkIsFresh(observedThrough ?? undefined, now, rule.sourceFreshnessMs)
+          && openIncidents === 0,
+        sourceObservedThrough: observedThrough,
         openIncidents,
       },
     }];

@@ -24,6 +24,21 @@ jest.mock('@/components/layout/header', () => ({
   default: () => <div data-testid="treasure-wallet-controls" />,
 }));
 
+jest.mock('@/hooks/use-treasure-hunt-credit-access', () => ({
+  useTreasureHuntCreditAccess: () => ({
+    isLoading: false,
+    walletConnected: true,
+    canPlay: false,
+  }),
+}));
+
+jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
+  useTreasureHuntCompetitionOverview: () => ({
+    status: null,
+    isLoading: true,
+  }),
+}));
+
 const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 
 describe('TreasureHuntExperienceShell', () => {
@@ -55,9 +70,9 @@ describe('TreasureHuntExperienceShell', () => {
       '/games/treasure-hunt/profile',
     );
     expect(
-      screen.getByText('Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas.'),
+      screen.getByText(/Consigue la mayor puntuación antes de agotar el tiempo o perder las 3 vidas\./),
     ).not.toHaveClass('truncate');
-    expect(screen.getByText('Disponible')).toHaveClass('hidden');
+    expect(screen.getByText('Comprobando')).toHaveClass('hidden');
     expect(screen.getByText('Contenido largo')).toBeInTheDocument();
     expect(screen.queryByTestId('treasure-wallet-controls')).not.toBeInTheDocument();
   });

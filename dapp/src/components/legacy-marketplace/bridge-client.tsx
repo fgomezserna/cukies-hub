@@ -72,13 +72,13 @@ function enabledBridgeRuntime(
   config: CukiesBridgeRuntimeConfig,
 ): EnabledBridgeRuntime | null {
   if (
-    !config.enabled
-    || config.bsc.chainId !== 97
-    || !config.bsc.collectionAddress
-    || !config.bsc.endpointAddress
-    || !config.tron.collectionAddress
-    || !config.tron.endpointAddress
-    || !config.tron.rpcUrl
+    !config.enabled ||
+    config.bsc.chainId !== 97 ||
+    !config.bsc.collectionAddress ||
+    !config.bsc.endpointAddress ||
+    !config.tron.collectionAddress ||
+    !config.tron.endpointAddress ||
+    !config.tron.rpcUrl
   ) {
     return null;
   }
@@ -97,9 +97,10 @@ function enabledBridgeRuntime(
 
 function tronWalletRpcOrigin() {
   if (typeof window === 'undefined') return null;
-  const configuredHost = window.tronWeb?.fullNode?.host
-    ?? window.tronLink?.tronWeb?.fullNode?.host
-    ?? window.tron?.tronWeb?.fullNode?.host;
+  const configuredHost =
+    window.tronWeb?.fullNode?.host ??
+    window.tronLink?.tronWeb?.fullNode?.host ??
+    window.tron?.tronWeb?.fullNode?.host;
   if (typeof configuredHost !== 'string') return null;
 
   try {
@@ -247,9 +248,17 @@ function BridgeUnavailable() {
             Bridge no disponible
           </h2>
           <p className="mt-2 text-sm text-amber-100/90">
-            Las transferencias están desactivadas mientras el servicio no esté listo.
-            Tus Cukies no se moverán.
+            Las transferencias están desactivadas mientras el servicio no esté
+            listo. Tus Cukies no se moverán.
           </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/cukies"
+              className="inline-flex items-center rounded-[8px] border border-amber-200/30 bg-amber-200/10 px-3 py-2 text-sm font-semibold text-amber-50"
+            >
+              Volver a Mis Cukies
+            </Link>
+          </div>
         </div>
       </div>
     </section>
@@ -263,7 +272,11 @@ export function BridgeClient() {
   return <BridgeOperationsClient runtime={runtime} />;
 }
 
-function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) {
+function BridgeOperationsClient({
+  runtime,
+}: {
+  runtime: EnabledBridgeRuntime;
+}) {
   const {
     bscChainId,
     bscNetworkLabel,
@@ -286,7 +299,9 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
   const [sourceNetwork] = useState<BridgeNetwork>('TRON');
   const [destinationOwner, setDestinationOwner] = useState('');
   const [candidates, setCandidates] = useState<LegacyMarketplaceCukiItem[]>([]);
-  const [bridgingCukies, setBridgingCukies] = useState<LegacyMarketplaceCukiItem[]>([]);
+  const [bridgingCukies, setBridgingCukies] = useState<
+    LegacyMarketplaceCukiItem[]
+  >([]);
   const [selectedCuki, setSelectedCuki] =
     useState<LegacyMarketplaceCukiItem | null>(null);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
@@ -301,10 +316,12 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
 
   const destinationNetwork = getDestinationNetwork(sourceNetwork);
   const sourceOwner = sourceNetwork === 'BSC' ? address : tronAddress;
-  const bscReady = sourceNetwork === 'BSC' && isConnected && chainId === bscChainId;
-  const tronReady = sourceNetwork === 'TRON'
-    && isTronConnected
-    && tronWalletRpcOrigin() === tronRpcUrl;
+  const bscReady =
+    sourceNetwork === 'BSC' && isConnected && chainId === bscChainId;
+  const tronReady =
+    sourceNetwork === 'TRON' &&
+    isTronConnected &&
+    tronWalletRpcOrigin() === tronRpcUrl;
   const ready = sourceNetwork === 'BSC' ? bscReady : tronReady;
   const disabled = isWriting || isSwitchingChain;
 
@@ -334,11 +351,13 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
   const bridgePrice =
     sourceNetwork === 'BSC'
       ? formatBscBridgePrice(bscBridgePrice as bigint | undefined)
-      : (tronSnapshot.price ?? '-');
+      : tronSnapshot.price ?? '-';
   const bridgePaused =
     sourceNetwork === 'BSC' ? Boolean(bscPaused) : tronSnapshot.paused === true;
   const approved =
-    sourceNetwork === 'BSC' ? Boolean(bscApproved) : tronSnapshot.approved === true;
+    sourceNetwork === 'BSC'
+      ? Boolean(bscApproved)
+      : tronSnapshot.approved === true;
 
   const suggestedDestination = useMemo(() => {
     if (sourceNetwork === 'TRON') return address ?? '';
@@ -366,10 +385,9 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
         limit: '60',
         sort: 'newest',
       });
-      const response = await fetch(
-        `/api/cukies?${query}`,
-        { cache: 'no-store' },
-      );
+      const response = await fetch(`/api/cukies?${query}`, {
+        cache: 'no-store',
+      });
       if (!response.ok) throw new Error('No se han podido cargar Cukies.');
 
       const payload = (await response.json()) as LegacyMarketplaceListResponse;
@@ -383,8 +401,8 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
   }, [sourceNetwork, sourceOwner]);
 
   const refreshBridgingCukies = useCallback(async () => {
-    const wallets = [address, tronAddress].filter(
-      (wallet): wallet is string => Boolean(wallet),
+    const wallets = [address, tronAddress].filter((wallet): wallet is string =>
+      Boolean(wallet),
     );
 
     if (wallets.length === 0) {
@@ -402,25 +420,23 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             limit: '30',
             sort: 'newest',
           });
-          const response = await fetch(
-            `/api/cukies?${query}`,
-            { cache: 'no-store' },
-          );
+          const response = await fetch(`/api/cukies?${query}`, {
+            cache: 'no-store',
+          });
           if (!response.ok) return [];
 
-          const payload = (await response.json()) as LegacyMarketplaceListResponse;
+          const payload =
+            (await response.json()) as LegacyMarketplaceListResponse;
           return payload.items;
         }),
       );
 
       const seen = new Set<string>();
-      const items = responses
-        .flat()
-        .filter((item) => {
-          if (seen.has(item.tokenId)) return false;
-          seen.add(item.tokenId);
-          return true;
-        });
+      const items = responses.flat().filter((item) => {
+        if (seen.has(item.tokenId)) return false;
+        seen.add(item.tokenId);
+        return true;
+      });
       setBridgingCukies(items);
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -525,7 +541,8 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
     if (!value) throw new Error('Introduce una wallet destino.');
 
     if (destinationNetwork === 'BSC') {
-      if (!isAddress(value)) throw new Error('La wallet destino BSC no es valida.');
+      if (!isAddress(value))
+        throw new Error('La wallet destino BSC no es valida.');
       return value;
     }
 
@@ -596,7 +613,11 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
         address: bscBridgeAddress,
         abi: cukiesBridgeEndpointAbi,
         functionName: 'requestBridge',
-        args: [BigInt(selectedCuki.tokenId), contractDestination as Address, destinationPrefix],
+        args: [
+          BigInt(selectedCuki.tokenId),
+          contractDestination as Address,
+          destinationPrefix,
+        ],
         value: (bscBridgePrice as bigint | undefined) ?? BigInt(0),
         chainId: bscChainId,
       });
@@ -647,10 +668,10 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
 
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             {[
-              ['Source', sourceNetwork, Network],
-              ['Destination', destinationNetwork, Route],
-              ['Bridge price', bridgePrice, ArrowRightLeft],
-              ['Status', bridgePaused ? 'Paused' : 'Open', ShieldAlert],
+              ['Origen', sourceNetwork, Network],
+              ['Destino', destinationNetwork, Route],
+              ['Coste del bridge', bridgePrice, ArrowRightLeft],
+              ['Estado', bridgePaused ? 'Pausado' : 'Disponible', ShieldAlert],
             ].map(([label, value, Icon]) => (
               <div
                 key={String(label)}
@@ -673,10 +694,10 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             <Wallet className="h-5 w-5 text-lilac-200" />
             <div>
               <h2 className="font-headline text-xl font-bold text-white">
-                Destination wallet
+                Wallet destino
               </h2>
               <p className="text-xs text-slate-400">
-                {sourceNetwork} to {destinationNetwork}
+                {sourceNetwork} a {destinationNetwork}
               </p>
             </div>
           </div>
@@ -701,7 +722,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             disabled={!suggestedDestination}
             className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
           >
-            Use connected destination
+            Usar wallet conectada como destino
           </Button>
         </aside>
       </section>
@@ -713,14 +734,18 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               <span>Conecta una wallet EVM y usa {bscNetworkLabel}.</span>
               {isConnected && chainId !== bscChainId && (
                 <Button onClick={() => switchChain({ chainId: bscChainId })}>
-                  Switch to {bscNetworkLabel}
+                  Cambiar a {bscNetworkLabel}
                 </Button>
               )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>Conecta TronLink en {tronNetworkLabel} para iniciar el bridge.</span>
-              <Button onClick={() => void ensureTron()}>Connect TronLink</Button>
+              <span>
+                Conecta TronLink en {tronNetworkLabel} para iniciar el bridge.
+              </span>
+              <Button onClick={() => void ensureTron()}>
+                Conectar TronLink
+              </Button>
             </div>
           )}
         </div>
@@ -731,7 +756,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-headline text-2xl font-bold text-white">
-                Select Cukie
+                Selecciona un Cukie
               </h2>
               <p className="mt-1 text-sm text-slate-400">
                 Cukies disponibles en la wallet seleccionada.
@@ -748,7 +773,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               ) : (
                 <RefreshCcw className="mr-2 h-4 w-4" />
               )}
-              Refresh
+              Actualizar
             </Button>
           </div>
 
@@ -776,7 +801,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
         <aside className="grid content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
           <div>
             <h2 className="font-headline text-2xl font-bold text-white">
-              Bridge desk
+              Resumen del bridge
             </h2>
             <p className="mt-1 text-sm text-slate-400">
               Revisa destino, coste y confirma el bridge.
@@ -785,15 +810,17 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
 
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
             <p className="text-xs uppercase tracking-wide text-slate-500">
-              Selected Cukie
+              Cukie seleccionado
             </p>
             <p className="mt-1 font-semibold text-white">
-              {selectedCuki ? getCukiDisplayName(selectedCuki) : 'Not selected'}
+              {selectedCuki
+                ? getCukiDisplayName(selectedCuki)
+                : 'Sin seleccionar'}
             </p>
           </div>
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
             <p className="text-xs uppercase tracking-wide text-slate-500">
-              Destination
+              Destino
             </p>
             <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
               {destinationOwner || '-'}
@@ -801,7 +828,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
           </div>
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
             <p className="text-xs uppercase tracking-wide text-slate-500">
-              Required fee
+              Coste requerido
             </p>
             <p className="mt-1 font-mono text-lg font-semibold text-white">
               {bridgePrice}
@@ -816,7 +843,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               <Check className="mr-2 h-4 w-4" />
-              Approve bridge
+              Aprobar bridge
             </Button>
           )}
 
@@ -833,12 +860,15 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
           >
             <ArrowRightLeft className="mr-2 h-4 w-4" />
-            Start bridge
+            Iniciar bridge
           </Button>
         </aside>
       </section>
 
-      <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
+      <section
+        id="seguimiento"
+        className="rounded-[8px] border border-white/10 bg-black/30 p-5"
+      >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-headline text-2xl font-bold text-white">
@@ -859,7 +889,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             ) : (
               <RefreshCcw className="mr-2 h-4 w-4" />
             )}
-            Refresh
+            Actualizar
           </Button>
         </div>
 
@@ -870,7 +900,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             ))
           ) : (
             <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-              No bridge entries loaded for connected wallets.
+              No hay movimientos de bridge para las wallets conectadas.
             </div>
           )}
         </div>

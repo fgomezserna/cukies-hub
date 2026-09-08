@@ -515,6 +515,19 @@ export const EXPECTED_CUSTODIAL_NFT_CURSOR_IDS = [
   'CUKIE_MASTER_NFT_VAULT:CukieMasterUntrackedERC721Recovered',
 ] as const;
 
+export function expectedBscCursorFilter(expectedCursorIds: readonly string[]) {
+  return {
+    chain: 'BSC',
+    $or: expectedCursorIds.map((cursorId) => {
+      const separator = cursorId.indexOf(':');
+      return {
+        contractAlias: cursorId.slice(0, separator),
+        eventName: cursorId.slice(separator + 1),
+      };
+    }),
+  };
+}
+
 export function cukieMasterNftHealthScope(mode: 'legacy' | 'custodial' | 'invalid') {
   if (mode === 'custodial') {
     return {
@@ -877,10 +890,10 @@ export function createMongoCukieMasterRepository(
         contractDeploymentBlock?: unknown;
         contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
-      }>('chain_cursors').find({
-          chain: 'BSC',
-          contractAlias: { $in: aliases },
-        }, { ...options, maxTimeMS: 2_000 }).limit(EXPECTED_UKI_CURSOR_IDS.length + 1).toArray();
+      }>('chain_cursors').find(
+        expectedBscCursorFilter(EXPECTED_UKI_CURSOR_IDS),
+        { ...options, maxTimeMS: 2_000 },
+      ).limit(EXPECTED_UKI_CURSOR_IDS.length + 1).toArray();
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
@@ -1020,10 +1033,10 @@ export function createMongoCukieMasterRepository(
         contractDeploymentBlock?: unknown;
         contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
-      }>('chain_cursors').find({
-        chain: 'BSC',
-        contractAlias: { $in: aliases },
-      }, { ...options, maxTimeMS: 2_000 }).limit(scope.cursorIds.length + 1).toArray();
+      }>('chain_cursors').find(
+        expectedBscCursorFilter(scope.cursorIds),
+        { ...options, maxTimeMS: 2_000 },
+      ).limit(scope.cursorIds.length + 1).toArray();
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });

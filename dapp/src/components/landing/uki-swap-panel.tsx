@@ -28,7 +28,7 @@ import {
 } from 'wagmi';
 
 import { Panel } from './primitives';
-import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
+import { UKI_PRESALE_CHAIN_ID } from './sale-config';
 import { WalletConnectorDialog } from './wallet-connector-dialog';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +42,7 @@ import {
   createSwapDeadline,
   formatEditableSwapAmount,
   formatSwapAmount,
+  getUkiSwapNetworkLabel,
   pancakeV2RouterAbi,
   type UkiSwapSourceSymbol,
 } from '@/lib/uki-swap';
@@ -60,7 +61,7 @@ const SWAP_COPY = {
     maximum: 'Máximo a pagar',
     slippage: 'Tolerancia',
     connect: 'Conectar wallet',
-    switchNetwork: 'Cambiar a BNB Smart Chain',
+    switchNetwork: (network: string) => `Cambiar a ${network}`,
     approve: 'Autorizar importe exacto',
     approving: 'Confirmando autorización',
     buy: 'Comprar UKI',
@@ -68,11 +69,12 @@ const SWAP_COPY = {
     enterAmount: 'Introduce una cantidad',
     quoting: 'Calculando ruta',
     unavailable: 'Ruta no disponible',
+    availableSources: 'Monedas disponibles para firmar',
     helper: 'La operación se firma en tu wallet y se ejecuta directamente en PancakeSwap V2.',
     gas: 'Necesitas BNB para pagar el gas de red.',
-    staging: 'En testnet solo está habilitada la ruta de prueba ASM → UKI.',
     approved: 'Importe autorizado. Ya puedes firmar la compra.',
-    success: 'Compra confirmada en BNB Smart Chain.',
+    success: (network: string) => `Compra confirmada en ${network}.`,
+    network: (network: string) => `Red objetivo: ${network}. Firma la operación en tu wallet.`,
     tx: 'Ver transacción',
     fallback: 'Abrir el pool ASM/UKI en PancakeSwap',
     quoteError: 'No se ha podido cotizar esta ruta. Revisa el importe o inténtalo de nuevo.',
@@ -91,7 +93,7 @@ const SWAP_COPY = {
     maximum: 'Maximum to pay',
     slippage: 'Tolerance',
     connect: 'Connect wallet',
-    switchNetwork: 'Switch to BNB Smart Chain',
+    switchNetwork: (network: string) => `Switch to ${network}`,
     approve: 'Approve exact amount',
     approving: 'Confirming approval',
     buy: 'Buy UKI',
@@ -99,11 +101,12 @@ const SWAP_COPY = {
     enterAmount: 'Enter an amount',
     quoting: 'Calculating route',
     unavailable: 'Route unavailable',
+    availableSources: 'Currencies available to sign',
     helper: 'You sign in your wallet and the swap executes directly through PancakeSwap V2.',
     gas: 'You need BNB to pay network gas.',
-    staging: 'Only the ASM → UKI test route is enabled on testnet.',
     approved: 'Amount approved. You can now sign the purchase.',
-    success: 'Purchase confirmed on BNB Smart Chain.',
+    success: (network: string) => `Purchase confirmed on ${network}.`,
+    network: (network: string) => `Target network: ${network}. Sign the operation in your wallet.`,
     tx: 'View transaction',
     fallback: 'Open the ASM/UKI pool on PancakeSwap',
     quoteError: 'This route could not be quoted. Check the amount or try again.',
@@ -184,6 +187,7 @@ export function UkiSwapPanel() {
     [connectors, hasMounted],
   );
   const targetChainId = swapConfig?.chainId ?? UKI_PRESALE_CHAIN_ID;
+  const targetNetworkLabel = getUkiSwapNetworkLabel(targetChainId);
   const publicClient = usePublicClient({ chainId: targetChainId });
   const isWrongChain = Boolean(hasMounted && isConnected && chainId !== targetChainId);
 
@@ -415,10 +419,10 @@ export function UkiSwapPanel() {
       await publicClient.waitForTransactionReceipt({ hash: swapHash });
       setLastTxHash(swapHash);
       setOperationState('success');
-      setOperationMessage(copy.success);
+      setOperationMessage(copy.success(targetNetworkLabel));
       setLocallyApproved(null);
       await Promise.all([refetchExactInputQuote(), refetchExactOutputQuote(), refetchAllowance()]);
-      toast({ title: copy.success, description: `${formatSwapAmount(receivedUki)} UKI` });
+      toast({ title: copy.success(targetNetworkLabel), description: `${formatSwapAmount(receivedUki)} UKI` });
     } catch {
       setOperationState('error');
       setOperationMessage(copy.transactionError);
@@ -460,8 +464,8 @@ export function UkiSwapPanel() {
 
   const ctaLabel = !isConnected
     ? copy.connect
-    : isWrongChain
-      ? copy.switchNetwork
+      : isWrongChain
+      ? copy.switchNetwork(targetNetworkLabel)
       : !activeInputAmount
         ? copy.enterAmount
         : isQuoteLoading
@@ -507,6 +511,9 @@ export function UkiSwapPanel() {
           <>
             <fieldset className="mt-4">
               <legend className="uki-label">{copy.payWith}</legend>
+              <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                {copy.availableSources}: {swapConfig.sources.map((option) => option.symbol).join(', ')}
+              </p>
               <div className={`mt-2 grid gap-2 ${swapConfig.sources.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'}`}>
                 {swapConfig.sources.map((option) => {
                   const selected = option.symbol === source.symbol;
@@ -597,9 +604,7 @@ export function UkiSwapPanel() {
               </p>
             ) : null}
 
-            {UKI_PRESALE_CHAIN_ID === 97 ? (
-              <p className="mt-3 text-xs font-semibold text-[#ffe2a0]">{copy.staging}</p>
-            ) : null}
+            <p className="mt-3 text-xs font-semibold text-[#ffe2a0]">{copy.network(targetNetworkLabel)}</p>
 
             {operationMessage ? (
               <div
@@ -668,7 +673,7 @@ export function UkiSwapPanel() {
         onSelectConnector={connectWallet}
         isConnecting={isConnecting}
         title={copy.connect}
-        description={`${UKI_PRESALE_CHAIN_LABEL}. ${copy.helper}`}
+        description={`${targetNetworkLabel}. ${copy.helper}`}
       />
     </Panel>
   );

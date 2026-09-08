@@ -106,6 +106,8 @@ describe('UkiSwapPanel', () => {
     expect(screen.getByRole('button', { name: 'USDT' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'USDC' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ASM' })).toBeInTheDocument();
+    expect(screen.getByText('Monedas disponibles para firmar: BNB, USDT, USDC, ASM')).toBeInTheDocument();
+    expect(screen.getByText('Red objetivo: BNB Smart Chain. Firma la operación en tu wallet.')).toBeInTheDocument();
     expect(screen.queryByText(/Ruta ejecutada/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Importe a pagar BNB' }), {

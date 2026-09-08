@@ -226,6 +226,8 @@ export async function listMyCukieCollectionFromDb(input: {
         id,
         typeof document.img === 'string' ? document.img : null,
       ),
+      network: typeof document.network === 'string' ? document.network : null,
+      origin: typeof document.origin === 'string' ? document.origin : null,
       generation: normalized.generation,
       rarity: normalized.rarity,
       state: master ? 'cukie_master' : pool ? 'in_pool' : normalized.canonicalState,

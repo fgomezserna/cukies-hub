@@ -205,16 +205,22 @@ export default function PublicVestingPage() {
                   ? 'Esta es la cantidad que puedes reclamar con la wallet conectada.'
                   : 'Cuando tengas una asignación y se liberen UKI, aparecerán aquí.'}
               </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
-                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Inicio</p>
-                  <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingStartLabel}</p>
+              {hasPosition ? (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
+                    <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Inicio</p>
+                    <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingStartLabel}</p>
+                  </div>
+                  <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
+                    <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Final</p>
+                    <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingEndLabel}</p>
+                  </div>
                 </div>
-                <div className="rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
-                  <p className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Final</p>
-                  <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">{vestingEndLabel}</p>
-                </div>
-              </div>
+              ) : (
+                <p className="mt-5 rounded-[10px] border border-white/10 bg-white/[0.035] p-3 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                  Sin asignación personal: no hay un calendario que mostrar para esta wallet.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -302,7 +308,7 @@ export default function PublicVestingPage() {
             </p>
           ) : isConfigured && isConnected && !hasWalletReadError ? (
             <p className="mt-5 rounded-[10px] border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              No hay una asignación de vesting para esta wallet. Si recibes UKI sujetos a liberación gradual, el calendario aparecerá aquí automáticamente.
+              No hay una asignación de vesting para esta wallet. Cuando exista una asignación, mostraremos aquí su calendario y la parte reclamable.
             </p>
           ) : null}
         </div>

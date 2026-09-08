@@ -31,6 +31,14 @@ export interface BscIngestDependencies {
   readonly rpcClients?: BscRpcClient[];
 }
 
+export type BscIngestError = {
+  cursorId: string;
+  chain: 'BSC';
+  contractAlias: string;
+  eventName: string;
+  error: string;
+};
+
 type CanonicalBlockHeader = {
   number: bigint;
   hash: Hash | null;
@@ -327,48 +335,95 @@ export async function ingestBscOnce(
   }
   const safeBlockTimestampMs = Number(safeTimestampMsBigInt);
   timestampCache.set(safeBlock, safeBlockTimestampMs);
-  const unresolvedCutoffs = typeof store.listUnresolvedCompetitionCreditCutoffs === 'function'
-    ? await store.listUnresolvedCompetitionCreditCutoffs(new Date(safeBlockTimestampMs), 32)
-    : [];
+  let inserted = 0;
+  let ranges = 0;
+  let allCursorsCoverSafeBlock = true;
+  const errors: BscIngestError[] = [];
+  const failedContractAliases = new Set<string>();
+  const markAllConfiguredAliasesFailed = () => {
+    for (const contractEvent of contractEvents) {
+      failedContractAliases.add(contractEvent.contractAlias);
+    }
+  };
+  let unresolvedCutoffs: Date[] = [];
+  try {
+    unresolvedCutoffs = typeof store.listUnresolvedCompetitionCreditCutoffs === 'function'
+      ? await store.listUnresolvedCompetitionCreditCutoffs(new Date(safeBlockTimestampMs), 32)
+      : [];
+  } catch (error) {
+    errors.push({
+      cursorId: 'BSC:COMPETITION_CREDIT_CUTOFF:resolve',
+      chain: 'BSC',
+      contractAlias: 'COMPETITION_CREDIT_CUTOFF',
+      eventName: 'resolve',
+      error: errorMessage(error),
+    });
+    allCursorsCoverSafeBlock = false;
+    markAllConfiguredAliasesFailed();
+  }
   for (const cutoff of unresolvedCutoffs) {
-    const evidence = await findGreatestBscBlockBeforeTimestamp({
-      cutoffTimestampMs: cutoff.getTime(),
-      safeBlockNumber: safeBlock,
-      getBlock: async (blockNumber) => {
-        const { value } = await withBscRpcFallback(
-          rpcClientsWithPreferredFirst(safeHeadRpc, rpcClients),
-          config.bscExpectedChainId,
-          (rpc) => rpc.client.getBlock({ blockNumber: BigInt(blockNumber) }),
-        );
-        return value;
-      },
-    });
-    await store.upsertCompetitionCreditCutoffBlock({
-      cutoff,
-      chainId: config.bscExpectedChainId,
-      ...evidence,
-      safeBlockNumber: safeBlock,
-      safeBlockHash,
-      resolvedAt: now(),
-    });
+    try {
+      const evidence = await findGreatestBscBlockBeforeTimestamp({
+        cutoffTimestampMs: cutoff.getTime(),
+        safeBlockNumber: safeBlock,
+        getBlock: async (blockNumber) => {
+          const { value } = await withBscRpcFallback(
+            rpcClientsWithPreferredFirst(safeHeadRpc, rpcClients),
+            config.bscExpectedChainId,
+            (rpc) => rpc.client.getBlock({ blockNumber: BigInt(blockNumber) }),
+          );
+          return value;
+        },
+      });
+      await store.upsertCompetitionCreditCutoffBlock({
+        cutoff,
+        chainId: config.bscExpectedChainId,
+        ...evidence,
+        safeBlockNumber: safeBlock,
+        safeBlockHash,
+        resolvedAt: now(),
+      });
+    } catch (error) {
+      errors.push({
+        cursorId: `BSC:COMPETITION_CREDIT_CUTOFF:${cutoff.toISOString()}`,
+        chain: 'BSC',
+        contractAlias: 'COMPETITION_CREDIT_CUTOFF',
+        eventName: 'resolve',
+        error: errorMessage(error),
+      });
+      allCursorsCoverSafeBlock = false;
+      markAllConfiguredAliasesFailed();
+    }
   }
   const verifiedContracts = new Map<string, Awaited<
     ReturnType<typeof verifyBscContractIdentity>
   >>();
-  for (const identity of Object.values(config.verifiedBscContracts)) {
-    if (!identity) continue;
-    const verified = await verifyBscContractIdentity({
-      identity,
-      rpcClients: rpcClientsWithPreferredFirst(safeHeadRpc, rpcClients),
-      expectedChainId: config.bscExpectedChainId,
-    });
-    verifiedContracts.set(identity.alias, verified);
-  }
-  let inserted = 0;
-  let ranges = 0;
-  let allCursorsCoverSafeBlock = true;
+  const identityErrors = new Map<string, string>();
+  const getVerifiedContract = async (alias: string) => {
+    const identity = config.verifiedBscContracts[alias as keyof typeof config.verifiedBscContracts];
+    if (!identity) return undefined;
+    const verified = verifiedContracts.get(alias);
+    if (verified) return verified;
+    const previousError = identityErrors.get(alias);
+    if (previousError) throw new Error(previousError);
+    try {
+      const result = await verifyBscContractIdentity({
+        identity,
+        rpcClients: rpcClientsWithPreferredFirst(safeHeadRpc, rpcClients),
+        expectedChainId: config.bscExpectedChainId,
+      });
+      verifiedContracts.set(alias, result);
+      return result;
+    } catch (error) {
+      const message = errorMessage(error);
+      identityErrors.set(alias, message);
+      throw error;
+    }
+  };
 
   for (const contractEvent of contractEvents) {
+    await (async () => {
+    const verified = await getVerifiedContract(contractEvent.contractAlias);
     const cursor = await store.getCursor(contractEvent);
     const cursorHasCoverageOrigin =
       Number.isSafeInteger(cursor?.processedFromBlock) &&
@@ -412,7 +467,6 @@ export async function ingestBscOnce(
         throw new Error(`${contractEvent.contractAlias} legacy exige un bloque inicial explícito no negativo.`);
       }
     }
-    const verified = verifiedContracts.get(contractEvent.contractAlias);
     if (
       verified
       && cursor
@@ -467,7 +521,7 @@ export async function ingestBscOnce(
             }
           : {}),
       });
-      continue;
+      return;
     }
 
     const toBlock = Math.min(fromBlock + config.maxBlockRange - 1, safeBlock);
@@ -566,31 +620,68 @@ export async function ingestBscOnce(
       processedThroughBlock: toBlock,
       processedThroughTimestampMs,
     });
+    })().catch((error) => {
+      errors.push({
+        cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+        chain: 'BSC',
+        contractAlias: contractEvent.contractAlias,
+        eventName: contractEvent.eventName,
+        error: errorMessage(error),
+      });
+      failedContractAliases.add(contractEvent.contractAlias);
+      allCursorsCoverSafeBlock = false;
+    });
   }
 
   const verifiedStaking = verifiedContracts.get('UKI_STAKING');
-  if (verifiedStaking) {
-    await store.reconcileVerifiedUkiStakingBootstrap({
-      identity: verifiedStaking.identity,
-      safeBlockNumber: safeBlock,
-      safeBlockHash,
-      verifiedAt: verifiedStaking.verifiedAt,
-    });
+  if (verifiedStaking && !failedContractAliases.has('UKI_STAKING')) {
+    try {
+      await store.reconcileVerifiedUkiStakingBootstrap({
+        identity: verifiedStaking.identity,
+        safeBlockNumber: safeBlock,
+        safeBlockHash,
+        verifiedAt: verifiedStaking.verifiedAt,
+      });
+    } catch (error) {
+      errors.push({
+        cursorId: 'BSC:UKI_STAKING:bootstrap',
+        chain: 'BSC',
+        contractAlias: 'UKI_STAKING',
+        eventName: 'bootstrap',
+        error: errorMessage(error),
+      });
+      failedContractAliases.add('UKI_STAKING');
+      allCursorsCoverSafeBlock = false;
+    }
   }
 
   if (allCursorsCoverSafeBlock) {
-    await store.upsertBscCheckpoint({
-      chainId: config.bscExpectedChainId,
-      safeBlockNumber: safeBlock,
-      safeBlockHash,
-      safeBlockTimestampMs,
-      checkedAt: now(),
-    });
+    try {
+      await store.upsertBscCheckpoint({
+        chainId: config.bscExpectedChainId,
+        safeBlockNumber: safeBlock,
+        safeBlockHash,
+        safeBlockTimestampMs,
+        checkedAt: now(),
+      });
+    } catch (error) {
+      errors.push({
+        cursorId: 'BSC:CANONICAL_CHECKPOINT:upsert',
+        chain: 'BSC',
+        contractAlias: 'CANONICAL_CHECKPOINT',
+        eventName: 'upsert',
+        error: errorMessage(error),
+      });
+      markAllConfiguredAliasesFailed();
+    }
   }
 
   return {
+    outcome: errors.length > 0 ? 'incomplete' as const : 'complete' as const,
     inserted,
     ranges,
+    errors,
+    failedContractAliases: [...failedContractAliases],
     safeBlock,
     safeBlockHash,
     rpcHosts: rpcClients.map((rpc) => rpc.host),

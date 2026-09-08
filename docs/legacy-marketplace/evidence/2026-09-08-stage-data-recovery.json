@@ -1,0 +1,125 @@
+{
+  "observedAt": "2026-09-08T10:31:00Z",
+  "environment": "staging",
+  "applicationId": 28,
+  "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
+  "servedCommit": "ed2d50da47ef5eeef83162b9cfda9e247821c930",
+  "uiPatchDeployed": false,
+  "mainChanged": false,
+  "diagnosis": {
+    "failure": "BSC testnet RPC receipt and historical log failures stalled shared event ingestion",
+    "previousCursor": 129722220,
+    "lastPreviousStakingCursorUpdate": "2026-09-07T22:52:00Z",
+    "timePrecision": "previous update minute",
+    "postBackfillBlocker": {
+      "rootCause": "Unsorted cursor health queries limit before selecting required event IDs",
+      "uki": {
+        "matchedBeforeLimit": 14,
+        "limit": 5,
+        "requiredOmitted": [
+          "UKI_STAKING:Unstaked",
+          "VESTING_VAULT:VestingCreated",
+          "VESTING_VAULT:TokensReleased"
+        ]
+      },
+      "nftCustodial": {
+        "matchedBeforeLimit": 13,
+        "limit": 7,
+        "requiredOmitted": [
+          "TOKEN_V2:Transfer",
+          "TOKEN_V2:CukieMetadataConfigured"
+        ]
+      },
+      "obsoleteCursorCausedBlocker": false,
+      "integrityIncidents": 0,
+      "deadLetters": 0,
+      "fix": "Select exactly the required cursor manifest before applying the limit; preserve identity and freshness checks"
+    }
+  },
+  "recovery": {
+    "deployment": "roowww4o00g0goc0gkooscwg",
+    "deploymentFinished": "2026-09-08T09:40:25Z",
+    "primaryRpc": "https://bsc-testnet.rpc.sentio.xyz",
+    "verification": {
+      "chainId": 97,
+      "contractIdentitiesVerified": 10,
+      "deploymentReceiptsRuntimeHashesVerified": true,
+      "knownHistoricalEventVerified": true
+    },
+    "maxBlockRange": 100000,
+    "pollIntervalMs": 10000,
+    "cursorReset": false,
+    "ledgerChangedManually": false,
+    "historicalBackfill": "caught up for 77 configured event cursors",
+    "minCursor": 129813878,
+    "maxCursor": 129813940,
+    "backfillVerifiedAt": "2026-09-08T10:20:12Z",
+    "canonicalCheckpoint": {
+      "chainId": 97,
+      "safeBlockNumber": 129813877,
+      "safeBlockTimestamp": "2026-09-08T10:19:23Z",
+      "updatedAt": "2026-09-08T10:19:47.604Z"
+    }
+  },
+  "userWithdrawal": {
+    "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "transactionHash": "0xc149213fe36b229a3a46214609bae5773b2d33986165fe44d05ac7ac9c2f9e09",
+    "blockNumber": 129802234,
+    "timestamp": "2026-09-08T08:52:04Z",
+    "withdrawnUki": "20500",
+    "onchainStakedUki": "0",
+    "backendStakedUki": "0",
+    "backendVerifiedAt": "2026-09-08T09:47:49Z"
+  },
+  "notYetVerified": [
+    "Post-deploy route health with corrected cursor queries",
+    "Cukie Master UKI slot deactivation",
+    "Current credit period reconciliation without duplicated grants",
+    "Authenticated UI after application patch deployment"
+  ],
+  "tracking": "docs/antes-del-15-seguimiento.md",
+  "recalculation": {
+    "requeuedJobs": 1,
+    "requeuedAt": "2026-09-08T10:20:58.118Z",
+    "scope": "user wallet UKI failed job only",
+    "attemptCounterReset": false,
+    "balanceChangedManually": false,
+    "result": "failed again",
+    "attempts": 10,
+    "lastFailureAt": "2026-09-08T10:21:33.984Z",
+    "nextAttemptAt": "2026-09-08T11:04:13.984Z",
+    "errorCode": "RECALCULATION_FAILED",
+    "storedSlots": {
+      "nftActive": 5,
+      "ukiActive": 1
+    }
+  },
+  "localValidation": {
+    "date": "2026-09-08",
+    "branch": "codex/ux-data-consistency",
+    "dapp": {
+      "lint": "passed",
+      "typecheck": "passed",
+      "testSuitesPassed": 215,
+      "testsPassed": 1715,
+      "build": "passed"
+    },
+    "sybilSlayer": {
+      "lint": "passed with warnings",
+      "typecheck": "passed",
+      "build": "passed"
+    },
+    "chainIndexer": {
+      "testsPassed": 86,
+      "testsSkipped": 1,
+      "skipReason": "opt-in Mongo integration unavailable",
+      "typecheck": "passed",
+      "build": "passed"
+    },
+    "visual": {
+      "viewport391x844": "Games primary CTA visible",
+      "viewport320x568": "Games CTA visible; no overflow; sidebar close/navigation/hash focus verified"
+    },
+    "postDeployStillRequired": true
+  }
+}
