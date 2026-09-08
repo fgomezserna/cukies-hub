@@ -92,8 +92,14 @@ function stableValue(value) {
 function payloadHash(value) { return createHash('sha256').update(JSON.stringify(stableValue(value))).digest('hex'); }
 
 export function assertExistingRepairPayload(existing, planned) {
-  if (existing && existing.repairPayloadHash !== planned.repairPayloadHash) {
-    throw new Error(`La correccion ${planned.version._id} ya existe con payload distinto.`);
+  if (existing) {
+    const { repairPayloadHash: _storedHash, ...storedPayload } = existing;
+    if (
+      existing.repairPayloadHash !== planned.repairPayloadHash
+      || payloadHash(storedPayload) !== planned.repairPayloadHash
+    ) {
+      throw new Error(`La correccion ${planned.version._id} ya existe con payload distinto.`);
+    }
   }
 }
 
@@ -174,7 +180,8 @@ export function planSlotHistoryRepair({ withdrawals, positionEvents, jobs, versi
       const slotId = positionEvent.nextSlot._id;
       const candidates = versionAtRevision(validVersions, slotId, positionEvent.nextSlot.revision);
       if (candidates.length > 1) { mismatches.push({ code: 'CANONICAL_VERSION_REVISION_AMBIGUOUS', eventId: positionEvent._id, slotId }); continue; }
-      const original = candidates[0] ?? null;
+      if (candidates.length === 0) { mismatches.push({ code: 'CANONICAL_VERSION_REVISION_MISSING', eventId: positionEvent._id, slotId }); continue; }
+      const original = candidates[0];
       const validFrom = original?.validFrom instanceof Date && !Number.isNaN(original.validFrom.getTime()) ? original.validFrom : positionEvent.createdAt;
       const validUntil = original?.validUntil instanceof Date && !Number.isNaN(original.validUntil.getTime()) ? original.validUntil : undefined;
       const correctedSlot = { ...positionEvent.nextSlot, sourceBlockNumber: withdrawal.blockNumber, sourceBlockHash: withdrawal.blockHash.toLowerCase(), sourceBlockTimestamp: triggerTime };

@@ -56,6 +56,8 @@ test('plans first loss for ordinal 5 and second loss for ordinals 1-4', () => {
   assert.doesNotThrow(() => assertExistingRepairPayload(plan.plans[0].version, plan.plans[0]));
   assert.doesNotThrow(() => assertExistingRepairPayload(undefined, plan.plans[0]));
   assert.throws(() => assertExistingRepairPayload({ repairPayloadHash: 'different' }, plan.plans[0]), /payload distinto/);
+  const tampered = { ...plan.plans[0].version, slot: { ...plan.plans[0].version.slot, status: 'active' } };
+  assert.throws(() => assertExistingRepairPayload(tampered, plan.plans[0]), /payload distinto/);
 });
 
 test('fails closed on ambiguous linkage and legacy timestamp gaps', () => {
@@ -65,6 +67,23 @@ test('fails closed on ambiguous linkage and legacy timestamp gaps', () => {
   assert.equal(plan.plans.length, 0);
   assert.equal(plan.mismatches[0].code, 'WITHDRAWAL_JOB_LINK_AMBIGUOUS');
   assert.throws(() => assertNonEmptyRepairPlan(plan, { wallet, fromBlock: 1, toBlock: 2 }), /scope explicito/);
+});
+
+test('fails closed when the canonical temporal version is missing or timestamp-invalid', () => {
+  const event = withdrawal(150, 'withdrawal-missing-version');
+  const job = { _id: 'job-missing-version', status: 'completed', route: 'nft', walletNormalized: wallet, sourceType: 'chain_event', sourceEventId: event._id, completedAt: at(151) };
+  const position = positionEvent(job._id, 1);
+  const plan = planSlotHistoryRepair({
+    withdrawals: [event],
+    jobs: [job],
+    positionEvents: [position],
+    versions: [{ ...version(1), effectiveBlockTimestamp: undefined }],
+    checkpoint,
+    vaultAddress: configuredVault,
+    now: at(301),
+  });
+  assert.equal(plan.plans.length, 0);
+  assert.equal(plan.mismatches[0].code, 'CANONICAL_VERSION_REVISION_MISSING');
 });
 
 test('requires explicit staging chain, database and vault guards', () => {
