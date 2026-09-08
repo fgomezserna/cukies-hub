@@ -366,9 +366,22 @@
         "dappSuites": 215,
         "dappTests": 1725,
         "economyFocusedTests": 67,
-        "repairFocusedTests": 3,
-        "review": "pending final script review"
-      }
+        "repairFocusedTests": 4,
+        "review": "passed independent Luna max after removing temporal fallback and verifying existing payload"
+      },
+      "finalScriptCommit": "849a9c1",
+      "finalFrozenPlan": "pending re-read after infrastructure recovery"
+    },
+    "infrastructureInterruption": {
+      "recordedAt": "2026-09-08T15:40:08.619231+00:00",
+      "observed": [
+        "Stage indexer could not resolve staging Mongo hostname",
+        "Coolify could not resolve coolify-db",
+        "Stage Mongo container restarting with exit64"
+      ],
+      "repairWrites": 0,
+      "owner": "Parallel assets deployment task investigating infrastructure; root avoids concurrent server changes",
+      "status": "open"
     }
   }
 }

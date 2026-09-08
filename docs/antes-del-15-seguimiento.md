@@ -995,7 +995,12 @@ dapp. El dry-run real obtiene cinco correcciones con sus versiones
 originales presentes y cero ambiguedades: ordinal 5 en bloque 129842320 y
 ordinales 1–4 en 129842496. Se copian las transiciones de dominio ligadas a
 los jobs y retiradas, sin recalcular rareza con metadata actual. Pendientes
-revision final del script, apply, despliegue y reactivacion verificada.
+lectura final del plan, apply, despliegue y reactivacion verificada. El
+script `849a9c1` obtiene revision independiente PASS y 4/4 tests focales;
+no infiere fechas si falta evidencia temporal. La lectura final queda
+interrumpida por perdida de resolucion DNS hacia Mongo y `coolify-db`
+durante el despliegue paralelo de assets. No se ha aplicado la reparacion
+a Mongo; la recuperacion de infraestructura se coordina con esa tarea.
 
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 
