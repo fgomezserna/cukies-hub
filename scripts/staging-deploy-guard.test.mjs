@@ -219,19 +219,21 @@ describe('staging deployment guard', () => {
     assert.equal(cancelCalls, 1);
   });
 
-  it('cancels once after a query failure only after the target was verified', async () => {
-    let getCalls = 0;
+  it('cancels once after an application-list failure only after the target was verified', async () => {
+    let listCalls = 0;
     let cancelCalls = 0;
     const result = await watchDeployment({
       deploymentUuid: TARGET,
       expectedCommit: COMMIT,
       client: {
         getDeployment: async () => {
-          getCalls += 1;
-          if (getCalls === 2) throw new Error('temporary Coolify read failure');
-          return record(getCalls >= 3 ? 'cancelled' : 'building');
+          return record('building');
         },
-        listDeployments: async () => [record(getCalls >= 3 ? 'cancelled' : 'building')],
+        listDeployments: async () => {
+          listCalls += 1;
+          if (listCalls === 2) throw new Error('temporary Coolify application-list failure');
+          return [record(listCalls >= 3 ? 'cancelled' : 'building')];
+        },
         cancelDeployment: async () => {
           cancelCalls += 1;
           return { status: 200, payload: { message: 'cancelled' } };
@@ -243,6 +245,31 @@ describe('staging deployment guard', () => {
     assert.equal(result.status, 'cancelled');
     assert.equal(result.cancelCount, 1);
     assert.equal(cancelCalls, 1);
+  });
+
+  it('uses the direct deployment endpoint only for initial binding', async () => {
+    let getCalls = 0;
+    let listCalls = 0;
+    const result = await watchDeployment({
+      deploymentUuid: TARGET,
+      expectedCommit: COMMIT,
+      client: {
+        getDeployment: async () => {
+          getCalls += 1;
+          return record('building');
+        },
+        listDeployments: async () => {
+          listCalls += 1;
+          return [record(listCalls >= 2 ? 'finished' : 'building')];
+        },
+        cancelDeployment: async () => { throw new Error('not expected'); },
+      },
+      exec: fakeExec(dfOutput(20_000_000)),
+      sleep: cooperativeSleep,
+    });
+    assert.equal(result.status, 'finished');
+    assert.equal(getCalls, 1);
+    assert.equal(listCalls, 2);
   });
 
   it('fails without cancelling when the first query cannot verify the target', async () => {

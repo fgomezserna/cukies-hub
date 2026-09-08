@@ -373,16 +373,19 @@ export async function watchDeployment({
     lastOperation = operation;
   };
 
-  const verifyTarget = async () => {
-    const deployment = await measureOperation(
-      'get',
-      () => client.getDeployment(deploymentUuid),
-      (operation) => {
-        recordOperation(operation);
-        lastApiOperation = operation;
-      },
-    );
-    assertDeploymentTarget(deployment, { deploymentUuid, expectedCommit });
+  const verifyTarget = async ({ direct = false } = {}) => {
+    let deployment;
+    if (direct) {
+      deployment = await measureOperation(
+        'get',
+        () => client.getDeployment(deploymentUuid),
+        (operation) => {
+          recordOperation(operation);
+          lastApiOperation = operation;
+        },
+      );
+      assertDeploymentTarget(deployment, { deploymentUuid, expectedCommit });
+    }
     const records = await measureOperation(
       'list',
       () => client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid),
@@ -397,9 +400,9 @@ export async function watchDeployment({
     }
     assertDeploymentTarget(listedTarget, { deploymentUuid, expectedCommit });
     assertNoOtherBuild(records, deploymentUuid);
-    lastVerifiedRecord = deployment;
+    lastVerifiedRecord = listedTarget;
     targetVerified = true;
-    return deployment;
+    return listedTarget;
   };
 
   const cancellationEvent = ({ event, triggerOperation, code, message, cancellationResult }) => ({
@@ -479,7 +482,10 @@ export async function watchDeployment({
     return cancellationPromise;
   };
 
-  const initial = await verifyTarget();
+  // La consulta directa se limita al enlace inicial. Durante un build Coolify
+  // puede tardar en servir un deployment individual; la lista de la aplicación
+  // ya vincula UUID, aplicación y SHA sin añadir esa ruta pesada al monitor.
+  const initial = await verifyTarget({ direct: true });
   if (isTerminal(initial)) return { deploymentUuid, status: statusOf(initial), cancelCount };
 
   const diskMonitor = async () => {
