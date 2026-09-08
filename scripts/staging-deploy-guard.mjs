@@ -138,11 +138,13 @@ function requireExpectedCommit(expectedCommit) {
 export function createCoolifyClient({
   baseUrl = process.env.COOLIFY_API_URL,
   token = process.env.COOLIFY_API_TOKEN,
+  readToken = process.env.COOLIFY_API_READ_TOKEN,
+  deployToken = process.env.COOLIFY_API_DEPLOY_TOKEN,
   fetchImpl = globalThis.fetch,
   timeoutMs = STAGING_DEPLOY_GUARD.operationTimeoutMs,
 } = {}) {
-  if (!baseUrl || !token) {
-    throw new Error('Guard de staging: faltan COOLIFY_API_URL o COOLIFY_API_TOKEN.');
+  if (!baseUrl || (!token && !readToken && !deployToken)) {
+    throw new Error('Guard de staging: faltan COOLIFY_API_URL y una credencial Coolify.');
   }
   if (typeof fetchImpl !== 'function') {
     throw new Error('Guard de staging: no hay un fetch disponible para Coolify.');
@@ -152,7 +154,10 @@ export function createCoolifyClient({
   }
 
   const apiUrl = baseUrl.replace(/\/$/, '');
-  const request = async (method, path, body) => {
+  const request = async (method, path, body, requestToken = token) => {
+    if (!requestToken) {
+      throw new Error(`Guard de staging: falta credencial Coolify para ${method} ${path}.`);
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     let response;
@@ -161,7 +166,7 @@ export function createCoolifyClient({
         method,
         headers: {
           accept: 'application/json',
-          authorization: `Bearer ${token}`,
+          authorization: `Bearer ${requestToken}`,
           ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         },
         signal: controller.signal,
@@ -189,15 +194,15 @@ export function createCoolifyClient({
 
   return Object.freeze({
     async getDeployment(deploymentUuid) {
-      const result = await request('GET', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}`);
+      const result = await request('GET', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}`, undefined, readToken ?? token);
       return result.payload;
     },
     async listDeployments(resourceUuid = STAGING_DEPLOY_GUARD.resourceUuid) {
-      const result = await request('GET', `/api/v1/deployments/applications/${encodeURIComponent(resourceUuid)}`);
+      const result = await request('GET', `/api/v1/deployments/applications/${encodeURIComponent(resourceUuid)}`, undefined, readToken ?? token);
       return asDeploymentRecords(result.payload);
     },
     async cancelDeployment(deploymentUuid) {
-      return request('POST', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}/cancel`);
+      return request('POST', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}/cancel`, undefined, deployToken ?? token);
     },
   });
 }

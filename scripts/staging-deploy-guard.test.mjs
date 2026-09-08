@@ -290,4 +290,21 @@ describe('staging deployment guard', () => {
     });
     await assert.rejects(client.getDeployment(TARGET), /excedió el timeout de 10 ms/);
   });
+
+  it('uses separate least-privilege read and deploy tokens', async () => {
+    const authorizationHeaders = [];
+    const client = createCoolifyClient({
+      baseUrl: 'https://coolify.test',
+      readToken: 'read-token',
+      deployToken: 'deploy-token',
+      fetchImpl: async (_url, options) => {
+        authorizationHeaders.push(options.headers.authorization);
+        return { ok: true, status: 200, json: async () => ({ deployment_uuid: TARGET, application_id: '28', commit: COMMIT, status: 'finished', message: 'Deployment cancelled.' }) };
+      },
+    });
+    await client.getDeployment(TARGET);
+    await client.listDeployments();
+    await client.cancelDeployment(TARGET);
+    assert.deepEqual(authorizationHeaders, ['Bearer read-token', 'Bearer read-token', 'Bearer deploy-token']);
+  });
 });
