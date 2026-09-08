@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { ObjectId } from 'mongodb';
+
 import { CardWorkerStore } from './storage/mongo.js';
 import type { CardWorkerConfig, CukiDocument } from './types.js';
 
@@ -9,7 +11,14 @@ const config: CardWorkerConfig = {
   pollIntervalMs: 1, maxAttempts: 2, staleLockMs: 60_000, upload: false, publicBaseUrl: null,
   publicKeyPrefix: null, s3Bucket: null, s3Region: null, s3Prefix: 'cards', s3Endpoint: null,
   s3ForcePathStyle: false, s3Acl: null, verifyPublic: false, backfillConcurrency: 1,
-  backfillManifestPath: null, sourceIdentity: null,
+  backfillManifestPath: null, sourceFormat: 'indexed', legacyStagingEnabled: false, sourceIdentity: null,
+};
+
+const legacyConfig: CardWorkerConfig = {
+  ...config,
+  dbName: 'cukies-legacy-staging',
+  sourceFormat: 'legacy',
+  legacyStagingEnabled: true,
 };
 
 class FakeCursor {
@@ -36,6 +45,14 @@ class FakeCursor {
     return this;
   }
 
+  project() {
+    return this;
+  }
+
+  async toArray() {
+    return this.documents;
+  }
+
   async *[Symbol.asyncIterator]() {
     for (const document of this.documents) yield document;
   }
@@ -44,17 +61,19 @@ class FakeCursor {
 class FakeCukiCollection {
   readonly documents: CukiDocument[];
   updates = 0;
+  lastFindFilter?: unknown;
   mutateBeforeUpdate?: (document: CukiDocument) => void;
 
   constructor(documents: CukiDocument[]) {
     this.documents = documents;
   }
 
-  find() {
+  find(filter: unknown = {}) {
+    this.lastFindFilter = filter;
     return new FakeCursor(this.documents);
   }
 
-  async findOne(filter: { _id?: string }) {
+  async findOne(filter: { _id?: string | number }) {
     return this.documents.find((document) => document._id === filter._id) ?? null;
   }
 
@@ -87,15 +106,15 @@ class FakeCukiCollection {
   }
 }
 
-function storeFor(documents: CukiDocument[]) {
+function storeFor(documents: CukiDocument[], configOverride = config) {
   const collection = new FakeCukiCollection(documents);
   const store = Object.create(CardWorkerStore.prototype) as CardWorkerStore;
   Object.defineProperty(store, 'db', { value: { collection: () => collection } });
-  Object.defineProperty(store, 'config', { value: config });
+  Object.defineProperty(store, 'config', { value: configOverride });
   return { collection, store };
 }
 
-function candidate(_id: string, identity: Partial<CukiDocument>): CukiDocument {
+function candidate(_id: string | number, identity: Partial<CukiDocument>): CukiDocument {
   return {
     _id,
     rarity: 3,
@@ -148,5 +167,52 @@ describe('reclamación con identidad canónica', () => {
     assert.equal(claimed?._id, 'valid');
     assert.equal(collection.updates, 1);
     assert.equal(stale.cardImageAttempts, undefined);
+  });
+
+  it('rechaza network BSC/chain TRON sin consumir intentos y reclama el siguiente válido', async () => {
+    const conflict = candidate(123, { network: 'BSC', chain: 'TRON' });
+    const valid = candidate(124, { network: 'BSC' });
+    const { collection, store } = storeFor([conflict, valid], legacyConfig);
+
+    const claimed = await store.claimNextCuki();
+
+    assert.equal(claimed?._id, 124);
+    assert.equal(collection.updates, 1);
+    assert.equal(conflict.cardImageAttempts, undefined);
+  });
+
+  it('resuelve un documentId con tipo exacto sin cruzar el lease entre 123 y "123"', async () => {
+    for (const id of [0, 123]) {
+      const numeric = candidate(id, { network: 'BSC' });
+      const string = candidate(String(id), { network: 'BSC' });
+      const { collection, store } = storeFor([numeric, string], legacyConfig);
+
+      const claimed = await store.claimCukiByDocumentId(id);
+
+      assert.equal(claimed?._id, id);
+      assert.equal(numeric.cardImageAttempts, 1);
+      assert.equal(string.cardImageAttempts, undefined);
+      assert.equal(collection.updates, 1);
+    }
+  });
+
+  it('permite que el CLI busque ambos tipos de id pero rechaza la ambigüedad', async () => {
+    const numeric = candidate(123, { network: 'BSC' });
+    const string = candidate('123', { network: 'BSC' });
+    const { store } = storeFor([numeric, string], legacyConfig);
+
+    await assert.rejects(() => store.getCukiByTokenId('123'), /ambig/);
+  });
+
+  it('censa todos los documentos legacy, incluidos ids inválidos y ObjectId, sin filtrarlos', async () => {
+    const invalidObjectId = candidate(new ObjectId() as unknown as string, { network: 'BSC' });
+    const invalidString = candidate('not-a-token', { network: 'BSC' });
+    const { collection, store } = storeFor([invalidObjectId, invalidString], legacyConfig);
+
+    const documents = await store.listBackfillCukies();
+
+    assert.deepEqual(collection.lastFindFilter, {});
+    assert.equal(documents.length, 2);
+    assert.ok(documents.every((document) => document.sourceValidationError));
   });
 });

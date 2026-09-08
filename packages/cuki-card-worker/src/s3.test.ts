@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 
 import {
+  assertS3UploadConfig,
   buildCardObjectUpload,
   cardContentSha256FromUrl,
   cardContentSha256,
@@ -31,6 +32,8 @@ const config: CardWorkerConfig = {
   verifyPublic: true,
   backfillConcurrency: 2,
   backfillManifestPath: null,
+  sourceFormat: 'indexed',
+  legacyStagingEnabled: false,
   sourceIdentity: null,
 };
 
@@ -47,6 +50,21 @@ const validPng = Buffer.from(
 );
 
 describe('immutable card uploads', () => {
+  it('limita el upload legacy al bucket y origen de staging confirmados', () => {
+    const legacy = {
+      ...config,
+      dbName: 'cukies-legacy-staging',
+      sourceFormat: 'legacy' as const,
+      legacyStagingEnabled: true,
+      s3Bucket: 'cukies-cards-staging',
+      publicBaseUrl: 'https://assets-staging.cukies.world',
+    };
+
+    assert.doesNotThrow(() => assertS3UploadConfig(legacy));
+    assert.throws(() => assertS3UploadConfig({ ...legacy, s3Bucket: 'other-bucket' }), /cukies-cards-staging/);
+    assert.throws(() => assertS3UploadConfig({ ...legacy, publicBaseUrl: 'https://other.example' }), /assets-staging/);
+  });
+
   it('uses a deterministic SHA-256 content address', () => {
     const firstBody = Buffer.from('first png');
     const secondBody = Buffer.from('second png');

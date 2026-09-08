@@ -121,7 +121,7 @@ describe('Cukie Master custodial inventory identity', () => {
       walletAddress: wallet,
       now,
       documents: [
-        metadata('a-7', '7', collectionA),
+        metadata('a-7', '7', collectionA, { img: 'https://cdn.example/a-7.png' }),
         metadata('b-7', '7', collectionB, { rarity: 5 }),
       ],
       locks: [],
@@ -135,6 +135,8 @@ describe('Cukie Master custodial inventory identity', () => {
     ]);
     expect(inventory.map((item) => item.collectionAddress)).toEqual([collectionA, collectionB]);
     expect(inventory.every((item) => item.canDeposit)).toBe(true);
+    expect(inventory[0]?.imageUrl).toBe('https://cdn.example/a-7.png');
+    expect(inventory[1]?.imageUrl).toContain('/7.png');
   });
 
   it('fails closed for duplicate, legacy or non-normalized identities', () => {

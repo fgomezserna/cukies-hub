@@ -11,6 +11,7 @@ import type {
   GenerationResult,
 } from '../types.js';
 import { canonicalAssetIdentity, validateAssetIdentityContext } from '../identity.js';
+import { assertCardWorkerSourceConfig, normalizeCukiSourceDocument, normalizeCukiSourceForRead, sourceCandidateFilter, sourceDocumentFilter, sourceTokenIdFilter } from '../source.js';
 
 const validTypeValues = [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'];
 const validGenerationValues = [1, 2, '1', '2'];
@@ -29,7 +30,7 @@ export function buildRenderableMetadataFilter(): Filter<CukiDocument> {
   };
 }
 
-export function buildCardImageLeaseFilter(documentId: string, lease: CardImageLease): Filter<CukiDocument> {
+export function buildCardImageLeaseFilter(documentId: string | number, lease: CardImageLease): Filter<CukiDocument> {
   return {
     _id: documentId,
     cardImageStatus: 'processing',
@@ -46,6 +47,7 @@ export class CardWorkerStore {
   private config: CardWorkerConfig;
 
   constructor(config: CardWorkerConfig) {
+    assertCardWorkerSourceConfig(config);
     this.config = config;
     this.client = new MongoClient(config.mongoUrl);
     this.db = this.client.db(config.dbName);
@@ -80,23 +82,30 @@ export class CardWorkerStore {
     ]);
   }
 
-  async getCuki(documentId: string) {
-    return this.cukies().findOne({ _id: documentId });
+  async getCuki(documentId: string | number) {
+    const document = await this.cukies().findOne(sourceDocumentFilter(documentId, this.config.sourceFormat));
+    return document ? normalizeCukiSourceForRead(document, this.config.sourceFormat) : null;
   }
 
   private async findCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
     if (context) validateAssetIdentityContext(context);
-    const candidates = await this.cukies().find({ $or: [{ tokenId }, { _id: tokenId }] }).toArray();
+    const candidates = await this.cukies().find(sourceTokenIdFilter(tokenId, this.config.sourceFormat)).toArray();
     const matching = candidates.filter((candidate) => {
-      if (candidate.tokenId && candidate.tokenId !== tokenId) return false;
+      let normalized: CukiDocument;
+      try {
+        normalized = normalizeCukiSourceDocument(candidate, this.config.sourceFormat);
+      } catch {
+        return false;
+      }
+      if (normalized.tokenId && normalized.tokenId !== tokenId) return false;
       const identity = canonicalAssetIdentity(
-        context && !candidate.tokenId ? { ...candidate, tokenId } : candidate,
+        context && !normalized.tokenId ? { ...normalized, tokenId } : normalized,
         context,
       );
       if (!identity) return false;
       if (!context) return true;
       const expected = canonicalAssetIdentity({
-        _id: candidate._id,
+        _id: normalized._id,
         tokenId,
         ...context,
       });
@@ -105,7 +114,7 @@ export class CardWorkerStore {
     if (matching.length > 1) {
       throw new Error(`El token ${tokenId} es ambiguo: exige red, chainId y colección.`);
     }
-    return matching[0] ?? null;
+    return matching[0] ? normalizeCukiSourceDocument(matching[0], this.config.sourceFormat) : null;
   }
 
   async getCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
@@ -116,14 +125,14 @@ export class CardWorkerStore {
     return buildRenderableMetadataFilter();
   }
 
-  private claimFilter(tokenId?: string, _legacyContext?: AssetIdentityContext, expected?: CukiDocument): Filter<CukiDocument> {
+  private claimFilter(tokenId?: string | number, _legacyContext?: AssetIdentityContext, expected?: CukiDocument): Filter<CukiDocument> {
     const metadataFilter = this.renderableMetadataFilter();
     const revisionFilter: Filter<CukiDocument>[] = expected
       ? [expected.updatedAt ? { updatedAt: expected.updatedAt } : { $or: [{ updatedAt: { $exists: false } }, { updatedAt: null }] }]
       : [];
 
     return {
-      ...(tokenId ? { _id: tokenId } : {}),
+      ...(tokenId !== undefined ? { _id: tokenId } : {}),
       $and: [
         ...(metadataFilter.$and ?? []),
         ...revisionFilter,
@@ -181,7 +190,7 @@ export class CardWorkerStore {
       sourceRevision: updated.cardImageLeaseSourceRevision ?? null,
     };
 
-    return { ...updated, lease } satisfies ClaimedCuki;
+    return { ...normalizeCukiSourceDocument(updated, this.config.sourceFormat), lease } satisfies ClaimedCuki;
   }
 
   async claimNextCuki(context?: AssetIdentityContext) {
@@ -202,19 +211,26 @@ export class CardWorkerStore {
       ],
     };
     if (context) validateAssetIdentityContext(context);
-    const candidates = this.cukies().find(candidateFilter).sort({ timeStamp: 1, _id: 1 }).batchSize(50);
+    const candidates = this.cukies().find({ ...sourceCandidateFilter(this.config.sourceFormat), $and: candidateFilter.$and })
+      .sort({ timeStamp: 1, _id: 1 }).batchSize(50);
     for await (const candidate of candidates) {
-      if (!canonicalAssetIdentity(candidate, context)) continue;
+      let normalized: CukiDocument;
+      try {
+        normalized = normalizeCukiSourceDocument(candidate, this.config.sourceFormat);
+      } catch {
+        continue;
+      }
+      if (!canonicalAssetIdentity(normalized, context)) continue;
       const claimed = await this.claimCukiByDocumentId(candidate._id, context);
       if (claimed) return claimed;
     }
     return null;
   }
 
-  async claimCukiByDocumentId(documentId: string, legacyContext?: AssetIdentityContext) {
+  async claimCukiByDocumentId(documentId: string | number, legacyContext?: AssetIdentityContext) {
     if (legacyContext) validateAssetIdentityContext(legacyContext);
     const current = await this.getCuki(documentId);
-    if (!current || !canonicalAssetIdentity(current, legacyContext)) return null;
+    if (!current || current.sourceValidationError || !canonicalAssetIdentity(current, legacyContext)) return null;
     return this.claim(this.claimFilter(documentId, legacyContext, current));
   }
 
@@ -223,7 +239,7 @@ export class CardWorkerStore {
     return candidate ? this.claimCukiByDocumentId(candidate._id, context) : null;
   }
 
-  async claimCukiById(documentId: string) {
+  async claimCukiById(documentId: string | number) {
     return this.claimCukiByDocumentId(documentId);
   }
 
@@ -247,9 +263,12 @@ export class CardWorkerStore {
         cardImageAttempts: 1,
         cardImageLockedAt: 1,
         updatedAt: 1,
+        sourceValidationError: 1,
       })
       .sort({ _id: 1 })
-      .toArray();
+      .batchSize(50)
+      .toArray()
+      .then((documents) => documents.map((document) => normalizeCukiSourceForRead(document, this.config.sourceFormat)));
   }
 
   private leaseFilter(claimed: ClaimedCuki): Filter<CukiDocument> {
@@ -306,7 +325,7 @@ export class CardWorkerStore {
     await this.recordJob(claimed._id, 'failed', { error: message });
   }
 
-  async recordJob(documentId: string, status: string, payload: Record<string, unknown>) {
+  async recordJob(documentId: string | number, status: string, payload: Record<string, unknown>) {
     await this.jobs().insertOne({
       documentId,
       tokenId: payload.tokenId ?? documentId,

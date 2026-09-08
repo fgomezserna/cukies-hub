@@ -4,8 +4,9 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
-import type { AssetIdentityContext, CardWorkerConfig } from '../types.js';
+import type { AssetIdentityContext, CardWorkerConfig, CardWorkerSourceFormat } from '../types.js';
 import { validateAssetIdentityContext } from '../identity.js';
+import { assertCardWorkerSourceConfig } from '../source.js';
 
 const defaultTokenAddress = 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe';
 
@@ -71,6 +72,8 @@ const envSchema = z.object({
   CARD_WORKER_SOURCE_NETWORK: z.string().optional(),
   CARD_WORKER_SOURCE_CHAIN_ID: z.coerce.number().int().positive().optional(),
   CARD_WORKER_SOURCE_COLLECTION: z.string().optional(),
+  CARD_WORKER_SOURCE_FORMAT: z.enum(['indexed', 'legacy']).default('indexed'),
+  CARD_WORKER_LEGACY_STAGING_ENABLED: z.string().default('false'),
 });
 
 function parseBoolean(value: string | undefined) {
@@ -110,12 +113,19 @@ export function getCardWorkerConfig(sourceIdentityOverride?: AssetIdentityContex
     throw new Error('Falta CARD_WORKER_MONGO_URL, CHAIN_INDEXER_MONGO_URL o DATABASE_URL.');
   }
 
-  const sourceIdentity = sourceIdentityOverride ?? resolveSourceIdentity(env);
+  const sourceFormat = env.CARD_WORKER_SOURCE_FORMAT as CardWorkerSourceFormat;
+  const legacyStagingEnabled = parseBoolean(env.CARD_WORKER_LEGACY_STAGING_ENABLED);
+  const sourceIdentity = sourceFormat === 'legacy'
+    ? null
+    : sourceIdentityOverride ?? resolveSourceIdentity(env);
   if (sourceIdentityOverride) validateAssetIdentityContext(sourceIdentityOverride);
+
+  const dbName = env.CARD_WORKER_DB_NAME ?? env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new';
+  assertCardWorkerSourceConfig({ sourceFormat, legacyStagingEnabled, dbName });
 
   return {
     mongoUrl,
-    dbName: env.CARD_WORKER_DB_NAME ?? env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new',
+    dbName,
     assetsDir: env.CARD_WORKER_ASSETS_DIR
       ? path.resolve(env.CARD_WORKER_ASSETS_DIR)
       : path.join(packageRoot(), 'assets'),
@@ -145,6 +155,8 @@ export function getCardWorkerConfig(sourceIdentityOverride?: AssetIdentityContex
     backfillManifestPath: env.CARD_WORKER_BACKFILL_MANIFEST_PATH
       ? path.resolve(env.CARD_WORKER_BACKFILL_MANIFEST_PATH)
       : null,
+    sourceFormat,
+    legacyStagingEnabled,
     sourceIdentity,
   };
 }

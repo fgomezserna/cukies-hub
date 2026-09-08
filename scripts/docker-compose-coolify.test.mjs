@@ -16,6 +16,7 @@ const guardedWorkers = [
   'cukie-pool-scheduler',
   'weekly-ranking-scheduler',
   'cuki-card-worker',
+  'cuki-card-worker-legacy',
 ];
 
 const sharedDappRuntimeWorkers = [
@@ -82,6 +83,25 @@ for (const serviceName of guardedWorkers) {
     );
   });
 }
+
+test('legacy card worker is opt-in, staging-only and cannot target indexed fixtures', () => {
+  const definition = serviceDefinition('cuki-card-worker-legacy');
+
+  assert.match(definition, /    profiles:\n      - legacy-card-worker/);
+  assert.ok(definition.includes('CARD_WORKER_SOURCE_FORMAT: legacy'));
+  assert.ok(definition.includes('CARD_WORKER_LEGACY_STAGING_ENABLED: ${CARD_WORKER_LEGACY_STAGING_ENABLED:-false}'));
+  assert.ok(definition.includes('CARD_WORKER_DB_NAME: cukies-legacy-staging'));
+  assert.ok(definition.includes('CARD_WORKER_MONGO_URL: ${CARD_WORKER_LEGACY_MONGO_URL:-${CUKIES_DATABASE_URL}}'));
+  assert.ok(definition.includes('CARD_WORKER_S3_BUCKET: cukies-cards-staging'));
+  assert.ok(definition.includes('CARD_WORKER_PUBLIC_BASE_URL: https://assets-staging.cukies.world'));
+  assert.ok(definition.includes('AWS_ACCESS_KEY_ID: ${CARD_WORKER_LEGACY_S3_ACCESS_KEY_ID:-}'));
+  assert.ok(definition.includes('AWS_SECRET_ACCESS_KEY: ${CARD_WORKER_LEGACY_S3_SECRET_ACCESS_KEY:-}'));
+  assert.ok(definition.includes('CARD_WORKER_S3_REGION: ${CARD_WORKER_LEGACY_S3_REGION:-us-east-1}'));
+  assert.doesNotMatch(definition, /CARD_WORKER_LEGACY_S3_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|REGION):[^\n]*\?:/);
+  assert.doesNotMatch(definition, /AWS_ACCESS_KEY_ID: \$\{AWS_ACCESS_KEY_ID\}/);
+  assert.doesNotMatch(definition, /AWS_SECRET_ACCESS_KEY: \$\{AWS_SECRET_ACCESS_KEY\}/);
+  assert.ok(definition.includes('assert-staging-only.mjs --scope cuki-card-worker'));
+});
 
 test('chain-indexer reports health from its staging Mongo connection', () => {
   const definition = serviceDefinition('chain-indexer');

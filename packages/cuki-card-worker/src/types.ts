@@ -11,7 +11,7 @@ export type CukiSkills = {
 };
 
 export type CukiDocument = {
-  _id: string;
+  _id: string | number;
   tokenId?: string;
   network?: string;
   chain?: string;
@@ -34,7 +34,10 @@ export type CukiDocument = {
   cardGeneratedAt?: Date;
   timeStamp?: number;
   updatedAt?: Date | null;
+  sourceValidationError?: string;
 };
+
+export type CardWorkerSourceFormat = 'indexed' | 'legacy';
 
 export type AssetIdentityContext = {
   network: string;
@@ -83,12 +86,14 @@ export type CardWorkerConfig = {
   verifyPublic: boolean;
   backfillConcurrency: number;
   backfillManifestPath: string | null;
+  sourceFormat: CardWorkerSourceFormat;
+  legacyStagingEnabled: boolean;
   sourceIdentity: AssetIdentityContext | null;
 };
 
 export type RenderResult = {
   tokenId: string;
-  documentId?: string;
+  documentId?: string | number;
   assetIdentity?: string;
   outputPath: string;
   width: number;

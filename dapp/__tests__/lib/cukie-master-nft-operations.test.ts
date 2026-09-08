@@ -21,8 +21,9 @@ function asset(
   rarity: string,
   canonicalState: string,
   rarityPoints: number,
+  imageUrl?: string,
 ) {
-  return { assetId, tokenId, rarity, canonicalState, rarityPoints } as never;
+  return { assetId, tokenId, rarity, canonicalState, rarityPoints, imageUrl } as never;
 }
 
 describe('getCukieMasterNftInventory', () => {
@@ -30,7 +31,7 @@ describe('getCukieMasterNftInventory', () => {
     mockSummary.mockResolvedValue({
       walletNormalized: wallet,
       eligibleAssets: [
-        asset('cukies:soft', '42', 'rare', 'soft_staked', 4),
+        asset('cukies:soft', '42', 'rare', 'soft_staked', 4, 'https://cdn.example/42.png'),
         asset('cukies:game', '43', 'epic', 'assigned_to_game', 7),
         asset('cukies:available', '44', 'common', 'available', 1),
       ],
@@ -59,7 +60,7 @@ describe('getCukieMasterNftInventory', () => {
     const byId = new Map(inventory.map((item) => [item.assetId, item]));
 
     expect(byId.get('cukies:soft')).toEqual(expect.objectContaining({
-      imageUrl: expect.stringContaining('/42.png'),
+      imageUrl: 'https://cdn.example/42.png',
       rarityPoints: 4,
       contributesToCukieMaster: true,
       contributionPoints: 4,
@@ -72,6 +73,7 @@ describe('getCukieMasterNftInventory', () => {
       canUnstake: false,
     }));
     expect(byId.get('cukies:available')).toEqual(expect.objectContaining({
+      imageUrl: expect.stringContaining('/44.png'),
       rarityPoints: 1,
       contributesToCukieMaster: false,
       contributionPoints: 0,

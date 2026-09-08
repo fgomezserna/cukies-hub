@@ -39,6 +39,8 @@ pnpm cards:dev
 - `CARD_WORKER_VERIFY_PUBLIC`: comprueba mediante `GET` público el PNG completo, MIME, longitud, hash y caché después de cada upload; default `true`.
 - `CARD_WORKER_BACKFILL_CONCURRENCY`: concurrencia acotada del backfill; default `2`.
 - `CARD_WORKER_BACKFILL_MANIFEST_PATH`: ruta obligatoria para `backfill`; guarda el run durable, checkpoints, inventario inicial y delta de reconciliación.
+- `CARD_WORKER_SOURCE_FORMAT`: `indexed` por defecto. Usa `legacy` sólo para leer el Mongo legacy de staging mediante el servicio opt-in protegido.
+- `CARD_WORKER_LEGACY_STAGING_ENABLED`: debe ser `true` junto con `CARD_WORKER_SOURCE_FORMAT=legacy`; el worker rechaza cualquier DB distinta de `cukies-legacy-staging`.
 - `CARD_WORKER_SOURCE_NETWORK`: contexto explícito de origen (`BSC` o `TRON`) para documentos legacy sin identidad materializada.
 - `CARD_WORKER_SOURCE_CHAIN_ID`: obligatorio para `BSC`; no se admite para `TRON`, cuya red canónica es `mainnet`.
 - `CARD_WORKER_SOURCE_COLLECTION`: colección canónica del contexto de origen. En TRON se conserva la dirección Base58 con sus mayúsculas.
@@ -61,5 +63,9 @@ Cada PNG se publica bajo una clave inmutable `<prefix>/<tokenId-base64url>/<sha2
 `backfill` captura un manifiesto ordenado por `_id` y un cutoff al inicio, conserva una identidad explícita (`documentId`, `tokenId` visible y `assetIdentity` canónica), clasifica también metadata ausente o fuera de rango, y escribe checkpoints atómicos. Es reanudable: sólo un lease con propietario, versión y revisión de origen puede finalizar un documento; una URL del destino que responda correctamente se cuenta como `alreadyValid`. Los candidatos bloqueados, agotados o fallidos dejan el run incompleto y se reintentan en la siguiente ejecución. Los documentos creados o modificados después del cutoff entran en `deltaItems` sin sobrescribir el inventario inicial.
 
 El contexto también puede pasarse al CLI con `--source-network`, `--source-chain-id` (solo BSC) y `--source-collection`; se valida antes de abrir el store y se propaga a censo, claims, renderer y manifiesto. Un token-only sin identidad completa o con una coincidencia ambigua se rechaza.
+
+En modo `legacy`, el adaptador trata `_id` decimal como token ID, conserva el `_id` original para claims y resuelve por documento la identidad BSC `chainId=56` o TRON mainnet. Rechaza ObjectId, IDs no decimales, conflictos de red/colección/chain y metadata inválida antes de consumir intentos. No activa el indexador legacy ni importa documentos al esquema nuevo.
+
+El perfil Compose `legacy-card-worker` fija `cukies-legacy-staging`, el bucket `cukies-cards-staging` y el origen `https://assets-staging.cukies.world`. Usa credenciales propias `CARD_WORKER_LEGACY_S3_ACCESS_KEY_ID` y `CARD_WORKER_LEGACY_S3_SECRET_ACCESS_KEY`, con región `CARD_WORKER_LEGACY_S3_REGION`; sus permisos exclusivos de staging deben comprobarse antes de la publicación. El censo incluye también los documentos inválidos como `missing_identity` y conserva `sourceValidationError` en el manifiesto. La lectura por ID documental mantiene su tipo exacto; la búsqueda CLI por token detecta coincidencias ambiguas entre IDs numéricos y de texto.
 
 Los documentos del indexador nuevo pueden exponer `rarity` y `generation` a partir del evento canónico `CukieMetadataConfigured`; el renderer los adapta a la forma legacy sin inventar ni persistir atributos derivados.
