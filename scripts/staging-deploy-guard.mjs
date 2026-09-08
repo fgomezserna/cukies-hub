@@ -102,16 +102,14 @@ function isActive(record) {
   return ACTIVE_STATUSES.has(statusOf(record)) || (!isTerminal(record) && Boolean(statusOf(record)));
 }
 
-function isVerificationIntegrityFailure(error) {
-  const message = String(error instanceof Error ? error.message : error);
-  return [
-    'payload inesperado',
-    'no está relacionado con la aplicación',
-    'no coincide con',
-    'no pertenece a la aplicación',
-    'no corresponde al commit esperado',
-    'hay otro build activo',
-  ].some((fragment) => message.includes(fragment));
+function coolifyRequestError(message, { retriable = false } = {}) {
+  const error = new Error(message);
+  error.coolifyRetriable = retriable;
+  return error;
+}
+
+function isRetriableCoolifyError(error) {
+  return error?.coolifyRetriable === true;
 }
 
 function asDeploymentRecords(payload) {
@@ -235,7 +233,10 @@ export function createCoolifyClient({
       throw new Error(`Guard de staging: falta credencial Coolify para ${method} ${path}.`);
     }
     const controller = new AbortController();
-    const timeoutError = new Error(`Coolify API ${method} ${path} excedió el timeout de ${requestTimeoutMs} ms.`);
+    const timeoutError = coolifyRequestError(
+      `Coolify API ${method} ${path} excedió el timeout de ${requestTimeoutMs} ms.`,
+      { retriable: true },
+    );
     let rejectTimeout;
     const timeoutPromise = new Promise((_, reject) => {
       rejectTimeout = reject;
@@ -267,12 +268,18 @@ export function createCoolifyClient({
       if (error === timeoutError || controller.signal.aborted) {
         throw timeoutError;
       }
-      throw error;
+      throw coolifyRequestError(
+        `Coolify API ${method} ${path} falló por red: ${safeDiagnosticText(error instanceof Error ? error.message : error)}.`,
+        { retriable: true },
+      );
     } finally {
       clearTimeout(timeout);
     }
     if (!response.ok) {
-      throw new Error(`Coolify API ${method} ${path} devolvió HTTP ${response.status}.`);
+      throw coolifyRequestError(
+        `Coolify API ${method} ${path} devolvió HTTP ${response.status}.`,
+        { retriable: response.status === 408 || response.status === 429 || response.status >= 500 },
+      );
     }
     return { status: response.status, payload };
   };
@@ -282,8 +289,8 @@ export function createCoolifyClient({
       const result = await request('GET', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}`, undefined, readToken ?? token, timeoutMs);
       return result.payload;
     },
-    async listDeployments(resourceUuid = STAGING_DEPLOY_GUARD.resourceUuid) {
-      const result = await request('GET', `/api/v1/deployments/applications/${encodeURIComponent(resourceUuid)}`, undefined, readToken ?? token, timeoutMs);
+    async listDeployments(resourceUuid = STAGING_DEPLOY_GUARD.resourceUuid, { timeoutMs: requestTimeoutMs = timeoutMs } = {}) {
+      const result = await request('GET', `/api/v1/deployments/applications/${encodeURIComponent(resourceUuid)}`, undefined, readToken ?? token, requestTimeoutMs);
       return asDeploymentRecords(result.payload);
     },
     async cancelDeployment(deploymentUuid) {
@@ -393,7 +400,7 @@ export async function watchDeployment({
     lastOperation = operation;
   };
 
-  const verifyTarget = async ({ direct = false } = {}) => {
+  const verifyTarget = async ({ direct = false, apiTimeoutMs, deadlineAt } = {}) => {
     let deployment;
     if (direct) {
       deployment = await measureOperation(
@@ -408,7 +415,10 @@ export async function watchDeployment({
     }
     const records = await measureOperation(
       'list',
-      () => client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid),
+      () => client.listDeployments(
+        STAGING_DEPLOY_GUARD.resourceUuid,
+        apiTimeoutMs === undefined ? undefined : { timeoutMs: apiTimeoutMs },
+      ),
       (operation) => {
         recordOperation(operation);
         lastApiOperation = operation;
@@ -420,9 +430,16 @@ export async function watchDeployment({
     }
     assertDeploymentTarget(listedTarget, { deploymentUuid, expectedCommit });
     assertNoOtherBuild(records, deploymentUuid);
+    const verifiedAt = now();
+    if (deadlineAt !== undefined && verifiedAt >= deadlineAt) {
+      throw coolifyRequestError(
+        `Guard de staging: la lectura Coolify agotó la ventana de vigilancia de ${maximumApiUnverifiedMs} ms.`,
+        { retriable: true },
+      );
+    }
     lastVerifiedRecord = listedTarget;
     targetVerified = true;
-    lastApiVerifiedAt = now();
+    lastApiVerifiedAt = verifiedAt;
     return listedTarget;
   };
 
@@ -457,6 +474,17 @@ export async function watchDeployment({
     sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
     minimumFreeBytes: minimumFreeBytes.toString(),
     freeBytes: lastFreeBytes?.toString() ?? null,
+    apiUnverifiedMs,
+    maximumApiUnverifiedMs,
+  });
+
+  const apiRecoveredEvent = ({ apiUnverifiedMs }) => ({
+    event: 'api_recovered',
+    at: new Date().toISOString(),
+    deploymentUuid,
+    expectedCommit,
+    status: statusOf(lastVerifiedRecord),
+    sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
     apiUnverifiedMs,
     maximumApiUnverifiedMs,
   });
@@ -561,22 +589,46 @@ export async function watchDeployment({
   };
 
   const apiMonitor = async () => {
+    let apiFailureStartedAt = null;
     while (!finished && !cancellationRequested) {
       let deployment;
+      const verificationStartedAt = lastApiVerifiedAt;
+      const apiUnverifiedBeforeReadMs = Math.max(0, now() - verificationStartedAt);
+      if (apiUnverifiedBeforeReadMs >= maximumApiUnverifiedMs) {
+        const error = coolifyRequestError(
+          `Guard de staging: no queda presupuesto para otra lectura Coolify tras ${apiUnverifiedBeforeReadMs} ms.`,
+          { retriable: true },
+        );
+        await emitDiagnostic(apiFailureEvent({ error, apiUnverifiedMs: apiUnverifiedBeforeReadMs, terminal: true }));
+        await cancelOnce({
+          code: 'coolify_query_unavailable',
+          message: error.message,
+          operation: lastApiOperation,
+        });
+        return;
+      }
       try {
-        deployment = await verifyTarget();
+        const apiTimeoutMs = Math.min(
+          STAGING_DEPLOY_GUARD.apiOperationTimeoutMs,
+          maximumApiUnverifiedMs - apiUnverifiedBeforeReadMs,
+        );
+        deployment = await verifyTarget({
+          apiTimeoutMs,
+          deadlineAt: verificationStartedAt + maximumApiUnverifiedMs,
+        });
       } catch (error) {
-        if (isVerificationIntegrityFailure(error)) {
+        if (!isRetriableCoolifyError(error)) {
           await cancelOnce({
-            code: 'coolify_verification_integrity_error',
-            message: `fallo de integridad de consulta: ${error.message}`,
+            code: 'coolify_query_nonretryable_error',
+            message: `fallo no reintentable de consulta: ${error.message}`,
             operation: lastApiOperation,
           });
           return;
         }
-        const apiUnverifiedMs = Math.max(0, now() - lastApiVerifiedAt);
+        const apiUnverifiedMs = Math.max(0, now() - verificationStartedAt);
         const terminal = apiUnverifiedMs >= maximumApiUnverifiedMs;
         await emitDiagnostic(apiFailureEvent({ error, apiUnverifiedMs, terminal }));
+        apiFailureStartedAt ??= verificationStartedAt;
         if (!terminal) {
           await sleep(apiIntervalMs);
           continue;
@@ -587,6 +639,10 @@ export async function watchDeployment({
           operation: lastApiOperation,
         });
         return;
+      }
+      if (apiFailureStartedAt !== null) {
+        await emitDiagnostic(apiRecoveredEvent({ apiUnverifiedMs: Math.max(0, now() - apiFailureStartedAt) }));
+        apiFailureStartedAt = null;
       }
       if (isTerminal(deployment)) {
         terminalResult = { deploymentUuid, status: statusOf(deployment), cancelCount };
