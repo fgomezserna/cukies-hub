@@ -116,39 +116,17 @@ export class CardWorkerStore {
     return buildRenderableMetadataFilter();
   }
 
-  private canonicalIdentityFilter(): Filter<CukiDocument> {
-    return {
-      $and: [
-        { tokenId: { $type: 'string', $ne: '' } },
-        { collectionAddressNormalized: { $type: 'string', $ne: '' } },
-        {
-          $or: [
-            {
-              $and: [
-                { $or: [{ network: 'BSC' }, { network: 'bsc' }, { chain: 'BSC' }, { chain: 'bsc' }] },
-                { $or: [{ chainId: { $type: 'int' } }, { chainId: { $type: 'long' } }, { chainId: { $type: 'double' } }] },
-              ],
-            },
-            {
-              $and: [
-                { $or: [{ network: 'TRON' }, { network: 'tron' }, { chain: 'TRON' }, { chain: 'tron' }] },
-                { chainId: { $exists: false } },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-  }
-
-  private claimFilter(tokenId?: string, legacyContext?: AssetIdentityContext): Filter<CukiDocument> {
+  private claimFilter(tokenId?: string, _legacyContext?: AssetIdentityContext, expected?: CukiDocument): Filter<CukiDocument> {
     const metadataFilter = this.renderableMetadataFilter();
+    const revisionFilter: Filter<CukiDocument>[] = expected
+      ? [expected.updatedAt ? { updatedAt: expected.updatedAt } : { $or: [{ updatedAt: { $exists: false } }, { updatedAt: null }] }]
+      : [];
 
     return {
       ...(tokenId ? { _id: tokenId } : {}),
       $and: [
-        ...(legacyContext ? [] : (this.canonicalIdentityFilter().$and ?? [])),
         ...(metadataFilter.$and ?? []),
+        ...revisionFilter,
         {
           $or: [
             { cardImageAttempts: { $exists: false } },
@@ -223,10 +201,9 @@ export class CardWorkerStore {
         },
       ],
     };
-    if (!context) return this.claim(candidateFilter, { timeStamp: 1, _id: 1 });
-    validateAssetIdentityContext(context);
-    const candidates = await this.cukies().find(candidateFilter).sort({ timeStamp: 1, _id: 1 }).toArray();
-    for (const candidate of candidates) {
+    if (context) validateAssetIdentityContext(context);
+    const candidates = this.cukies().find(candidateFilter).sort({ timeStamp: 1, _id: 1 }).batchSize(50);
+    for await (const candidate of candidates) {
       if (!canonicalAssetIdentity(candidate, context)) continue;
       const claimed = await this.claimCukiByDocumentId(candidate._id, context);
       if (claimed) return claimed;
@@ -236,11 +213,9 @@ export class CardWorkerStore {
 
   async claimCukiByDocumentId(documentId: string, legacyContext?: AssetIdentityContext) {
     if (legacyContext) validateAssetIdentityContext(legacyContext);
-    if (legacyContext) {
-      const current = await this.getCuki(documentId);
-      if (!current || !canonicalAssetIdentity(current, legacyContext)) return null;
-    }
-    return this.claim(this.claimFilter(documentId, legacyContext));
+    const current = await this.getCuki(documentId);
+    if (!current || !canonicalAssetIdentity(current, legacyContext)) return null;
+    return this.claim(this.claimFilter(documentId, legacyContext, current));
   }
 
   async claimCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {

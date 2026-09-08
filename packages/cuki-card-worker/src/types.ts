@@ -33,7 +33,7 @@ export type CukiDocument = {
   cardImageUrl?: string | null;
   cardGeneratedAt?: Date;
   timeStamp?: number;
-  updatedAt?: Date;
+  updatedAt?: Date | null;
 };
 
 export type AssetIdentityContext = {
