@@ -2,7 +2,15 @@ import crypto from 'node:crypto';
 
 import { Db, MongoClient, type Filter } from 'mongodb';
 
-import type { CardImageLease, CardWorkerConfig, ClaimedCuki, CukiDocument, GenerationResult } from '../types.js';
+import type {
+  AssetIdentityContext,
+  CardImageLease,
+  CardWorkerConfig,
+  ClaimedCuki,
+  CukiDocument,
+  GenerationResult,
+} from '../types.js';
+import { canonicalAssetIdentity, validateAssetIdentityContext } from '../identity.js';
 
 export function buildCardImageLeaseFilter(documentId: string, lease: CardImageLease): Filter<CukiDocument> {
   return {
@@ -59,30 +67,63 @@ export class CardWorkerStore {
     return this.cukies().findOne({ _id: documentId });
   }
 
-  async getCukiByTokenId(tokenId: string) {
-    return this.cukies().findOne({ $or: [{ tokenId }, { _id: tokenId }] });
+  private async findCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    if (context) validateAssetIdentityContext(context);
+    const candidates = await this.cukies().find({ $or: [{ tokenId }, { _id: tokenId }] }).toArray();
+    const matching = candidates.filter((candidate) => {
+      if (candidate.tokenId && candidate.tokenId !== tokenId) return false;
+      const identity = canonicalAssetIdentity(
+        context && !candidate.tokenId ? { ...candidate, tokenId } : candidate,
+        context,
+      );
+      if (!identity) return false;
+      if (!context) return true;
+      const expected = canonicalAssetIdentity({
+        _id: candidate._id,
+        tokenId,
+        ...context,
+      });
+      return identity === expected;
+    });
+    if (matching.length > 1) {
+      throw new Error(`El token ${tokenId} es ambiguo: exige red, chainId y colección.`);
+    }
+    return matching[0] ?? null;
+  }
+
+  async getCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    return this.findCukiByTokenId(tokenId, context);
   }
 
   private renderableMetadataFilter(): Filter<CukiDocument> {
+    const typeValues = [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'];
+    const generationValues = [1, 2, '1', '2'];
     return {
       $and: [
-        { $or: [{ type: { $exists: true, $ne: null } }, { rarity: { $exists: true, $ne: null } }] },
-        {
-          $or: [
-            { 'skills.generation': { $exists: true, $ne: null } },
-            { generation: { $exists: true, $ne: null } },
-          ],
-        },
+        { $or: [{ type: { $in: typeValues } }, { rarity: { $in: typeValues } }] },
+        { $or: [{ 'skills.generation': { $in: generationValues } }, { generation: { $in: generationValues } }] },
       ],
     };
   }
 
-  private claimFilter(tokenId?: string): Filter<CukiDocument> {
+  private canonicalIdentityFilter(): Filter<CukiDocument> {
+    return {
+      $and: [
+        { tokenId: { $type: 'string', $ne: '' } },
+        { $or: [{ chainId: { $type: 'int' } }, { chainId: { $type: 'long' } }, { chainId: { $type: 'double' } }] },
+        { collectionAddressNormalized: { $type: 'string', $ne: '' } },
+        { $or: [{ network: { $type: 'string', $ne: '' } }, { chain: { $type: 'string', $ne: '' } }] },
+      ],
+    };
+  }
+
+  private claimFilter(tokenId?: string, legacyContext?: AssetIdentityContext): Filter<CukiDocument> {
     const metadataFilter = this.renderableMetadataFilter();
 
     return {
       ...(tokenId ? { _id: tokenId } : {}),
       $and: [
+        ...(legacyContext ? [] : (this.canonicalIdentityFilter().$and ?? [])),
         ...(metadataFilter.$and ?? []),
         {
           $or: [
@@ -161,19 +202,14 @@ export class CardWorkerStore {
     return this.claim(candidateFilter, { timeStamp: 1, _id: 1 });
   }
 
-  async claimCukiByDocumentId(documentId: string) {
-    return this.claim(this.claimFilter(documentId));
+  async claimCukiByDocumentId(documentId: string, legacyContext?: AssetIdentityContext) {
+    if (legacyContext) validateAssetIdentityContext(legacyContext);
+    return this.claim(this.claimFilter(documentId, legacyContext));
   }
 
-  async claimCukiByTokenId(tokenId: string) {
-    const base = this.claimFilter();
-    return this.claim({
-      ...base,
-      $and: [
-        ...(base.$and ?? []),
-        { $or: [{ tokenId }, { _id: tokenId }] },
-      ],
-    });
+  async claimCukiByTokenId(tokenId: string, context?: AssetIdentityContext) {
+    const candidate = await this.findCukiByTokenId(tokenId, context);
+    return candidate ? this.claimCukiByDocumentId(candidate._id, context) : null;
   }
 
   async claimCukiById(documentId: string) {

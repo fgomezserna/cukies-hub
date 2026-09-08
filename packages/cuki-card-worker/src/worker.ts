@@ -19,16 +19,43 @@ import {
   verifyS3UploadAccess,
 } from './s3.js';
 import { CardWorkerStore } from './storage/index.js';
+import { canonicalAssetIdentity, cukiInputFingerprint } from './identity.js';
+import type { AssetIdentityContext } from './types.js';
+export { canonicalAssetIdentity, cukiInputFingerprint } from './identity.js';
 
-type StoreTask<T> = (store: CardWorkerStore, config: CardWorkerConfig) => Promise<T>;
+export type CardWorkerStoreLike = Pick<
+  CardWorkerStore,
+  | 'close'
+  | 'ensureIndexes'
+  | 'summary'
+  | 'getCukiByTokenId'
+  | 'recordJob'
+  | 'claimCukiByTokenId'
+  | 'claimNextCuki'
+  | 'getCuki'
+  | 'claimCukiByDocumentId'
+  | 'markGenerated'
+  | 'markFailed'
+  | 'listBackfillCukies'
+>;
 
-async function withStore<T>(task: StoreTask<T>, config = getCardWorkerConfig()) {
-  const store = await new CardWorkerStore(config).connect();
+export type CardWorkerDependencies = {
+  store?: CardWorkerStoreLike;
+  skipUploadAccess?: boolean;
+  renderAndUpload?: (store: CardWorkerStoreLike, cuki: CukiDocument, config: CardWorkerConfig) => Promise<GenerationResult>;
+  writeCheckpoint?: (manifestPath: string, content: string, runId: string) => Promise<void>;
+};
+
+type StoreTask<T> = (store: CardWorkerStoreLike, config: CardWorkerConfig) => Promise<T>;
+
+async function withStore<T>(task: StoreTask<T>, config: CardWorkerConfig, dependencies: CardWorkerDependencies = {}) {
+  const injected = dependencies.store;
+  const store = injected ?? await new CardWorkerStore(config).connect();
 
   try {
     return await task(store, config);
   } finally {
-    await store.close();
+    if (!injected) await store.close();
   }
 }
 
@@ -45,25 +72,30 @@ async function ensureUploadAccess(config: CardWorkerConfig) {
   await verifyS3UploadAccess(config);
 }
 
-async function renderAndUpload(store: CardWorkerStore, cuki: CukiDocument, config: CardWorkerConfig) {
+async function renderAndUpload(store: CardWorkerStoreLike, cuki: CukiDocument, config: CardWorkerConfig) {
   const renderResult = await renderCukiCard(cuki, config);
   return uploadRenderedCard(config, renderResult);
 }
 
-export async function setupCardWorker(config = getCardWorkerConfig()) {
+export async function setupCardWorker(config = getCardWorkerConfig(), dependencies: CardWorkerDependencies = {}) {
   return withStore(async (store) => {
     await store.ensureIndexes();
     return store.summary();
-  }, config);
+  }, config, dependencies);
 }
 
-export async function getCardWorkerStatus(config = getCardWorkerConfig()) {
-  return withStore(async (store) => store.summary(), config);
+export async function getCardWorkerStatus(config = getCardWorkerConfig(), dependencies: CardWorkerDependencies = {}) {
+  return withStore(async (store) => store.summary(), config, dependencies);
 }
 
-export async function renderTokenCard(tokenId: string, config = getCardWorkerConfig()): Promise<RenderResult> {
+export async function renderTokenCard(
+  tokenId: string,
+  config = getCardWorkerConfig(),
+  dependencies: CardWorkerDependencies = {},
+  identity?: AssetIdentityContext,
+): Promise<RenderResult> {
   return withStore(async (store, resolvedConfig) => {
-    const cuki = await store.getCukiByTokenId(tokenId);
+    const cuki = await store.getCukiByTokenId(tokenId, identity);
 
     if (!cuki) {
       throw new Error(`No existe el Cuki ${tokenId} en la coleccion cukies.`);
@@ -72,31 +104,43 @@ export async function renderTokenCard(tokenId: string, config = getCardWorkerCon
     const result = await renderCukiCard(cuki, resolvedConfig);
     await store.recordJob(tokenId, 'rendered_local', result);
     return result;
-  }, config);
+  }, config, dependencies);
 }
 
-export async function generateTokenCard(tokenId: string, config = getCardWorkerConfig()): Promise<GenerationResult> {
+export async function generateTokenCard(
+  tokenId: string,
+  config = getCardWorkerConfig(),
+  dependencies: CardWorkerDependencies = {},
+  identity?: AssetIdentityContext,
+): Promise<GenerationResult> {
   return withStore(async (store, resolvedConfig) => {
-    await ensureUploadAccess(resolvedConfig);
-    const cuki = await store.claimCukiByTokenId(tokenId);
+    if (!dependencies.skipUploadAccess) await ensureUploadAccess(resolvedConfig);
+    const cuki = await store.claimCukiByTokenId(tokenId, identity);
 
     if (!cuki) {
       throw new Error(`No existe el Cuki ${tokenId} o no tiene metadata renderizable.`);
     }
 
     try {
-      const result = await renderAndUpload(store, cuki, resolvedConfig);
+      const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig);
       await store.markGenerated(cuki, result);
       return result;
     } catch (error) {
-      await store.markFailed(cuki, error);
+      try {
+        await store.markFailed(cuki, error);
+      } catch (fencingError) {
+        console.error(fencingError instanceof Error ? fencingError.message : fencingError);
+      }
       throw error;
     }
-  }, config);
+  }, config, dependencies);
 }
 
-export async function processOneCard(config = getCardWorkerConfig()): Promise<GenerationResult | null> {
-  await ensureUploadAccess(config);
+export async function processOneCard(
+  config = getCardWorkerConfig(),
+  dependencies: CardWorkerDependencies = {},
+): Promise<GenerationResult | null> {
+  if (!dependencies.skipUploadAccess) await ensureUploadAccess(config);
 
   return withStore(async (store, resolvedConfig) => {
     await store.ensureIndexes();
@@ -108,14 +152,18 @@ export async function processOneCard(config = getCardWorkerConfig()): Promise<Ge
     }
 
     try {
-      const result = await renderAndUpload(store, cuki, resolvedConfig);
+      const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig);
       await store.markGenerated(cuki, result);
       return result;
     } catch (error) {
-      await store.markFailed(cuki, error);
+      try {
+        await store.markFailed(cuki, error);
+      } catch (fencingError) {
+        console.error(fencingError instanceof Error ? fencingError.message : fencingError);
+      }
       throw error;
     }
-  }, config);
+  }, config, dependencies);
 }
 
 type BackfillManifestItem = {
@@ -129,7 +177,10 @@ type BackfillManifestItem = {
   chainId?: number;
   collectionAddressNormalized?: string;
   previousImageHost: string | null;
+  previousImageUrl: string | null;
+  previousImageSha256: string | null;
   sourceRevision: string | null;
+  sourceFingerprint?: string;
   censusCategory: BackfillCensusCategory;
   status?: BackfillCensusCategory;
   lastError?: string;
@@ -192,21 +243,14 @@ export function classifyCukiMetadata(cuki: CukiDocument): Extract<BackfillCensus
   return 'renderable';
 }
 
-export function canonicalAssetIdentity(cuki: CukiDocument) {
-  const tokenId = cuki.tokenId ?? cuki._id;
-  const network = (cuki.network ?? cuki.chain ?? 'unknown').trim().toLowerCase() || 'unknown';
-  const collection = (cuki.collectionAddressNormalized ?? 'unknown').trim().toLowerCase() || 'unknown';
-  if (network === 'unknown' || collection === 'unknown') return `document:${cuki._id}`;
-  return `${network}:${collection}:${tokenId}`;
-}
-
 function manifestItem(cuki: CukiDocument): BackfillManifestItem {
-  const tokenId = cuki.tokenId ?? cuki._id;
-  const censusCategory = classifyCukiMetadata(cuki);
+  const tokenId = cuki.tokenId ?? '';
+  const assetIdentity = canonicalAssetIdentity(cuki);
+  const censusCategory = assetIdentity ? classifyCukiMetadata(cuki) : 'missing_identity';
   return {
     documentId: cuki._id,
     tokenId,
-    assetIdentity: canonicalAssetIdentity(cuki),
+    assetIdentity: assetIdentity ?? '',
     legacyDocumentId: cuki._id,
     legacyTokenId: tokenId,
     network: cuki.network,
@@ -214,21 +258,30 @@ function manifestItem(cuki: CukiDocument): BackfillManifestItem {
     chainId: cuki.chainId,
     collectionAddressNormalized: cuki.collectionAddressNormalized,
     previousImageHost: imageHost(cuki.img),
+    previousImageUrl: typeof cuki.img === 'string' && cuki.img.trim() ? cuki.img : null,
+    previousImageSha256: typeof cuki.img === 'string' ? cardContentSha256FromUrl(cuki.img) : null,
     sourceRevision: cuki.updatedAt?.toISOString() ?? null,
+    sourceFingerprint: cukiInputFingerprint(cuki),
     censusCategory,
     ...(censusCategory === 'renderable' ? {} : { status: censusCategory }),
   };
 }
 
 async function processBackfillToken(
-  store: CardWorkerStore,
+  store: CardWorkerStoreLike,
   candidate: BackfillManifestItem,
   config: CardWorkerConfig,
+  upload: CardWorkerDependencies['renderAndUpload'] = renderAndUpload,
 ) {
   if (candidate.censusCategory !== 'renderable') return { status: candidate.censusCategory } as const;
 
   const existing = await store.getCuki(candidate.documentId);
   if (!existing) return { status: 'missing' as const };
+
+  const currentIdentity = canonicalAssetIdentity(existing);
+  if (!currentIdentity) return { status: 'missing_identity' as const };
+  const currentMetadata = classifyCukiMetadata(existing);
+  if (currentMetadata !== 'renderable') return { status: currentMetadata };
 
   if (hasOwnedPublicImage(existing.img, config)) {
     try {
@@ -246,11 +299,15 @@ async function processBackfillToken(
     if (!claimed) return { status: 'locked_or_exhausted' as const };
 
     try {
-      const result = await renderAndUpload(store, claimed, config);
+      const result = await upload(store, claimed, config);
       await store.markGenerated(claimed, result);
       return { status: 'generated' as const, result };
     } catch (error) {
-      await store.markFailed(claimed, error);
+      try {
+        await store.markFailed(claimed, error);
+      } catch {
+        return { status: 'locked_or_exhausted' as const };
+      }
       if (attempt === config.maxAttempts - 1) {
         return {
           status: 'failed' as const,
@@ -263,8 +320,11 @@ async function processBackfillToken(
   return { status: 'failed' as const, error: 'Se agotaron los intentos de backfill.' };
 }
 
-export async function backfillCards(config = getCardWorkerConfig()) {
-  await ensureUploadAccess(config);
+export async function backfillCards(
+  config = getCardWorkerConfig(),
+  dependencies: CardWorkerDependencies = {},
+) {
+  if (!dependencies.skipUploadAccess) await ensureUploadAccess(config);
 
   return withStore(async (store, resolvedConfig) => {
     await store.ensureIndexes();
@@ -300,11 +360,17 @@ export async function backfillCards(config = getCardWorkerConfig()) {
     }
 
     let checkpoint = Promise.resolve();
+    let checkpointError: Error | null = null;
     const saveManifest = async () => {
       checkpoint = checkpoint.then(async () => {
         const temporaryPath = `${manifestPath}.${manifest!.runId}.tmp`;
-        await fs.writeFile(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-        await fs.rename(temporaryPath, manifestPath);
+        const content = `${JSON.stringify(manifest, null, 2)}\n`;
+        if (dependencies.writeCheckpoint) {
+          await dependencies.writeCheckpoint(manifestPath, content, manifest!.runId);
+        } else {
+          await fs.writeFile(temporaryPath, content, 'utf8');
+          await fs.rename(temporaryPath, manifestPath);
+        }
       });
       await checkpoint;
     };
@@ -312,8 +378,6 @@ export async function backfillCards(config = getCardWorkerConfig()) {
 
     let cursor = 0;
     const candidates = [...manifest.initialItems, ...manifest.deltaItems];
-    const processedDocumentIds = new Set<string>();
-
     async function worker() {
       while (true) {
         const index = cursor;
@@ -321,20 +385,22 @@ export async function backfillCards(config = getCardWorkerConfig()) {
         const candidate = candidates[index];
         if (!candidate) return;
         if (!backfillItemNeedsResume(candidate)) {
-          processedDocumentIds.add(candidate.documentId);
           continue;
         }
         try {
-          const result = await processBackfillToken(store, candidate, resolvedConfig);
+          const result = await processBackfillToken(store, candidate, resolvedConfig, dependencies.renderAndUpload);
           candidate.status = result.status;
           candidate.lastError = 'error' in result ? result.error : undefined;
         } catch (error) {
           candidate.status = 'failed';
           candidate.lastError = error instanceof Error ? error.message : String(error);
         } finally {
-          processedDocumentIds.add(candidate.documentId);
           candidate.checkedAt = new Date().toISOString();
-          await saveManifest();
+          try {
+            await saveManifest();
+          } catch (error) {
+            checkpointError ??= error instanceof Error ? error : new Error(String(error));
+          }
         }
       }
     }
@@ -346,14 +412,28 @@ export async function backfillCards(config = getCardWorkerConfig()) {
       ),
     );
 
+    if (checkpointError) {
+      const checkpointMessage = String(checkpointError);
+      throw new Error(`No se pudo guardar el checkpoint del backfill; se conserva el último checkpoint válido: ${checkpointMessage}`);
+    }
+
     const current = await store.listBackfillCukies();
     const initialIds = new Set(manifest.initialItems.map((item) => item.documentId));
-    const knownDeltaIds = new Set(manifest.deltaItems.map((item) => `${item.documentId}:${item.sourceRevision ?? 'none'}`));
+    const knownDeltaIds = new Set(
+      manifest.deltaItems.map((item) => `${item.documentId}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`),
+    );
+    const initialByDocumentId = new Map(manifest.initialItems.map((item) => [item.documentId, item]));
     for (const cuki of current) {
       const changedAfterCutoff = cuki.updatedAt && cuki.updatedAt > new Date(manifest.cutoffAt);
-      if ((!initialIds.has(cuki._id) || changedAfterCutoff) && !processedDocumentIds.has(cuki._id)) {
-        const item = manifestItem(cuki);
-        const key = `${item.documentId}:${item.sourceRevision ?? 'none'}`;
+      const item = manifestItem(cuki);
+      const baseline = initialByDocumentId.get(cuki._id);
+      const sourceChanged = baseline
+        ? baseline.sourceFingerprint
+          ? baseline.sourceFingerprint !== item.sourceFingerprint
+          : Boolean(changedAfterCutoff)
+        : true;
+      if ((!initialIds.has(cuki._id) || sourceChanged) && !knownDeltaIds.has(`${item.documentId}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`)) {
+        const key = `${item.documentId}:${item.sourceFingerprint ?? item.sourceRevision ?? 'none'}`;
         if (!knownDeltaIds.has(key)) manifest.deltaItems.push(item);
       }
     }
@@ -376,11 +456,11 @@ export async function backfillCards(config = getCardWorkerConfig()) {
       counts,
       manifestPath,
     };
-  }, config);
+  }, config, dependencies);
 }
 
-export async function runCardWorker(config = getCardWorkerConfig()) {
-  await ensureUploadAccess(config);
+export async function runCardWorker(config = getCardWorkerConfig(), dependencies: CardWorkerDependencies = {}) {
+  if (!dependencies.skipUploadAccess) await ensureUploadAccess(config);
 
   let stopped = false;
   const stop = () => {
@@ -391,7 +471,12 @@ export async function runCardWorker(config = getCardWorkerConfig()) {
   process.once('SIGTERM', stop);
 
   while (!stopped) {
-    const result = await processOneCard(config);
+    let result: GenerationResult | null = null;
+    try {
+      result = await processOneCard(config, dependencies);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+    }
 
     if (!result) {
       await new Promise((resolve) => setTimeout(resolve, config.pollIntervalMs));

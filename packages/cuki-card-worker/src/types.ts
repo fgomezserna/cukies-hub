@@ -36,6 +36,12 @@ export type CukiDocument = {
   updatedAt?: Date;
 };
 
+export type AssetIdentityContext = {
+  network: string;
+  chainId: number;
+  collectionAddressNormalized: string;
+};
+
 export type CardImageLease = {
   lockId: string;
   leaseVersion: number;
@@ -47,6 +53,7 @@ export type ClaimedCuki = CukiDocument & { lease: CardImageLease };
 
 export type BackfillCensusCategory =
   | 'renderable'
+  | 'missing_identity'
   | 'missing_metadata'
   | 'unsupported_metadata'
   | 'missing'
