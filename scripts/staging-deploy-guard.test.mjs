@@ -132,6 +132,32 @@ describe('staging deployment guard', () => {
     assert.equal(typeof diagnostics[0].operation.durationMs, 'number');
   });
 
+  it('persists the cancellation timeout diagnostic when the ACK is unavailable', async () => {
+    const diagnostics = [];
+    await assert.rejects(
+      watchDeployment({
+        deploymentUuid: TARGET,
+        expectedCommit: COMMIT,
+        client: {
+          getDeployment: async () => record('building'),
+          listDeployments: async () => [record('building')],
+          cancelDeployment: async () => { throw new Error('Coolify API POST /cancel excedió el timeout de 3000 ms.'); },
+        },
+        exec: fakeExec(dfOutput(9_000_000)),
+        sleep: async () => {},
+        diagnosticWriter: async (event) => diagnostics.push(event),
+      }),
+      /excedió el timeout/,
+    );
+    assert.equal(diagnostics.length, 1);
+    assert.equal(diagnostics[0].reasonCode, 'low_disk');
+    assert.equal(diagnostics[0].phase, 'df');
+    assert.equal(diagnostics[0].cancellationResult.ok, false);
+    assert.match(diagnostics[0].cancellationResult.error, /timeout/);
+    assert.equal(diagnostics[0].cancellationOperation.phase, 'cancel');
+    assert.equal(diagnostics[0].cancelCount, 1);
+  });
+
   it('cancels exactly once on df failure and verifies terminal state', async () => {
     let current = record('building');
     let reads = 0;

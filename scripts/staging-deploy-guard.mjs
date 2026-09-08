@@ -350,6 +350,14 @@ export async function watchDeployment({
     maxBytes: diagnosticMaxBytes,
   }));
 
+  const emitDiagnostic = async (event) => {
+    try {
+      await writeDiagnostic(event);
+    } catch (error) {
+      console.error(`Guard de staging: no se pudo persistir el diagnóstico: ${safeDiagnosticText(error instanceof Error ? error.message : error)}`);
+    }
+  };
+
   const recordOperation = (operation) => {
     lastOperation = operation;
   };
@@ -358,14 +366,40 @@ export async function watchDeployment({
     if (cancellationRequested) return false;
     assertDeploymentTarget(lastVerifiedRecord, { deploymentUuid, expectedCommit });
     const triggeringOperation = lastOperation;
-    const result = await measureOperation(
-      'cancel',
-      () => client.cancelDeployment(deploymentUuid),
-      recordOperation,
-    );
-    const cancellationResult = assertCancellationAck(result, deploymentUuid);
+    const attemptedCancelCount = cancelCount + 1;
+    let cancellationResult;
+    try {
+      const result = await measureOperation(
+        'cancel',
+        () => client.cancelDeployment(deploymentUuid),
+        recordOperation,
+      );
+      cancellationResult = { ok: true, ...assertCancellationAck(result, deploymentUuid) };
+    } catch (error) {
+      await emitDiagnostic({
+        event: 'cancel',
+        at: new Date().toISOString(),
+        phase: triggeringOperation?.phase,
+        operation: triggeringOperation,
+        cancellationOperation: lastOperation,
+        reasonCode: code,
+        reason: safeDiagnosticText(message),
+        deploymentUuid,
+        expectedCommit,
+        status: statusOf(lastVerifiedRecord),
+        sha: commitOf(lastVerifiedRecord) ?? expectedCommit,
+        minimumFreeBytes: minimumFreeBytes.toString(),
+        freeBytes: lastFreeBytes?.toString() ?? null,
+        cancelCount: attemptedCancelCount,
+        cancellationResult: {
+          ok: false,
+          error: safeDiagnosticText(error instanceof Error ? error.message : error),
+        },
+      });
+      throw error;
+    }
     cancellationRequested = true;
-    cancelCount += 1;
+    cancelCount = attemptedCancelCount;
     const event = {
       event: 'cancel',
       at: new Date().toISOString(),
@@ -383,7 +417,7 @@ export async function watchDeployment({
       cancelCount,
       cancellationResult,
     };
-    await writeDiagnostic(event);
+    await emitDiagnostic(event);
     await onCancel(event);
     return true;
   };
