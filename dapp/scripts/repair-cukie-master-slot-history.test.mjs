@@ -69,7 +69,7 @@ test('fails closed on ambiguous linkage and legacy timestamp gaps', () => {
   assert.throws(() => assertNonEmptyRepairPlan(plan, { wallet, fromBlock: 1, toBlock: 2 }), /scope explicito/);
 });
 
-test('fails closed when the canonical temporal version is missing or timestamp-invalid', () => {
+test('fails closed when the canonical temporal version is missing or validFrom-invalid', () => {
   const event = withdrawal(150, 'withdrawal-missing-version');
   const job = { _id: 'job-missing-version', status: 'completed', route: 'nft', walletNormalized: wallet, sourceType: 'chain_event', sourceEventId: event._id, completedAt: at(151) };
   const position = positionEvent(job._id, 1);
@@ -77,7 +77,7 @@ test('fails closed when the canonical temporal version is missing or timestamp-i
     withdrawals: [event],
     jobs: [job],
     positionEvents: [position],
-    versions: [{ ...version(1), effectiveBlockTimestamp: undefined }],
+    versions: [{ ...version(1), validFrom: undefined }],
     checkpoint,
     vaultAddress: configuredVault,
     now: at(301),

@@ -114,6 +114,8 @@ function validTemporalVersion(version) {
   return version && typeof version._id === 'string' && typeof version.slotId === 'string' && version.route === 'nft'
     && Number.isSafeInteger(version.effectiveBlockNumber) && validHash(version.effectiveBlockHash)
     && version.effectiveBlockTimestamp instanceof Date && !Number.isNaN(version.effectiveBlockTimestamp.getTime())
+    && version.validFrom instanceof Date && !Number.isNaN(version.validFrom.getTime())
+    && (version.validUntil === undefined || (version.validUntil instanceof Date && !Number.isNaN(version.validUntil.getTime())))
     && version.slot && typeof version.slot._id === 'string' && Number.isSafeInteger(version.slot.revision);
 }
 
@@ -182,8 +184,8 @@ export function planSlotHistoryRepair({ withdrawals, positionEvents, jobs, versi
       if (candidates.length > 1) { mismatches.push({ code: 'CANONICAL_VERSION_REVISION_AMBIGUOUS', eventId: positionEvent._id, slotId }); continue; }
       if (candidates.length === 0) { mismatches.push({ code: 'CANONICAL_VERSION_REVISION_MISSING', eventId: positionEvent._id, slotId }); continue; }
       const original = candidates[0];
-      const validFrom = original?.validFrom instanceof Date && !Number.isNaN(original.validFrom.getTime()) ? original.validFrom : positionEvent.createdAt;
-      const validUntil = original?.validUntil instanceof Date && !Number.isNaN(original.validUntil.getTime()) ? original.validUntil : undefined;
+      const validFrom = original.validFrom;
+      const validUntil = original.validUntil;
       const correctedSlot = { ...positionEvent.nextSlot, sourceBlockNumber: withdrawal.blockNumber, sourceBlockHash: withdrawal.blockHash.toLowerCase(), sourceBlockTimestamp: triggerTime };
       const version = { _id: `repair:${positionEvent._id}`, slotId, route: 'nft', validFrom, ...(validUntil ? { validUntil } : {}), effectiveBlockNumber: withdrawal.blockNumber, effectiveBlockHash: withdrawal.blockHash.toLowerCase(), effectiveBlockTimestamp: triggerTime, observedAt: positionEvent.createdAt, slot: correctedSlot, createdAt: positionEvent.createdAt, repairSourceEventId: withdrawal._id, repairSourcePositionEventId: positionEvent._id, repairReason: 'confirmed_cukie_master_withdrawal' };
       const hash = payloadHash(version);
