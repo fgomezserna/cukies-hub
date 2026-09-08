@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -34,7 +34,10 @@ type RequestState =
   | { state: 'idle'; summary: null }
   | { state: 'loading'; summary: DashboardSummary | null }
   | { state: 'ready'; summary: DashboardSummary }
-  | { state: 'unavailable'; summary: null };
+  | { state: 'unavailable'; summary: DashboardSummary | null };
+
+const DASHBOARD_REFRESH_INTERVAL_MS = 30_000;
+const DASHBOARD_REQUEST_TIMEOUT_MS = 20_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -215,21 +218,57 @@ export function DashboardOverviewPanel() {
   const [reloadNonce, setReloadNonce] = useState(0);
   const hasSignedEvmSession = Boolean(user && walletType === 'evm');
   const walletNeedsSignature = Boolean(isConnected && !hasSignedEvmSession);
+  const sessionKey = hasSignedEvmSession && user?.walletAddress
+    ? `${walletType}:${user.walletAddress.toLowerCase()}`
+    : null;
+  const requestSummaryRef = useRef<DashboardSummary | null>(null);
+  requestSummaryRef.current = request.summary;
 
   useEffect(() => {
     if (authLoading) return;
-    if (!hasSignedEvmSession) {
+    if (!sessionKey || !user?.walletAddress) {
       setRequest({ state: 'idle', summary: null });
       return;
     }
-    const controller = new AbortController();
-    setRequest((current) => ({ state: 'loading', summary: current.summary }));
-    fetch('/api/dashboard/v1/summary', {
-      cache: 'no-store',
-      credentials: 'same-origin',
-      signal: controller.signal,
-    })
-      .then(async (response) => {
+    let disposed = false;
+    let requestInFlight = false;
+    let activeController: AbortController | null = null;
+    let activeTimeout: number | null = null;
+    let requestGeneration = 0;
+    let interval: number | null = null;
+    const walletNormalized = user.walletAddress.toLowerCase();
+    const retainedSummary = requestSummaryRef.current?.identity.walletNormalized.toLowerCase() === walletNormalized
+      ? requestSummaryRef.current
+      : null;
+
+    setRequest({ state: 'loading', summary: retainedSummary });
+
+    const refresh = async (initial = false) => {
+      if (disposed || requestInFlight || (!initial && document.visibilityState !== 'visible')) return;
+      requestInFlight = true;
+      const requestId = requestGeneration + 1;
+      requestGeneration = requestId;
+      const controller = new AbortController();
+      let timedOut = false;
+      const timeout = window.setTimeout(() => {
+        timedOut = true;
+        if (requestGeneration === requestId) {
+          requestInFlight = false;
+          activeController = null;
+          activeTimeout = null;
+          setRequest((current) => ({ state: 'unavailable', summary: current.summary }));
+        }
+        controller.abort();
+      }, DASHBOARD_REQUEST_TIMEOUT_MS);
+      activeController = controller;
+      activeTimeout = timeout;
+      setRequest((current) => ({ state: 'loading', summary: current.summary }));
+      try {
+        const response = await fetch('/api/dashboard/v1/summary', {
+          cache: 'no-store',
+          credentials: 'same-origin',
+          signal: controller.signal,
+        });
         const body: unknown = await response.json();
         if (
           !response.ok
@@ -237,16 +276,69 @@ export function DashboardOverviewPanel() {
           || body.status !== 'ok'
           || !isDashboardSummary(body.data)
         ) throw new Error('DASHBOARD_RESPONSE_INVALID');
+        if (disposed || timedOut || requestGeneration !== requestId) return;
+        if (body.data.identity.walletNormalized.toLowerCase() !== walletNormalized) {
+          throw new Error('DASHBOARD_RESPONSE_IDENTITY_MISMATCH');
+        }
         setRequest({ state: 'ready', summary: body.data });
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        setRequest({ state: 'unavailable', summary: null });
-      });
-    return () => controller.abort();
-  }, [authLoading, hasSignedEvmSession, reloadNonce]);
+      } catch (error: unknown) {
+        if (disposed || requestGeneration !== requestId || timedOut || (error instanceof DOMException && error.name === 'AbortError')) return;
+        setRequest((current) => ({ state: 'unavailable', summary: current.summary }));
+      } finally {
+        window.clearTimeout(timeout);
+        if (requestGeneration === requestId) {
+          activeTimeout = null;
+          requestInFlight = false;
+          activeController = null;
+        }
+      }
+    };
+    const stopPolling = () => {
+      if (interval !== null) {
+        window.clearInterval(interval);
+        interval = null;
+      }
+    };
+    const startPolling = () => {
+      stopPolling();
+      if (!disposed && document.visibilityState === 'visible') {
+        interval = window.setInterval(() => void refresh(), DASHBOARD_REFRESH_INTERVAL_MS);
+      }
+    };
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refresh();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
 
-  const summary = request.summary;
+    void refresh(true);
+    startPolling();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      disposed = true;
+      stopPolling();
+      if (activeTimeout !== null) window.clearTimeout(activeTimeout);
+      activeController?.abort();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [authLoading, reloadNonce, sessionKey, user?.walletAddress]);
+
+  const currentWalletNormalized = user?.walletAddress?.toLowerCase();
+  const summary = request.summary
+    && !authLoading
+    && hasSignedEvmSession
+    && currentWalletNormalized
+    && request.summary.identity.walletNormalized.toLowerCase() === currentWalletNormalized
+    ? request.summary
+    : null;
   const unavailableModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_UNAVAILABLE') ?? [];
   const reviewModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_DEGRADED') ?? [];
   const wrongChain = Boolean(summary && isConnected && chainId !== summary.network.chainId);
@@ -317,10 +409,17 @@ export function DashboardOverviewPanel() {
         ) : null}
 
         {request.state === 'unavailable' ? (
-          <div role="alert" className="mt-6 rounded-[8px] border border-red-400/30 bg-red-500/10 p-5">
-            <p className="font-black text-red-200">No podemos cargar tu cuenta ahora</p>
+          <div
+            role={summary ? 'status' : 'alert'}
+            className="mt-6 rounded-[8px] border border-red-400/30 bg-red-500/10 p-5"
+          >
+            <p className="font-black text-red-200">
+              {summary ? 'No hemos podido actualizar tu cuenta' : 'No podemos cargar tu cuenta ahora'}
+            </p>
             <p className="mt-1 text-sm font-semibold text-red-100/80">
-              Inténtalo de nuevo en unos instantes.
+              {summary
+                ? 'Mostramos la última lectura disponible. Inténtalo de nuevo en unos instantes.'
+                : 'Inténtalo de nuevo en unos instantes.'}
             </p>
           </div>
         ) : null}
@@ -332,9 +431,17 @@ export function DashboardOverviewPanel() {
                 {summary.identity.username || 'Tu cuenta'}
                 <span className="ml-2 font-semibold text-[var(--uki-muted)]">{shortWallet(summary.identity.walletNormalized)}</span>
               </p>
-              <p className={wrongChain ? 'text-xs font-black text-amber-200' : 'text-xs font-semibold text-[var(--uki-muted)]'}>
-                {wrongChain ? 'Cambia de red para continuar' : 'BNB Smart Chain'}
-              </p>
+              <div className="flex flex-col gap-1 sm:items-end">
+                <p className={wrongChain ? 'text-xs font-black text-amber-200' : 'text-xs font-semibold text-[var(--uki-muted)]'}>
+                  {wrongChain ? 'Cambia de red para continuar' : 'BNB Smart Chain'}
+                </p>
+                <time
+                  dateTime={summary.generatedAt}
+                  className="text-[11px] font-semibold text-[var(--uki-muted)]"
+                >
+                  Actualizado {new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(summary.generatedAt))}
+                </time>
+              </div>
             </div>
 
             {wrongChain ? (

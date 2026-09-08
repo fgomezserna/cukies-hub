@@ -210,5 +210,70 @@
       "activeLocks": 0,
       "expectedAvailableAfterMasterExclusion": 9
     }
+  },
+  "continuityFollowUp": {
+    "observedAt": "2026-09-08T14:05:00Z",
+    "servedCommit": "159e1e8af0f322df3f04ae59588989420d0a5d7f",
+    "scope": "Read-only comparison of the existing dashboard tab, fresh authenticated views and Stage runtime.",
+    "dashboardOldAllocatedSlots": 5,
+    "freshAllocatedSlots": 0,
+    "remainingCustodialNft": "98000002",
+    "remainingRarityPoints": 2,
+    "requiredRarityPointsPerSlot": 3,
+    "withdrawals": [
+      {
+        "tokenId": "98000006",
+        "blockNumber": 129842320,
+        "transactionHash": "0xf8a00ca5527b9c27e63d4bf2acd7660caefe1bc0f73c9e2c47e89e4a930692c3",
+        "indexedAt": "2026-09-08T13:53:07.502Z",
+        "recalculationCompletedAt": "2026-09-08T13:53:19.573Z"
+      },
+      {
+        "tokenId": "98000005",
+        "blockNumber": 129842496,
+        "transactionHash": "0xa84607ab2fae6cdc9789b4880af04218e76669f6bd6e6e1185a95c819d8553ad",
+        "indexedAt": "2026-09-08T13:54:31.115Z",
+        "recalculationCompletedAt": "2026-09-08T13:55:20.134Z"
+      }
+    ],
+    "slotDeactivationAt": "2026-09-08T13:55:19.992Z",
+    "runtime": {
+      "observedFrom": "2026-09-08T13:12:00Z",
+      "observedThrough": "2026-09-08T14:03:01Z",
+      "restarts": 0,
+      "oomKilled": false,
+      "completeRangesPerLoop": 77,
+      "rpcErrorsObserved": 0,
+      "isolatedCreditErrorAt": "2026-09-08T14:00:20Z",
+      "isolatedCreditErrorCode": "DOMAIN_CONFLICT",
+      "subsequentCreditRuns": "success"
+    },
+    "marketplace": {
+      "legacy": "ready",
+      "uki": "unavailable",
+      "cause": "Operational UKI marketplace deployment not evidenced; public/indexer runtime identity absent. Existing Stage address is an event fixture, not the operational marketplace.",
+      "deploymentVerified": false,
+      "stageFixtureAddress": "0x95780d891461e3183562B5D785f2D2c1c72ecE65",
+      "stageFixtureContract": "StagingCukiesMarketplaceSource",
+      "fixtureCodeMatchedOnChain": true,
+      "requiredContract": "CukiesMarketplace"
+    },
+    "finding": "Fresh Master and Credits are consistent with the new withdrawals; the existing Dashboard tab does not refresh automatically.",
+    "fixScope": "Refresh on focus/visibility and every 30s while visible; 20s request deadline, no overlap, identity isolation, visible update time and failed-refresh last-known data warning.",
+    "verificationCoordination": "https://github.com/fgomezserna/cukies-hub/issues/289#issuecomment-5586447371",
+    "limits": [
+      "No transactions or balance/ledger mutations performed by this audit.",
+      "The observed runtime interval does not certify indefinite stability."
+    ],
+    "localValidation": {
+      "dappLint": "passed",
+      "dappTypecheck": "passed",
+      "dappBuild": "passed",
+      "testSuites": 215,
+      "testsPassed": 1723,
+      "focusedPanelTestsPassed": 14,
+      "independentReview": "passed after correcting late JSON deadline race",
+      "diffCheck": "passed"
+    }
   }
 }
