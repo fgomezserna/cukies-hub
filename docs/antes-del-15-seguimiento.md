@@ -73,7 +73,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | D | **MIGRACION POR COMPLETAR**: migrar toda funcionalidad legacy al Hub con infraestructura nueva, auth, datos y contratos seguros; dejar de usar el repo antiguo. | Decision de producto e [inventario de migracion](legacy-marketplace/README.md); 2026-09-07: 14 contratos, 34 contenedores y 16 instancias de base. | Inventario registrado; seguir con importacion preview y paridad por flujos completos; coordinar [#160](https://github.com/fgomezserna/cukies-hub/issues/160); cero consumidores runtime antes de retirar. |
 | 1 | **EN PROGRAMA DE MIGRACION LEGACY**: bridge Tron -> BSC, con seguridad, E2E y fees dentro del alcance. | Decision de producto; 2026-09-07. | Revalidar fuente, relayer, rutas, fee y pausa; sin presentar el bridge como cerrado. |
 | 2A-C | **EVENTOS Y WORKER INTEGRADOS EN STAGING**: 14 contratos legacy y 10 perfiles nuevos cubiertos (75 + 87 relaciones contrato/evento); replay de breeding, CAS bridge y aislamiento verificados. 14/14 fuentes contrastadas live y pasada TRON 40/40 sin 429 con delay 2 s. Catalogo conjunto y UX publicados en PR #322 (8/09); la paridad de datos legacy sigue pendiente. | [PR #319](https://github.com/fgomezserna/cukies-hub/pull/319) integrada en `7d0d1ce`, codigo `fa708fd`; [validacion y limites](legacy-marketplace/evidence/2026-09-07-indexer-validation.json); 2026-09-07. Pruebas: indexer 84/84, Stage/Compose 63/63, produccion 14/14, typecheck/build correctos. | Resolver RPC de archivo BSC antes del backfill, provisionar destino dedicado, activar y reconciliar datos. Reconciliar lista/filtros/acciones ya implementados segun [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). Dapp Stage `7d0d1ce` verificada por health; rollout del indexador normal requirio completar identidades PRESALE/REWARDS (ver [configuracion](deployment-environments.md)). El worker legacy sigue inactivo y no se afirma paridad; main `fb2b190`. |
-| 3 | **EN STAGING, EN PRUEBAS · INCIDENTE DE HISTORIAL ABIERTO**: Cukie Master, creditos, pools, prestamos y rewards. La proyeccion actual de cupos cambia correctamente tras retirar, pero el corte de creditos NFT selecciona versiones activas antiguas. | 2026-09-08: QA pasa a 0 cupos a las 13:55 UTC; cortes NFT 14:00 y 14:30 emiten 500 cada uno. Repartidor Stage detenido temporalmente a las 14:44:12 UTC; indexador y Master siguen activos. [Evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Corregir y reconstruir historial con eventos confirmados, reconciliar cortes afectados sin reset ni cambios manuales de balances y reanudar/verificar el repartidor. Los cortes anteriores a las retiradas no se declaran erroneos. |
+| 3 | **EN STAGING, EN PRUEBAS · HISTORIAL Y PROYECCION REPARADOS, PARCHE DEL REPARTIDOR VALIDADO**: Cukie Master, creditos, pools, prestamos y rewards. | 2026-09-08 18:39 UTC, Stage `2620904`: selector real 5→4→0 NFT; UKI 0; dos repartos incorrectos excluidos de premios. Worker normal rematerializa la unica fuente afectada; las cuatro proyecciones NFT estan frescas y UI QA muestra 0 activos sin aviso. [Evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Creditos activos desde 18:13 UTC. NFT sigue bloqueado en el runtime anterior por incidentes historicos contenidos; parche `e02d394` validado con Mongo real y 1.737 tests. Integrar, desplegar y comprobar repartos NFT efectivos antes de cerrar [#326](https://github.com/fgomezserna/cukies-hub/issues/326). |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
 | 5 | **PUBLICADO EN STAGING · REFRESCO VERIFICADO · PRUEBAS UX ABIERTAS**: navegacion, cuenta, Master/creditos, juego y catalogo conjunto. Dashboard renueva automaticamente su lectura y descarta respuestas de otra identidad o fuera de plazo. | 2026-09-08, [PR #325](https://github.com/fgomezserna/cukies-hub/pull/325), Stage `78fb0f8`, deploy terminado 14:37:25 UTC. Pestaña original firmada: lectura `14:39:24.786Z` -> `14:40:24.781Z` sin pulsar Actualizar; 0 cupos coherentes con dos puntos restantes. [Verificacion](https://github.com/fgomezserna/cukies-hub/pull/325#issuecomment-5586923897), [evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Completar variantes/flujos UX. El incidente de repartos historicos se sigue en el punto 3. Marketplace UKI sin despliegue operativo acreditado/configuracion; Legacy responde. Esta comprobacion no certifica toda la migracion. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
@@ -973,71 +973,112 @@ items y 500 creditos. Los cortes de 13:00/13:30 son anteriores a las retiradas
 y no se clasifican como erroneos. UKI tiene una revision inactiva efectiva
 en `129802234`; no se afirma que todo su historico sea incorrecto.
 
-A las 14:44:12 UTC se detiene solo `competition-credit-scheduler` de app 28
-como contencion reversible. Se mantienen indexador y Master activos. No se
-borran documentos, runs, ledger ni balances. Para proteger los despliegues
-concurrentes, se fija tambien `COMPETITION_CREDITS_RUNTIME_ENABLED=false`
-en Coolify app 28; el compose deriva de ella el gate del scheduler. La
-reparacion y la restitucion de esta variable a `true` deben verificarse
-explicitamente. El alcance pendiente es corregir la escritura/lectura del
-historial, contrastar un dry-run apoyado en eventos confirmados y reconciliar
-los cortes afectados conservando trazabilidad de las emisiones previas.
+A las 14:44:12 UTC se detuvo solo `competition-credit-scheduler` de app 28
+como contencion reversible y se persistio `COMPETITION_CREDITS_RUNTIME_ENABLED=false`.
+El indexador y Master siguieron activos. Los cortes incorrectos contienen diez
+items: 1.000 creditos de prueba, 110 propios y 390 de pool por corte, sin
+consumo ni reserva de esos lotes. Se conservan las emisiones que ocurrieron,
+sus runs y ledger. El corte 14:00 habia caducado; el 14:30 caduca por el
+flujo normal tras reactivar el repartidor a las 18:13 UTC.
 
-El impacto NFT confirmado para QA son diez items de dos cortes, 1.000
-creditos de prueba (110 propios y 390 de pool por corte), sin consumo ni
-reserva de esos lotes. El corte 14:00 ya ha expirado; el 14:30 debe expirar
-por el proceso normal al reanudar. No hay nuevas emisiones despues de la
-contencion. Se preservan los runs y el ledger de lo que realmente se emitio;
-la correccion del historial debe impedir futuros repartos indebidos.
+Durante un despliegue paralelo, `/srv` llego al 100% (175G y cero espacio
+libre). Mongo registro `WiredTiger errno 28 / No space left on device` y
+`WT_PANIC`; tambien fallo Coolify DB. Esta caida de infraestructura es distinta
+del defecto de historial. Tras recuperar el servicio se observaron 23G
+libres. Cancelar el deploy `p4sso0c00wo8gk0ocgkc4484` libero aproximadamente
+1G; no se atribuyen a esa accion los otros 25G recuperados previamente, cuya
+causa no quedo establecida. Estas tareas no ejecutaron prune ni borraron datos.
 
-El candidato `0464fd8` supera lint, typecheck, build y 1.725 tests de la
-dapp. El dry-run real obtiene cinco correcciones con sus versiones
-originales presentes y cero ambiguedades: ordinal 5 en bloque 129842320 y
-ordinales 1–4 en 129842496. Se copian las transiciones de dominio ligadas a
-los jobs y retiradas, sin recalcular rareza con metadata actual. Pendientes
-lectura final del plan, apply, despliegue y reactivacion verificada. El
-script `849a9c1` obtiene revision independiente PASS y 4/4 tests focales;
-no infiere fechas si falta evidencia temporal. La lectura final queda
-interrumpida por perdida de resolucion DNS hacia Mongo y `coolify-db`
-durante el despliegue paralelo de assets. No se ha aplicado la reparacion
-a Mongo; la recuperacion de infraestructura se coordina con esa tarea. Su
-diagnostico confirma `/srv` al 100% (175G, sin espacio libre), con Mongo
-`WiredTiger errno 28 / No space left on device` y `WT_PANIC`. La causa de
-esta caida de infraestructura se distingue del defecto de historial.
-Tras la recuperacion, Mongo Stage, Coolify DB e indexador estan healthy y
-la API responde 200; se observan 23G libres (87% usado). Cancelar el deploy
-`p4sso0c00wo8gk0ocgkc4484` libera aproximadamente 1G; no se atribuyen a esa
-accion los otros 25G observados antes. No se han borrado datos ni ejecutado
-prune. El plan final del script `849a9c1` se repite con exito: cinco
-correcciones y cero ambiguedades. Se mantiene el gate false hasta disponer
-de margen de build, codigo correcto servido, apply y verificacion.
-La [PR #329](https://github.com/fgomezserna/cukies-hub/pull/329) se integra
-en staging `92eb725` a las 16:30:11 UTC. Para el rollout se prepara serializacion de builds
-con `COMPOSE_PARALLEL_LIMIT=1` en app28 y un guard cada 2–3 segundos que
-cancela por debajo de 10GiB libres. El preflight y la ventana unica se
-coordinan con el operador de infraestructura. El primer intento de ese SHA,
-`zgwww40k4k8wks4s0gcgco40`, queda cancelado por el guard a las 16:59:02 UTC
-con mas de 26 GiB libres, antes de sustituir el runtime. No se considera
-desplegado ni se ha aplicado la reparacion de Mongo.
+La [PR #329](https://github.com/fgomezserna/cukies-hub/pull/329) incorpora la
+correccion de historial y su reparador basado en eventos confirmados. La
+[PR #330](https://github.com/fgomezserna/cukies-hub/pull/330) excluye de
+`listCreditContributors` los runs con incidentes de integridad abiertos.
+Las ocho posiciones de pool historicas permanecen registradas: bloquearlas
+sin bloquear sus runs romperia la reconciliacion financiera. La
+[PR #331](https://github.com/fgomezserna/cukies-hub/pull/331) adapta el join
+`$lookup` a Mongo Stage 4.4.29 mediante `let/$expr`; la incompatibilidad de
+la primera variante se detecto antes de servirla o insertar incidentes.
+Los gates de accounting/publicacion de rewards estaban desactivados y
+permanecen asi; se observaron cero allocations, cierres, batches y proofs.
 
-La revision economica confirma ocho `credit_pool_positions` abiertas,
-390 por cada corte erroneo. Aunque los lotes caduquen, esas posiciones son
-fuente de `listCreditContributors` para futuros premios. Se observan cero
-cierres, allocations, batches y proofs; las dos fuentes de partidas existentes
-usan creditos propios de periodos anteriores. Los gates de accounting y
-publicacion de rewards ya estaban desactivados y se conservan asi. Se prepara
-una exclusion por incidentes de integridad abiertos, conservando posiciones,
-runs, lotes y ledger: bloquear solo las posiciones romperia su reconciliacion
-con los runs abiertos. La aplicacion de incidentes y su efecto real quedan
-pendientes de verificacion; no se presenta el helper inicial como operativo.
+Cuatro intentos de build quedaron cancelados antes de sustituir el runtime.
+En los dos ultimos se acredito un timeout de lectura API de Coolify de unos
+tres segundos con disco disponible, no otra caida de Mongo. Se ajusto la
+supervision: consulta API de hasta 15s, tolerancia acotada de 45s solo para
+disponibilidad y vigilancia independiente de disco cada 2,5s con minimo
+10GiB. Identidad/payload invalidos o un segundo build siguen cancelando.
+El despliegue unico `zck88go4sgk48owcsswkcgkw` termino a las 17:57:38 UTC,
+sin cancelaciones del guard, sirviendo `2620904915ce3522d22a74271c9e92dc9ec4bc03`.
+Health publico de staging verificado y Mongo/indexador/dapp healthy. Los
+checks del lote final son lint, typecheck, build y 215 suites / 1.725 tests;
+reparador de historial 4/4 y helper de incidentes 9/9.
 
-La consulta real del filtro detecta una incompatibilidad antes de aplicar
-incidentes: Mongo Stage devuelve `buildInfo.version=4.4.29` y rechaza combinar
-`$lookup.pipeline` con `localField/foreignField`. Se sustituye ese join por
-`let/$expr`, conservando run, tipo y estado. La consulta corregida pasa en
-Mongo real a las 17:22:27 UTC: 390 para QA en cada uno de los periodos 13:30,
-14:00 y 14:30, sin incidentes insertados ni otras escrituras. Tras el append,
-debera conservar 13:30 y excluir exclusivamente los dos cortes erroneos.
+A las 17:58–18:00 UTC se ejecuto el plan congelado
+`da5c561d99fdb5d9fd4c87b7392573f402654f1a946b39211b0a0107074f2026`:
+cinco nuevas versiones de reparacion, sin modificar las filas originales.
+La consulta historica pasa de cinco cupos activos en todos los cortes a
+5 antes de la primera retirada, 4 en bloque 129842320 y 0 desde 129842496,
+incluido el corte 14:00 y el ultimo bloque seguro. UKI sigue en 0. El replay
+inserta cero y reconoce cinco existentes. Se conservan las mismas huellas
+de las 54 versiones QA originales, los 1.008 asientos QA y la proyeccion
+actual completa. Las ventanas temporales antiguas con `temporalWindowValid=false`
+se conservan como evidencia; esta reparacion corrige la seleccion por bloque
+y no normaliza retrospectivamente todas las fechas historicas.
+
+Se insertan dos incidentes `SOURCE_SLOT_HISTORY_CORRECTED` mediante plan
+`55bfd468f859ca1ecc6c01e0c15d3652d152563721426b74420c7047f84934b9`;
+el replay inserta cero. La agregacion real de Mongo a las 18:00:42 UTC
+conserva los 390 de pool del corte legitimo 13:30 y excluye los 390 de cada
+corte incorrecto 14:00/14:30. Las filas financieras siguen intactas y no
+se ha materializado ningun premio de esos cortes. Los incidentes quedan
+abiertos para mantener esa exclusion; resolverlos requiere reconciliar
+antes su efecto en premios.
+
+A las 18:00 UTC se restituye solo la variable de creditos a `true` en Coolify
+app 28. El despliegue normal `cgw8gc40ook0socwsww0s48c` termina a las
+18:13:05 UTC con el mismo SHA y el gate efectivo activo. Los ticks posteriores
+avanzan UKI y caducan normalmente los 110 propios y 390 de pool pendientes,
+sin nuevos grants para QA. **NFT sigue bloqueado con `DOMAIN_CONFLICT`**;
+el status success del tick no certifica el resultado de ambas rutas.
+
+La comprobacion de UI detecto `projectionFresh=false`: PR #329 incorpora
+la evidencia de la ultima retirada al sourceHash, pero la proyeccion
+preservada conservaba el hash anterior. El worker Master estaba activo;
+los jobs anteriores ya completados y la reconciliacion completa cada 24h
+no programaban una recalculacion inmediata. Se inventariaron las cuatro
+proyecciones NFT: solo una necesitaba rematerializacion. El plan
+`0a040ce4dcef468be7bdc3acba95d3a7bfe5a3d714adb1eca85c8bfe305f25e4`
+inserto un job determinista a las 18:33:57 UTC y el worker normal lo
+completo a las 18:34:11 UTC. Replay antes y despues de completarse:
+cero inserciones y un job existente. No se reabrieron jobs completados
+ni se editaron cupos directamente. La precondicion del hash antiguo se
+comprobo dentro de la transaccion; no es un CAS de la posicion, y el
+worker vuelve a leer la fuente actual al procesar el job.
+
+A las 18:39:10 UTC las cuatro fuentes estaban completas y sus proyecciones
+frescas; no se proponia ningun job adicional. QA conserva cero cupos y
+el selector historico 5→4→0 NFT / UKI 0. La UI firmada de `/cukie-master`
+muestra 0 activos, 0 creditos diarios y ya no presenta el aviso de
+materializacion. La rematerializacion normal añade cinco versiones y
+la caducidad normal añade dos asientos: la igualdad de hashes descrita
+arriba corresponde exclusivamente a la reparacion previa a reactivar.
+
+El `DOMAIN_CONFLICT` restante procede de `readSnapshotGate`: cualquier
+incidente abierto bloqueaba todos los cortes nuevos de su ruta. Los dos
+incidentes historicos deben seguir abiertos para excluir sus aportaciones
+de premios. El parche `e02d394` permite solo cortes estrictamente posteriores
+cuando el incidente tiene exclusivamente `SOURCE_SLOT_HISTORY_CORRECTED`,
+la contencion exacta del selector de premios, selectorCutoff 0 y metadatos
+validos de run, periodo, plan y evidencia. Incidentes normales, ambiguos,
+invalidos o del mismo corte siguen bloqueando; los otros gates se conservan.
+
+Prueba de los repositorios actuales contra Mongo real a las 18:38:20 UTC,
+solo lectura: dos bloqueos para 14:00, uno para 14:30 y cero desde 15:00.
+El lector de premios conserva 390 para 13:30 y excluye 14:00/14:30 con cero
+contribuciones. Checks finales del parche: 56 focales, 215 suites / 1.737
+tests, lint, typecheck y build PASS. Falta integrar y desplegar este ultimo
+parche, y verificar nuevos repartos NFT reales con cero grants QA;
+[#326](https://github.com/fgomezserna/cukies-hub/issues/326) sigue abierta.
 
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 

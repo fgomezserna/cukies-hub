@@ -396,6 +396,9 @@ export type CreditIntegrityIncident = {
   walletNormalized: string | null;
   reasonCodes: string[];
   evidenceHash: string;
+  containment?: string;
+  selectorCutoff?: number;
+  planHash?: string;
   detectedAt: Date;
   updatedAt: Date;
 };

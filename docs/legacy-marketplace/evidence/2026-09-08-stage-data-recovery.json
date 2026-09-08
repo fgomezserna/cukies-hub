@@ -291,7 +291,7 @@
   },
   "creditCutoffFollowUp": {
     "observedAt": "2026-09-08T14:44:19Z",
-    "status": "open",
+    "status": "history and NFT projection repaired; contained historical incident gate patch validated, deployment and actual NFT runs pending",
     "qaNftCutoffs": [
       {
         "cutoff": "2026-09-08T14:00:00Z",
@@ -307,7 +307,7 @@
         "expectedItemsAfterWithdrawals": 0
       }
     ],
-    "finding": "Current slot projection is inactive but cutoff selection still uses prior active NFT slot versions. Historical grants require reconciliation, not classification as legitimate retained balances.",
+    "finding": "Confirmed withdrawal-linked corrections now produce 5→4→0 active NFT slots. Actual prior erroneous emissions remain auditable; two open integrity incidents exclude their pool positions from reward contribution selection.",
     "legitimatePriorNftCuts": [
       "2026-09-08T13:00:00Z",
       "2026-09-08T13:30:00Z"
@@ -318,17 +318,19 @@
       "stoppedAt": "2026-09-08T14:44:12.213196274Z",
       "previousRunning": true,
       "scope": "Stage app28 competition-credit-scheduler only",
-      "restoreRequired": true,
+      "restoreRequired": false,
       "persistedRuntimeGate": {
         "id": 1310,
         "key": "COMPETITION_CREDITS_RUNTIME_ENABLED",
         "previous": "true",
-        "current": "false",
-        "restoreRequired": true
+        "current": "true",
+        "restoreRequired": false,
+        "restoredAt": "2026-09-08T18:00Z",
+        "activation": "confirmed in runtime after normal Coolify deployment cgw8gc40ook0socwsww0s48c"
       }
     },
     "dataMutationsDuringAudit": false,
-    "nextStep": "Guarded event-backed history repair dry-run; fix and deploy, reconcile affected cuts, resume scheduler and verify.",
+    "nextStep": "Merge and deploy the validated snapshot gate patch, then verify actual NFT catchup, zero QA grants after withdrawals, reward exclusion and signed UI.",
     "issue": "https://github.com/fgomezserna/cukies-hub/issues/326",
     "impactAudit": {
       "qaAffectedNftRuns": 2,
@@ -339,11 +341,11 @@
       "consumptionOrReservationFromAffectedNftCuts": 0,
       "emissionsAfterContainment": 0,
       "normalExpiryMinutes": 30,
-      "status": "14:00 expired; 14:30 pending normal expiry while scheduler paused",
+      "status": "Both affected cuts expired normally after resumption; own available 0 and pool available 0, no consumption or manual balance edits.",
       "ledgerPolicy": "Preserve actual emissions and ledger; append canonical slot history corrections, then verify normal expiry and zero new QA grants.",
       "recordedAt": "2026-09-08T15:16:05.669233+00:00",
       "rewardPropagation": {
-        "checkedAt": "2026-09-08T16:41:00Z",
+        "checkedAt": "2026-09-08T18:00:42.698Z",
         "poolPositions": 8,
         "poolCreditsPerAffectedRun": 390,
         "materializedDailyClosures": 0,
@@ -355,9 +357,9 @@
         "weeklyGameSources": 2,
         "weeklySourcesScope": "own credit, before 14:00; no link to erroneous pool grants",
         "runtimeRewardGates": "false pre-existing; unchanged",
-        "futureRisk": "open pool positions remain a reward contributor source after lot expiry",
+        "futureRisk": "Contained while the two integrity incidents remain open; do not resolve them without reconciling the effect on reward contributors.",
         "proposedContainment": "append two integrity incidents and exclude runs with open credit_reconciliation_mismatch incidents in reward contributor selection; preserve existing financial records",
-        "applied": false,
+        "applied": true,
         "evidence": "/tmp/cukies-pool-rewards-impact-batch-result.json",
         "compatibility": {
           "serverVersion": "4.4.29",
@@ -372,9 +374,163 @@
           },
           "writes": 0,
           "evidence": "/tmp/cukies-pool-live-baseline.json",
-          "afterIncidentVerification": "pending"
+          "afterIncidentVerification": {
+            "generatedAt": "2026-09-08T18:00:42.698Z",
+            "results": [
+              {
+                "cutoff": "2026-09-08T13:30:00.000Z",
+                "originalQaUnits": 390,
+                "filteredQaUnits": 390,
+                "originalOtherHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "filteredOtherHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "originalContributors": 1,
+                "filteredContributors": 1
+              },
+              {
+                "cutoff": "2026-09-08T14:00:00.000Z",
+                "originalQaUnits": 390,
+                "filteredQaUnits": 0,
+                "originalOtherHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "filteredOtherHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "originalContributors": 1,
+                "filteredContributors": 0
+              },
+              {
+                "cutoff": "2026-09-08T14:30:00.000Z",
+                "originalQaUnits": 390,
+                "filteredQaUnits": 0,
+                "originalOtherHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "filteredOtherHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+                "originalContributors": 1,
+                "filteredContributors": 0
+              }
+            ]
+          }
+        },
+        "containment": "Two open SOURCE_SLOT_HISTORY_CORRECTED integrity incidents; deployed reader excludes runs with open credit_reconciliation_mismatch incidents. Existing financial rows preserved.",
+        "incidentExecution": {
+          "planHash": "55bfd468f859ca1ecc6c01e0c15d3652d152563721426b74420c7047f84934b9",
+          "helperSha256": "5afb696c3d76b6595fd622267d7787193e8b3d08800cf0940b0b3d24dfe38d51",
+          "observedAt": "2026-09-08T18:00:27.961276+00:00",
+          "firstInsertCount": 2,
+          "replayInsertCount": 0,
+          "incidentIds": [
+            "e8529b28ee40974ca0447429167ca43c7c480bb7130f882bd2b781694cca5b5d",
+            "8593d00e653cc073b79280a0b80c483d4a6df3ce9ce9994c7c5a2ce5a4e8a12d"
+          ],
+          "affectedRuns": [
+            {
+              "_id": "710889cdd9bf6d6e29dbcbecb2ed9fef345b885d8581d05fdbe2d6eb0ae3d38c",
+              "runId": "710889cdd9bf6d6e29dbcbecb2ed9fef345b885d8581d05fdbe2d6eb0ae3d38c",
+              "route": "nft",
+              "status": "open",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T14:00:00.000Z",
+              "cutoff": "2026-09-08T14:00:00.000Z",
+              "nextCutoff": "2026-09-08T14:30:00.000Z",
+              "settlementPeriodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T14:00:00.000Z"
+            },
+            {
+              "_id": "f14223f6525d83b0a18bb3c3818db0f1472822522c1ebe3ec82a92c01361189c",
+              "runId": "f14223f6525d83b0a18bb3c3818db0f1472822522c1ebe3ec82a92c01361189c",
+              "route": "nft",
+              "status": "open",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T14:30:00.000Z",
+              "cutoff": "2026-09-08T14:30:00.000Z",
+              "nextCutoff": "2026-09-08T15:00:00.000Z",
+              "settlementPeriodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T14:30:00.000Z"
+            }
+          ],
+          "protectedCountsAfter": {
+            "competition_credit_runs": 110,
+            "competition_credit_run_items": 420,
+            "competition_credit_run_holds": 0,
+            "competition_credit_ledger": 1451,
+            "competition_credit_lots": 420,
+            "competition_credit_pool_lots": 167,
+            "competition_credit_account_periods": 69,
+            "competition_credit_pool_periods": 17,
+            "competition_credit_reservations": 2,
+            "credit_pool_positions": 167,
+            "cukie_master_slots": 8,
+            "cukie_master_slot_versions": 63
+          },
+          "rewardCountsAfter": {
+            "reward_daily_accounting": 0,
+            "reward_weekly_prize_accounting": 0,
+            "reward_daily_capacity_materializations": 0,
+            "reward_accounting_allocations": 0,
+            "reward_allocations": 0,
+            "reward_pool_accruals": 0,
+            "reward_claim_batches": 0,
+            "reward_claim_proofs": 0,
+            "reward_claims": 0,
+            "reward_publication_plans": 0,
+            "reward_source_manifests": 0,
+            "reward_pool_tranche_accounting": 0
+          },
+          "selectorHistory": [
+            {
+              "runId": "710889cdd9bf6d6e29dbcbecb2ed9fef345b885d8581d05fdbe2d6eb0ae3d38c",
+              "cutoff": "2026-09-08T14:00:00.000Z",
+              "cutoffBlockNumber": 129843288,
+              "qaSlots": 5,
+              "eligibleSlots": 0
+            },
+            {
+              "runId": "f14223f6525d83b0a18bb3c3818db0f1472822522c1ebe3ec82a92c01361189c",
+              "cutoff": "2026-09-08T14:30:00.000Z",
+              "cutoffBlockNumber": 129847288,
+              "qaSlots": 5,
+              "eligibleSlots": 0
+            }
+          ],
+          "mutationScope": "Insert-only incidents; no manual balance, lot, position or run status changes."
         }
-      }
+      },
+      "expiryAfterResumption": [
+        {
+          "cutoff": "2026-09-08T14:00:00.000Z",
+          "ownLots": {
+            "count": 5,
+            "blocked": 0,
+            "total": 500,
+            "available": 0,
+            "reserved": 0,
+            "spent": 0,
+            "expired": 110
+          },
+          "poolLots": {
+            "count": 4,
+            "blocked": 0,
+            "total": 390,
+            "available": 0,
+            "reserved": 0,
+            "spent": 0,
+            "expired": 390
+          }
+        },
+        {
+          "cutoff": "2026-09-08T14:30:00.000Z",
+          "ownLots": {
+            "count": 5,
+            "blocked": 0,
+            "total": 500,
+            "available": 0,
+            "reserved": 0,
+            "spent": 0,
+            "expired": 110
+          },
+          "poolLots": {
+            "count": 4,
+            "blocked": 0,
+            "total": 390,
+            "available": 0,
+            "reserved": 0,
+            "spent": 0,
+            "expired": 390
+          }
+        }
+      ]
     },
     "repairCandidate": {
       "codeCommit": "0464fd8793c09b663e9e03ed8ad1815f9cde19a0a0",
@@ -391,7 +547,7 @@
         "scriptSha256": "1a06362cab2851a154b8a612ec1172598578de89c3af087dc1d26f02acbf7dff"
       },
       "allOriginalVersionsPresent": true,
-      "applied": false,
+      "applied": true,
       "validation": {
         "lint": "passed",
         "typecheck": "passed",
@@ -418,7 +574,8 @@
       },
       "mergedCommit": "92eb725b78b596d77ad3ec1d8081a48515ebd36b",
       "mergedAt": "2026-09-08T16:30:11Z",
-      "deployed": false
+      "deployed": true,
+      "deployedCommit": "2620904915ce3522d22a74271c9e92dc9ec4bc03"
     },
     "infrastructureInterruption": {
       "recordedAt": "2026-09-08T15:40:08.619231+00:00",
@@ -429,7 +586,7 @@
       ],
       "repairWrites": 0,
       "owner": "Parallel assets deployment task investigating infrastructure; root avoids concurrent server changes",
-      "status": "runtime recovered; new build held pending disk peak mitigation",
+      "status": "infrastructure recovered; credits active since 18:13:05Z; contained historical NFT gate patch still pending deployment",
       "rootCause": "VM1001 /srv filesystem full: 175G total, zero available; Mongo WiredTiger errno28 / No space left on device with WT_PANIC.",
       "confirmedBy": "Parallel infrastructure owner 01a0817d-b179-7ba0-aa3e-bbeca0d0dc0a",
       "updatedAt": "2026-09-08T16:02:14.554982+00:00",
@@ -445,25 +602,260 @@
         "cancelReleasedApproximately": "1G (22G before, 23G after)",
         "earlierSpaceRecoveryCause": "not established; no cleanup performed by these tasks",
         "pruneOrDataDeletionPerformed": false
-      }
+      },
+      "statusUpdatedAt": "2026-09-08T18:48:21Z"
     },
     "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/329",
     "buildMitigation": {
       "scope": "Coolify app28 only",
       "configuration": "COMPOSE_PARALLEL_LIMIT=1 as build-time environment variable",
       "mechanism": "Coolify build-time.env passed via --env-file; installed Compose consumes MaxConcurrency",
-      "guard": "sample disk every 2-3s; cancel if free space below 10GiB",
-      "status": "approved; awaiting operator preflight before one controlled deployment",
-      "creditsGate": "false until repaired history and correct deployed code verified",
+      "guard": "Independent disk probe every 2.5s, floor 10GiB; API request budget 15s and bounded 45s availability tolerance, immediate invalid-identity/payload/concurrent-build rejection",
+      "status": "code deployment and same-SHA credit activation finished; final gate patch deployment pending",
+      "creditsGate": "restored true and verified effective at 18:13:05Z; do not pause again for the final code deployment",
       "assetsWorker": "contained by deployment operator; backfill not part of this repair",
       "latestAttempt": {
-        "deploymentUuid": "zgwww40k4k8wks4s0gcgco40",
-        "commit": "92eb725b78b596d77ad3ec1d8081a48515ebd36b",
-        "status": "cancelled-by-user",
-        "cancelledAt": "2026-09-08T16:59:02Z",
-        "reportedDiskFree": "greater than 26 GiB throughout",
-        "runtimeReplaced": false,
-        "reason": "guard cancellation; precise probe failure under investigation by sole operator"
+        "deploymentUuid": "zck88go4sgk48owcsswkcgkw",
+        "commit": "2620904915ce3522d22a74271c9e92dc9ec4bc03",
+        "finishedAt": "2026-09-08T17:57:38Z",
+        "publicHealthVerifiedAt": "2026-09-08T17:58Z",
+        "publicHealth": {
+          "status": "ok",
+          "environment": "staging",
+          "gitSha": "2620904915ce3522d22a74271c9e92dc9ec4bc03"
+        },
+        "pullRequests": [
+          329,
+          330,
+          331
+        ],
+        "guardCancellationCount": 0
+      }
+    },
+    "updatedAt": "2026-09-08T18:03:57.302027+00:00",
+    "repairExecution": {
+      "firstApply": {
+        "mode": "apply",
+        "database": "cukieshub-new-staging",
+        "chainId": 97,
+        "checkpoint": {
+          "safeBlockNumber": 129875087,
+          "safeBlockHash": "0xf4d0698046f8801b5a69a96dce57093754d3a5572f85a2b141261e5f5cdf9e99"
+        },
+        "plannedCorrections": 5,
+        "mismatches": [],
+        "invalidWithdrawals": 0,
+        "outOfScopeWithdrawals": 7,
+        "writes": {
+          "slotVersionsInserted": 5
+        },
+        "scope": [
+          "cukie_master_slot_versions"
+        ],
+        "untouched": [
+          "competition_credit_runs",
+          "competition_credit_run_items",
+          "competition_credit_ledger",
+          "cukie_master_slots",
+          "competition_credit_lots",
+          "competition_credit_pool_lots"
+        ],
+        "planHash": "da5c561d99fdb5d9fd4c87b7392573f402654f1a946b39211b0a0107074f2026",
+        "result": {
+          "inserted": 5,
+          "existing": 0
+        },
+        "observedAt": "2026-09-08T17:59:41.702183+00:00"
+      },
+      "idempotentReplay": {
+        "inserted": 0,
+        "existing": 5
+      },
+      "cutoffActiveNftBefore": {
+        "129842319": 5,
+        "129842320": 5,
+        "129842496": 5,
+        "129843288": 5,
+        "safeActual": 5
+      },
+      "cutoffActiveNftAfter": {
+        "129842319": 5,
+        "129842320": 4,
+        "129842496": 0,
+        "129843288": 0,
+        "safeActual": 0
+      },
+      "ukiActiveAtAllVerifiedCutoffs": 0,
+      "unchangedHistoricalVersions": {
+        "count": 54,
+        "hash": "609e283cbe83b44d2123c81482a5014d3f3899fce07d7049c655bc552483da49"
+      },
+      "unchangedQaLedger": {
+        "count": 1008,
+        "hash": "ccbd99c15ddd4b5a8012f92b73f1574b15526b196937998b0d997f110e50ac22"
+      },
+      "unchangedCurrentProjectionHash": "0974574ac5ad9dda428879ff72b9b707d8dd3e5d0af3f5013dcabbf22bf23a14",
+      "mutationScope": "Five new deterministic repair slot-version records; no update/delete of existing rows, slots, runs, financial ledger, lots or balances.",
+      "temporalWindowScope": "Pre-existing temporalWindowValid=false rows preserved; correction verified for block-based cutoff selection, not a normalization of all historical time windows."
+    },
+    "runtimeDeployment": {
+      "deploymentUuid": "zck88go4sgk48owcsswkcgkw",
+      "commit": "2620904915ce3522d22a74271c9e92dc9ec4bc03",
+      "finishedAt": "2026-09-08T17:57:38Z",
+      "publicHealthVerifiedAt": "2026-09-08T17:58Z",
+      "publicHealth": {
+        "status": "ok",
+        "environment": "staging",
+        "gitSha": "2620904915ce3522d22a74271c9e92dc9ec4bc03"
+      },
+      "pullRequests": [
+        329,
+        330,
+        331
+      ],
+      "guardCancellationCount": 0
+    },
+    "runtimeActivation": {
+      "deploymentUuid": "cgw8gc40ook0socwsww0s48c",
+      "commit": "2620904915ce3522d22a74271c9e92dc9ec4bc03",
+      "finishedAt": "2026-09-08T18:13:05Z",
+      "runtimeEnabled": true,
+      "guardCancellationCount": 0,
+      "observedAt": "2026-09-08T18:14:20.672Z",
+      "lastSuccessAt": "2026-09-08T18:14:07.593Z",
+      "latestRoutes": [
+        {
+          "route": "uki",
+          "status": "open",
+          "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T16:00:00.000Z",
+          "creditRunId": "a345a425ecb0595b43022cbe894357c4edc9edfa92669ff64f31868eb2698fb7",
+          "batchesProcessed": 1,
+          "itemsApplied": 2,
+          "pendingItems": 0,
+          "warningCode": "SNAPSHOT_LATE"
+        },
+        {
+          "route": "nft",
+          "status": "blocked",
+          "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-08T18:00:00.000Z",
+          "creditRunId": "",
+          "batchesProcessed": 0,
+          "itemsApplied": 0,
+          "pendingItems": 0,
+          "errorCode": "DOMAIN_CONFLICT"
+        }
+      ],
+      "qaItemsSince1500": 0,
+      "qaGrantSince1500": 0,
+      "status": "active, UKI catchup progressing; NFT blocked DOMAIN_CONFLICT, not declared recovered"
+    },
+    "operationalFollowUp": {
+      "observedAt": "2026-09-08T18:39:10.047Z",
+      "masterProjection": "All four existing NFT sources complete and projectionFresh true; only one required rematerialization. QA has zero slots and no pending-materialization UI warning.",
+      "masterWorker": "Enabled; one deterministic new full-reconciliation job completed normally, no completed jobs reopened.",
+      "creditRoute": "NFT still blocked in served 2620904 by historical open incidents. Candidate e02d394 scopes the bypass to strictly later snapshots with validated containment metadata.",
+      "jobWrites": 1,
+      "rematerialization": {
+        "planHash": "0a040ce4dcef468be7bdc3acba95d3a7bfe5a3d714adb1eca85c8bfe305f25e4",
+        "helperSha256": "ab487194e9b9ea66b17534676e8cd22531bb3a9c8d809fc8423f1ae7a217ea40",
+        "bundleSha256": "2f7cc19dac8817c0cab1235bfab7536acda6d99311b3d1859df4caf3b9665e49",
+        "jobId": "full-reconciliation:upgrade-2620904:0x26789b9743d187174c3e3a87729730824a4d0c13:nft",
+        "insertedAt": "2026-09-08T18:33:57.204Z",
+        "completedAt": "2026-09-08T18:34:11.362Z",
+        "attempts": 1,
+        "replays": {
+          "beforeCompletionInserted": 0,
+          "afterCompletionInserted": 0,
+          "existing": 1
+        },
+        "preconditionScope": "Old source hash checked inside snapshot transaction, not strict CAS of position; normal worker rereads current source.",
+        "allFourSourcesComplete": true,
+        "allFourProjectionsFresh": true,
+        "additionalJobsRequired": 0,
+        "qaSourceHash": "974bc4e27b0e969bde2309eae207eea079dc9459908e9dba590df2783e20ec4e",
+        "qaDesiredSlots": 0,
+        "qaAllocatedSlots": 0,
+        "qaProtectedSlots": 0,
+        "normalWorkerNewVersions": 5,
+        "normalExpiryNewLedgerEntries": 2,
+        "historicalSelectorPreserved": {
+          "nft": [
+            5,
+            4,
+            0
+          ],
+          "uki": 0
+        },
+        "ui": {
+          "route": "/cukie-master",
+          "signedQaWallet": true,
+          "activeSlots": 0,
+          "dailyCredits": 0,
+          "materializationWarning": false
+        }
+      }
+    },
+    "historicalIncidentGatePatch": {
+      "codeCommit": "e02d39492238cd1b496058ae46ffb016a0de99ae",
+      "deployed": false,
+      "scope": "Only strictly later credit snapshots bypass fully validated historical SOURCE_SLOT_HISTORY_CORRECTED containment. Incidents remain open and reward reader exclusion remains unchanged.",
+      "checks": {
+        "focusedTests": 56,
+        "testSuites": 215,
+        "tests": 1737,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "build": "PASS"
+      },
+      "realMongoReadOnlyVerification": {
+        "verifiedAt": "2026-09-08T18:38:20.277Z",
+        "writes": 0,
+        "gateCode": "current candidate repository and shared incident predicate",
+        "database": "cukieshub-new-staging",
+        "gates": [
+          {
+            "cutoff": "2026-09-08T14:00:00.000Z",
+            "openIntegrityIncidents": 2,
+            "activeRuleMatches": true,
+            "maturedQualifyingSlots": 0
+          },
+          {
+            "cutoff": "2026-09-08T14:30:00.000Z",
+            "openIntegrityIncidents": 1,
+            "activeRuleMatches": true,
+            "maturedQualifyingSlots": 0
+          },
+          {
+            "cutoff": "2026-09-08T15:00:00.000Z",
+            "openIntegrityIncidents": 0,
+            "activeRuleMatches": true,
+            "maturedQualifyingSlots": 0
+          },
+          {
+            "cutoff": "2026-09-08T18:30:00.000Z",
+            "openIntegrityIncidents": 0,
+            "activeRuleMatches": true,
+            "maturedQualifyingSlots": 0
+          }
+        ],
+        "contributions": [
+          {
+            "cutoff": "2026-09-08T13:30:00.000Z",
+            "qaUnits": 390,
+            "contributorCount": 1
+          },
+          {
+            "cutoff": "2026-09-08T14:00:00.000Z",
+            "qaUnits": 0,
+            "contributorCount": 0
+          },
+          {
+            "cutoff": "2026-09-08T14:30:00.000Z",
+            "qaUnits": 0,
+            "contributorCount": 0
+          }
+        ],
+        "bundleSha256": "d7df951e009eda74d03f9572e040e168d4bb5e671f257350b011ec3e4aa28544"
       }
     }
   }

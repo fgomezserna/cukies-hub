@@ -13,6 +13,7 @@ import {
 } from "@/lib/uki-economy/credits/testing";
 import type {
   CompetitionCreditRun,
+  CreditIntegrityIncident,
   CreditLot,
   CreditSnapshotSlot,
 } from "@/lib/uki-economy/credits/types";
@@ -147,6 +148,71 @@ function replaceWithFragmentedLots(input: {
     });
   }
   return lots;
+}
+
+function historicalSlotHistoryIncident(
+  run: CompetitionCreditRun,
+  overrides: Partial<CreditIntegrityIncident> = {},
+): CreditIntegrityIncident {
+  return {
+    _id: `incident:${run.runId}`,
+    incidentId: `incident:${run.runId}`,
+    type: "credit_reconciliation_mismatch",
+    status: "open",
+    runId: run.runId,
+    route: run.route,
+    periodId: run.period.periodId,
+    walletNormalized: null,
+    reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED"],
+    evidenceHash: "b".repeat(64),
+    containment: "pool_positions_excluded_by_reward_contributor_selector",
+    selectorCutoff: 0,
+    planHash: "a".repeat(64),
+    detectedAt: new Date("2026-07-10T12:01:00.000Z"),
+    updatedAt: new Date("2026-07-10T12:01:00.000Z"),
+    ...overrides,
+  };
+}
+
+function nftRepositoryForFlow() {
+  const repository = new MemoryCompetitionCreditRepository({
+    slots: [slot({ route: "nft", _id: "nft-slot-1" })],
+  });
+  const sourceHash = buildCreditSourceSlotsHash(repository.state.slots);
+  const watermark = testCreditSourceWatermark({
+    _id: "cukie-master-slots:nft",
+    route: "nft",
+    sourceHash,
+    slotCount: 1,
+  });
+  repository.state.watermark = watermark;
+  repository.state.sourceHealth = {
+    ...repository.state.sourceHealth,
+    observedThrough: watermark.observedThrough,
+    sourceRuleVersions: watermark.sourceRuleVersions,
+    evidenceHash: watermark.healthEvidenceHash,
+    canonicalSafeBlock: watermark.canonicalSafeBlock,
+    canonicalSafeBlockHash: watermark.canonicalSafeBlockHash,
+    checkedAt: watermark.updatedAt,
+  };
+  return repository;
+}
+
+async function setupNftHistoricalIncident() {
+  const repository = nftRepositoryForFlow();
+  const service = createCompetitionCreditService(
+    createMemoryCompetitionCreditRunner(repository),
+  );
+  const first = await openDailyRun({ repository, service, route: "nft" });
+  repository.state.incidents.push(historicalSlotHistoryIncident(first));
+  const nextCutoff = new Date("2026-07-11T12:00:00.000Z");
+  repository.state.sourceHealth.observedThrough = nextCutoff;
+  await service.refreshSourceWatermark({
+    route: "nft",
+    expectedRuleVersion: "credits-v1",
+    now: new Date(nextCutoff.getTime() + 1_000),
+  });
+  return { repository, service, first, nextCutoff };
 }
 
 describe("competition credit grant -> pool -> reservation flow", () => {
@@ -1697,6 +1763,66 @@ describe("competition credit grant -> pool -> reservation flow", () => {
         now: new Date("2026-07-10T11:00:00.000Z"),
       })
     ).rejects.toThrow(/solapadas/);
+  });
+
+  it("allows a later NFT snapshot while keeping a contained correction open", async () => {
+    const { repository, service, nextCutoff } = await setupNftHistoricalIncident();
+
+    const next = await openDailyRun({
+      repository,
+      service,
+      route: "nft",
+      cutoff: nextCutoff,
+      now: new Date(nextCutoff.getTime() + 60_000),
+    });
+
+    expect(next.period.cutoff).toEqual(nextCutoff);
+    expect(repository.state.incidents).toEqual([
+      expect.objectContaining({
+        status: "open",
+        reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED"],
+        containment: "pool_positions_excluded_by_reward_contributor_selector",
+      }),
+    ]);
+  });
+
+  it.each([
+    ["normal reason", { reasonCodes: ["RUNTIME_RUN_INVALID"] }],
+    ["mixed reasons", { reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED", "RUNTIME_RUN_INVALID"] }],
+    ["duplicated reason", { reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED", "SOURCE_SLOT_HISTORY_CORRECTED"] }],
+    ["missing containment", { containment: undefined }],
+    ["wrong containment", { containment: "pool_positions_excluded_by_reward_contributor_selector:other" }],
+    ["nonzero selector cutoff", { selectorCutoff: 1 }],
+    ["invalid plan hash", { planHash: "invalid" }],
+    ["invalid evidence hash", { evidenceHash: "invalid" }],
+    ["invalid run id", { runId: "invalid-run-id" }],
+    ["invalid period id", { periodId: "malformed-period" }],
+  ])("keeps blocking later NFT snapshots for a %s incident", async (_label, overrides) => {
+    const { repository, service, first, nextCutoff } = await setupNftHistoricalIncident();
+    repository.state.incidents[0] = historicalSlotHistoryIncident(first, overrides);
+    await expect(
+      service.createDailyRun({
+        route: "nft",
+        cutoff: nextCutoff,
+        expectedRuleVersion: "credits-v1",
+        now: new Date(nextCutoff.getTime() + 60_000),
+      }),
+    ).rejects.toThrow(/incidentes de integridad/);
+  });
+
+  it("does not exempt a contained correction for its own or an earlier cutoff", async () => {
+    const { repository, first } = await setupNftHistoricalIncident();
+    const rule = (await repository.findRuleAt(CUTOFF))!;
+    await expect(repository.readSnapshotGate(rule, CUTOFF, "nft")).resolves.toMatchObject({
+      openIntegrityIncidents: 1,
+    });
+    await expect(repository.readSnapshotGate(
+      rule,
+      new Date("2026-07-09T12:00:00.000Z"),
+      "nft",
+    )).resolves.toMatchObject({ openIntegrityIncidents: 1 });
+    expect(repository.state.incidents[0].periodId).toBe(first.period.periodId);
+    expect(repository.state.incidents[0].status).toBe("open");
   });
 
   it("turns malformed Mongo runtime values into a blocking incident instead of throwing", async () => {
