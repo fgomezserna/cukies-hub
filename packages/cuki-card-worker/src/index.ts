@@ -2,6 +2,7 @@ export { getCardWorkerConfig, loadCardWorkerEnvFiles, packageRoot } from './conf
 export { renderCukiCard } from './renderer.js';
 export {
   assertS3UploadConfig,
+  cardContentSha256FromUrl,
   cardS3Key,
   uploadRenderedCard,
   verifyPublishedCard,

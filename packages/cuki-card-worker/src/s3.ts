@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 
 import { HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import type { ObjectCannedACL, PutObjectCommandInput } from '@aws-sdk/client-s3';
+import Jimp from 'jimp';
 
 import type { CardWorkerConfig, GenerationResult, PublicCardVerification, RenderResult } from './types.js';
 
@@ -37,26 +38,80 @@ export async function verifyS3UploadAccess(config: CardWorkerConfig) {
   await client.send(new HeadBucketCommand({ Bucket: config.s3Bucket ?? undefined }));
 }
 
-async function requestPublicCard(url: string) {
-  let lastError: unknown;
+const PUBLIC_CARD_TIMEOUT_MS = 10_000;
+const PUBLIC_CARD_MAX_BYTES = 8 * 1024 * 1024;
 
-  for (let attempt = 1; attempt <= 5; attempt += 1) {
+export type PublicCardVerificationOptions = {
+  expectedContentSha256?: string;
+  expectedContentLength?: number;
+  timeoutMs?: number;
+  maxBytes?: number;
+  attempts?: number;
+};
+
+async function readResponseBody(response: Response, maxBytes: number) {
+  if (!response.body) {
+    throw new Error('La card publicada no devuelve cuerpo.');
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+
+      if (total > maxBytes) {
+        throw new Error(`La card publicada supera el limite de ${maxBytes} bytes.`);
+      }
+
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+}
+
+async function requestPublicCard(url: string, options: PublicCardVerificationOptions) {
+  let lastError: unknown;
+  const attempts = options.attempts ?? 5;
+  const timeoutMs = options.timeoutMs ?? PUBLIC_CARD_TIMEOUT_MS;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-      const response = await fetch(url, { method: 'HEAD', redirect: 'error' });
-      if (response.ok) return response;
+      const response = await fetch(url, { method: 'GET', redirect: 'error', signal: controller.signal });
+      if (response.ok) {
+        const body = await readResponseBody(response, options.maxBytes ?? PUBLIC_CARD_MAX_BYTES);
+        return { body, response };
+      }
       lastError = new Error(`HTTP ${response.status}`);
     } catch (error) {
       lastError = error;
+    } finally {
+      clearTimeout(timeout);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, Math.min(2000, 200 * 2 ** (attempt - 1))));
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(2000, 200 * 2 ** (attempt - 1))));
+    }
   }
 
   throw new Error(`La card no es legible desde la URL pública ${url}: ${String(lastError)}`);
 }
 
-export async function verifyPublishedCard(url: string): Promise<PublicCardVerification> {
-  const response = await requestPublicCard(url);
+export async function verifyPublishedCard(
+  url: string,
+  options: PublicCardVerificationOptions = {},
+): Promise<PublicCardVerification> {
+  const { body, response } = await requestPublicCard(url, options);
   const contentType = response.headers.get('content-type');
   const contentLengthHeader = response.headers.get('content-length');
   const contentLength = contentLengthHeader ? Number(contentLengthHeader) : null;
@@ -69,13 +124,45 @@ export async function verifyPublishedCard(url: string): Promise<PublicCardVerifi
     throw new Error(`La card publicada devuelve Content-Length inválido: ${contentLengthHeader}`);
   }
 
+  if (contentLength !== null && contentLength !== body.length) {
+    throw new Error(`La card publicada está truncada: header=${contentLength} bytes, body=${body.length} bytes.`);
+  }
+
+  if (options.expectedContentLength !== undefined && body.length !== options.expectedContentLength) {
+    throw new Error(
+      `La card publicada tiene longitud inesperada: esperado=${options.expectedContentLength}, recibido=${body.length}.`,
+    );
+  }
+
+  try {
+    const image = await Jimp.read(body);
+    if (image.bitmap.width <= 0 || image.bitmap.height <= 0) {
+      throw new Error('dimensiones vacías');
+    }
+  } catch (error) {
+    throw new Error(`La card publicada no es un PNG válido: ${String(error)}`);
+  }
+
+  if (options.expectedContentSha256 && cardContentSha256(body) !== options.expectedContentSha256) {
+    throw new Error('La card publicada no coincide con el SHA-256 content-addressed esperado.');
+  }
+
   return {
     status: response.status,
     contentType,
-    contentLength,
+    contentLength: body.length,
     cacheControl: response.headers.get('cache-control'),
     etag: response.headers.get('etag'),
   };
+}
+
+export function cardContentSha256FromUrl(url: string) {
+  try {
+    const match = new URL(url).pathname.match(/\/([a-f0-9]{64})\.png$/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function cardContentSha256(body: Uint8Array) {
@@ -147,7 +234,10 @@ export async function uploadRenderedCard(
   await client.send(new PutObjectCommand(upload.putObjectInput));
 
   const publicVerification = config.verifyPublic
-    ? await verifyPublishedCard(upload.imageUrl)
+    ? await verifyPublishedCard(upload.imageUrl, {
+        expectedContentSha256: upload.contentSha256,
+        expectedContentLength: body.length,
+      })
     : undefined;
 
   return {

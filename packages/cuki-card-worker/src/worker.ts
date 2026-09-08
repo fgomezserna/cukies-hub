@@ -7,6 +7,7 @@ import { getCardWorkerConfig } from './config/env.js';
 import { renderCukiCard } from './renderer.js';
 import {
   assertS3UploadConfig,
+  cardContentSha256FromUrl,
   uploadRenderedCard,
   verifyPublishedCard,
   verifyS3UploadAccess,
@@ -144,7 +145,9 @@ async function processBackfillToken(
 
   if (hasOwnedPublicImage(existing.img, config)) {
     try {
-      await verifyPublishedCard(existing.img!);
+      const expectedContentSha256 = cardContentSha256FromUrl(existing.img!);
+      if (!expectedContentSha256) throw new Error('La URL pública no tiene SHA-256 content-addressed.');
+      await verifyPublishedCard(existing.img!, { expectedContentSha256 });
       return { status: 'already_valid' as const };
     } catch {
       // A stale DB reference is repaired by the claim/upload path below.

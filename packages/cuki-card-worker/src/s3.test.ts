@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 
 import {
   buildCardObjectUpload,
+  cardContentSha256FromUrl,
   cardContentSha256,
   cardS3Key,
   IMMUTABLE_CARD_CACHE_CONTROL,
+  verifyPublishedCard,
 } from './s3.js';
 import type { CardWorkerConfig, RenderResult } from './types.js';
 
@@ -37,6 +39,11 @@ const renderResult: RenderResult = {
   width: 752,
   height: 1152,
 };
+
+const validPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
 
 describe('immutable card uploads', () => {
   it('uses a deterministic SHA-256 content address', () => {
@@ -97,5 +104,66 @@ describe('immutable card uploads', () => {
   it('rejects empty token ids and malformed content hashes', () => {
     assert.throws(() => cardS3Key(config, '', '0'.repeat(64)), /tokenId/);
     assert.throws(() => cardS3Key(config, '42', 'ABC'), /SHA-256/);
+  });
+
+  it('verifies a valid public PNG and its content-addressed hash', async () => {
+    const hash = cardContentSha256(validPng);
+    const url = `https://assets-staging.cukies.world/${hash}.png`;
+    mock.method(globalThis, 'fetch', async () => new Response(validPng, {
+      status: 200,
+      headers: { 'content-type': 'image/png', 'content-length': String(validPng.length) },
+    }));
+
+    await assert.doesNotReject(() => verifyPublishedCard(url, {
+      expectedContentSha256: hash,
+      expectedContentLength: validPng.length,
+      attempts: 1,
+    }));
+    assert.equal(cardContentSha256FromUrl(url), hash);
+    mock.restoreAll();
+  });
+
+  it('rejects a different PNG, a placeholder and a truncated body', async () => {
+    const hash = cardContentSha256(validPng);
+    const url = `https://assets-staging.cukies.world/${hash}.png`;
+
+    mock.method(globalThis, 'fetch', async () => new Response(validPng, {
+      status: 200,
+      headers: { 'content-type': 'image/png' },
+    }));
+    await assert.rejects(
+      () => verifyPublishedCard(url, { expectedContentSha256: cardContentSha256(Buffer.from('other')), attempts: 1 }),
+      /SHA-256/,
+    );
+    mock.restoreAll();
+
+    mock.method(globalThis, 'fetch', async () => new Response('placeholder', {
+      status: 200,
+      headers: { 'content-type': 'image/png' },
+    }));
+    await assert.rejects(() => verifyPublishedCard(url, { attempts: 1 }), /PNG válido/);
+    mock.restoreAll();
+
+    mock.method(globalThis, 'fetch', async () => new Response(validPng, {
+      status: 200,
+      headers: { 'content-type': 'image/png' },
+    }));
+    await assert.rejects(
+      () => verifyPublishedCard(url, { expectedContentLength: validPng.length + 1, attempts: 1 }),
+      /longitud inesperada/,
+    );
+    mock.restoreAll();
+  });
+
+  it('aborts a public verification that exceeds its timeout', async () => {
+    mock.method(globalThis, 'fetch', (_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+    }));
+
+    await assert.rejects(
+      () => verifyPublishedCard('https://assets-staging.cukies.world/slow.png', { timeoutMs: 5, attempts: 1 }),
+      /AbortError/,
+    );
+    mock.restoreAll();
   });
 });
