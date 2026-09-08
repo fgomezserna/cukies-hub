@@ -57,12 +57,16 @@ const envSchema = z.object({
   CARD_WORKER_STALE_LOCK_MS: z.coerce.number().int().min(60000).default(15 * 60 * 1000),
   CARD_WORKER_UPLOAD: z.string().default('false'),
   CARD_WORKER_PUBLIC_BASE_URL: z.string().optional(),
+  CARD_WORKER_PUBLIC_KEY_PREFIX: z.string().optional(),
   CARD_WORKER_S3_BUCKET: z.string().optional(),
   CARD_WORKER_S3_REGION: z.string().optional(),
   CARD_WORKER_S3_PREFIX: z.string().default(`png/tokens/v2/${defaultTokenAddress}`),
   CARD_WORKER_S3_ENDPOINT: z.string().optional(),
   CARD_WORKER_S3_FORCE_PATH_STYLE: z.string().default('false'),
   CARD_WORKER_S3_ACL: z.string().optional(),
+  CARD_WORKER_VERIFY_PUBLIC: z.string().default('true'),
+  CARD_WORKER_BACKFILL_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
+  CARD_WORKER_BACKFILL_MANIFEST_PATH: z.string().optional(),
 });
 
 function parseBoolean(value: string | undefined) {
@@ -105,11 +109,19 @@ export function getCardWorkerConfig(): CardWorkerConfig {
       env.CARD_WORKER_S3_BUCKET,
       env.CARD_WORKER_S3_REGION,
     ),
+    publicKeyPrefix: env.CARD_WORKER_PUBLIC_KEY_PREFIX
+      ? normalizePrefix(env.CARD_WORKER_PUBLIC_KEY_PREFIX)
+      : null,
     s3Bucket: env.CARD_WORKER_S3_BUCKET ?? null,
     s3Region: env.CARD_WORKER_S3_REGION ?? null,
     s3Prefix: normalizePrefix(env.CARD_WORKER_S3_PREFIX),
     s3Endpoint: env.CARD_WORKER_S3_ENDPOINT ?? null,
     s3ForcePathStyle: parseBoolean(env.CARD_WORKER_S3_FORCE_PATH_STYLE),
     s3Acl: env.CARD_WORKER_S3_ACL ?? null,
+    verifyPublic: parseBoolean(env.CARD_WORKER_VERIFY_PUBLIC),
+    backfillConcurrency: env.CARD_WORKER_BACKFILL_CONCURRENCY,
+    backfillManifestPath: env.CARD_WORKER_BACKFILL_MANIFEST_PATH
+      ? path.resolve(env.CARD_WORKER_BACKFILL_MANIFEST_PATH)
+      : null,
   };
 }

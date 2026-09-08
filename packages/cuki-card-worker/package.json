@@ -14,6 +14,7 @@
     "setup": "tsx src/cli.ts setup",
     "status": "tsx src/cli.ts status",
     "process:once": "tsx src/cli.ts process-once",
+    "backfill": "tsx src/cli.ts backfill",
     "render": "tsx src/cli.ts render-token",
     "generate": "tsx src/cli.ts generate-token",
     "test": "node --import tsx --test src/*.test.ts",

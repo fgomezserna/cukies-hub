@@ -19,12 +19,16 @@ const config: CardWorkerConfig = {
   staleLockMs: 900_000,
   upload: true,
   publicBaseUrl: 'https://cards.staging.invalid/staging-bucket',
+  publicKeyPrefix: null,
   s3Bucket: 'staging-bucket',
   s3Region: 'us-east-1',
   s3Prefix: 'png/staging/tokens/v2/test-collection',
   s3Endpoint: 'http://minio.staging.invalid:9000',
   s3ForcePathStyle: true,
   s3Acl: 'private',
+  verifyPublic: true,
+  backfillConcurrency: 2,
+  backfillManifestPath: null,
 };
 
 const renderResult: RenderResult = {
@@ -76,6 +80,18 @@ describe('immutable card uploads', () => {
     assert.equal(upload.putObjectInput.CacheControl, IMMUTABLE_CARD_CACHE_CONTROL);
     assert.equal(upload.putObjectInput.ACL, 'private');
     assert.equal(upload.imageUrl, `${config.publicBaseUrl}/${upload.key}`);
+  });
+
+  it('omits the private gateway prefix from the public URL', () => {
+    const body = Buffer.from('gateway png bytes');
+    const upload = buildCardObjectUpload(
+      { ...config, publicBaseUrl: 'https://assets-staging.cukies.world', publicKeyPrefix: config.s3Prefix },
+      renderResult,
+      body,
+    );
+
+    assert.equal(upload.imageUrl, `https://assets-staging.cukies.world/${upload.key.slice(config.s3Prefix.length + 1)}`);
+    assert.match(upload.key, new RegExp(`^${config.s3Prefix}/`));
   });
 
   it('rejects empty token ids and malformed content hashes', () => {

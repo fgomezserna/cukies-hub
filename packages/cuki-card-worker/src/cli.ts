@@ -1,6 +1,7 @@
 import { getCardWorkerConfig } from './config/env.js';
 import {
   generateTokenCard,
+  backfillCards,
   getCardWorkerStatus,
   processOneCard,
   renderTokenCard,
@@ -8,7 +9,7 @@ import {
   setupCardWorker,
 } from './worker.js';
 
-type Command = 'setup' | 'status' | 'render-token' | 'generate-token' | 'process-once' | 'run';
+type Command = 'setup' | 'status' | 'render-token' | 'generate-token' | 'process-once' | 'backfill' | 'run';
 
 function printJson(value: unknown) {
   console.log(JSON.stringify(value, null, 2));
@@ -43,6 +44,9 @@ async function main() {
       break;
     case 'process-once':
       printJson(await processOneCard(config));
+      break;
+    case 'backfill':
+      printJson(await backfillCards(config));
       break;
     case 'run':
       await runCardWorker(config);

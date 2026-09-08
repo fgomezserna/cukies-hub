@@ -1,0 +1,43 @@
+services:
+  assets-gateway-staging:
+    image: ghcr.io/nginx/nginx-s3-gateway/nginx-oss-s3-gateway:unprivileged-oss-20260907@sha256:71231122a24e759491802cc5aa695ab4492e561ba3ca3aa3064db5a39666554e
+    restart: unless-stopped
+    environment:
+      ALLOW_DIRECTORY_LIST: "false"
+      AWS_ACCESS_KEY_ID_FILE: /run/secrets/assets_staging_reader_access_key
+      AWS_SECRET_ACCESS_KEY_FILE: /run/secrets/assets_staging_reader_secret_key
+      AWS_SIGS_VERSION: "4"
+      CORS_ALLOWED_ORIGIN: https://cukieshub.eurekand.com
+      CORS_ENABLED: "true"
+      PREFIX_LEADING_DIRECTORY_PATH: /png/staging/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe
+      PROVIDE_INDEX_PAGE: "false"
+      S3_BUCKET_NAME: cukies-cards-staging
+      S3_REGION: us-east-1
+      S3_SERVER: 192.168.1.223
+      S3_SERVER_PORT: "9000"
+      S3_SERVER_PROTO: http
+      S3_SERVICE: s3
+      S3_STYLE: path
+    secrets:
+      - assets_staging_reader_access_key
+      - assets_staging_reader_secret_key
+    networks:
+      - coolify
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.assets-staging-https.entrypoints: websecure
+      traefik.http.routers.assets-staging-https.rule: Host(`assets-staging.cukies.world`)
+      traefik.http.routers.assets-staging-https.service: assets-staging-https
+      traefik.http.routers.assets-staging-https.tls: "true"
+      traefik.http.routers.assets-staging-https.tls.certresolver: letsencrypt
+      traefik.http.services.assets-staging-https.loadbalancer.server.port: "8080"
+
+networks:
+  coolify:
+    external: true
+
+secrets:
+  assets_staging_reader_access_key:
+    file: ${ASSETS_STAGING_READER_ACCESS_KEY_FILE:?set a mode-0444 reader key file}
+  assets_staging_reader_secret_key:
+    file: ${ASSETS_STAGING_READER_SECRET_KEY_FILE:?set a mode-0444 reader secret file}

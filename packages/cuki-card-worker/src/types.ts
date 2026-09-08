@@ -13,8 +13,13 @@ export type CukiSkills = {
 export type CukiDocument = {
   _id: string;
   tokenId?: string;
+  chain?: string;
+  chainId?: number;
+  collectionAddressNormalized?: string;
   img?: string | null;
   type?: number | string | null;
+  rarity?: number | string | null;
+  generation?: number | string | null;
   skills?: CukiSkills | null;
   needsImage?: boolean;
   cardImageStatus?: 'pending' | 'processing' | 'generated' | 'failed';
@@ -36,12 +41,16 @@ export type CardWorkerConfig = {
   staleLockMs: number;
   upload: boolean;
   publicBaseUrl: string | null;
+  publicKeyPrefix: string | null;
   s3Bucket: string | null;
   s3Region: string | null;
   s3Prefix: string;
   s3Endpoint: string | null;
   s3ForcePathStyle: boolean;
   s3Acl: string | null;
+  verifyPublic: boolean;
+  backfillConcurrency: number;
+  backfillManifestPath: string | null;
 };
 
 export type RenderResult = {
@@ -54,4 +63,13 @@ export type RenderResult = {
 export type GenerationResult = RenderResult & {
   imageUrl: string | null;
   s3Key: string | null;
+  publicVerification?: PublicCardVerification;
+};
+
+export type PublicCardVerification = {
+  status: number;
+  contentType: string | null;
+  contentLength: number | null;
+  cacheControl: string | null;
+  etag: string | null;
 };

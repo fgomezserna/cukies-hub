@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import { HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import type { ObjectCannedACL, PutObjectCommandInput } from '@aws-sdk/client-s3';
 
-import type { CardWorkerConfig, GenerationResult, RenderResult } from './types.js';
+import type { CardWorkerConfig, GenerationResult, PublicCardVerification, RenderResult } from './types.js';
 
 export const IMMUTABLE_CARD_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
@@ -37,6 +37,47 @@ export async function verifyS3UploadAccess(config: CardWorkerConfig) {
   await client.send(new HeadBucketCommand({ Bucket: config.s3Bucket ?? undefined }));
 }
 
+async function requestPublicCard(url: string) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      const response = await fetch(url, { method: 'HEAD', redirect: 'error' });
+      if (response.ok) return response;
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, Math.min(2000, 200 * 2 ** (attempt - 1))));
+  }
+
+  throw new Error(`La card no es legible desde la URL pública ${url}: ${String(lastError)}`);
+}
+
+export async function verifyPublishedCard(url: string): Promise<PublicCardVerification> {
+  const response = await requestPublicCard(url);
+  const contentType = response.headers.get('content-type');
+  const contentLengthHeader = response.headers.get('content-length');
+  const contentLength = contentLengthHeader ? Number(contentLengthHeader) : null;
+
+  if (!contentType?.toLowerCase().startsWith('image/png')) {
+    throw new Error(`La card publicada devuelve Content-Type inválido: ${contentType ?? 'ausente'}`);
+  }
+
+  if (contentLength !== null && (!Number.isSafeInteger(contentLength) || contentLength <= 0)) {
+    throw new Error(`La card publicada devuelve Content-Length inválido: ${contentLengthHeader}`);
+  }
+
+  return {
+    status: response.status,
+    contentType,
+    contentLength,
+    cacheControl: response.headers.get('cache-control'),
+    etag: response.headers.get('etag'),
+  };
+}
+
 export function cardContentSha256(body: Uint8Array) {
   return createHash('sha256').update(body).digest('hex');
 }
@@ -55,6 +96,16 @@ export function cardS3Key(config: CardWorkerConfig, tokenId: string, contentSha2
   }
 
   return `${config.s3Prefix}/${cardTokenPathSegment(tokenId)}/${contentSha256}.png`;
+}
+
+function publicObjectPath(config: CardWorkerConfig, key: string) {
+  if (!config.publicKeyPrefix) return key;
+  const prefix = `${config.publicKeyPrefix}/`;
+  if (!key.startsWith(prefix)) {
+    throw new Error(`La clave ${key} no está dentro del prefijo público configurado.`);
+  }
+
+  return key.slice(prefix.length);
 }
 
 export function buildCardObjectUpload(
@@ -77,7 +128,7 @@ export function buildCardObjectUpload(
 
   return {
     contentSha256,
-    imageUrl: `${config.publicBaseUrl}/${key}`,
+    imageUrl: `${config.publicBaseUrl}/${publicObjectPath(config, key)}`,
     key,
     putObjectInput,
   };
@@ -95,9 +146,14 @@ export async function uploadRenderedCard(
 
   await client.send(new PutObjectCommand(upload.putObjectInput));
 
+  const publicVerification = config.verifyPublic
+    ? await verifyPublishedCard(upload.imageUrl)
+    : undefined;
+
   return {
     ...renderResult,
     imageUrl: upload.imageUrl,
     s3Key: upload.key,
+    ...(publicVerification ? { publicVerification } : {}),
   };
 }
