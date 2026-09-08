@@ -7,12 +7,66 @@ const execFileAsync = promisify(execFile);
 
 export const STAGING_DEPLOY_GUARD = Object.freeze({
   resourceUuid: 'u4s804o4wwcckowgk0woo4wg',
+  applicationId: '28',
   minimumFreeBytes: 10n * 1024n * 1024n * 1024n,
   intervalMs: 2500,
 });
 
+const TERMINAL_STATUSES = new Set([
+  'finished',
+  'failed',
+  'cancelled',
+  'cancelled-by-user',
+  'canceled',
+  'canceled-by-user',
+  'error',
+]);
+
+const ACTIVE_STATUSES = new Set([
+  'queued',
+  'pending',
+  'building',
+  'deploying',
+  'running',
+  'in_progress',
+  'in-progress',
+  'canceling',
+  'cancelling',
+]);
+
+function statusOf(record) {
+  return String(record?.status ?? '').trim().toLowerCase();
+}
+
+function deploymentUuidOf(record) {
+  return record?.deployment_uuid ?? record?.deploymentUuid ?? record?.uuid;
+}
+
+function applicationIdOf(record) {
+  return String(record?.application_id ?? record?.applicationId ?? '').trim();
+}
+
+function commitOf(record) {
+  return record?.commit ?? record?.commit_sha ?? record?.commitSha;
+}
+
+function isTerminal(record) {
+  return TERMINAL_STATUSES.has(statusOf(record));
+}
+
+function isActive(record) {
+  return ACTIVE_STATUSES.has(statusOf(record)) || (!isTerminal(record) && Boolean(statusOf(record)));
+}
+
+function asDeploymentRecords(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.deployments)) return payload.deployments;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
+
 export function parseFreeBytes(dfOutput) {
-  const line = dfOutput.trim().split('\n').at(-1)?.trim();
+  const line = String(dfOutput).trim().split('\n').at(-1)?.trim();
   const fields = line?.split(/\s+/);
   const freeKib = fields?.at(3);
   if (!freeKib || !/^\d+$/.test(freeKib)) {
@@ -28,18 +82,31 @@ export function assertFreeSpace(freeBytes, minimumFreeBytes = STAGING_DEPLOY_GUA
   return freeBytes;
 }
 
-export function assertDeploymentTarget(deploymentUuid, expected = STAGING_DEPLOY_GUARD.resourceUuid) {
-  if (!deploymentUuid || deploymentUuid !== expected) {
-    throw new Error(`Guard de staging: sólo se puede cancelar el deployment exacto ${expected}.`);
+export function assertDeploymentTarget(
+  record,
+  { deploymentUuid, expectedCommit, applicationId = STAGING_DEPLOY_GUARD.applicationId } = {},
+) {
+  const actualUuid = deploymentUuidOf(record);
+  if (!deploymentUuid || actualUuid !== deploymentUuid) {
+    throw new Error(`Guard de staging: el deployment consultado no coincide con ${deploymentUuid ?? '(sin UUID)'}.`);
   }
-  return deploymentUuid;
+  if (applicationIdOf(record) !== String(applicationId)) {
+    throw new Error(`Guard de staging: el deployment ${deploymentUuid} no pertenece a la aplicación ${applicationId}.`);
+  }
+  if (expectedCommit && commitOf(record) !== expectedCommit) {
+    throw new Error(`Guard de staging: el deployment ${deploymentUuid} no corresponde al commit esperado.`);
+  }
+  return record;
 }
 
-export function assertNoOtherBuild(activeDeploymentUuids, expected = STAGING_DEPLOY_GUARD.resourceUuid) {
-  const others = activeDeploymentUuids.filter((uuid) => uuid && uuid !== expected);
+export function assertNoOtherBuild(records, deploymentUuid = null) {
+  const active = records.filter(isActive);
+  const others = active.filter((record) => deploymentUuidOf(record) !== deploymentUuid);
   if (others.length) {
-    throw new Error(`Guard de staging: hay otro build activo (${others.join(', ')}).`);
+    const ids = others.map(deploymentUuidOf).filter(Boolean).join(', ');
+    throw new Error(`Guard de staging: hay otro build activo (${ids || 'UUID ausente'}).`);
   }
+  return records;
 }
 
 export async function readFreeBytes({ mountPath = '/srv', exec = execFileAsync } = {}) {
@@ -47,51 +114,194 @@ export async function readFreeBytes({ mountPath = '/srv', exec = execFileAsync }
   return parseFreeBytes(stdout);
 }
 
-export async function checkStagingDeploy({
-  deploymentUuid,
-  activeDeploymentUuids = [],
+function requireExpectedCommit(expectedCommit) {
+  if (!expectedCommit || !/^[0-9a-f]{40}$/i.test(expectedCommit)) {
+    throw new Error('Guard de staging: STAGING_EXPECTED_COMMIT debe ser un SHA-1 completo.');
+  }
+  return expectedCommit;
+}
+
+export function createCoolifyClient({ baseUrl = process.env.COOLIFY_API_URL, token = process.env.COOLIFY_API_TOKEN, fetchImpl = globalThis.fetch } = {}) {
+  if (!baseUrl || !token) {
+    throw new Error('Guard de staging: faltan COOLIFY_API_URL o COOLIFY_API_TOKEN.');
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('Guard de staging: no hay un fetch disponible para Coolify.');
+  }
+
+  const apiUrl = baseUrl.replace(/\/$/, '');
+  const request = async (method, path, body) => {
+    const response = await fetchImpl(`${apiUrl}${path}`, {
+      method,
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    if (!response.ok) {
+      throw new Error(`Coolify API ${method} ${path} devolvió HTTP ${response.status}.`);
+    }
+    return { status: response.status, payload };
+  };
+
+  return Object.freeze({
+    async getDeployment(deploymentUuid) {
+      const result = await request('GET', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}`);
+      return result.payload;
+    },
+    async listDeployments(resourceUuid = STAGING_DEPLOY_GUARD.resourceUuid) {
+      const result = await request('GET', `/api/v1/deployments/applications/${encodeURIComponent(resourceUuid)}`);
+      return asDeploymentRecords(result.payload);
+    },
+    async cancelDeployment(deploymentUuid) {
+      return request('POST', `/api/v1/deployments/${encodeURIComponent(deploymentUuid)}/cancel`);
+    },
+  });
+}
+
+export async function preflightBeforeStart({
+  client,
+  expectedCommit,
   mountPath = '/srv',
   minimumFreeBytes = STAGING_DEPLOY_GUARD.minimumFreeBytes,
   exec = execFileAsync,
 } = {}) {
-  assertDeploymentTarget(deploymentUuid);
-  assertNoOtherBuild(activeDeploymentUuids);
+  requireExpectedCommit(expectedCommit);
+  if (!client?.listDeployments) throw new Error('Guard de staging: cliente Coolify incompleto.');
+  const records = await client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid);
+  assertNoOtherBuild(records);
   const freeBytes = await readFreeBytes({ mountPath, exec });
   assertFreeSpace(freeBytes, minimumFreeBytes);
-  return { deploymentUuid, freeBytes, intervalMs: STAGING_DEPLOY_GUARD.intervalMs };
+  return {
+    resourceUuid: STAGING_DEPLOY_GUARD.resourceUuid,
+    applicationId: STAGING_DEPLOY_GUARD.applicationId,
+    expectedCommit,
+    freeBytes,
+    intervalMs: STAGING_DEPLOY_GUARD.intervalMs,
+    readyToStart: true,
+  };
 }
 
-export async function watchStagingDeploy({
+function assertCancellationAck(result, deploymentUuid) {
+  if (!result || result.status < 200 || result.status >= 300) {
+    throw new Error(`Guard de staging: Coolify no confirmó la cancelación de ${deploymentUuid}.`);
+  }
+  const body = result.payload ?? {};
+  const acknowledgedUuid = deploymentUuidOf(body);
+  if (acknowledgedUuid && acknowledgedUuid !== deploymentUuid) {
+    throw new Error(`Guard de staging: ACK de cancelación para deployment incorrecto (${acknowledgedUuid}).`);
+  }
+  const message = String(body.message ?? body.status ?? '').toLowerCase();
+  if (body.cancelled !== true && body.canceled !== true && !message.includes('cancel')) {
+    throw new Error(`Guard de staging: ACK de Coolify no indica cancelación de ${deploymentUuid}.`);
+  }
+}
+
+export async function watchDeployment({
+  client,
   deploymentUuid,
-  getActiveDeploymentUuids = async () => [],
+  expectedCommit,
+  mountPath = '/srv',
+  minimumFreeBytes = STAGING_DEPLOY_GUARD.minimumFreeBytes,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  ...options
+  exec = execFileAsync,
+  onCancel = () => {},
 } = {}) {
+  requireExpectedCommit(expectedCommit);
+  if (!deploymentUuid) throw new Error('Guard de staging: falta STAGING_DEPLOYMENT_UUID.');
+  if (!client?.getDeployment || !client?.listDeployments || !client?.cancelDeployment) {
+    throw new Error('Guard de staging: cliente Coolify incompleto.');
+  }
+
+  let cancelCount = 0;
+  let targetVerified = false;
+  let cancellationRequested = false;
+  let lastVerifiedRecord;
+
+  const cancelOnce = async (reason) => {
+    if (cancellationRequested) return false;
+    assertDeploymentTarget(lastVerifiedRecord, { deploymentUuid, expectedCommit });
+    const result = await client.cancelDeployment(deploymentUuid);
+    assertCancellationAck(result, deploymentUuid);
+    cancellationRequested = true;
+    cancelCount += 1;
+    await onCancel({ deploymentUuid, reason, cancelCount });
+    return true;
+  };
+
   while (true) {
-    const activeDeploymentUuids = await getActiveDeploymentUuids();
-    await checkStagingDeploy({ deploymentUuid, activeDeploymentUuids, ...options });
+    let deployment;
+    try {
+      deployment = await client.getDeployment(deploymentUuid);
+      assertDeploymentTarget(deployment, { deploymentUuid, expectedCommit });
+      const records = await client.listDeployments(STAGING_DEPLOY_GUARD.resourceUuid);
+      const listedTarget = records.find((record) => deploymentUuidOf(record) === deploymentUuid);
+      if (!listedTarget) {
+        throw new Error(`Guard de staging: ${deploymentUuid} no está relacionado con la aplicación ${STAGING_DEPLOY_GUARD.resourceUuid}.`);
+      }
+      assertDeploymentTarget(listedTarget, { deploymentUuid, expectedCommit });
+      assertNoOtherBuild(records, deploymentUuid);
+      lastVerifiedRecord = deployment;
+      targetVerified = true;
+    } catch (error) {
+      if (!targetVerified) throw error;
+      if (cancellationRequested) {
+        throw new Error(`Guard de staging: no se pudo verificar el estado terminal tras cancelar ${deploymentUuid}: ${error.message}`);
+      }
+      await cancelOnce(`fallo de consulta: ${error.message}`);
+      await sleep(STAGING_DEPLOY_GUARD.intervalMs);
+      continue;
+    }
+
+    if (isTerminal(deployment)) {
+      return { deploymentUuid, status: statusOf(deployment), cancelCount };
+    }
+
+    let freeBytes;
+    try {
+      freeBytes = await readFreeBytes({ mountPath, exec });
+    } catch (error) {
+      await cancelOnce(`fallo de lectura de espacio: ${error.message}`);
+    }
+    if (freeBytes !== undefined && freeBytes < minimumFreeBytes) {
+      await cancelOnce(`espacio libre insuficiente: ${freeBytes} bytes`);
+    }
+
     await sleep(STAGING_DEPLOY_GUARD.intervalMs);
   }
 }
 
 async function main() {
+  const client = createCoolifyClient();
+  const expectedCommit = requireExpectedCommit(process.env.STAGING_EXPECTED_COMMIT);
+  const mountPath = process.env.STAGING_MOUNT_PATH ?? '/srv';
   const deploymentUuid = process.env.STAGING_DEPLOYMENT_UUID;
-  const activeDeploymentUuids = (process.env.STAGING_ACTIVE_DEPLOYMENT_UUIDS ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const result = await checkStagingDeploy({
-    deploymentUuid,
-    activeDeploymentUuids,
-    mountPath: process.env.STAGING_MOUNT_PATH ?? '/srv',
-  });
-  console.log(JSON.stringify({
-    ok: true,
-    deploymentUuid: result.deploymentUuid,
-    freeBytes: result.freeBytes.toString(),
-    intervalMs: result.intervalMs,
-    cancellationTarget: result.deploymentUuid,
-  }));
+
+  if (!deploymentUuid) {
+    const result = await preflightBeforeStart({ client, expectedCommit, mountPath });
+    console.log(JSON.stringify({
+      ok: true,
+      phase: 'preflight',
+      resourceUuid: result.resourceUuid,
+      applicationId: result.applicationId,
+      expectedCommit: result.expectedCommit,
+      freeBytes: result.freeBytes.toString(),
+      intervalMs: result.intervalMs,
+      readyToStart: result.readyToStart,
+    }));
+    return;
+  }
+
+  const result = await watchDeployment({ client, deploymentUuid, expectedCommit, mountPath });
+  console.log(JSON.stringify({ ok: true, phase: 'watch', ...result }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
