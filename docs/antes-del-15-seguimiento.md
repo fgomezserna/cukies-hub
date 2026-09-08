@@ -73,7 +73,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | D | **MIGRACION POR COMPLETAR**: migrar toda funcionalidad legacy al Hub con infraestructura nueva, auth, datos y contratos seguros; dejar de usar el repo antiguo. | Decision de producto e [inventario de migracion](legacy-marketplace/README.md); 2026-09-07: 14 contratos, 34 contenedores y 16 instancias de base. | Inventario registrado; seguir con importacion preview y paridad por flujos completos; coordinar [#160](https://github.com/fgomezserna/cukies-hub/issues/160); cero consumidores runtime antes de retirar. |
 | 1 | **EN PROGRAMA DE MIGRACION LEGACY**: bridge Tron -> BSC, con seguridad, E2E y fees dentro del alcance. | Decision de producto; 2026-09-07. | Revalidar fuente, relayer, rutas, fee y pausa; sin presentar el bridge como cerrado. |
 | 2A-C | **EVENTOS Y WORKER INTEGRADOS EN STAGING**: 14 contratos legacy y 10 perfiles nuevos cubiertos (75 + 87 relaciones contrato/evento); replay de breeding, CAS bridge y aislamiento verificados. 14/14 fuentes contrastadas live y pasada TRON 40/40 sin 429 con delay 2 s. Catalogo conjunto y UX publicados en PR #322 (8/09); la paridad de datos legacy sigue pendiente. | [PR #319](https://github.com/fgomezserna/cukies-hub/pull/319) integrada en `7d0d1ce`, codigo `fa708fd`; [validacion y limites](legacy-marketplace/evidence/2026-09-07-indexer-validation.json); 2026-09-07. Pruebas: indexer 84/84, Stage/Compose 63/63, produccion 14/14, typecheck/build correctos. | Resolver RPC de archivo BSC antes del backfill, provisionar destino dedicado, activar y reconciliar datos. Reconciliar lista/filtros/acciones ya implementados segun [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). Dapp Stage `7d0d1ce` verificada por health; rollout del indexador normal requirio completar identidades PRESALE/REWARDS (ver [configuracion](deployment-environments.md)). El worker legacy sigue inactivo y no se afirma paridad; main `fb2b190`. |
-| 3 | **EN STAGING, EN PRUEBAS · NFT RECUPERA CORTES; CIERRE DE FRESCURA PENDIENTE**: Cukie Master, creditos, pools, prestamos y rewards. | 2026-09-08 19:07 UTC, Stage `bd5567f` (PR #332): NFT abre cortes posteriores y QA recibe 0 nuevos creditos; selector 5→4→0 NFT / UKI 0 y cuatro proyecciones frescas. [Evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Lector publico y refresco entre cortes corregidos localmente: la fuente caducaba a los 15 min aunque el reparto Stage ocurre cada 30 min. 1.746 tests y prueba Mongo real PASS. Falta desplegar este lote y verificar ambas rutas al dia y UI coherente antes de cerrar [#326](https://github.com/fgomezserna/cukies-hub/issues/326). |
+| 3 | **EN STAGING, EN PRUEBAS · INCIDENCIA DE CUPOS/CRÉDITOS RESUELTA**: Cukie Master, creditos, pools, prestamos y rewards. | 2026-09-08 19:28 UTC, Stage `67303f6` (PR #329–#333): historial 5→4→0 NFT / UKI 0, ambas rutas al dia y 0 grants QA posteriores a retiradas. Dos ticks waiting renuevan ambas fuentes; Master/Créditos/Resumen coherentes y sin sus avisos incorrectos. 1.746 tests y gates PASS. [Evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Cierre de [#326](https://github.com/fgomezserna/cukies-hub/issues/326) limitado a esta incidencia. Continuan las pruebas amplias de economia/UX en [#289](https://github.com/fgomezserna/cukies-hub/issues/289); avisos independientes de Marketplace y Vesting sin asignacion. Produccion `fb2b190` sin cambios. |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
 | 5 | **PUBLICADO EN STAGING · REFRESCO VERIFICADO · PRUEBAS UX ABIERTAS**: navegacion, cuenta, Master/creditos, juego y catalogo conjunto. Dashboard renueva automaticamente su lectura y descarta respuestas de otra identidad o fuera de plazo. | 2026-09-08, [PR #325](https://github.com/fgomezserna/cukies-hub/pull/325), Stage `78fb0f8`, deploy terminado 14:37:25 UTC. Pestaña original firmada: lectura `14:39:24.786Z` -> `14:40:24.781Z` sin pulsar Actualizar; 0 cupos coherentes con dos puntos restantes. [Verificacion](https://github.com/fgomezserna/cukies-hub/pull/325#issuecomment-5586923897), [evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Completar variantes/flujos UX. El incidente de repartos historicos se sigue en el punto 3. Marketplace UKI sin despliegue operativo acreditado/configuracion; Legacy responde. Esta comprobacion no certifica toda la migracion. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
@@ -1107,9 +1107,29 @@ Mongo real con el lector candidato a las 19:07:35 UTC: ambas rutas healthy,
 cero incidentes bloqueantes actuales, saldos y cupos configurables cero;
 la misma fuente evaluada 16 minutos despues devuelve healthy=false para
 ambas rutas. Premios sigue conservando 390 de 13:30 y cero de 14:00/14:30.
-Falta desplegar este ultimo lote y comprobar ambas rutas al dia, refresco
-en ticks sin reparto y UI firmada; [#326](https://github.com/fgomezserna/cukies-hub/issues/326)
-permanece abierta.
+La [PR #333](https://github.com/fgomezserna/cukies-hub/pull/333) queda integrada
+y desplegada como `67303f66f0b64797fffa21a4722b3f0a672a07c1`; queue
+`xkkg08gk4c84ss8ww0gc4w8o` termina a las 19:25:51 UTC. Health publico y
+SHA exacto verificados, dapp/indexador healthy, creditos activos, rewards
+apagados y card worker contenido. Disco libre: 18.450.132 KiB. El guard
+arranco tras identificar la queue en progreso y termino sin cancelaciones
+ni diagnosticos; no se presenta como activo antes de identificarla.
+
+Verificacion live 19:26:54→19:27:56 UTC, dentro del corte 19:00 y sin nuevo
+reparto: ambas rutas siguen waiting, cero items aplicados, y los watermarks
+avanzan UKI 19:26:29→19:27:25 y NFT 19:26:34→19:27:30. Ambas fuentes son
+healthy y no hay incidentes bloqueantes actuales. Los dos incidentes
+historicos permanecen abiertos para la exclusion de premios. A las
+19:28:28 UTC UKI y NFT estan al dia y todos los cortes QA desde 15:00
+contienen cero items/grants. No se ha cambiado ningun balance manualmente.
+
+Con la misma sesion QA, sin reconectar wallet: Cukie Master muestra cero
+activos y ningun aviso de materializacion; Creditos muestra cero y ningun
+aviso de vigencia pendiente; Resumen coincide para Master, Creditos y Pool.
+Siguen los avisos independientes de Marketplace no disponible y Vesting
+sin asignacion. Produccion permanece en `fb2b19023e7edd824bc6eb86dc5409025cc3ee1e`,
+health OK. Se cierra [#326](https://github.com/fgomezserna/cukies-hub/issues/326)
+en este alcance; la validacion amplia de UX/economia/legacy sigue en #289.
 
 Alcance del codigo `5fbe106` en [PR #322](https://github.com/fgomezserna/cukies-hub/pull/322), publicado en staging `26dd990`:
 
