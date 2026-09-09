@@ -171,6 +171,7 @@ describe('MyCukiesPanel', () => {
         network: 'BSC',
         collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
         marketplaceSurface: 'legacy',
+        sellSurfaces: ['legacy', 'uki'],
         availableActions: ['sell'],
       }),
       item({
@@ -188,7 +189,7 @@ describe('MyCukiesPanel', () => {
 
     await screen.findByRole('heading', { name: 'Cukie #56' });
     const sellLinks = (await screen.findAllByRole('link', { name: /Vender/i }))
-      .filter((link) => link.getAttribute('href')?.includes('tokenId=') || link.getAttribute('href')?.includes('/marketplace/56'));
+      .filter((link) => link.getAttribute('href')?.startsWith('/marketplace/56') || link.getAttribute('href')?.includes('tokenId=97'));
     expect(sellLinks[0]).toHaveAttribute(
       'href',
       `/marketplace/56?source=legacy&network=BSC&collection=${legacyMarketplaceContracts.bsc.contracts.token}`,
@@ -196,6 +197,32 @@ describe('MyCukiesPanel', () => {
     expect(sellLinks[1]).toHaveAttribute(
       'href',
       '/marketplace?tokenId=97&collection=0x3333333333333333333333333333333333333333&chainId=97#mis-anuncios',
+    );
+    expect(screen.getByRole('link', { name: /Vender en UKI/i })).toHaveAttribute(
+      'href',
+      `/marketplace?tokenId=56&collection=${legacyMarketplaceContracts.bsc.contracts.token}&chainId=56#mis-anuncios`,
+    );
+  });
+
+  it('mantiene solo Legacy cuando V2 no está disponible para la colección compartida', async () => {
+    fetchMock.mockResolvedValue(response([item({
+      tokenId: '56',
+      assetId: `56:${legacyMarketplaceContracts.bsc.contracts.token.toLowerCase()}:56`,
+      chainId: 56,
+      network: 'BSC',
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplaceSurface: 'legacy',
+      sellSurfaces: ['legacy'],
+      availableActions: ['sell'],
+    })]));
+
+    render(<MyCukiesPanel />);
+
+    await screen.findByRole('heading', { name: 'Cukie #56' });
+    expect(screen.queryByRole('link', { name: /Vender en UKI/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Vender' })).toHaveAttribute(
+      'href',
+      `/marketplace/56?source=legacy&network=BSC&collection=${legacyMarketplaceContracts.bsc.contracts.token}`,
     );
   });
 

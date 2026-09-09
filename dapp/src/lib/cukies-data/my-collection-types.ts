@@ -34,6 +34,8 @@ export type MyCukieCollectionItem = {
   saleKind: MyCukieSaleKind;
   /** Superficie que resuelve la identidad del activo, también cuando aún no está listado. */
   marketplaceSurface: MyCukieMarketplaceSurface;
+  /** Destinos de publicación disponibles para un activo en wallet. */
+  sellSurfaces?: Array<Exclude<MyCukieMarketplaceSurface, null>>;
   availableActions: MyCukieAction[];
   recoveryVaultAddress?: string | null;
   recoveryExitRequestedAt?: string | null;

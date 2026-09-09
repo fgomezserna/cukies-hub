@@ -67,12 +67,13 @@ function sameCollection(network: string, actual: string, expected: string) {
 export function resolveCukieSaleEligibility(input: CukieSaleEligibilityInput): {
   canSell: boolean;
   surface: CukieSaleSurface;
+  sellSurfaces: Array<Exclude<CukieSaleSurface, null>>;
 } {
   const network = typeof input.network === 'string' ? input.network.toUpperCase() : null;
   const collection = typeof input.collectionAddress === 'string'
     ? input.collectionAddress
     : null;
-  if (!network || !collection) return { canSell: false, surface: null };
+  if (!network || !collection) return { canSell: false, surface: null, sellSurfaces: [] };
 
   const guardsPass = input.ownerMatches
     && input.custody === 'wallet'
@@ -82,30 +83,42 @@ export function resolveCukieSaleEligibility(input: CukieSaleEligibilityInput): {
     : network === 'TRON'
       ? legacyMarketplaceContracts.tron.contracts.token
       : null;
-  if (
+  const legacyIdentity = Boolean(
     legacyCollection
     && sameCollection(network, collection, legacyCollection)
     && ((network === 'BSC' && input.chainId === 56) || (network === 'TRON' && input.chainId == null))
-  ) {
-    return { canSell: guardsPass, surface: 'legacy' };
-  }
+  );
 
-  // Una colección Legacy nunca se transforma en un anuncio V2 por una
-  // allowlist accidental o una configuración de red contradictoria.
+  // La identidad Legacy BSC56 atribuida a otra cadena no puede convertirse
+  // en V2; una allowlist V2 explícita en BSC56 sí es un destino válido.
   if (
     network === 'BSC'
+    && input.chainId !== 56
     && sameCollection(network, collection, legacyMarketplaceContracts.bsc.contracts.token)
-  ) return { canSell: false, surface: null };
+  ) return { canSell: false, surface: null, sellSurfaces: [] };
 
   const v2Collection = network === 'BSC'
     && (input.chainId === 56 || input.chainId === 97)
     && input.marketplace.chainId === input.chainId
     && input.marketplace.collectionAddresses.some((address) => sameCollection('BSC', collection, address));
-  if (v2Collection) {
-    return { canSell: guardsPass && input.marketplace.ready, surface: 'uki' };
+  const ukiIdentity = v2Collection && input.marketplace.ready;
+  const surfaces = [
+    ...(legacyIdentity ? ['legacy' as const] : []),
+    ...(ukiIdentity ? ['uki' as const] : []),
+  ];
+  if (surfaces.length > 0) {
+    return {
+      canSell: guardsPass,
+      surface: legacyIdentity ? 'legacy' : 'uki',
+      sellSurfaces: guardsPass ? surfaces : [],
+    };
   }
 
-  return { canSell: false, surface: null };
+  // Conserva la superficie V2 como identidad aunque todavía no esté lista,
+  // pero no ofrece el CTA hasta que la configuración sea utilizable.
+  if (v2Collection) return { canSell: false, surface: 'uki', sellSurfaces: [] };
+
+  return { canSell: false, surface: null, sellSurfaces: [] };
 }
 
 function legacySaleKind(document: CanonicalCukieDocument, walletNormalized: string, state: string) {
@@ -263,6 +276,7 @@ export async function listMyCukieCollectionFromDb(input: {
   walletAddress: string;
   now?: Date;
   config?: UkiNftVaultPublicConfig;
+  marketplaceConfig?: UkiMarketplaceEligibilityConfig;
 }): Promise<MyCukieCollectionData> {
   const walletNormalized = normalizeWalletAddress(input.walletAddress)?.toLowerCase() ?? null;
   if (!walletNormalized) throw new DomainValidationError('walletAddress no es una dirección EVM válida.');
@@ -456,7 +470,7 @@ export async function listMyCukieCollectionFromDb(input: {
       ownerMatches: ownerMatchesWallet(document, walletNormalized),
       custody,
       state,
-      marketplace: ukiMarketplacePublicConfig,
+      marketplace: input.marketplaceConfig ?? ukiMarketplacePublicConfig,
     });
     return {
       assetId,
@@ -472,7 +486,10 @@ export async function listMyCukieCollectionFromDb(input: {
       chainId,
       collectionAddress: String(document.collectionAddressNormalized).toLowerCase(),
       saleKind,
-      marketplaceSurface: saleEligibility.surface,
+      // Un anuncio activo conserva su origen reconciliado: una orden UKI no
+      // se convierte en Legacy aunque ambas rutas compartan colección y cadena.
+      marketplaceSurface: saleKind ?? saleEligibility.surface,
+      sellSurfaces: saleEligibility.sellSurfaces,
       availableActions: actionsForItem({
         custody,
         state,

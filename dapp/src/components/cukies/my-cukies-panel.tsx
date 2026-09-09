@@ -452,6 +452,13 @@ export function MyCukiesPanel() {
                         {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
                       </Link>
                     )}
+                    {cukie.state === 'available'
+                      && cukie.marketplaceSurface === 'legacy'
+                      && cukie.sellSurfaces?.includes('uki') ? (
+                      <Link href={ukiMarketplaceHref(cukie) ?? '/marketplace'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                        Vender en UKI <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </article>
