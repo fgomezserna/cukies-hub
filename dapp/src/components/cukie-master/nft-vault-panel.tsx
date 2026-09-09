@@ -26,6 +26,13 @@ import {
   type NftVaultPendingOperation,
   type NftVaultPendingPhase,
 } from '@/lib/nft-vault/pending-operations';
+import {
+  executeNftTransaction,
+  nftTransactionContextFromNullable,
+  nftTransactionContextMatches,
+  type NftTransactionClient,
+  type NftTransactionContext,
+} from '@/lib/nft-vault/transaction-lifecycle';
 import { useAuth } from '@/providers/auth-provider';
 
 const erc721CustodyAbi = [
@@ -123,6 +130,24 @@ function pendingLabel(operation: NftVaultPendingOperation) {
   } as const)[operation.action];
 }
 
+function nftTransactionError(reason: unknown) {
+  const raw = reason instanceof Error ? reason.message : String(reason ?? '');
+  const message = raw.toLowerCase();
+  if (message.includes('simulation_unavailable') || message.includes('simulation')) {
+    return 'No se pudo simular la operación. No se ha enviado ninguna transacción; actualiza el estado y vuelve a intentarlo cuando el RPC esté disponible.';
+  }
+  if (raw.startsWith('NFT_OPERATION_CONTEXT_CHANGED')) {
+    return 'La wallet, la red o el vault cambiaron durante la comprobación. No se ha enviado ninguna transacción; actualiza el estado antes de reintentarlo.';
+  }
+  if (message.includes('user rejected') || message.includes('user denied') || message.includes('rejected')) {
+    return 'La wallet canceló la firma. No se ha cambiado ninguna posición.';
+  }
+  if (message.includes('transaction_reverted') || message.includes('reverted')) {
+    return 'El contrato ha rechazado la operación. Revisa la colección, la red y el estado del Cukie antes de volver a intentarlo.';
+  }
+  return 'No se pudo completar la operación. Actualiza el estado y vuelve a intentarlo.';
+}
+
 export function CukieMasterNftVaultPanel() {
   const { user, isLoading: authLoading, walletType } = useAuth();
   const runtime = useAppRuntime();
@@ -132,6 +157,16 @@ export function CukieMasterNftVaultPanel() {
   const operationGuard = useGuardedOperation('nft-write');
   const operationGuardRef = useRef(operationGuard);
   operationGuardRef.current = operationGuard;
+  const writeContextRef = useRef({
+    wallet: address ?? null,
+    chainId: chainId ?? null,
+    vault: ukiNftVaults.cukieMasterNftVaultAddress ?? null,
+  });
+  writeContextRef.current = {
+    wallet: address ?? null,
+    chainId: chainId ?? null,
+    vault: ukiNftVaults.cukieMasterNftVaultAddress ?? null,
+  };
   const [phase, setPhase] = useState<Phase>('idle');
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -143,6 +178,14 @@ export function CukieMasterNftVaultPanel() {
   const operationLocksRef = useRef(new Set<string>());
   const statusResource = useAppRuntimeResource<PublicStatus>('master-nft', {
     enabled: Boolean(user?.walletAddress) && !authLoading,
+    validate: (value): value is PublicStatus => Boolean(
+      value
+      && typeof value === 'object'
+      && 'walletNormalized' in value
+      && typeof value.walletNormalized === 'string'
+      && runtime.address
+      && value.walletNormalized.toLowerCase() === runtime.address.toLowerCase(),
+    ),
   });
   const status = statusResource.data ?? null;
   const loading = statusResource.state === 'loading';
@@ -209,6 +252,14 @@ export function CukieMasterNftVaultPanel() {
   }, [serverConfig?.indexer.status]);
 
   useEffect(() => {
+    setPhase('idle');
+    setActiveAssetId(null);
+    setLatestTxHash(null);
+    setError(null);
+    setNotice(null);
+  }, [address, chainId]);
+
+  useEffect(() => {
     operationLocksRef.current.clear();
     setHydratedPendingKey(null);
     if (!pendingContext || !pendingKey) {
@@ -236,15 +287,24 @@ export function CukieMasterNftVaultPanel() {
     action: NftVaultPendingAction;
     phase: NftVaultPendingPhase;
     txHash: Hash;
+    context?: NftTransactionContext;
+    updateUi?: boolean;
   }) => {
-    if (!pendingContext || !input.asset.collectionAddress || !input.asset.tokenId) return null;
+    const storageContext = input.context
+      ? {
+        chainId: input.context.chainId,
+        walletAddress: input.context.wallet,
+        vaultAddress: input.context.vault,
+      }
+      : pendingContext;
+    if (!storageContext || !input.asset.collectionAddress || !input.asset.tokenId) return null;
     const now = Date.now();
     const storage = getNftVaultBrowserStorage();
-    const previous = loadPendingNftVaultOperations(storage, pendingContext)
+    const previous = loadPendingNftVaultOperations(storage, storageContext)
       .find((operation) => operation.assetId === input.asset.assetId);
     const operation: NftVaultPendingOperation = {
       version: 1,
-      ...pendingContext,
+      ...storageContext,
       assetId: input.asset.assetId,
       collectionAddress: input.asset.collectionAddress,
       tokenId: input.asset.tokenId,
@@ -255,14 +315,24 @@ export function CukieMasterNftVaultPanel() {
       updatedAt: now,
     };
     savePendingNftVaultOperation(storage, operation);
-    setPendingByAsset((current) => ({ ...current, [operation.assetId]: operation }));
+    if (input.updateUi !== false) {
+      setPendingByAsset((current) => ({ ...current, [operation.assetId]: operation }));
+    }
     return operation;
   }, [pendingContext]);
 
-  const clearPending = useCallback((assetId: string) => {
-    if (pendingContext) {
-      clearPendingNftVaultOperation(getNftVaultBrowserStorage(), pendingContext, assetId);
+  const clearPending = useCallback((assetId: string, input: { context?: NftTransactionContext; updateUi?: boolean } = {}) => {
+    const storageContext = input.context
+      ? {
+        chainId: input.context.chainId,
+        walletAddress: input.context.wallet,
+        vaultAddress: input.context.vault,
+      }
+      : pendingContext;
+    if (storageContext) {
+      clearPendingNftVaultOperation(getNftVaultBrowserStorage(), storageContext, assetId);
     }
+    if (input.updateUi === false) return;
     setPendingByAsset((current) => {
       if (!current[assetId]) return current;
       const next = { ...current };
@@ -349,26 +419,41 @@ export function CukieMasterNftVaultPanel() {
     action: NftVaultPendingAction,
   ) {
     const currentGuard = operationGuardRef.current;
-    if (!currentGuard.ready) {
-      if (currentGuard.reason === 'wrong_chain') await currentGuard.switchToTarget();
-      throw new Error(`NFT_OPERATION_${currentGuard.reason.toUpperCase()}`);
+    if (!publicClient) throw new Error('NFT_OPERATION_PUBLIC_CLIENT_UNAVAILABLE');
+    const expectedWallet = address;
+    const expectedChainId = ukiNftVaults.chainId;
+    const expectedVault = ukiNftVaults.cukieMasterNftVaultAddress;
+    if (!expectedWallet || !expectedChainId || !expectedVault) {
+      throw new Error('NFT_OPERATION_CONTEXT_CHANGED');
     }
-    if (!publicClient) throw new Error('PUBLIC_CLIENT_UNAVAILABLE');
-    const hash = await writeContractAsync(input);
-    setLatestTxHash(hash);
-    persistPending({ asset, action, phase: 'awaiting_receipt', txHash: hash });
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== 'success') {
-      clearPending(asset.assetId);
-      throw new Error('TRANSACTION_REVERTED');
-    }
-    persistPending({
-      asset,
-      action,
-      phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
-      txHash: hash,
+    const expectedContext: NftTransactionContext = {
+      wallet: expectedWallet,
+      chainId: expectedChainId,
+      vault: expectedVault,
+    };
+    return executeNftTransaction({
+      request: input as Record<string, unknown>,
+      client: publicClient as unknown as NftTransactionClient,
+      guard: currentGuard,
+      expectedContext,
+      currentContext: () => nftTransactionContextFromNullable(writeContextRef.current),
+      isReady: () => operationGuardRef.current.ready,
+      write: (request) => writeContractAsync(request as Parameters<typeof writeContractAsync>[0]),
+      errorPrefix: 'NFT_OPERATION',
+      onSubmitted: (hash, isCurrent) => {
+        if (isCurrent) setLatestTxHash(hash);
+        persistPending({ asset, action, phase: 'awaiting_receipt', txHash: hash, context: expectedContext, updateUi: isCurrent });
+      },
+      onReverted: (isCurrent) => clearPending(asset.assetId, { context: expectedContext, updateUi: isCurrent }),
+      onConfirmed: (hash, isCurrent) => persistPending({
+        asset,
+        action,
+        phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
+        txHash: hash,
+        context: expectedContext,
+        updateUi: isCurrent,
+      }),
     });
-    return hash;
   }
 
   async function mutate(asset: PublicNft, operation: Operation) {
@@ -403,6 +488,13 @@ export function CukieMasterNftVaultPanel() {
     setError(null);
     setNotice(null);
     setLatestTxHash(null);
+    const operationContext: NftTransactionContext = {
+      wallet: address,
+      chainId: ukiNftVaults.chainId,
+      vault: ukiNftVaults.cukieMasterNftVaultAddress,
+    };
+    const identityMatches = () => nftTransactionContextMatches(operationContext, writeContextRef.current);
+    const operationReady = () => operationGuardRef.current.ready && identityMatches();
     try {
       if (operation === 'deposit') {
         if (!asset.canDeposit || !publicClient) throw new Error('DEPOSIT_NOT_ALLOWED');
@@ -422,6 +514,7 @@ export function CukieMasterNftVaultPanel() {
             args: [vaultAddress, tokenId],
           }, asset, 'approval');
         }
+        if (!operationReady()) throw new Error('NFT_OPERATION_CONTEXT_CHANGED');
         setPhase('depositing');
         await writeAndConfirm({
           chainId: ukiNftVaults.chainId,
@@ -441,11 +534,14 @@ export function CukieMasterNftVaultPanel() {
           args: [collection, tokenId],
         }, asset, 'withdraw');
       }
+      if (!operationReady()) throw new Error('NFT_OPERATION_CONTEXT_CHANGED_AFTER_RECEIPT');
       setPhase('syncing');
       setNotice('Operación confirmada. Actualizando el estado de tu Cukie…');
       await runtime.refreshAfterTransaction('master-nft');
+      if (!identityMatches()) throw new Error('NFT_OPERATION_CONTEXT_CHANGED');
       setNotice('Transacción confirmada. Estamos actualizando el inventario; no repitas la operación.');
-    } catch {
+    } catch (reason) {
+      if (!identityMatches()) return;
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
           .find((item) => item.assetId === asset.assetId)
@@ -455,11 +551,13 @@ export function CukieMasterNftVaultPanel() {
           ? 'La aprobación quedó confirmada. Pulsa «Continuar staking» cuando quieras reanudar el depósito.'
           : 'La operación ya tiene transacción. Seguiremos comprobándola automáticamente; no la repitas.');
       } else {
-        setError('La wallet rechazó la operación antes de crear una transacción, o la transacción fue revertida.');
+        setError(nftTransactionError(reason));
       }
     } finally {
-      setPhase('idle');
-      setActiveAssetId(null);
+      if (identityMatches()) {
+        setPhase('idle');
+        setActiveAssetId(null);
+      }
       operationLocksRef.current.delete(asset.assetId);
     }
   }
@@ -478,7 +576,7 @@ export function CukieMasterNftVaultPanel() {
         </p>
         {status ? (
           <p className="mt-3 text-xs font-semibold text-[var(--uki-muted)]">
-            {assets.length} Cukies Originales disponibles o depositados · {eligibleAssetCount} con una acción disponible
+            {assets.length} Cukies Originales en tu colección · {eligibleAssetCount} con una acción disponible
           </p>
         ) : null}
 

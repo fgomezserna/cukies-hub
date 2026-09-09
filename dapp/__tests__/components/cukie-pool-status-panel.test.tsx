@@ -4,6 +4,11 @@ import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'w
 
 import { CukiePoolStatusPanel } from '@/components/cukie-pool/status-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
+import {
+  pendingNftVaultStorageKey,
+  savePendingNftVaultOperation,
+  type NftVaultPendingOperation,
+} from '@/lib/nft-vault/pending-operations';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
 import { usePathname } from 'next/navigation';
@@ -190,6 +195,23 @@ function successfulResponse(data: ReturnType<typeof poolStatus>) {
   return { ok: true, json: async () => ({ status: 'ok', data }) };
 }
 
+function pendingDeposit(asset = availableAsset()): NftVaultPendingOperation {
+  return {
+    version: 1,
+    chainId: 97,
+    walletAddress,
+    vaultAddress,
+    assetId: asset.assetId,
+    collectionAddress: asset.collectionAddress,
+    tokenId: asset.tokenId,
+    action: 'deposit',
+    phase: 'syncing_projection',
+    txHash: depositHash,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+
 describe('CukiePoolStatusPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -262,6 +284,67 @@ describe('CukiePoolStatusPanel', () => {
       'data-src',
       'https://example.com/cukies/8.png',
     );
+  });
+
+  it('retains the last known Pool list while a degraded source returns empty arrays', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({ address: walletAddress, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({ simulateContract: jest.fn(), readContract: jest.fn(), waitForTransactionReceipt: jest.fn() } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const known = poolStatus({ availableAssets: [availableAsset('8')], positions: [position({ tokenId: '7' })] });
+    fetchMock
+      .mockResolvedValueOnce(successfulResponse(known))
+      .mockResolvedValueOnce(successfulResponse(poolStatus({ indexerStatus: 'unavailable' })))
+      .mockResolvedValueOnce(successfulResponse(known));
+
+    render(<CukiePoolStatusPanel />);
+    expect(await screen.findByText('1 Cukie para aportar')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    expect(await screen.findByText(/Estamos actualizando tus Cukies/i)).toBeInTheDocument();
+    expect(screen.getByText('1 Cukie para aportar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Aportar este Cukie/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    await waitFor(() => expect(screen.queryByText(/Estamos actualizando tus Cukies/i)).not.toBeInTheDocument());
+    expect(screen.getByText('1 Cukie para aportar')).toBeInTheDocument();
+  });
+
+  it('keeps a pending deposit card when a healthy response temporarily omits the asset', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({ address: walletAddress, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({ simulateContract: jest.fn(), readContract: jest.fn(), waitForTransactionReceipt: jest.fn() } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const asset = availableAsset();
+    savePendingNftVaultOperation(window.localStorage, pendingDeposit(asset));
+    const known = poolStatus({ availableAssets: [asset] });
+    fetchMock
+      .mockResolvedValueOnce(successfulResponse(known))
+      .mockResolvedValueOnce(successfulResponse(poolStatus()));
+
+    render(<CukiePoolStatusPanel />);
+    expect(await screen.findByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    expect(await screen.findByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
+    expect(screen.getByRole('img', { name: 'Cukie #7' })).toBeInTheDocument();
+  });
+
+  it('does not retain another wallet list after the Pool identity changes', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({ address: walletAddress, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({ simulateContract: jest.fn(), readContract: jest.fn(), waitForTransactionReceipt: jest.fn() } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock
+      .mockResolvedValueOnce(successfulResponse(poolStatus({ availableAssets: [availableAsset('8')] })))
+      .mockResolvedValueOnce(successfulResponse(poolStatus()));
+    const view = render(<CukiePoolStatusPanel />);
+    expect(await screen.findByText('1 Cukie para aportar')).toBeInTheDocument();
+
+    const otherWallet = '0x9999999999999999999999999999999999999999';
+    mockUseAuth.mockReturnValue(authValue({ walletAddress: otherWallet } as User, 'evm'));
+    mockUseAccount.mockReturnValue({ address: otherWallet, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    view.rerender(<CukiePoolStatusPanel />);
+    await waitFor(() => expect(screen.queryByText('1 Cukie para aportar')).not.toBeInTheDocument());
+    expect(screen.queryByRole('img', { name: 'Cukie #8' })).not.toBeInTheDocument();
   });
 
   it('approves and deposits on-chain before accepting the canonical projection', async () => {
@@ -369,10 +452,53 @@ describe('CukiePoolStatusPanel', () => {
     rerenderPanel = view.rerender;
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
 
-    await waitFor(() => expect(screen.getAllByRole('alert').some((alert) => (
-      /wallet.*red.*vault cambiaron/i.test(alert.textContent ?? '')
-    ))).toBe(true));
+    expect(await screen.findByText(/Cambia tu wallet a la red correcta/i)).toBeInTheDocument();
+    expect(screen.queryByText(/wallet, la red o el vault cambiaron/i)).not.toBeInTheDocument();
     expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('conserva el receipt pendiente en la wallet original si cambia durante la espera', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    let accountState = {
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    };
+    mockUseAccount.mockImplementation(() => accountState as unknown as ReturnType<typeof useAccount>);
+    const resolveReceipt = jest.fn();
+    const receiptPromise = new Promise<{ status: string }>((resolve) => {
+      resolveReceipt.mockImplementation(resolve);
+    });
+    const waitForTransactionReceipt = jest.fn().mockReturnValue(receiptPromise);
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn()
+        .mockResolvedValueOnce(walletAddress)
+        .mockResolvedValueOnce(vaultAddress)
+        .mockResolvedValueOnce(true),
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
+      waitForTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    writeContractAsync.mockResolvedValueOnce(depositHash);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    const view = render(<CukiePoolStatusPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
+    await waitFor(() => expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash }));
+
+    const otherWallet = '0x9999999999999999999999999999999999999999';
+    accountState = { address: otherWallet, chainId: 97, isConnected: true };
+    mockUseAuth.mockReturnValue(authValue({ walletAddress: otherWallet } as User, 'evm'));
+    view.rerender(<CukiePoolStatusPanel />);
+    await waitFor(() => expect(screen.queryByText(/Aportar este Cukie/i)).not.toBeInTheDocument());
+
+    await act(async () => resolveReceipt({ status: 'success' }));
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem(pendingNftVaultStorageKey({
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    }))).toContain(depositHash);
   });
 
   it('explica un inventario stale cuando ownerOf ya no pertenece a la wallet', async () => {

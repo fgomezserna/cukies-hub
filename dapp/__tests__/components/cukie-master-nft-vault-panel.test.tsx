@@ -64,11 +64,13 @@ const fetchMock = jest.fn();
 const readContract = jest.fn();
 const getTransactionReceipt = jest.fn();
 const waitForTransactionReceipt = jest.fn();
+const simulateContract = jest.fn();
 const writeContractAsync = jest.fn();
 
 function status(input: { indexer?: 'ready' | 'syncing' | 'unavailable'; deposited?: boolean } = {}) {
   const deposited = input.deposited ?? false;
   return {
+    walletNormalized: wallet,
     nftCustody: {
       mode: 'custodial',
       chainId: 97,
@@ -133,10 +135,11 @@ describe('CukieMasterNftVaultPanel', () => {
     } as never);
     mockUseAccount.mockReturnValue({ address: wallet, chainId: 97, isConnected: true } as never);
     mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as never);
-    mockUsePublicClient.mockReturnValue({ readContract, getTransactionReceipt, waitForTransactionReceipt } as never);
+    mockUsePublicClient.mockReturnValue({ readContract, getTransactionReceipt, waitForTransactionReceipt, simulateContract } as never);
     mockUseWriteContract.mockReturnValue({ writeContractAsync } as never);
     mockUsePathname.mockReturnValue('/cukie-master');
     waitForTransactionReceipt.mockResolvedValue({ status: 'success' });
+    simulateContract.mockResolvedValue({});
     getTransactionReceipt.mockRejectedValue(new Error('receipt not available yet'));
   });
 
@@ -263,8 +266,24 @@ describe('CukieMasterNftVaultPanel', () => {
     render(<CukieMasterNftVaultPanel />);
     fireEvent.click(await screen.findByRole('button', { name: /Hacer staking/i }));
 
-    expect(await screen.findByText(/rechazó la operación antes de crear una transacción/i)).toBeInTheDocument();
+    expect(await screen.findByText(/wallet canceló la firma/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeEnabled();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('no firma si la simulación del depósito falla', async () => {
+    fetchMock.mockResolvedValue(response(status()));
+    readContract
+      .mockResolvedValueOnce(wallet)
+      .mockResolvedValueOnce(vault)
+      .mockResolvedValueOnce(true);
+    simulateContract.mockRejectedValueOnce(new Error('ContractFunctionRevertedError: CollectionNotAllowed'));
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Hacer staking/i }));
+
+    expect(await screen.findByText(/No se pudo simular la operación/i)).toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalled();
     expect(localStorage.length).toBe(0);
   });
 
@@ -287,7 +306,7 @@ describe('CukieMasterNftVaultPanel', () => {
 
     render(<CukieMasterNftVaultPanel />);
 
-    expect(await screen.findByText('6 Cukies Originales disponibles o depositados · 6 con una acción disponible')).toBeInTheDocument();
+    expect(await screen.findByText('6 Cukies Originales en tu colección · 6 con una acción disponible')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Hacer staking/i })).toHaveLength(6);
     expect(screen.queryByText('Cukie #98000007')).not.toBeInTheDocument();
     expect(screen.queryByText('Solo cuentan Cukies Originales')).not.toBeInTheDocument();

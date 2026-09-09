@@ -33,6 +33,7 @@ import { CUKIE_MASTER_ORIGINAL_RARITY_POINTS } from '../rules';
 import { listCanonicalCukieMasterNftPositions } from './nft-vault-source';
 import { createMongoCukieMasterRepository } from './repository';
 import { createCukieMasterService } from './service';
+import { readPoolRecoveryPositions } from '../cukie-pool/recovery-read';
 
 export type CukieMasterNftOperation = 'soft_stake' | 'unstake';
 
@@ -257,6 +258,8 @@ export function buildCukieMasterCustodialDepositInventory(input: {
   locks: NftAssetLockDocument[];
   openVaultPositions: OpenNftVaultPositionDocument[];
   config: UkiNftVaultPublicConfig;
+  /** Assets confirmed in another/current vault remain visible but blocked. */
+  custodyBlockers?: ReadonlyMap<string, NftInventoryBlocker>;
 }) {
   const config = custodialInventoryConfig(input.config);
   const grouped = new Map<string, CanonicalCustodialCandidate[]>();
@@ -330,6 +333,9 @@ export function buildCukieMasterCustodialDepositInventory(input: {
       throw new SchemaNotReadyError(`No se pudo normalizar ${candidate.assetId}.`);
     }
     const blockers = [...new Set<NftInventoryBlocker>([
+      ...(input.custodyBlockers?.has(candidate.assetId)
+        ? [input.custodyBlockers.get(candidate.assetId)!]
+        : []),
       ...(rejected?.blockers ?? []),
       ...(!ownerIdentityValid
         ? [normalizedAsset?.ownerWallet ? 'owner_mismatch' : 'unknown_owner'] as const
@@ -346,7 +352,9 @@ export function buildCukieMasterCustodialDepositInventory(input: {
       rarityPoints: eligible?.rarityPoints ?? null,
       contributesToCukieMaster: false,
       contributionPoints: 0,
-      state: asset.canonicalState,
+      state: input.custodyBlockers?.has(candidate.assetId)
+        ? 'unknown'
+        : asset.canonicalState,
       custody: 'wallet' as const,
       custodyMode: 'custodial' as const,
       depositEpoch: null,
@@ -354,6 +362,7 @@ export function buildCukieMasterCustodialDepositInventory(input: {
       lock: null,
       canDeposit: Boolean(
         eligible
+        && !input.custodyBlockers?.has(candidate.assetId)
         && asset.generation === 'original'
         && asset.canonicalState === 'available'
       ),
@@ -449,7 +458,30 @@ export async function custodialInventoryFromDb(
         assetId: { $in: lockAssetIds },
         status: 'active',
       }, { session }).toArray(),
-    ]);
+      ]);
+  const recovery = await readPoolRecoveryPositions({
+    walletNormalized: normalizeWalletAddress(walletAddress),
+    vaults: publicConfig.poolRecoveryVaults ?? [],
+    activeVaultAddress: publicConfig.cukieMasterNftVaultAddress,
+    activeVaultAddresses: publicConfig.cukiePoolNftVaultAddress
+      ? [publicConfig.cukiePoolNftVaultAddress]
+      : [],
+    activeVaultChainId: config.chainId,
+    assets: inspected.map((candidate) => ({
+      chainId: config.chainId,
+      collectionAddress: candidate.collectionAddress,
+      tokenId: candidate.tokenId,
+    })),
+  });
+  const custodyBlockers = new Map<string, NftInventoryBlocker>();
+  for (const item of recovery) {
+    if (item.status === 'custodied') custodyBlockers.set(item.assetId, 'in_pool');
+    else if (item.status === 'current_custody' || item.status === 'unknown') {
+      // ownerOf is ahead of projection or inconclusive: never offer a
+      // deposit/stake action until the owner and position are unambiguous.
+      custodyBlockers.set(item.assetId, 'unknown_state');
+    }
+  }
   const available = buildCukieMasterCustodialDepositInventory({
     walletAddress,
     now,
@@ -457,6 +489,7 @@ export async function custodialInventoryFromDb(
     locks,
     openVaultPositions: [...masterPositions, ...poolPositions],
     config: publicConfig,
+    custodyBlockers,
   });
   return [...available, ...custodied].sort((left, right) => (
     (left.canonicalAssetId ?? left.assetId).localeCompare(right.canonicalAssetId ?? right.assetId)

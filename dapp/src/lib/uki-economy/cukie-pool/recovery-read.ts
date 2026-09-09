@@ -34,7 +34,7 @@ export type PoolRecoveryAssetInput = {
 
 export type PoolRecoveryInspection = {
   assetId: string;
-  status: 'custodied' | 'not_found' | 'unknown';
+  status: 'custodied' | 'current_custody' | 'not_found' | 'unknown';
   vaultAddress: string | null;
   beneficialOwner: string | null;
   exitRequestedAt: string | null;
@@ -51,7 +51,16 @@ export function mergePoolRecoveryInspection(
   next: PoolRecoveryInspection,
 ): PoolRecoveryInspection {
   if (!previous) return next;
+  if (previous.status === 'current_custody') {
+    if (next.status === 'custodied') {
+      return unknownResult(next.assetId, 'POOL_RECOVERY_VAULT_AMBIGUOUS');
+    }
+    return previous;
+  }
   if (previous.status === 'custodied') {
+    if (next.status === 'current_custody') {
+      return unknownResult(next.assetId, 'POOL_RECOVERY_VAULT_AMBIGUOUS');
+    }
     if (
       next.status === 'custodied'
       && previous.vaultAddress
@@ -60,7 +69,7 @@ export function mergePoolRecoveryInspection(
     ) return unknownResult(next.assetId, 'POOL_RECOVERY_VAULT_AMBIGUOUS');
     return previous;
   }
-  if (next.status === 'custodied') return next;
+  if (next.status === 'custodied' || next.status === 'current_custody') return next;
   return previous;
 }
 
@@ -133,17 +142,39 @@ export function classifyPoolRecoveryRead(input: {
   assetId: string;
   walletNormalized: string;
   vaultAddress: string;
+  activeVaultAddress?: string | null;
+  activeVaultAddresses?: string[];
   owner: unknown;
   rawPosition: unknown;
 }): PoolRecoveryInspection {
   const ownerNormalized = typeof input.owner === 'string' && isAddress(input.owner, { strict: false })
     ? input.owner.toLowerCase()
     : null;
+  // `multicall(..., allowFailure: true)` reports a reverted ownerOf as an
+  // absent result. It is a source read failure, not proof that this asset is
+  // owned by somebody else; callers must not turn it into a healthy omission.
+  if (!ownerNormalized) {
+    return unknownResult(input.assetId, 'POOL_RECOVERY_RPC_READ_FAILED');
+  }
   if (ownerNormalized === input.walletNormalized.toLowerCase()) {
     return {
       assetId: input.assetId,
       status: 'not_found',
       vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    };
+  }
+  const activeVaultAddresses = [
+    ...(input.activeVaultAddress ? [input.activeVaultAddress] : []),
+    ...(input.activeVaultAddresses ?? []),
+  ].map((address) => address.toLowerCase());
+  if (ownerNormalized && activeVaultAddresses.includes(ownerNormalized)) {
+    return {
+      assetId: input.assetId,
+      status: 'current_custody',
+      vaultAddress: ownerNormalized,
       beneficialOwner: null,
       exitRequestedAt: null,
       withdrawableAt: null,
@@ -166,7 +197,12 @@ export function classifyPoolRecoveryRead(input: {
     || !depositEpoch
     || !exitRequestedAt
     || !withdrawableAt
-  ) return unknownResult(input.assetId, 'POOL_RECOVERY_POSITION_INVALID');
+  ) return unknownResult(
+    input.assetId,
+    input.rawPosition == null
+      ? 'POOL_RECOVERY_RPC_READ_FAILED'
+      : 'POOL_RECOVERY_POSITION_INVALID',
+  );
   if (beneficialOwnerNormalized !== input.walletNormalized.toLowerCase()) {
     return unknownResult(input.assetId, 'POOL_RECOVERY_OWNER_MISMATCH');
   }
@@ -181,13 +217,17 @@ export function classifyPoolRecoveryRead(input: {
 }
 
 /**
- * Reads only explicitly configured former Pool vaults. A failed read is kept
- * as `unknown` so callers never turn a custody check into an empty inventory.
+ * Reads current vaults for receipt/projection transitions and only explicitly
+ * configured former Pool vaults for recovery. A failed read is kept as
+ * `unknown` so callers never turn a custody check into an empty inventory.
  */
 export async function readPoolRecoveryPositions(input: {
   walletNormalized: string;
   assets: PoolRecoveryAssetInput[];
   vaults?: UkiPoolRecoveryVault[];
+  activeVaultAddress?: string | null;
+  activeVaultAddresses?: string[];
+  activeVaultChainId?: 56 | 97;
 }): Promise<PoolRecoveryInspection[]> {
   const vaults = input.vaults ?? ukiNftVaults.poolRecoveryVaults ?? [];
   const assets = input.assets
@@ -199,7 +239,18 @@ export async function readPoolRecoveryPositions(input: {
   const configuredVaults = vaults.filter((vault) => (
     (vault.chainId === 56 || vault.chainId === 97) && isAddress(vault.vaultAddress)
   ));
-  if (configuredVaults.length === 0) {
+  const hasActiveProbe = Boolean(
+    input.activeVaultChainId
+    && [
+      ...(input.activeVaultAddress ? [input.activeVaultAddress] : []),
+      ...(input.activeVaultAddresses ?? []),
+    ].some((address) => isAddress(address)),
+  );
+  const activeVaultAddresses = [
+    ...(input.activeVaultAddress ? [input.activeVaultAddress] : []),
+    ...(input.activeVaultAddresses ?? []),
+  ].filter((address) => isAddress(address));
+  if (configuredVaults.length === 0 && !hasActiveProbe) {
     return assets.map((asset) => ({
       assetId: asset.assetId,
       status: 'not_found' as const,
@@ -210,8 +261,13 @@ export async function readPoolRecoveryPositions(input: {
     }));
   }
   const recoveryChainIds = new Set(configuredVaults.map((vault) => vault.chainId));
+  if (hasActiveProbe) recoveryChainIds.add(input.activeVaultChainId!);
   const assetsRequiringRecovery = assets.filter((asset) => recoveryChainIds.has(asset.chainId));
-  if (assetsRequiringRecovery.length > MAX_RECOVERY_ASSETS) {
+  // The historical probe is bounded because it may include one ownerOf and
+  // positionOf pair per configured former vault. An active-vault-only probe
+  // remains useful during the receipt/projection race and must not change the
+  // existing 500-row collection limit when no former vault is configured.
+  if (configuredVaults.length > 0 && assetsRequiringRecovery.length > MAX_RECOVERY_ASSETS) {
     const oversized = new Set(assetsRequiringRecovery.map((asset) => asset.assetId));
     return assets.map((asset) => oversized.has(asset.assetId)
       ? unknownResult(asset.assetId, 'POOL_RECOVERY_ASSET_LIMIT')
@@ -241,10 +297,13 @@ export async function readPoolRecoveryPositions(input: {
   for (const chainId of [56, 97] as const) {
     const chainVaults = configuredVaults.filter((vault) => vault.chainId === chainId);
     const chainAssets = assets.filter((asset) => asset.chainId === chainId);
+    const activeAssets = hasActiveProbe && input.activeVaultChainId === chainId
+      ? chainAssets
+      : [];
     // No allowlisted former vault on this chain means there is no historical
     // custody source to inspect; keep the asset available for normal flow.
     if (chainAssets.length === 0) continue;
-    if (chainVaults.length === 0) {
+    if (chainVaults.length === 0 && activeAssets.length === 0) {
       chainAssets.forEach((asset) => inspections.set(asset.assetId, {
         assetId: asset.assetId,
         status: 'not_found',
@@ -264,7 +323,20 @@ export async function readPoolRecoveryPositions(input: {
       continue;
     }
     const contracts: ContractFunctionParameters[] = [];
-    const lookups: Array<{ asset: typeof chainAssets[number]; vault: typeof chainVaults[number] }> = [];
+    const lookups: Array<{
+      asset: typeof chainAssets[number];
+      vault: typeof chainVaults[number] | null;
+      active: boolean;
+    }> = [];
+    for (const asset of activeAssets) {
+      contracts.push({
+        address: asset.collectionAddress as Address,
+        abi: nftOwnerAbi,
+        functionName: 'ownerOf',
+        args: [BigInt(asset.tokenId)],
+      });
+      lookups.push({ asset, vault: null, active: true });
+    }
     for (const vault of chainVaults) {
       for (const asset of chainAssets) {
         contracts.push(
@@ -281,7 +353,7 @@ export async function readPoolRecoveryPositions(input: {
             args: [asset.collectionAddress as Address, BigInt(asset.tokenId)],
           },
         );
-        lookups.push({ asset, vault });
+        lookups.push({ asset, vault, active: false });
       }
     }
     try {
@@ -294,12 +366,26 @@ export async function readPoolRecoveryPositions(input: {
         12_000,
       );
       lookups.forEach(({ asset, vault }, index) => {
-        const owner = successfulResult(results[index * 2]);
-        const rawPosition = successfulResult(results[index * 2 + 1]);
+        const active = lookups[index].active;
+        const resultOffset = active
+          ? index
+          : activeAssets.length + (index - activeAssets.length) * 2;
+        const owner = successfulResult(results[resultOffset]);
+        const rawPosition = active ? null : successfulResult(results[resultOffset + 1]);
         const classified = classifyPoolRecoveryRead({
           assetId: asset.assetId,
           walletNormalized: input.walletNormalized,
-          vaultAddress: vault.vaultAddress,
+          vaultAddress: active
+            ? input.activeVaultAddress ?? activeVaultAddresses[0]!
+            : vault!.vaultAddress,
+          // Never apply a chain-97 active-vault identity while inspecting a
+          // historical chain-56 vault (or vice versa).
+          activeVaultAddress: active && input.activeVaultChainId === chainId
+            ? input.activeVaultAddress
+            : null,
+          activeVaultAddresses: active && input.activeVaultChainId === chainId
+            ? activeVaultAddresses
+            : [],
           owner,
           rawPosition,
         });

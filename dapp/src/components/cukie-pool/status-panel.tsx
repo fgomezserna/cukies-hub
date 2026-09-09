@@ -36,6 +36,14 @@ import {
   type NftVaultPendingOperation,
   type NftVaultPendingPhase,
 } from '@/lib/nft-vault/pending-operations';
+import {
+  executeNftTransaction,
+  nftTransactionContextFromNullable,
+  nftTransactionContextMatches,
+  retainNftVaultLists,
+  type NftTransactionClient,
+  type NftTransactionContext,
+} from '@/lib/nft-vault/transaction-lifecycle';
 import { useAuth } from '@/providers/auth-provider';
 
 const erc721CustodyAbi = [
@@ -195,10 +203,16 @@ function poolGuardLabel(input: {
 function poolTransactionError(reason: unknown) {
   const raw = reason instanceof Error ? reason.message : String(reason ?? '');
   const message = raw.toLowerCase();
-  if (message.includes('pool_simulation_unavailable')) {
+  if (message.includes('simulation_unavailable')) {
     return 'No se pudo ejecutar la simulación previa del Pool. No se ha enviado ninguna transacción; actualiza la página o inténtalo cuando el RPC esté disponible.';
   }
-  if (message.includes('user rejected') || message.includes('user denied') || message.includes('rejected')) {
+  if (message.includes('simulation_rejected')) {
+    if (message.includes('collectionnotallowed') || message.includes('invalidcollection')) {
+      return 'El contrato no permite esta colección en el Pool configurado. No se ha movido ningún NFT.';
+    }
+    return 'La simulación del contrato ha rechazado la operación. No se ha enviado ninguna transacción; revisa el estado antes de firmar.';
+  }
+  if (message.includes('user rejected') || message.includes('user denied')) {
     return 'La wallet canceló la firma. No se ha cambiado ninguna posición.';
   }
   if (raw.startsWith('POOL_OPERATION_')) {
@@ -270,6 +284,30 @@ function projectionMatchesPoolOperation(
     return !position || position.status === 'withdrawn' || !position.lifecycleOpen;
   }
   return false;
+}
+
+function mergePendingPoolAssets(
+  status: PoolStatus,
+  previous: PoolStatus | null,
+  pendingByAsset: Record<string, NftVaultPendingOperation>,
+) {
+  if (status.mode !== 'custodial_vault' || !previous || previous.mode !== 'custodial_vault') return status;
+  const availableAssets = [...status.availableAssets];
+  for (const operation of Object.values(pendingByAsset)) {
+    if (
+      operation.action !== 'deposit'
+      || operation.walletAddress.toLowerCase() !== status.walletNormalized.toLowerCase()
+      || operation.chainId !== status.nftCustody.chainId
+      || operation.vaultAddress.toLowerCase() !== status.nftCustody.vaultAddress.toLowerCase()
+      || !availableAssets.every((asset) => asset.assetId !== operation.assetId)
+    ) continue;
+    if (status.positions.some((position) => position.assetId === operation.assetId)) continue;
+    const previousAsset = previous.availableAssets.find((asset) => asset.assetId === operation.assetId);
+    if (previousAsset) availableAssets.push(previousAsset);
+  }
+  return availableAssets.length === status.availableAssets.length
+    ? status
+    : { ...status, availableAssets };
 }
 
 function scheduleSummary(position: CustodialPosition) {
@@ -366,10 +404,50 @@ export function CukiePoolStatusPanel() {
   const walletOperationLockRef = useRef(false);
   const statusResource = useAppRuntimeResource<PoolStatus>('pool', {
     enabled: Boolean(user?.walletAddress) && !authLoading,
+    validate: (value): value is PoolStatus => Boolean(
+      value
+      && typeof value === 'object'
+      && 'walletNormalized' in value
+      && typeof value.walletNormalized === 'string'
+      && runtime.address
+      && value.walletNormalized.toLowerCase() === runtime.address.toLowerCase(),
+    ),
   });
-  const status = statusResource.data ?? null;
+  const fetchedStatus = statusResource.data ?? null;
+  const statusIdentityKey = [
+    user?.walletAddress?.toLowerCase() ?? '',
+    chainId ?? '',
+    ukiNftVaults.cukiePoolNftVaultAddress?.toLowerCase() ?? '',
+  ].join(':');
+  const lastStatusIdentityRef = useRef(statusIdentityKey);
+  const lastHealthyStatusRef = useRef<PoolStatus | null>(null);
+  if (lastStatusIdentityRef.current !== statusIdentityKey) {
+    lastStatusIdentityRef.current = statusIdentityKey;
+    lastHealthyStatusRef.current = null;
+  }
+  const status = useMemo(() => {
+    if (!fetchedStatus) return null;
+    const retained = fetchedStatus.sourceHealthy
+      ? fetchedStatus
+      : retainNftVaultLists(fetchedStatus, lastHealthyStatusRef.current);
+    return mergePendingPoolAssets(retained, lastHealthyStatusRef.current, pendingByAsset);
+  }, [fetchedStatus, pendingByAsset]);
+  useEffect(() => {
+    if (fetchedStatus?.sourceHealthy) {
+      lastHealthyStatusRef.current = mergePendingPoolAssets(fetchedStatus, lastHealthyStatusRef.current, pendingByAsset);
+    }
+  }, [fetchedStatus, pendingByAsset]);
   const loadState = statusResource.state === 'stale' ? 'ready' : statusResource.state;
   const refreshStatusQuery = statusResource.refresh;
+
+  useEffect(() => {
+    setPhase('idle');
+    setMutatingAssetId(null);
+    setLatestTxHash(null);
+    setError(null);
+    setNotice(null);
+    walletOperationLockRef.current = false;
+  }, [address, chainId]);
 
   function refreshStatus() {
     void refreshStatusQuery();
@@ -420,15 +498,24 @@ export function CukiePoolStatusPanel() {
     action: NftVaultPendingAction;
     phase: NftVaultPendingPhase;
     txHash: Hash;
+    context?: NftTransactionContext;
+    updateUi?: boolean;
   }) => {
-    if (!pendingContext) return null;
+    const storageContext = input.context
+      ? {
+        chainId: input.context.chainId,
+        walletAddress: input.context.wallet,
+        vaultAddress: input.context.vault,
+      }
+      : pendingContext;
+    if (!storageContext) return null;
     const now = Date.now();
     const storage = getNftVaultBrowserStorage();
-    const previous = loadPendingNftVaultOperations(storage, pendingContext)
+    const previous = loadPendingNftVaultOperations(storage, storageContext)
       .find((operation) => operation.assetId === input.asset.assetId);
     const operation: NftVaultPendingOperation = {
       version: 1,
-      ...pendingContext,
+      ...storageContext,
       assetId: input.asset.assetId,
       collectionAddress: input.asset.collectionAddress,
       tokenId: input.asset.tokenId,
@@ -439,14 +526,24 @@ export function CukiePoolStatusPanel() {
       updatedAt: now,
     };
     savePendingNftVaultOperation(storage, operation);
-    setPendingByAsset((current) => ({ ...current, [operation.assetId]: operation }));
+    if (input.updateUi !== false) {
+      setPendingByAsset((current) => ({ ...current, [operation.assetId]: operation }));
+    }
     return operation;
   }, [pendingContext]);
 
-  const clearPending = useCallback((assetId: string) => {
-    if (pendingContext) {
-      clearPendingNftVaultOperation(getNftVaultBrowserStorage(), pendingContext, assetId);
+  const clearPending = useCallback((assetId: string, input: { context?: NftTransactionContext; updateUi?: boolean } = {}) => {
+    const storageContext = input.context
+      ? {
+        chainId: input.context.chainId,
+        walletAddress: input.context.wallet,
+        vaultAddress: input.context.vault,
+      }
+      : pendingContext;
+    if (storageContext) {
+      clearPendingNftVaultOperation(getNftVaultBrowserStorage(), storageContext, assetId);
     }
+    if (input.updateUi === false) return;
     setPendingByAsset((current) => {
       if (!current[assetId]) return current;
       const next = { ...current };
@@ -549,50 +646,44 @@ export function CukiePoolStatusPanel() {
     action: NftVaultPendingAction,
   ) {
     const currentGuard = operationGuardRef.current;
-    if (!currentGuard.ready) {
-      if (currentGuard.reason === 'wrong_chain') await currentGuard.switchToTarget();
-      throw new Error(`POOL_OPERATION_${currentGuard.reason.toUpperCase()}`);
-    }
     if (!publicClient) throw new Error('PUBLIC_CLIENT_UNAVAILABLE');
     if (!address || !ukiNftVaults.chainId || !ukiNftVaults.cukiePoolNftVaultAddress) {
       throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
     }
-    const expectedContext = {
-      wallet: address,
-      chainId: ukiNftVaults.chainId,
-      vault: ukiNftVaults.cukiePoolNftVaultAddress,
+    const expectedWallet = address;
+    const expectedChainId = ukiNftVaults.chainId;
+    const expectedVault = ukiNftVaults.cukiePoolNftVaultAddress;
+    if (!expectedWallet || !expectedChainId || !expectedVault) {
+      throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
+    }
+    const expectedContext: NftTransactionContext = {
+      wallet: expectedWallet,
+      chainId: expectedChainId,
+      vault: expectedVault,
     };
-    const simulateContract = (publicClient as unknown as {
-      simulateContract?: (request: Record<string, unknown>) => Promise<unknown>;
-    }).simulateContract;
-    if (typeof simulateContract !== 'function') {
-      throw new Error('POOL_SIMULATION_UNAVAILABLE');
-    }
-    const request = { ...input, account: expectedContext.wallet };
-    await simulateContract.call(publicClient, request);
-    const currentContext = writeContextRef.current;
-    const currentGuardAfterSimulation = operationGuardRef.current;
-    if (
-      !currentGuardAfterSimulation.ready
-      || !sameAddress(currentContext.wallet, expectedContext.wallet)
-      || currentContext.chainId !== expectedContext.chainId
-      || !sameAddress(currentContext.vault, expectedContext.vault)
-    ) throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
-    const hash = await writeContractAsync(request);
-    setLatestTxHash(hash);
-    persistPending({ asset, action, phase: 'awaiting_receipt', txHash: hash });
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== 'success') {
-      clearPending(asset.assetId);
-      throw new Error('TRANSACTION_REVERTED');
-    }
-    persistPending({
-      asset,
-      action,
-      phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
-      txHash: hash,
+    return executeNftTransaction({
+      request: input as Record<string, unknown>,
+      client: publicClient as unknown as NftTransactionClient,
+      guard: currentGuard,
+      expectedContext,
+      currentContext: () => nftTransactionContextFromNullable(writeContextRef.current),
+      isReady: () => operationGuardRef.current.ready,
+      write: (request) => writeContractAsync(request as Parameters<typeof writeContractAsync>[0]),
+      errorPrefix: 'POOL_OPERATION',
+      onSubmitted: (hash, isCurrent) => {
+        if (isCurrent) setLatestTxHash(hash);
+        persistPending({ asset, action, phase: 'awaiting_receipt', txHash: hash, context: expectedContext, updateUi: isCurrent });
+      },
+      onReverted: (isCurrent) => clearPending(asset.assetId, { context: expectedContext, updateUi: isCurrent }),
+      onConfirmed: (hash, isCurrent) => persistPending({
+        asset,
+        action,
+        phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
+        txHash: hash,
+        context: expectedContext,
+        updateUi: isCurrent,
+      }),
     });
-    return hash;
   }
 
   function canonicalIdentity(asset: Pick<AvailableAsset, 'assetId' | 'chainId' | 'collectionAddress' | 'tokenId'>) {
@@ -646,6 +737,13 @@ export function CukiePoolStatusPanel() {
     setError(null);
     setNotice(null);
     setLatestTxHash(null);
+    const operationContext: NftTransactionContext = {
+      wallet: address,
+      chainId: ukiNftVaults.chainId,
+      vault: vaultAddress,
+    };
+    const identityMatches = () => nftTransactionContextMatches(operationContext, writeContextRef.current);
+    const operationReady = () => operationGuardRef.current.ready && identityMatches();
     try {
       const [owner, approved, operatorApproved] = await Promise.all([
         publicClient.readContract({
@@ -676,8 +774,9 @@ export function CukiePoolStatusPanel() {
           abi: erc721CustodyAbi,
           functionName: 'approve',
           args: [vaultAddress, identity.tokenId],
-        }, asset, 'approval');
+          }, asset, 'approval');
       }
+      if (!operationReady()) throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
       setPhase('depositing');
       await writeAndConfirm({
         chainId: ukiNftVaults.chainId,
@@ -686,10 +785,13 @@ export function CukiePoolStatusPanel() {
         functionName: 'deposit',
         args: [identity.collection, identity.tokenId],
       }, asset, 'deposit');
+      if (!operationReady()) throw new Error('POOL_OPERATION_CONTEXT_CHANGED_AFTER_RECEIPT');
       setPhase('syncing');
       await runtime.refreshAfterTransaction('pool');
+      if (!identityMatches()) throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
       setNotice('Depósito confirmado en BSC. Este Cukie seguirá bloqueado mientras actualizamos el inventario; ya puedes operar con otro.');
     } catch (reason) {
+      if (!identityMatches()) return;
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
           .find((item) => item.assetId === asset.assetId)
@@ -705,8 +807,10 @@ export function CukiePoolStatusPanel() {
         }
       }
     } finally {
-      setPhase('idle');
-      setMutatingAssetId(null);
+      if (identityMatches()) {
+        setPhase('idle');
+        setMutatingAssetId(null);
+      }
       operationLocksRef.current.delete(asset.assetId);
       walletOperationLockRef.current = false;
     }
@@ -720,6 +824,7 @@ export function CukiePoolStatusPanel() {
     const vaultAddress = ukiNftVaults.cukiePoolNftVaultAddress;
     if (
       !user?.walletAddress
+      || !address
       || !identityReady
       || mutatingAssetId
       || walletOperationLockRef.current
@@ -749,6 +854,13 @@ export function CukiePoolStatusPanel() {
     setError(null);
     setNotice(null);
     setLatestTxHash(null);
+    const operationContext: NftTransactionContext = {
+      wallet: address,
+      chainId: ukiNftVaults.chainId,
+      vault: vaultAddress,
+    };
+    const identityMatches = () => nftTransactionContextMatches(operationContext, writeContextRef.current);
+    const operationReady = () => operationGuardRef.current.ready && identityMatches();
     try {
       setPhase(operation === 'request_exit' ? 'requesting_exit' : 'withdrawing');
       await writeAndConfirm({
@@ -758,12 +870,15 @@ export function CukiePoolStatusPanel() {
         functionName: operation === 'request_exit' ? 'requestExit' : 'withdraw',
         args: [identity.collection, identity.tokenId],
       }, position, operation);
+      if (!operationReady()) throw new Error('POOL_OPERATION_CONTEXT_CHANGED_AFTER_RECEIPT');
       setPhase('syncing');
       await runtime.refreshAfterTransaction('pool');
+      if (!identityMatches()) throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
       setNotice(operation === 'request_exit'
         ? 'Salida confirmada en BSC. Este Cukie ya no participa en el reparto y seguirá bloqueado mientras actualizamos su estado.'
         : 'Retirada confirmada en BSC. Estamos actualizando el inventario; ya puedes operar con otro Cukie.');
     } catch (reason) {
+      if (!identityMatches()) return;
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
           .find((item) => item.assetId === position.assetId)
@@ -774,8 +889,10 @@ export function CukiePoolStatusPanel() {
         setError(poolTransactionError(reason));
       }
     } finally {
-      setPhase('idle');
-      setMutatingAssetId(null);
+      if (identityMatches()) {
+        setPhase('idle');
+        setMutatingAssetId(null);
+      }
       operationLocksRef.current.delete(position.assetId);
       walletOperationLockRef.current = false;
     }

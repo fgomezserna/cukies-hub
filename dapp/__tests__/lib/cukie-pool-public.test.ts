@@ -10,11 +10,15 @@ jest.mock('@/lib/contracts/uki-nft-vaults', () => ({
     mode: { cukieMaster: 'legacy', cukiePool: 'legacy' },
   },
 }));
+jest.mock('@/lib/uki-economy/cukie-pool/recovery-read', () => ({
+  readPoolRecoveryPositions: jest.fn(),
+}));
 
 import type { NormalizedNftAsset } from '@/lib/nft-inventory';
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 import { listCukiePoolWalletPositions } from '@/lib/uki-economy/cukie-pool/public';
+import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
 import { SchemaNotReadyError } from '@/lib/uki-economy/errors';
 import { createMemoryCukiePoolHarness } from '@/lib/uki-economy/cukie-pool/testing';
 
@@ -41,6 +45,9 @@ const vaultConfig = ukiNftVaults as unknown as {
   ready: { cukiePool: boolean };
   mode: { cukieMaster: 'legacy' | 'custodial' | 'invalid'; cukiePool: 'legacy' | 'custodial' | 'invalid' };
 };
+const recoveryReadMock = readPoolRecoveryPositions as jest.MockedFunction<
+  typeof readPoolRecoveryPositions
+>;
 
 function asset(): NormalizedNftAsset {
   return {
@@ -197,6 +204,7 @@ function vaultPosition(
 describe('Cukie Pool public source health', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    recoveryReadMock.mockResolvedValue([]);
     vaultConfig.chainId = 97;
     vaultConfig.cukieMasterNftVaultAddress = null;
     vaultConfig.cukiePoolNftVaultAddress = VAULT;
@@ -545,6 +553,14 @@ describe('Cukie Pool public source health', () => {
         };
       },
     });
+    recoveryReadMock.mockResolvedValue([{
+      assetId: asset('10'),
+      status: 'not_found',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
 
     const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
     expect(result.availableAssets).toEqual([{
@@ -560,6 +576,7 @@ describe('Cukie Pool public source health', () => {
       status: 'available',
       canDeposit: true,
     }]);
+    expect(result.sourceHealthy).toBe(true);
 
     masterPositions = [{ ...historicalMasterPosition, chain: 'TRON' }];
     await expect(listCukiePoolWalletPositions({

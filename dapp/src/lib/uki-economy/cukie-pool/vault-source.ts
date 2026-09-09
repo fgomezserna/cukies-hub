@@ -13,7 +13,10 @@ import { SchemaNotReadyError } from '../errors';
 import { economyCycleDurationMs, loadEconomyCycleCalendar } from '../cycle-calendar';
 import { gamesQuota, poolPriority } from './rules';
 import type { CukiePoolGeneration, CukiePoolRarity } from './types';
-import { readPoolRecoveryPositions } from './recovery-read';
+import {
+  readPoolRecoveryPositions,
+  type PoolRecoveryInspection,
+} from './recovery-read';
 
 export const CUKIE_POOL_NFT_VAULT_POSITIONS = 'cukie_pool_nft_vault_positions';
 export const CUKIE_POOL_CALENDAR_VERSIONS = 'cukie_pool_calendar_versions';
@@ -154,6 +157,25 @@ type ParsedCalendar = {
 
 function sourceError(message: string): never {
   throw new SchemaNotReadyError(`Fuente custodial de Cukie Pool invalida: ${message}`);
+}
+
+/**
+ * A transport/configuration failure invalidates the source as a whole. An
+ * owner mismatch remains an item-level block so a single transition cannot
+ * erase otherwise confirmed wallet inventory.
+ */
+export function isPoolRecoverySourceFailure(
+  item: Pick<PoolRecoveryInspection, 'status' | 'reason'>,
+) {
+  if (item.status !== 'unknown') return false;
+  return [
+    'POOL_RECOVERY_CONFIG_INVALID',
+    'POOL_RECOVERY_RPC_NOT_CONFIGURED',
+    'POOL_RECOVERY_RPC_READ_FAILED',
+    'POOL_RECOVERY_ASSET_LIMIT',
+    'POOL_RECOVERY_VAULT_LIMIT',
+    'POOL_RECOVERY_READ_INCOMPLETE',
+  ].includes(item.reason ?? '');
 }
 
 function decimal(value: unknown, field: string, positive = false) {
@@ -932,6 +954,11 @@ export async function listAvailableCukiePoolVaultAssets(
   ]);
   const recovery = await readPoolRecoveryPositions({
     walletNormalized,
+    activeVaultAddress: config.vaultAddressNormalized,
+    activeVaultAddresses: ukiNftVaults.cukieMasterNftVaultAddress
+      ? [ukiNftVaults.cukieMasterNftVaultAddress]
+      : [],
+    activeVaultChainId: config.chainId,
     assets: preliminary
       .filter((item) => !currentCustody.has(item.assetId))
       .map((item) => ({
@@ -940,15 +967,19 @@ export async function listAvailableCukiePoolVaultAssets(
         tokenId: item.normalized.tokenId!,
       })),
   });
-  if (recovery.some((item) => item.status === 'unknown')) {
-    return sourceError('no se puede confirmar si un NFT disponible sigue en custodia de un vault Pool anterior.');
+  if (recovery.some(isPoolRecoverySourceFailure)) {
+    return sourceError('no se pudo confirmar la custodia on-chain; la fuente queda temporalmente no disponible.');
   }
-
   const unavailable = new Set([
     ...poolRows.map((row) => String(row.assetId)),
     ...masterRows.map((row) => String(row.assetId)),
     ...recovery
-      .filter((item) => item.status === 'custodied')
+      .filter((item) => item.status === 'custodied' || item.status === 'current_custody')
+      .map((item) => item.assetId),
+    // An inconclusive owner read blocks only that asset. Other canonical
+    // inventory entries remain publishable while this one stays fail-closed.
+    ...recovery
+      .filter((item) => item.status === 'unknown')
       .map((item) => item.assetId),
   ]);
   return preliminary
