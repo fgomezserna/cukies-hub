@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "chain-indexer",
+  "projectType": "library",
+  "sourceRoot": "packages/chain-indexer/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "pnpm exec tsc -p tsconfig.json",
+        "cwd": "packages/chain-indexer"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit",
+        "cwd": "packages/chain-indexer"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec node --import tsx --test test/*.test.ts src/projectors/*.test.ts",
+        "cwd": "packages/chain-indexer"
+      }
+    }
+  },
+  "tags": ["scope:chain-indexer"]
+}
