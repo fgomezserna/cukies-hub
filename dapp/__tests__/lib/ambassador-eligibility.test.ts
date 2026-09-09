@@ -22,6 +22,10 @@ jest.mock("@/lib/indexer-db/mongodb", () => ({
   getEconomyDb: jest.fn(),
   withEconomyTransaction: jest.fn(),
 }));
+const mockGetAmbassadorEligibility = jest.fn();
+jest.mock("@/lib/uki-economy/ambassadors/eligibility", () => ({
+  getAmbassadorEligibility: (...args: unknown[]) => mockGetAmbassadorEligibility(...args),
+}));
 
 const NEW_WALLET = "0x1111111111111111111111111111111111111111";
 const AMBASSADOR = "0x2222222222222222222222222222222222222222";
@@ -116,6 +120,12 @@ describe("ambassador enrollment eligibility", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS;
+    mockGetAmbassadorEligibility.mockResolvedValue({
+      isCukieMaster: true,
+      reason: null,
+      sourceHash: EVIDENCE,
+      observedAt: NOW,
+    });
   });
 
   afterAll(() => {
@@ -181,6 +191,9 @@ describe("ambassador enrollment eligibility", () => {
       isPresaleParticipant: false,
       canChooseSponsor: false,
       canInvite: true,
+      isCukieMaster: true,
+      hasConfirmedSponsor: true,
+      eligibilityReason: null,
     });
   });
 
@@ -189,13 +202,14 @@ describe("ambassador enrollment eligibility", () => {
       presale: [{ normalizedWalletAddress: NEW_WALLET, firstPurchaseAt: NOW }],
     });
 
-    await expect(getOrCreateMongoAmbassadorProfile(db, NEW_WALLET, NOW)).resolves.toMatchObject({
-      invitationCode: ambassadorInvitationCode(NEW_WALLET),
-    });
+    await expect(getOrCreateMongoAmbassadorProfile(db, NEW_WALLET, NOW)).resolves.toBeNull();
     await expect(getMongoAmbassadorEnrollment(db, NEW_WALLET)).resolves.toEqual({
       isPresaleParticipant: true,
       canChooseSponsor: false,
-      canInvite: true,
+      canInvite: false,
+      isCukieMaster: true,
+      hasConfirmedSponsor: false,
+      eligibilityReason: null,
     });
     await expect(acceptDirectAmbassadorAttribution(
       createMongoAmbassadorAttributionRepository(db, session),
@@ -208,7 +222,12 @@ describe("ambassador enrollment eligibility", () => {
     async (firstPurchaseAt) => {
       const { db } = fixture({ presale: [{ normalizedWalletAddress: NEW_WALLET, firstPurchaseAt }] });
       await expect(getMongoAmbassadorEnrollment(db, NEW_WALLET)).resolves.toEqual({
-        isPresaleParticipant: false, canChooseSponsor: true, canInvite: false,
+        isPresaleParticipant: false,
+        canChooseSponsor: true,
+        canInvite: false,
+        isCukieMaster: true,
+        hasConfirmedSponsor: false,
+        eligibilityReason: null,
       });
     },
   );
@@ -220,7 +239,12 @@ describe("ambassador enrollment eligibility", () => {
       sponsorLockedAt: NOW,
     }] });
     await expect(getMongoAmbassadorEnrollment(db, NEW_WALLET)).resolves.toEqual({
-      isPresaleParticipant: true, canChooseSponsor: false, canInvite: true,
+      isPresaleParticipant: true,
+      canChooseSponsor: false,
+      canInvite: true,
+      isCukieMaster: true,
+      hasConfirmedSponsor: true,
+      eligibilityReason: null,
     });
   });
 
@@ -243,7 +267,12 @@ describe("ambassador enrollment eligibility", () => {
       isCukiesWorld: true,
     });
     await expect(getMongoAmbassadorEnrollment(db, ROOT)).resolves.toEqual({
-      isPresaleParticipant: false, canChooseSponsor: false, canInvite: true,
+      isPresaleParticipant: false,
+      canChooseSponsor: false,
+      canInvite: true,
+      isCukieMaster: null,
+      hasConfirmedSponsor: true,
+      eligibilityReason: "CUKIE_WORLD_ROOT_EXEMPT",
     });
     await expect(acceptDirectAmbassadorAttribution(
       createMongoAmbassadorAttributionRepository(db, session),

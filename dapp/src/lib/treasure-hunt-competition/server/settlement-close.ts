@@ -35,6 +35,17 @@ export interface SettlementPurchaseRecord {
 export interface SettlementParticipantRecord {
   readonly walletAddress: string;
   readonly lockedSponsorWalletAddress?: string | null;
+  /** Effective attribution captured for a new settlement, when the source supports it. */
+  readonly effectiveSponsorWalletAddress?: string | null;
+  readonly sponsorAttributionSource?: string | null;
+  readonly sponsorAttributionSourceReferenceHash?: string | null;
+  readonly sponsorAttributionAcceptedAt?: string | null;
+  readonly sponsorAttributionEvidenceHash?: string | null;
+  readonly sponsorAttributionPolicyVersion?: string | null;
+  readonly sponsorCommissionEligible?: boolean | null;
+  readonly sponsorEligibilityReason?: string | null;
+  readonly sponsorEligibilitySourceHash?: string | null;
+  readonly sponsorEligibilityObservedAt?: string | null;
 }
 
 export interface CompetitionSettlementCloseSource {
@@ -56,6 +67,15 @@ export interface CompetitionSettlementCloseSource {
   listParticipants(input: {
     readonly walletAddresses: readonly string[];
   }): Promise<readonly SettlementParticipantRecord[]>;
+  /**
+   * Resolves the canonical sponsor and captures the eligibility evidence used
+   * for a new manifest. Every production source must implement this seam and
+   * must never fall back to the locked row for new commission allocations.
+   */
+  resolveAmbassadorSponsors(input: {
+    readonly walletAddresses: readonly string[];
+    readonly effectiveAt: string;
+  }): Promise<readonly SettlementParticipantRecord[]>;
 }
 
 export interface CompetitionSettlementManifest {
@@ -76,6 +96,10 @@ export interface CompetitionSettlementManifest {
   readonly rankedAttemptCount: number;
   readonly purchaseEventCount: number;
   readonly participantCount: number;
+  /** Present only on manifests created after the ambassador lifecycle gate. */
+  readonly ambassadorResolutionAt?: string | null;
+  readonly ambassadorPolicyVersion?: string | null;
+  readonly ambassadorEvidenceHash?: string | null;
 }
 
 export interface CompetitionSettlementAllocation {
@@ -348,9 +372,13 @@ function canonicalPurchases(
 function canonicalParticipantSponsors(
   participants: readonly SettlementParticipantRecord[],
   purchasedWallets: readonly string[],
+  options: { readonly requireAmbassadorEligibility: boolean } = {
+    requireAmbassadorEligibility: false,
+  },
 ) {
   const purchasedWalletSet = new Set(purchasedWallets);
   const participantByWallet = new Map<string, string | null>();
+  const rawSponsorByWallet = new Map<string, string | null>();
 
   for (const participant of participants) {
     if (typeof participant.walletAddress !== 'string') {
@@ -374,14 +402,26 @@ function canonicalParticipantSponsors(
     ) {
       invalidInput(`Invalid locked sponsor attribution for ${walletAddress}`);
     }
-    const sponsorCandidate = participant.lockedSponsorWalletAddress?.trim()
+    const rawSponsor = participant.lockedSponsorWalletAddress?.trim()
       ? normalizeCompetitionWallet(participant.lockedSponsorWalletAddress)
       : null;
+    const sponsorCandidate = participant.effectiveSponsorWalletAddress !== undefined
+      ? (participant.effectiveSponsorWalletAddress?.trim()
+        ? normalizeCompetitionWallet(participant.effectiveSponsorWalletAddress)
+        : null)
+      : rawSponsor;
     if (sponsorCandidate && (
       !isCompetitionWalletAddress(sponsorCandidate) || sponsorCandidate === walletAddress
     )) {
       invalidInput(`Invalid locked sponsor attribution for ${walletAddress}`);
     }
+    if (options.requireAmbassadorEligibility && sponsorCandidate && typeof participant.sponsorCommissionEligible !== 'boolean') {
+      sourceNotReady(`Ambassador eligibility is incomplete for ${walletAddress}`);
+    }
+    if (participant.sponsorCommissionEligible === null) {
+      sourceNotReady(`Ambassador eligibility is unknown for ${walletAddress}`);
+    }
+    rawSponsorByWallet.set(walletAddress, rawSponsor);
     participantByWallet.set(walletAddress, sponsorCandidate);
   }
 
@@ -395,15 +435,55 @@ function canonicalParticipantSponsors(
   const canonical = [...purchasedWalletSet]
     .sort((left, right) => left.localeCompare(right, 'en'))
     .map((walletAddress) => {
+      const participant = participants.find((row) => {
+        try {
+          return normalizeCompetitionWallet(row.walletAddress) === walletAddress;
+        } catch {
+          return false;
+        }
+      });
       const lockedSponsorWalletAddress = participantByWallet.get(walletAddress) as string | null;
-      sponsorByWallet.set(walletAddress, lockedSponsorWalletAddress);
-      return { walletAddress, lockedSponsorWalletAddress };
+      const rawLockedSponsorWalletAddress = rawSponsorByWallet.get(walletAddress) as string | null;
+      const commissionEligible = participant?.sponsorCommissionEligible;
+      sponsorByWallet.set(
+        walletAddress,
+        commissionEligible === false ? null : lockedSponsorWalletAddress,
+      );
+      const canonicalParticipant: Record<string, unknown> = {
+        walletAddress,
+        lockedSponsorWalletAddress: rawLockedSponsorWalletAddress,
+      };
+      if (participant?.effectiveSponsorWalletAddress !== undefined) {
+        canonicalParticipant.effectiveSponsorWalletAddress = lockedSponsorWalletAddress;
+      }
+      for (const key of [
+        'sponsorAttributionSource',
+        'sponsorAttributionSourceReferenceHash',
+        'sponsorAttributionAcceptedAt',
+        'sponsorAttributionEvidenceHash',
+        'sponsorAttributionPolicyVersion',
+        'sponsorCommissionEligible',
+        'sponsorEligibilityReason',
+        'sponsorEligibilitySourceHash',
+        'sponsorEligibilityObservedAt',
+      ] as const) {
+        if (participant?.[key] !== undefined) canonicalParticipant[key] = participant[key];
+      }
+      return canonicalParticipant;
     });
+
+  const policyVersions = [...new Set(canonical.map((row) => row.sponsorAttributionPolicyVersion).filter(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  ))];
+  if (policyVersions.length > 1) {
+    sourceNotReady('Ambassador attribution policies are mixed in the settlement input');
+  }
 
   return {
     canonical,
     participantCount: participantByWallet.size,
     sponsorByWallet,
+    ambassadorPolicyVersion: policyVersions[0] ?? null,
   };
 }
 
@@ -568,9 +648,16 @@ export async function closeTreasureHuntCompetition(input: {
   const purchasedWallets = [...new Set(purchases.map((purchase) => purchase.walletAddress))]
     .sort((left, right) => left.localeCompare(right, 'en'));
   const participantRows = purchasedWallets.length > 0
-    ? await input.source.listParticipants({ walletAddresses: purchasedWallets })
+    ? await input.source.resolveAmbassadorSponsors({
+      walletAddresses: purchasedWallets,
+      effectiveAt: now.toISOString(),
+    })
     : [];
-  const participantInput = canonicalParticipantSponsors(participantRows, purchasedWallets);
+  const participantInput = canonicalParticipantSponsors(
+    participantRows,
+    purchasedWallets,
+    { requireAmbassadorEligibility: true },
+  );
 
   // Client gameplay is never allowed to become an automatic economic fact.
   // Finished attempts enter a provisional `review` state and only an explicit
@@ -642,6 +729,12 @@ export async function closeTreasureHuntCompetition(input: {
   const attemptsHash = hash(attempts);
   const purchasesHash = hash(purchases);
   const participantsHash = hash(participantInput.canonical);
+  const ambassadorResolutionAt = now.toISOString();
+  const ambassadorEvidenceHash = hash({
+    ambassadorResolutionAt,
+    ambassadorPolicyVersion: participantInput.ambassadorPolicyVersion,
+    participantsHash,
+  });
   const inputHash = hash({
     schemaVersion: SETTLEMENT_SCHEMA_VERSION,
     algorithmVersion: SETTLEMENT_ALGORITHM_VERSION,
@@ -667,6 +760,9 @@ export async function closeTreasureHuntCompetition(input: {
     rankedAttemptCount: ranking.length,
     purchaseEventCount: purchases.length,
     participantCount: participantInput.participantCount,
+    ambassadorResolutionAt,
+    ambassadorPolicyVersion: participantInput.ambassadorPolicyVersion,
+    ambassadorEvidenceHash,
   };
   const outputHash = hash({
     manifest: manifestWithoutOutputHash,

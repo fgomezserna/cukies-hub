@@ -15,6 +15,15 @@ import type {
   AmbassadorProfile,
 } from "@/lib/uki-economy/ambassadors/types";
 
+jest.mock("@/lib/uki-economy/ambassadors/eligibility", () => ({
+  getAmbassadorEligibility: jest.fn(async () => ({
+    isCukieMaster: true,
+    reason: null,
+    sourceHash: "test-cukie-master-evidence",
+    observedAt: new Date("2026-08-30T12:00:00.000Z"),
+  })),
+}));
+
 const REFERRED = "0x1111111111111111111111111111111111111111";
 const AMBASSADOR = "0x2222222222222222222222222222222222222222";
 const OTHER = "0x3333333333333333333333333333333333333333";
@@ -160,7 +169,12 @@ describe("Mongo ambassador canonical resolution", () => {
           profiles.find((profile) => profile._id === filter._id) ?? null,
       }) : ({
         findOne: async () => name === "presale_participants"
-          ? { normalizedWalletAddress: AMBASSADOR, firstPurchaseAt: NOW }
+          ? {
+            normalizedWalletAddress: AMBASSADOR,
+            firstPurchaseAt: NOW,
+            lockedSponsorWalletAddress: OTHER,
+            sponsorLockedAt: NOW,
+          }
           : null,
       }),
     } as unknown as Db;

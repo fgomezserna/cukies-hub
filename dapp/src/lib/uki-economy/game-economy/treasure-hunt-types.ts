@@ -52,6 +52,13 @@ export type TreasureHuntEconomyRun = {
   ambassadorWalletNormalized: string | null;
   ambassadorCapturedAt: Date;
   ambassadorEvidenceHash: string;
+  ambassadorEligibilitySnapshot?: {
+    policyVersion: "ambassador-lifecycle-v2";
+    isCukieMaster: boolean | null;
+    commissionEligible: boolean;
+    capturedAt: Date;
+    evidenceHash: string;
+  };
   quotaReservationId: string | null;
   evidence: TreasureHuntEvidencePoint[];
   lastEvidenceHash: string;

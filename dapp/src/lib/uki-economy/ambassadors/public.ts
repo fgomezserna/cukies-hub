@@ -1,6 +1,6 @@
 import type { Db } from "mongodb";
 
-import { getEconomyDb } from "@/lib/indexer-db/mongodb";
+import { getEconomyDb, withEconomyTransaction } from "@/lib/indexer-db/mongodb";
 import type {
   RewardClaim,
   RewardClaimBatch,
@@ -14,6 +14,7 @@ import {
   getMongoAmbassadorEnrollment,
   getOrCreateMongoAmbassadorProfile,
   materializeLockedPresaleAmbassadorAttributions,
+  resolveMongoAmbassadorAttributionsForWallets,
   resolveMongoAmbassadorAttribution,
 } from "./repository";
 import { assertAmbassadorInvitationCode, getDefaultAmbassadorWallet, validAmbassadorWallet } from "./rules";
@@ -141,6 +142,37 @@ async function commissionDashboard(db: Db, walletNormalized: string, now: Date) 
   };
 }
 
+async function currentReferrals(db: Db, walletNormalized: string, now: Date) {
+  const base = await db.collection<AmbassadorAttribution>("ambassador_attributions")
+    .find({ ambassadorWalletNormalized: walletNormalized })
+    .sort({ acceptedAt: -1, _id: 1 })
+    .limit(100)
+    .toArray();
+  const presale = await db.collection<{
+    normalizedWalletAddress: string;
+    lockedSponsorWalletAddress?: string | null;
+  }>("presale_participants")
+    .find({ lockedSponsorWalletAddress: walletNormalized })
+    .limit(100)
+    .toArray();
+  const overrideRows = await db.collection<Pick<AmbassadorAttribution, "referredWalletNormalized" | "ambassadorWalletNormalized">>(
+    "ambassador_attribution_overrides",
+  ).find({ ambassadorWalletNormalized: walletNormalized }).limit(100).toArray();
+  const wallets = [...new Set([
+    ...base.map((row) => row.referredWalletNormalized),
+    ...presale.map((row) => row.normalizedWalletAddress),
+    ...overrideRows.map((row) => row.referredWalletNormalized),
+  ])];
+  if (wallets.length === 0) return [];
+  const resolved = await resolveMongoAmbassadorAttributionsForWallets(db, wallets, now);
+  return wallets.flatMap((wallet) => {
+    const attribution = resolved.get(wallet);
+    return attribution && attribution.ambassadorWalletNormalized === walletNormalized
+      ? [attribution]
+      : [];
+  });
+}
+
 export async function getPublicAmbassadorInvitation(code: string) {
   const invitationCode = assertAmbassadorInvitationCode(code);
   const profile = await findMongoAmbassadorByInvitationCode(await getEconomyDb(), invitationCode);
@@ -159,14 +191,20 @@ export async function getAmbassadorDashboard(wallet: string, now = new Date()) {
     ambassadorWallet: walletNormalized,
     now,
   });
+  if (process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()) {
+    await withEconomyTransaction((transactionDb, session) =>
+      materializeLockedPresaleAmbassadorAttributions(transactionDb, {
+        ambassadorWallet: getDefaultAmbassadorWallet(),
+        referredWallet: walletNormalized,
+        now,
+        session,
+      }),
+    );
+  }
   const [profile, ownAttribution, referrals, commissions, enrollment] = await Promise.all([
     getOrCreateMongoAmbassadorProfile(db, walletNormalized, now),
     resolveMongoAmbassadorAttribution(db, walletNormalized, now),
-    db.collection<AmbassadorAttribution>("ambassador_attributions")
-      .find({ ambassadorWalletNormalized: walletNormalized })
-      .sort({ acceptedAt: -1, _id: 1 })
-      .limit(100)
-      .toArray(),
+    currentReferrals(db, walletNormalized, now),
     commissionDashboard(db, walletNormalized, now),
     getMongoAmbassadorEnrollment(db, walletNormalized),
   ]);
