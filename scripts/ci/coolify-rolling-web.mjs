@@ -350,7 +350,7 @@ export async function deployRollingWeb({
         sleep: (ms) => sleep(ms || pollMs),
       });
     } catch (verificationError) {
-      if (allowRuntimeRollback && previousManifest && finished) {
+      if (allowRuntimeRollback && !rollback.bootstrap && previousManifest && finished) {
         runtimeRollbackAttempted = true;
         try {
           const runtimeRollback = await deployRollingWeb({

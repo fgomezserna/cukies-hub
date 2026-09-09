@@ -258,6 +258,9 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.2
+      undici:
+        specifier: 5.29.0
+        version: 5.29.0
 
   games/hyppie-road:
     dependencies:
