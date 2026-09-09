@@ -804,6 +804,8 @@ services:
       CARD_WORKER_DB_NAME: ${CARD_WORKER_DB_NAME:-cukieshub-new}
       CARD_WORKER_SOURCE_FORMAT: indexed
       CARD_WORKER_LEGACY_STAGING_ENABLED: "false"
+      CARD_WORKER_OUTPUT_DIR: /tmp/cuki-card-outputs
+      CARD_WORKER_CAPACITY_FILE: /run/cukies-card-capacity/capacity.json
       CARD_WORKER_UPLOAD: ${CARD_WORKER_UPLOAD:-false}
       CARD_WORKER_PUBLIC_BASE_URL: ${CARD_WORKER_PUBLIC_BASE_URL}
       CARD_WORKER_PUBLIC_KEY_PREFIX: ${CARD_WORKER_PUBLIC_KEY_PREFIX:-}
@@ -819,6 +821,12 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION:-${CARD_WORKER_S3_REGION}}
+    volumes:
+      - /etc/cukies/card-workers/capacity:/run/cukies-card-capacity:ro
+    tmpfs:
+      - /tmp/cuki-card-outputs:size=128m,mode=0700
+    mem_limit: 1g
+    cpus: 1.0
     restart: unless-stopped
     networks:
       - coolify
@@ -843,6 +851,8 @@ services:
       CARD_WORKER_DB_NAME: cukies-legacy-staging
       CARD_WORKER_SOURCE_FORMAT: legacy
       CARD_WORKER_LEGACY_STAGING_ENABLED: ${CARD_WORKER_LEGACY_STAGING_ENABLED:-false}
+      CARD_WORKER_OUTPUT_DIR: /tmp/cuki-card-outputs
+      CARD_WORKER_CAPACITY_FILE: /run/cukies-card-capacity/capacity.json
       CARD_WORKER_UPLOAD: ${CARD_WORKER_UPLOAD:-false}
       CARD_WORKER_PUBLIC_BASE_URL: https://assets-staging.cukies.world
       CARD_WORKER_PUBLIC_KEY_PREFIX: ${CARD_WORKER_PUBLIC_KEY_PREFIX:-}
@@ -862,7 +872,13 @@ services:
       - sh
       - -c
       - node scripts/assert-staging-only.mjs --scope cuki-card-worker && exec scripts/docker-start.sh
-    restart: "no"
+    volumes:
+      - /etc/cukies/card-workers/capacity:/run/cukies-card-capacity:ro
+    tmpfs:
+      - /tmp/cuki-card-outputs:size=128m,mode=0700
+    mem_limit: 1g
+    cpus: 1.0
+    restart: unless-stopped
     networks:
       - coolify
 

@@ -394,38 +394,41 @@ function normalizeCuki(document: LegacyCukiDocument): LegacyMarketplaceCukiItem 
 }
 
 async function hydrateCukiRelations(
-  document: LegacyCukiDocument,
+  documents: LegacyCukiDocument[],
   collection: Collection<LegacyCukiDocument>,
 ) {
-  const relationIds = [
+  const relationId = (value: unknown) => toStringOrNull(
+    value && typeof value === 'object' ? (value as LegacyCukiDocument)._id : value,
+  );
+  const relationIds = documents.flatMap((document) => [
     ...(Array.isArray(document.parents) ? document.parents : []),
     ...(Array.isArray(document.children) ? document.children : []),
-  ]
-    .map((value) => toStringOrNull(value))
+  ])
+    .map(relationId)
     .filter((value): value is string => value !== null);
 
-  if (relationIds.length === 0) return document;
+  if (relationIds.length === 0) return documents;
 
   const relationDocuments = await collection
     .find({ _id: { $in: [...new Set(relationIds)] } }, { projection: cukiProjection })
     .toArray();
   const relationById = new Map(relationDocuments.map((item) => [item._id, item]));
 
-  return {
+  return documents.map((document) => ({
     ...document,
     parents: Array.isArray(document.parents)
       ? document.parents.map((value) => {
-          const id = toStringOrNull(value);
+          const id = relationId(value);
           return id ? relationById.get(id) ?? value : value;
         })
       : document.parents,
     children: Array.isArray(document.children)
       ? document.children.map((value) => {
-          const id = toStringOrNull(value);
+          const id = relationId(value);
           return id ? relationById.get(id) ?? value : value;
         })
       : document.children,
-  };
+  }));
 }
 
 async function hydrateCukiHistory(document: LegacyCukiDocument) {
@@ -519,7 +522,7 @@ async function hydrateCukiDocument(
   document: LegacyCukiDocument,
   collection: Collection<LegacyCukiDocument>,
 ) {
-  const withRelations = await hydrateCukiRelations(document, collection);
+  const [withRelations] = await hydrateCukiRelations([document], collection);
   return hydrateCukiHistory(withRelations);
 }
 
@@ -679,7 +682,7 @@ export async function listLegacyMarketplaceCukies(
 
     return {
       source: 'mongo',
-      items: items.map(normalizeCuki),
+      items: (await hydrateCukiRelations(items, collection)).map(normalizeCuki),
       total,
       offset,
       limit,

@@ -54,6 +54,7 @@ const envSchema = z.object({
   CHAIN_INDEXER_DB_NAME: z.string().optional(),
   CARD_WORKER_ASSETS_DIR: z.string().optional(),
   CARD_WORKER_OUTPUT_DIR: z.string().optional(),
+  CARD_WORKER_CAPACITY_FILE: z.string().optional(),
   CARD_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(1000).default(5000),
   CARD_WORKER_MAX_ATTEMPTS: z.coerce.number().int().min(1).default(5),
   CARD_WORKER_STALE_LOCK_MS: z.coerce.number().int().min(60000).default(15 * 60 * 1000),
@@ -132,6 +133,7 @@ export function getCardWorkerConfig(sourceIdentityOverride?: AssetIdentityContex
     outputDir: env.CARD_WORKER_OUTPUT_DIR
       ? path.resolve(env.CARD_WORKER_OUTPUT_DIR)
       : path.join(packageRoot(), '.tmp/cards'),
+    capacityFile: env.CARD_WORKER_CAPACITY_FILE ?? null,
     pollIntervalMs: env.CARD_WORKER_POLL_INTERVAL_MS,
     maxAttempts: env.CARD_WORKER_MAX_ATTEMPTS,
     staleLockMs: env.CARD_WORKER_STALE_LOCK_MS,

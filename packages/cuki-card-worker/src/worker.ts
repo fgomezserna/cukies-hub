@@ -5,6 +5,7 @@ import path from 'node:path';
 import type {
   BackfillCensusCategory,
   CardWorkerConfig,
+  ClaimedCuki,
   CukiDocument,
   GenerationResult,
   RenderResult,
@@ -22,6 +23,7 @@ import { CardWorkerStore } from './storage/index.js';
 import { canonicalAssetIdentity, cukiInputFingerprint } from './identity.js';
 import type { AssetIdentityContext } from './types.js';
 import { resolveCukiMetadata } from './metadata.js';
+import { assertStorageCapacity, removeVerifiedOutput, StorageCapacityError } from './runtime-safety.js';
 export { canonicalAssetIdentity, cukiInputFingerprint } from './identity.js';
 
 export type CardWorkerStoreLike = Pick<
@@ -69,6 +71,7 @@ function ensureUploadMode(config: CardWorkerConfig) {
 }
 
 async function ensureUploadAccess(config: CardWorkerConfig) {
+  await assertStorageCapacity(config);
   ensureUploadMode(config);
   await verifyS3UploadAccess(config);
 }
@@ -76,6 +79,26 @@ async function ensureUploadAccess(config: CardWorkerConfig) {
 async function renderAndUpload(store: CardWorkerStoreLike, cuki: CukiDocument, config: CardWorkerConfig, identity?: AssetIdentityContext) {
   const renderResult = await renderCukiCard(cuki, config, identity);
   return uploadRenderedCard(config, renderResult);
+}
+
+export async function finalizeGeneratedCard(
+  store: CardWorkerStoreLike,
+  cuki: ClaimedCuki,
+  result: GenerationResult,
+  config: CardWorkerConfig,
+  ownsOutput: boolean,
+) {
+  await store.markGenerated(cuki, result);
+  if (!ownsOutput) return;
+  try {
+    if (result.documentId !== cuki._id || result.tokenId !== cuki.tokenId) {
+      throw new Error('CARD_OUTPUT_IDENTITY_MISMATCH');
+    }
+    await removeVerifiedOutput(result, config);
+  } catch {
+    // Publication already succeeded. Preserve evidence; never mark it failed.
+    console.error('CARD_OUTPUT_CLEANUP_FAILED: se conserva el PNG publicado');
+  }
 }
 
 export async function setupCardWorker(config = getCardWorkerConfig(), dependencies: CardWorkerDependencies = {}) {
@@ -118,6 +141,7 @@ export async function generateTokenCard(
   return withStore(async (store, resolvedConfig) => {
     if (!dependencies.skipUploadAccess) await ensureUploadAccess(resolvedConfig);
     const sourceIdentity = identity ?? resolvedConfig.sourceIdentity ?? undefined;
+    if (!dependencies.skipUploadAccess) await assertStorageCapacity(resolvedConfig);
     const cuki = await store.claimCukiByTokenId(tokenId, sourceIdentity);
 
     if (!cuki) {
@@ -126,7 +150,7 @@ export async function generateTokenCard(
 
     try {
       const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig, sourceIdentity);
-      await store.markGenerated(cuki, result);
+      await finalizeGeneratedCard(store, cuki, result, resolvedConfig, !dependencies.renderAndUpload);
       return result;
     } catch (error) {
       try {
@@ -149,6 +173,7 @@ export async function processOneCard(
     await store.ensureIndexes();
 
     const sourceIdentity = resolvedConfig.sourceIdentity ?? undefined;
+    if (!dependencies.skipUploadAccess) await assertStorageCapacity(resolvedConfig);
     const cuki = await store.claimNextCuki(sourceIdentity);
 
     if (!cuki) {
@@ -157,7 +182,7 @@ export async function processOneCard(
 
     try {
       const result = await (dependencies.renderAndUpload ?? renderAndUpload)(store, cuki, resolvedConfig, sourceIdentity);
-      await store.markGenerated(cuki, result);
+      await finalizeGeneratedCard(store, cuki, result, resolvedConfig, !dependencies.renderAndUpload);
       return result;
     } catch (error) {
       try {
@@ -318,12 +343,13 @@ async function processBackfillToken(
   }
 
   for (let attempt = 0; attempt < config.maxAttempts; attempt += 1) {
+    if (config.capacityFile) await assertStorageCapacity(config);
     const claimed = await store.claimCukiByDocumentId(candidate.documentId, identity);
     if (!claimed) return { status: 'locked_or_exhausted' as const };
 
     try {
       const result = await upload(store, claimed, config, identity);
-      await store.markGenerated(claimed, result);
+      await finalizeGeneratedCard(store, claimed, result, config, upload === renderAndUpload);
       return { status: 'generated' as const, result };
     } catch (error) {
       try {
@@ -490,7 +516,7 @@ export async function backfillCards(
 }
 
 export async function runCardWorker(config = getCardWorkerConfig(), dependencies: CardWorkerDependencies = {}) {
-  if (!dependencies.skipUploadAccess) await ensureUploadAccess(config);
+  if (!dependencies.skipUploadAccess) ensureUploadMode(config);
 
   let stopped = false;
   const stop = () => {
@@ -506,10 +532,16 @@ export async function runCardWorker(config = getCardWorkerConfig(), dependencies
       result = await processOneCard(config, dependencies);
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);
+      if (error instanceof StorageCapacityError) {
+        await new Promise((resolve) => setTimeout(resolve, Math.max(30_000, config.pollIntervalMs)));
+        continue;
+      }
     }
 
     if (!result) {
       await new Promise((resolve) => setTimeout(resolve, config.pollIntervalMs));
     }
   }
+  process.off('SIGINT', stop);
+  process.off('SIGTERM', stop);
 }
