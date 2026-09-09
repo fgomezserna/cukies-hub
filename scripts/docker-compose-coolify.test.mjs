@@ -101,6 +101,14 @@ test('legacy card worker is opt-in, staging-only and cannot target indexed fixtu
   assert.doesNotMatch(definition, /AWS_ACCESS_KEY_ID: \$\{AWS_ACCESS_KEY_ID\}/);
   assert.doesNotMatch(definition, /AWS_SECRET_ACCESS_KEY: \$\{AWS_SECRET_ACCESS_KEY\}/);
   assert.ok(definition.includes('assert-staging-only.mjs --scope cuki-card-worker'));
+  assert.doesNotMatch(definition, /CARD_WORKER_SOURCE_(?:NETWORK|CHAIN_ID|COLLECTION):/);
+});
+
+test('indexed card context is forwarded without mandatory interpolation in disabled profiles', () => {
+  const definition = serviceDefinition('cuki-card-worker');
+  for (const key of ['CARD_WORKER_SOURCE_NETWORK', 'CARD_WORKER_SOURCE_CHAIN_ID', 'CARD_WORKER_SOURCE_COLLECTION']) {
+    assert.ok(definition.includes(`${key}: \${${key}:-}`));
+  }
 });
 
 test('chain-indexer reports health from its staging Mongo connection', () => {

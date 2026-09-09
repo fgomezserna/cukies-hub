@@ -1,0 +1,9 @@
+[Unit]
+Description=Receive private Stage storage capacity every 10 seconds
+[Timer]
+OnBootSec=5s
+OnUnitActiveSec=10s
+AccuracySec=1s
+Unit=cukies-card-storage-receiver.service
+[Install]
+WantedBy=timers.target

@@ -35,7 +35,7 @@ pnpm cards:dev
 - `CARD_WORKER_S3_PREFIX`: prefijo S3. Default: `png/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe`.
 - `CARD_WORKER_S3_ENDPOINT`: opcional para S3-compatible.
 - `CARD_WORKER_S3_FORCE_PATH_STYLE`: `true` para endpoints compatibles.
-- `CARD_WORKER_S3_ACL`: ACL opcional del objeto; en staging se usa `private` y el bucket concede solo lectura publica.
+- `CARD_WORKER_S3_ACL`: ACL opcional del objeto; en staging se usa `private` y el gateway sirve las imágenes mediante lectura firmada. El bucket no permite lectura anónima.
 - `CARD_WORKER_VERIFY_PUBLIC`: comprueba mediante `GET` público el PNG completo, MIME, longitud, hash y caché después de cada upload; default `true`.
 - `CARD_WORKER_BACKFILL_CONCURRENCY`: concurrencia acotada del backfill; default `2`.
 - `CARD_WORKER_BACKFILL_MANIFEST_PATH`: ruta obligatoria para `backfill`; guarda el run durable, checkpoints, inventario inicial y delta de reconciliación.
@@ -69,3 +69,17 @@ En modo `legacy`, el adaptador trata `_id` decimal como token ID, conserva el `_
 El perfil Compose `legacy-card-worker` fija `cukies-legacy-staging`, el bucket `cukies-cards-staging` y el origen `https://assets-staging.cukies.world`. Usa credenciales propias `CARD_WORKER_LEGACY_S3_ACCESS_KEY_ID` y `CARD_WORKER_LEGACY_S3_SECRET_ACCESS_KEY`, con región `CARD_WORKER_LEGACY_S3_REGION`; sus permisos exclusivos de staging deben comprobarse antes de la publicación. El censo incluye también los documentos inválidos como `missing_identity` y conserva `sourceValidationError` en el manifiesto. La lectura por ID documental mantiene su tipo exacto; la búsqueda CLI por token detecta coincidencias ambiguas entre IDs numéricos y de texto.
 
 Los documentos del indexador nuevo pueden exponer `rarity` y `generation` a partir del evento canónico `CukieMetadataConfigured`; el renderer los adapta a la forma legacy sin inventar ni persistir atributos derivados.
+
+## Operación permanente en Stage
+
+Los perfiles `card-worker` y `legacy-card-worker` arrancan los dos daemons, sin importar documentos ni activar el indexador legacy. Deben añadirse a los perfiles ya aprobados de app28, no sustituirlos. Cada servicio dispone de 1 CPU, 1 GiB de memoria, `restart: unless-stopped` y output exclusivo en tmpfs de 128 MiB. El render propio sólo se elimina tras GET público verificado y `markGenerated` exitoso, comprobando identidad, ruta real, longitud y hash; un fallo conserva el PNG y nunca transforma una publicación confirmada en un fallo. Los outputs de `render-token` se conservan.
+
+`CARD_WORKER_CAPACITY_FILE` es obligatorio para publicar sobre las dos bases Stage. Compose monta `/etc/cukies/card-workers/capacity` en solo lectura; su `capacity.json` debe identificar `LXC2011:/opt/minio/data` y `VM1001:/srv`, contener espacio libre en bytes y un timestamp finito con antigüedad menor de 45 segundos. Ambos discos deben conservar al menos 10 GiB. El daemon no consume un claim ante datos inválidos/ausentes o falta de espacio y espera al menos 30 segundos antes de reintentar.
+
+El monitor permanente usa `scripts/card-worker-storage-heartbeat.py`, instalado como `/etc/cukies/card-workers/storage-heartbeat.py` en LXC2011 (`publish`, cada 15s) y VM1001 (`receive`, cada 10s). El writer Stage existente se conserva en `writer.json` con modo 0600, directorios 0700 y acceso sólo al usuario del servicio; no se usan claves SSH. El receptor reemplaza atómicamente `capacity/capacity.json` (0600). La imagen actual ejecuta como root: comprobar el UID efectivo y la lectura del montaje RO en cada cambio de imagen/usuario.
+
+Instalar script y units desde el mismo SHA revisado: `infrastructure/card-workers/cukies-card-storage-publisher.{service,timer}` en LXC2011 y `cukies-card-storage-receiver.{service,timer}` en VM1001, bajo `/etc/systemd/system/` (0644); ejecutar `systemctl daemon-reload` y habilitar el timer correspondiente tras verificar privacidad. En Coolify app28 configurar sólo para el worker indexed `CARD_WORKER_SOURCE_NETWORK=BSC`, `CARD_WORKER_SOURCE_CHAIN_ID=97`, `CARD_WORKER_SOURCE_COLLECTION=0xd4c7b16db234d7f62ba6a8f30153faf85feabec8` como runtime. Compose permite interpolación vacía con el perfil apagado; al arrancar indexed Stage se exige contexto completo, y los conflictos con metadata explícita siguen rechazándose. El RAWlegacy no recibe ni aplica este contexto.
+
+La métrica ocupa exclusivamente `cukies-cards-staging/png/staging/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe/_operational/card-worker-storage.json`, con `no-store`. Antes de publicarla, el reader del gateway debe tener un `Deny GetObject` para ese objeto exacto; no se amplían permisos. Validar writer firmado 200, reader/anónimo 403, gateway no público y dos latidos distintos antes de activar los perfiles. No retirar este monitor mientras los daemons lo consuman.
+
+Si la guarda bloquea trabajos: comprobar ambos discos y el timer correspondiente, corregir capacidad/conectividad sin borrar datos existentes ni bajar el suelo, y esperar dos latidos frescos. El daemon retoma la cola automáticamente. Conservar manifiestos, snapshots y evidencia del backfill; retirar sus controles temporales sólo cuando el monitor permanente y los workers hayan quedado verificados.

@@ -71,6 +71,7 @@ export type CardWorkerConfig = {
   dbName: string;
   assetsDir: string;
   outputDir: string;
+  capacityFile?: string | null;
   pollIntervalMs: number;
   maxAttempts: number;
   staleLockMs: number;
