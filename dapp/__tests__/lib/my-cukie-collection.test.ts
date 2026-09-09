@@ -7,7 +7,11 @@ jest.mock('@/lib/uki-economy/cukie-pool/recovery-read', () => ({
 import type { Db } from 'mongodb';
 
 import { parseUkiNftVaultPublicConfig } from '@/lib/contracts/uki-nft-vaults';
-import { listMyCukieCollectionFromDb } from '@/lib/cukies-data/my-collection';
+import {
+  listMyCukieCollectionFromDb,
+  resolveCukieSaleEligibility,
+} from '@/lib/cukies-data/my-collection';
+import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
 
 const wallet = '0x1111111111111111111111111111111111111111';
@@ -21,6 +25,98 @@ const config = parseUkiNftVaultPublicConfig({
   cukieMasterNftVaultAddress: masterVault,
 });
 const recoveryReadMock = readPoolRecoveryPositions as jest.MockedFunction<typeof readPoolRecoveryPositions>;
+
+const v2Marketplace = {
+  ready: true,
+  chainId: 97 as const,
+  collectionAddresses: [collection],
+};
+
+function saleEligibility(overrides: Partial<Parameters<typeof resolveCukieSaleEligibility>[0]> = {}) {
+  return resolveCukieSaleEligibility({
+    chainId: 97,
+    network: 'BSC',
+    collectionAddress: collection,
+    ownerMatches: true,
+    custody: 'wallet',
+    state: 'available',
+    marketplace: v2Marketplace,
+    ...overrides,
+  });
+}
+
+describe('eligibilidad de venta por identidad', () => {
+  it('permite Legacy BSC56 y Legacy TRON aunque V2 no esté listo', () => {
+    expect(saleEligibility({
+      chainId: 56,
+      network: 'BSC',
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplace: { ...v2Marketplace, ready: false },
+    })).toEqual({ canSell: true, surface: 'legacy', sellSurfaces: ['legacy'] });
+    expect(saleEligibility({
+      chainId: null,
+      network: 'TRON',
+      collectionAddress: legacyMarketplaceContracts.tron.contracts.token,
+      marketplace: { ...v2Marketplace, ready: false },
+    })).toEqual({ canSell: true, surface: 'legacy', sellSurfaces: ['legacy'] });
+  });
+
+  it('exige colección exacta y readiness para V2 BSC97', () => {
+    expect(saleEligibility()).toEqual({ canSell: true, surface: 'uki', sellSurfaces: ['uki'] });
+    expect(saleEligibility({ marketplace: { ...v2Marketplace, ready: false } }))
+      .toEqual({ canSell: false, surface: 'uki', sellSurfaces: [] });
+    expect(saleEligibility({ collectionAddress: '0x9999999999999999999999999999999999999999' }))
+      .toEqual({ canSell: false, surface: null, sellSurfaces: [] });
+    expect(saleEligibility({
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+    })).toEqual({ canSell: false, surface: null, sellSurfaces: [] });
+    expect(saleEligibility({
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplace: {
+        ...v2Marketplace,
+        collectionAddresses: [legacyMarketplaceContracts.bsc.contracts.token],
+      },
+    })).toEqual({ canSell: false, surface: null, sellSurfaces: [] });
+  });
+
+  it('admite V2 BSC56 cuando la configuración de Marketplace coincide', () => {
+    expect(saleEligibility({
+      chainId: 56,
+      marketplace: {
+        ready: true,
+        chainId: 56,
+        collectionAddresses: [collection],
+      },
+    })).toEqual({ canSell: true, surface: 'uki', sellSurfaces: ['uki'] });
+    expect(saleEligibility({
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplace: {
+        ready: true,
+        chainId: 56,
+        collectionAddresses: [legacyMarketplaceContracts.bsc.contracts.token],
+      },
+    })).toEqual({ canSell: true, surface: 'legacy', sellSurfaces: ['legacy', 'uki'] });
+    expect(saleEligibility({
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplace: {
+        ready: false,
+        chainId: 56,
+        collectionAddresses: [legacyMarketplaceContracts.bsc.contracts.token],
+      },
+    })).toEqual({ canSell: true, surface: 'legacy', sellSurfaces: ['legacy'] });
+  });
+
+  it.each([
+    ['owner mismatch', { ownerMatches: false }],
+    ['custody', { custody: 'cukie_pool' as const }],
+    ['listing', { state: 'listed' as const }],
+    ['staking', { state: 'soft_staked' as const }],
+  ])('falla cerrado ante %s', (_label, overrides) => {
+    expect(saleEligibility(overrides)).toEqual({ canSell: false, surface: 'uki', sellSurfaces: [] });
+  });
+});
 
 function cursor<T>(rows: T[]) {
   const value = {
@@ -224,6 +320,74 @@ describe('my canonical Cukie collection', () => {
       custody: 'cukie_pool',
       state: 'unknown',
       availableActions: [],
+    });
+  });
+
+  it.each([true, false])('mantiene el origen del anuncio activo y ofrece UKI adicional solo al republicar (V2 ready=%s)', async (marketplaceReady) => {
+    const legacyCollection = legacyMarketplaceContracts.bsc.contracts.token;
+    const legacyConfig = parseUkiNftVaultPublicConfig({
+      chainId: '56',
+      collectionAddress: legacyCollection,
+    });
+    const document = (token: string, state: string, listingStatus?: string) => ({
+      ...inventory(token),
+      chainId: 56,
+      collectionAddressNormalized: legacyCollection,
+      network: 'BSC',
+      state,
+      marketplaceListingStatus: listingStatus,
+      marketplaceListingOwnerNormalized: listingStatus ? wallet : undefined,
+    });
+    const ukiOrder = {
+      chainId: 56,
+      collectionAddressNormalized: legacyCollection,
+      tokenId: '3',
+      sellerNormalized: wallet,
+      status: 'active',
+    };
+    const db = {
+      collection: (name: string) => ({
+        find: () => {
+          if (name === 'cukie_pool_nft_vault_positions') return cursor([]);
+          if (name === 'cukie_master_nft_positions') return cursor([]);
+          if (name === 'uki_marketplace_orders') return cursor([ukiOrder]);
+          if (name === 'nft_asset_locks') return cursor([]);
+          return cursor([
+            document('1', 'available'),
+            document('2', 'listed', 'active'),
+            document('3', 'available'),
+          ]);
+        },
+      }),
+    } as unknown as Db;
+
+    const result = await listMyCukieCollectionFromDb({
+      db,
+      walletAddress: wallet,
+      config: legacyConfig,
+      marketplaceConfig: {
+        ready: marketplaceReady,
+        chainId: 56,
+        collectionAddresses: [legacyCollection],
+      },
+    });
+
+    expect(result.items.find((item) => item.tokenId === '1')).toMatchObject({
+      marketplaceSurface: 'legacy',
+      sellSurfaces: marketplaceReady ? ['legacy', 'uki'] : ['legacy'],
+      availableActions: ['sell'],
+    });
+    expect(result.items.find((item) => item.tokenId === '2')).toMatchObject({
+      marketplaceSurface: 'legacy',
+      saleKind: 'legacy',
+      sellSurfaces: [],
+      availableActions: ['cancel_sale'],
+    });
+    expect(result.items.find((item) => item.tokenId === '3')).toMatchObject({
+      marketplaceSurface: 'uki',
+      saleKind: 'uki',
+      sellSurfaces: [],
+      availableActions: ['cancel_sale'],
     });
   });
 });

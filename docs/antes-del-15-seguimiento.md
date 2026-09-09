@@ -129,8 +129,11 @@ alcance limitado por falta de una prueba adicional.
   UKI → cupo → créditos. La custodia de los NFTs 98000001/003/004 ya está acreditada;
   su retirada y experiencia de Pool se siguen en el bloque de PR355 existente.
   El resumen de Mis Cukies aún usa ceros mientras su fuente es desconocida.
-- Filas **2A-C y 5**: el CTA `Vender` existe, pero su predicado excluye BSC97 y liga
-  la venta BSC56 a la disponibilidad de V2. El contrato V2 cubre precio/cobro UKI,
+- Filas **2A-C y 5**: el P2 de PR359 está corregido localmente (2026-09-09):
+  origen de anuncio y destinos de publicación separados; colección original BSC56
+  conserva acceso UKI cuando la configuración exacta lo permite. Revisión del
+  coordinador superada sobre `33f7ef59`, sin nuevos bloqueos; integración/live pendientes.
+  Su integración y aceptación live siguen pendientes. El contrato V2 cubre precio/cobro UKI,
   conversión de la parte del vendedor y fee en moneda de entrada; su UI solo
   contempla UKI/BNB/USDT y Stage responde `UKI_MARKETPLACE_UNAVAILABLE`. No se
   certifica operación V2 en Stage ni producción. La fee BNB queda acreditada
@@ -708,6 +711,41 @@ Evidencia local cerrada:
 
 ### 2A. Estado correcto de listings, staking, Cukies y Cukie Points
 
+- Lote de elegibilidad `MC09 / SV01–SV04 / V12`, 2026-09-09, sobre base
+  `1646602`, rama `codex/seller-eligibility-v2`, [PR #359](https://github.com/fgomezserna/cukies-hub/pull/359),
+  **REVISIÓN P2 SUPERADA**: coordinador Astra confirmó `33f7ef59` sin nuevos
+  bloqueos de código. Sin integración ni aceptación live de este lote.
+  La revisión sobre `1f13cd99` detectó que priorizar Legacy por colección excluía
+  republicación UKI y enviaba una orden UKI existente al detalle equivocado.
+  Corrección acotada, según las reglas de convivencia Legacy/UKI:
+
+  1. `marketplaceSurface` usa `saleKind` reconciliado para anuncios activos;
+     detalle/cancelación conservan origen y contrato exactos, incluso si se
+     deshabilita la configuración de publicación UKI.
+  2. `sellSurfaces` separa destinos elegibles de publicación. La colección original
+     BSC56 disponible conserva Legacy y añade «Vender en UKI» cuando readiness,
+     cadena y allowlist exactas lo permiten. Un anuncio activo no ofrece venta
+     nueva: hay que cancelar antes de republicar; no hay migración automática.
+  3. Rechazo de colección Legacy56 atribuida a97 y guardas de propiedad, custodia
+     y estado conservados. Regresiones de doble elegibilidad, orden UKI activa y
+     anuncio Legacy sin migración en helper, ensamblado y UI.
+
+  Mismo Luna high, sin activación V2 completa ni infraestructura. Al entregar
+  se libera el hueco para Datos/juego. Rama actualizada con `staging` `c7b33c1`:
+  conflicto exclusivamente documental resuelto conservando INFRA y coordinación;
+  código de producto del lote intacto. No se repiten los 1.898 tests por este
+  arrastre del baseline. Merge/deploy sujetos al coordinador y handoff INFRA.
+  No amplía el inventario canónico EVM de Mis Cukies a TRON: sus NFTs mantienen
+  el panel vendedor Legacy. Despliegue y aceptación live de este lote pendientes;
+  la activación económica V2 conserva los requisitos de la sección 2C.
+  Verificación tras P2: `pnpm dapp lint` sin avisos,
+  `pnpm --filter dapp typecheck` OK y `pnpm dapp test --runInBand`
+  con 234 suites / 1.898 tests OK; `git diff --check` OK.
+  Suite focal de colección: 13 tests OK, incluidos ensamblado con V2 ready
+  true/false, ambos orígenes activos y destinos para republicación. Se conservan
+  cobertura BSC56/BSC97, red contradictoria, propiedad/custodia/estado,
+  token homónimo y URL inválida. Sin QA visual/live ni firmas en este lote.
+  No hay cambios de contratos, configuración económica, CI/CD ni producción.
 - Cierre Marketplace del 2026-09-09 en `staging`: el catálogo no publica todo
   el inventario Mongo; verifica estado y precio en los contratos Legacy BSC/TRON,
   degrada cada red por separado y conserva estable el cursor sin escribir durante
