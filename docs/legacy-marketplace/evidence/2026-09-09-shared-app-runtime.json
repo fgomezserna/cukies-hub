@@ -1,0 +1,168 @@
+{
+  "scope": "Shared layout runtime; staging only; no economic writes or configuration activation",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/340",
+  "sha": "43d8a2ffa318478d74d2289f741309f3ade2e2ea",
+  "deployment": {
+    "applicationId": 28,
+    "uuid": "qog48gg4o0s0os4gcows004g",
+    "finishedAt": "2026-09-09T09:28:48.695Z",
+    "guardPassed": true,
+    "cancelCount": 0,
+    "minimumFreeBytes": 11183640576
+  },
+  "health": {
+    "status": "ok",
+    "app": "cukies-hub",
+    "environment": "staging",
+    "gitSha": "43d8a2ffa318478d74d2289f741309f3ade2e2ea",
+    "gitRef": "staging",
+    "buildTime": null,
+    "coolify": {
+      "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
+      "fqdn": "cukies-hub.eurekand.com,cukieshub.eurekand.com"
+    }
+  },
+  "checks": {
+    "lint": "PASS without warnings",
+    "typecheck": "PASS",
+    "buildDapp": "PASS",
+    "jest": {
+      "suites": 219,
+      "tests": 1773,
+      "failed": 0
+    }
+  },
+  "backendReadOnlyProbe": {
+    "recentCreditErrors": [
+      {
+        "startedAt": "2026-09-09T09:30:13.849Z",
+        "endedAt": "2026-09-09T09:30:15.075Z",
+        "errorCode": "DOMAIN_CONFLICT"
+      },
+      {
+        "startedAt": "2026-09-09T09:00:20.491Z",
+        "endedAt": "2026-09-09T09:00:20.979Z",
+        "errorCode": "DOMAIN_CONFLICT"
+      },
+      {
+        "startedAt": "2026-09-09T08:30:32.963Z",
+        "endedAt": "2026-09-09T08:30:33.439Z",
+        "errorCode": "DOMAIN_CONFLICT"
+      }
+    ],
+    "observedAt": "2026-09-09T09:32:07.325Z",
+    "durationMs": 284,
+    "result": {
+      "checkedAt": "2026-09-09T09:32:07.041Z",
+      "services": {
+        "indexer": {
+          "status": "ready",
+          "checkedAt": "2026-09-09T09:32:07.041Z",
+          "lastSuccessAt": "2026-09-09T09:32:05.090Z",
+          "code": "indexer_ready"
+        },
+        "master": {
+          "status": "ready",
+          "checkedAt": "2026-09-09T09:32:07.041Z",
+          "lastSuccessAt": "2026-09-09T09:31:44.424Z",
+          "code": "master_ready"
+        },
+        "credits": {
+          "status": "ready",
+          "checkedAt": "2026-09-09T09:32:07.041Z",
+          "lastSuccessAt": "2026-09-09T09:31:46.931Z",
+          "code": "credits_ready"
+        }
+      }
+    },
+    "records": {
+      "cukie_master_runtime_runs": {
+        "status": "success",
+        "startedAt": "2026-09-09T09:31:44.072Z",
+        "endedAt": "2026-09-09T09:31:44.424Z"
+      },
+      "competition_credit_runtime_runs": {
+        "status": "success",
+        "startedAt": "2026-09-09T09:31:46.602Z",
+        "endedAt": "2026-09-09T09:31:46.931Z"
+      },
+      "chain_indexer_runs": {
+        "type": "loop",
+        "startedAt": "2026-09-09T09:31:47.210Z",
+        "endedAt": "2026-09-09T09:32:05.090Z"
+      }
+    },
+    "bundleSha256": "68d6ff9b482c4969f70d1ad3a6540ee25d4258bc678415292154b339b6fba3ba"
+  },
+  "apiUnauthorized": {
+    "http": 401,
+    "code": "WALLET_SESSION_REQUIRED"
+  },
+  "authenticatedUi": {
+    "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "master": {
+      "ukiSlots": 0,
+      "nftSlots": 3,
+      "dailyCredits": 300
+    },
+    "credits": {
+      "nftSlots": 3,
+      "nextAllocation": 300,
+      "available": 300
+    },
+    "dashboard": {
+      "ukiSlots": 0,
+      "nftSlots": 3,
+      "availableCredits": 300,
+      "poolPositions": 0
+    },
+    "sharedNoticeWhileReady": false,
+    "writesOrSignaturesPerformed": false,
+    "automaticRefresh": {
+      "first": "2026-09-09T09:34:28.957Z",
+      "second": "2026-09-09T09:35:30.200Z",
+      "manualRefresh": false,
+      "noticeCount": 0
+    },
+    "masterNft": {
+      "cards": 6,
+      "imagesLoaded": 6,
+      "depositedTokenId": "98000005",
+      "rarityPoints": 10,
+      "derivedSlots": 3,
+      "noticeCount": 0
+    },
+    "pool": {
+      "positions": 0,
+      "availableOriginals": 5,
+      "availableSecondGeneration": 6,
+      "availableTotal": 11,
+      "noticeCount": 0
+    }
+  },
+  "workers": {
+    "count": 12,
+    "allRunning": true,
+    "allZeroRestarts": true,
+    "previousServicesMissing": [],
+    "previousGateChanges": {},
+    "additionalDisabledServices": [
+      "game-economy-scheduler",
+      "weekly-ranking-scheduler",
+      "reward-accounting-scheduler",
+      "reward-batch-publisher"
+    ],
+    "allAdditionalGates": "false"
+  },
+  "productionUnchanged": {
+    "sha": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e",
+    "environment": "production",
+    "gitRef": "main"
+  },
+  "limits": [
+    "Authenticated API body could not be opened directly by browser tooling; verified signed UI consumers, unauthenticated denial and read-only backend logic on staging DB.",
+    "DOMAIN_CONFLICT occurred at 08:30, 09:00 and 09:30 UTC credit cutoffs, including before this rollout; next ticks recovered. Cause remains to be diagnosed.",
+    "Marketplace unavailable and Vesting without allocation remain independent dashboard module states.",
+    "No live transaction, network switch or deliberate backend outage was executed; adverse cases are covered by automated tests."
+  ]
+}

@@ -4,9 +4,9 @@ Estado del documento: fuente unica del estado vigente; vivo y versionado.
 
 Ultima actualizacion: 2026-09-09.
 
-Contexto de esta actualizacion: implementacion autorizada de la auditoria UX y
-diagnostico de actualizacion de datos del 2026-09-08, conservando la
-correccion de producto del 2026-09-07 y el contraste focalizado de la evidencia
+Contexto de esta actualizacion: coordinacion compartida del layout y despliegue
+staging del 2026-09-09, continuando la auditoria UX y recuperacion de datos.
+Se conserva la correccion de producto del 2026-09-07 y el contraste focalizado de la evidencia
 disponible. Las decisiones explicitas
 del usuario fijan el alcance; su confirmacion de funcionamiento queda registrada
 como tal. La evidencia nueva se fecha y cualquier contradiccion se reconcilia.
@@ -75,7 +75,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | 2A-C | **EVENTOS Y WORKER INTEGRADOS EN STAGING**: 14 contratos legacy y 10 perfiles nuevos cubiertos (75 + 87 relaciones contrato/evento); replay de breeding, CAS bridge y aislamiento verificados. 14/14 fuentes contrastadas live y pasada TRON 40/40 sin 429 con delay 2 s. Catalogo conjunto y UX publicados en PR #322 (8/09); la paridad de datos legacy sigue pendiente. | [PR #319](https://github.com/fgomezserna/cukies-hub/pull/319) integrada en `7d0d1ce`, codigo `fa708fd`; [validacion y limites](legacy-marketplace/evidence/2026-09-07-indexer-validation.json); 2026-09-07. Pruebas: indexer 84/84, Stage/Compose 63/63, produccion 14/14, typecheck/build correctos. | Resolver RPC de archivo BSC antes del backfill, provisionar destino dedicado, activar y reconciliar datos. Reconciliar lista/filtros/acciones ya implementados segun [reglas funcionales](uki-current-operating-rules.md#contratos-legacy-eventos-y-convivencia-decision-del-2026-09-07). Dapp Stage `7d0d1ce` verificada por health; rollout del indexador normal requirio completar identidades PRESALE/REWARDS (ver [configuracion](deployment-environments.md)). El worker legacy sigue inactivo y no se afirma paridad; main `fb2b190`. |
 | 3 | **EN STAGING, EN PRUEBAS · INCIDENCIA DE CUPOS/CRÉDITOS RESUELTA**: Cukie Master, creditos, pools, prestamos y rewards. | 2026-09-08 19:28 UTC, Stage `67303f6` (PR #329–#333): historial 5→4→0 NFT / UKI 0, ambas rutas al dia y 0 grants QA posteriores a retiradas. Dos ticks waiting renuevan ambas fuentes; Master/Créditos/Resumen coherentes y sin sus avisos incorrectos. 1.746 tests y gates PASS. [Evidencia](legacy-marketplace/evidence/2026-09-08-stage-data-recovery.json). | Cierre de [#326](https://github.com/fgomezserna/cukies-hub/issues/326) limitado a esta incidencia. Continuan las pruebas amplias de economia/UX en [#289](https://github.com/fgomezserna/cukies-hub/issues/289); avisos independientes de Marketplace y Vesting sin asignacion. Produccion `fb2b190` sin cambios. |
 | 4 | **EN MAIN, PENDIENTE DE PUBLICAR PRODUCTO**: embajadores y reglas asociadas siguen dentro del programa. | Confirmacion de producto; 2026-09-07; [PR317](https://github.com/fgomezserna/cukies-hub/pull/317), [PR318](https://github.com/fgomezserna/cukies-hub/pull/318). | Separar merge/deploy tecnico de publicacion, copy, allocations y claim. |
-| 5 | **COORDINACION COMPARTIDA VALIDADA LOCALMENTE · PRUEBAS UX ABIERTAS**: wallet, red, cache y recuperacion en `AppRuntimeProvider` persistente; aviso unico del layout; Resumen, Master/NFT, Creditos y Pool consumen lecturas compartidas. Cada operacion conserva su guard final. | 2026-09-09, rama `codex/shared-app-runtime` desde `82e8d43`; [alcance y validacion](#coordinacion-compartida-del-layout--2026-09-09). La evidencia anterior de PR #325 sigue siendo historica; el nuevo lote aun no esta desplegado. | Completar gates, integrar en `staging` y verificar app 28, API autenticada y continuidad de workers. Mantener abiertas las variantes UX y la paridad legacy; no modificar main. |
+| 5 | **PUBLICADO EN STAGING · RUNTIME COMPARTIDO VERIFICADO · PRUEBAS UX ABIERTAS**: wallet, red, cache y recuperacion en `AppRuntimeProvider` persistente; aviso comun del layout; Resumen, Master/NFT, Creditos y Pool consumen lecturas compartidas. Cada operacion conserva su guard final. | 2026-09-09, [PR #340](https://github.com/fgomezserna/cukies-hub/pull/340), Stage `43d8a2f`, deploy terminado 09:28:48 UTC. Lint, tipos, build y 1.773 tests PASS; sesion QA coherente con 3 cupos NFT/0 UKI y 300 creditos. [Evidencia y limites](legacy-marketplace/evidence/2026-09-09-shared-app-runtime.json). | Completar variantes UX y paridad legacy. Diagnosticar `DOMAIN_CONFLICT` recurrente en cortes de creditos: existia antes del rollout y recupera en ticks posteriores. No se reabre la reparacion historica del punto 3 ni se afirma resiliencia completa del backend. Main sigue `fb2b190`. |
 | 6 | **SIN CAMBIO**: conservar tokenomics, evidencia y decision previa; no inventar un estado nuevo. | `docs/uki-current-operating-rules.md` y evidencia previa; contraste 2026-09-07. | Reconciliar solo cuando exista una nueva decision versionada. |
 | post1-2 | **ANTES DEL 15 · MIGRACION LEGACY**: Cukie Points y crias siguen ligados al bloque de migracion; no son activos POST-15. | Decision de producto; 2026-09-07. | Inventario y migracion validada; no ejecutar pausa/corte en este seguimiento. |
 | post3-9 | Alcance conservado como inventario posterior, sin afirmar codigo definitivo ni cierre. | Registro historico; 2026-09-07. | Mantener scope y esperar decision/evidencia especifica. |
@@ -823,11 +823,27 @@ posterior al guardado; no basta con reutilizar la peticion en vuelo. Los tests
 cubren timeout del cuerpo JSON, identidad, desconexion, drafts e historial.
 Gates locales PASS: lint sin avisos, typecheck, build Dapp y Jest completo
 (219 suites, 1.773 tests). QA local desktop 1440 y movil 390: aviso comun sin
-overflow; landing sin lecturas privadas. Integracion y rollout pendientes; el runtime observado antes
-del cambio sirve `80608ea`. El 2026-09-09 a las 09:10 UTC la sesion QA
+overflow; landing sin lecturas privadas. Integrado en [PR #340](https://github.com/fgomezserna/cukies-hub/pull/340):
+Stage sirve `43d8a2f` desde las 09:28:48 UTC, deployment
+`qog48gg4o0s0os4gcows004g`, guard PASS sin cancelaciones. La version anterior
+era `80608ea`. El 2026-09-09 a las 09:10 UTC la sesion QA
 muestra 3 cupos NFT y 0 UKI en Master y Creditos, con 300 creditos previstos;
-esta observacion reemplaza el cero historico como referencia de este rollout. Este alcance no modifica saldos, contratos,
-reglas economicas, procesos de reparacion remotos ni produccion.
+esta observacion reemplaza el cero historico como referencia de este rollout.
+Resumen renovo su fecha DOM de `09:34:28.957Z` a `09:35:30.200Z` sin pulsar
+Actualizar y sin aviso general de servicio. Master NFT muestra seis imagenes
+cargadas y el legendario #98000005 depositado (10 puntos, tres cupos). Pool
+muestra 0 posiciones y 11 disponibles (5 Originales y 6 de Segunda Generacion),
+sin aviso de sincronizacion. El endpoint rechaza peticiones sin sesion (401);
+la UI firmada consume el
+estado comun. Indexer, Master y Creditos tienen evidencia `ready` a las
+09:32 UTC. El error de creditos `DOMAIN_CONFLICT` del corte 09:30 se recupero
+sin intervencion; tambien existia a las 08:30 y 09:00, antes del rollout.
+Se conserva como diagnostico pendiente, sin ocultarlo como cero ni confundirlo
+con un fallo del layout. Los 12 servicios estan running sin reinicios;
+los gates previos se conservan y los cuatro servicios adicionales del compose
+normal permanecen deshabilitados. [Evidencia](legacy-marketplace/evidence/2026-09-09-shared-app-runtime.json).
+Este alcance no modifica saldos, contratos, reglas economicas, procesos de
+reparacion remotos ni produccion.
 
 ### Auditoria del 2026-09-08
 
