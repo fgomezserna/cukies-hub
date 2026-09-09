@@ -813,9 +813,7 @@
     }
   },
   "nftOperationRecurrence": {
-    "status": "validated_local_deploy_blocked_capacity",
-    "observedAt": "2026-09-09T11:23:34.575Z",
-    "servedCommit": "bae6f3b022297ac431aa417ac8e8127d82d1913c",
+    "status": "deployed_readonly_verified_transaction_regressions_tested",
     "chainId": 97,
     "collectionSummary": {
       "total": 12,
@@ -931,11 +929,11 @@
       },
       "limitation": "Uncommitted candidate run against Stage data; not proof of code deployed or wallet transaction completion."
     },
-    "codeCommit": "50d27f5",
-    "baseCommit": "53088a33fcdca428a2f6d11967b63c69d1e4fccb",
+    "codeCommit": "a19f9aa4165d48f2d0f5e2f11afdfe25b18d3eda",
+    "baseCommit": "c5306e2b5e2a5a689ff8b611d7a972a1b3ce90ad",
     "validation": {
-      "jestSuites": 227,
-      "jestTests": 1841,
+      "jestSuites": 228,
+      "jestTests": 1844,
       "jestPassed": true,
       "buildPassed": true,
       "typecheckPassed": true,
@@ -955,7 +953,383 @@
         "controlPlane": "reported_healthy",
         "window": "reserved_by_marketplace_for_followup_fix_and_deployment",
         "nextDeploymentCondition": "operator handoff plus verified headroom for build consumption above the 10 GiB runtime floor"
-      }
+      },
+      "resolvedBy": "Explicit Marketplace handoff, 29,867,462,656 bytes verified before the guarded deployment; later superseded by authorized dedicated-runner transition."
+    },
+    "mergeCommit": "8d89676f4e7e9584e8362d1fe6a79a64ef150fc1",
+    "deploymentAttempt": {
+      "guard": {
+        "pass": false,
+        "expectedCommit": "8d89676f4e7e9584e8362d1fe6a79a64ef150fc1",
+        "deploymentUuid": "msck00wsw8g0sckokk0okw4c",
+        "status": "cancelled-by-user",
+        "cancelCount": 0,
+        "minimumFreeBytes": "17378201600",
+        "error": "deployment did not finish without cancellation",
+        "finishedAt": "2026-09-09T12:50:10.055Z"
+      },
+      "closure": {
+        "autodeploy": false,
+        "tokensRemaining": 0,
+        "deploymentSettingsChanged": false
+      },
+      "cancellationActor": "Dedicated-runner transition operator, confirmed 2026-09-09; not the NFT guard",
+      "cancellationReason": "Superseded by PR349 image pipeline while preventing concurrent deployment",
+      "replacementCommit": "0896fbd708617311a8db17a3e05387c1ae5ad2c5",
+      "replacementWorkflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34352921601",
+      "legacyManualDeploymentRetried": false
+    },
+    "baselineObservedAt": "2026-09-09T11:23:34.575Z",
+    "baselineServedCommit": "bae6f3b022297ac431aa417ac8e8127d82d1913c",
+    "postDeployment": {
+      "observedAt": "2026-09-09T13:21:41.687Z",
+      "servedCommit": "0896fbd708617311a8db17a3e05387c1ae5ad2c5",
+      "url": "https://cukieshub.eurekand.com",
+      "deployment": {
+        "deployment_uuid": "a76af1841ccb57fbdc12d071",
+        "status": "finished",
+        "commit": "0896fbd708617311a8db17a3e05387c1ae5ad2c5",
+        "updated_at": "2026-09-09T13:16:47.000000Z",
+        "logEntries": 456,
+        "recentBuildSteps": [
+          "Starting deployment"
+        ]
+      },
+      "pipelineInitialRunConclusion": "failure",
+      "recoveryMethod": "Explicit image deployment by the CI transition operator using the same five published image digests; no image rebuild",
+      "readOnlyProbe": {
+        "chainId": 97,
+        "indexer": {
+          "status": "ready"
+        },
+        "collectionSummary": {
+          "total": 12,
+          "inWallet": 2,
+          "available": 2,
+          "onSale": 0,
+          "inPool": 9,
+          "inCukieMaster": 1,
+          "otherInUse": 0
+        },
+        "masterInventory": [
+          {
+            "tokenId": "98000001",
+            "custody": "wallet",
+            "canDeposit": false,
+            "canWithdraw": false,
+            "state": "unknown"
+          },
+          {
+            "tokenId": "98000003",
+            "custody": "wallet",
+            "canDeposit": false,
+            "canWithdraw": false,
+            "state": "unknown"
+          },
+          {
+            "tokenId": "98000004",
+            "custody": "wallet",
+            "canDeposit": false,
+            "canWithdraw": false,
+            "state": "unknown"
+          },
+          {
+            "tokenId": "98000005",
+            "custody": "cukie_master_nft_vault",
+            "canDeposit": false,
+            "canWithdraw": true,
+            "state": "custodied"
+          },
+          {
+            "tokenId": "98000007",
+            "custody": "wallet",
+            "canDeposit": false,
+            "canWithdraw": false,
+            "state": "unknown"
+          },
+          {
+            "tokenId": "98000011",
+            "custody": "wallet",
+            "canDeposit": false,
+            "canWithdraw": false,
+            "state": "available"
+          },
+          {
+            "tokenId": "98000012",
+            "custody": "wallet",
+            "canDeposit": false,
+            "canWithdraw": false,
+            "state": "available"
+          }
+        ],
+        "recoverySimulations": [
+          {
+            "tokenId": "98000001",
+            "status": "request_exit_success"
+          },
+          {
+            "tokenId": "98000003",
+            "status": "request_exit_success"
+          },
+          {
+            "tokenId": "98000004",
+            "status": "request_exit_success"
+          },
+          {
+            "tokenId": "98000007",
+            "status": "already_requested"
+          }
+        ]
+      },
+      "probeAdaptation": "Standalone requires docker exec -w /app/dapp to resolve mongodb; probe bundle unchanged",
+      "browser": {
+        "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "routes": [
+          "/cukie-master",
+          "/cukie-hodler#mi-cukie-pool",
+          "/cukies"
+        ],
+        "masterBlockedWithPoolReason": [
+          "98000001",
+          "98000003",
+          "98000004"
+        ],
+        "masterWithdrawAvailable": [
+          "98000005"
+        ],
+        "poolCurrentPositions": 5,
+        "poolWalletAvailable": 2,
+        "collectionSummary": {
+          "total": 12,
+          "inWallet": 2,
+          "available": 2,
+          "onSale": 0,
+          "inPool": 9,
+          "inCukieMaster": 1,
+          "otherInUse": 0
+        },
+        "consoleErrors": []
+      },
+      "runtime": {
+        "freeBytes": 17023971328,
+        "containers": [
+          {
+            "name": "reward-accounting-scheduler-u4s804o4wwcckowgk0woo4wg-131215115976",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "APP_ENV": "staging",
+              "CARD_WORKER_UPLOAD": "true",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false"
+            }
+          },
+          {
+            "name": "game-economy-scheduler-u4s804o4wwcckowgk0woo4wg-131215027453",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_UPLOAD": "true",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "APP_ENV": "staging",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true"
+            }
+          },
+          {
+            "name": "weekly-ranking-scheduler-u4s804o4wwcckowgk0woo4wg-131215082606",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "CARD_WORKER_UPLOAD": "true",
+              "APP_ENV": "staging",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97"
+            }
+          },
+          {
+            "name": "reward-batch-publisher-u4s804o4wwcckowgk0woo4wg-131215146737",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "APP_ENV": "staging",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_UPLOAD": "true",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false"
+            }
+          },
+          {
+            "name": "cukie-pool-scheduler-u4s804o4wwcckowgk0woo4wg-131215051209",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "APP_ENV": "staging",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_UPLOAD": "true",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging"
+            }
+          },
+          {
+            "name": "cukie-master-scheduler-u4s804o4wwcckowgk0woo4wg-131214954069",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "APP_ENV": "staging",
+              "CARD_WORKER_UPLOAD": "true",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false"
+            }
+          },
+          {
+            "name": "competition-credit-scheduler-u4s804o4wwcckowgk0woo4wg-131214982461",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "CARD_WORKER_UPLOAD": "true",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "APP_ENV": "staging"
+            }
+          },
+          {
+            "name": "cuki-card-worker-legacy-u4s804o4wwcckowgk0woo4wg-131215269512",
+            "status": "running",
+            "health": null,
+            "restarts": 0,
+            "gates": {
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "CARD_WORKER_UPLOAD": "true",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "APP_ENV": "staging",
+              "CARD_WORKER_DB_NAME": "cukies-legacy-staging",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97"
+            }
+          },
+          {
+            "name": "dapp-u4s804o4wwcckowgk0woo4wg-131214468841",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_UPLOAD": "true",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "APP_ENV": "staging",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging"
+            }
+          },
+          {
+            "name": "cuki-card-worker-u4s804o4wwcckowgk0woo4wg-131215221044",
+            "status": "running",
+            "health": null,
+            "restarts": 0,
+            "gates": {
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "APP_ENV": "staging",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_UPLOAD": "true",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true"
+            }
+          },
+          {
+            "name": "chain-indexer-u4s804o4wwcckowgk0woo4wg-131214776007",
+            "status": "running",
+            "health": "healthy",
+            "restarts": 0,
+            "gates": {
+              "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+              "COMPOSE_PROFILES": "staging-runtime,card-worker,legacy-card-worker",
+              "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+              "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+              "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+              "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID": "97",
+              "APP_ENV": "staging",
+              "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+              "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+              "CUKIE_POOL_RUNTIME_ENABLED": "false",
+              "CARD_WORKER_UPLOAD": "true"
+            }
+          }
+        ]
+      },
+      "limitations": [
+        "No wallet transaction signed or submitted.",
+        "Post-deposit transient inventory retention verified by regression tests; a real wallet deposit was not replayed in this QA.",
+        "previousPositions is empty because the probe iterates available assets; historical custody is separately supported by collection recovery checks and read-only requestExit simulations."
+      ],
+      "transactionWrites": 0
     }
   }
 }
