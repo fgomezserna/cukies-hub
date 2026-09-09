@@ -32,9 +32,16 @@ jobs:
       CUKIES_STATE_PATH: /srv/cukies-ci/state/staging/release.json
       CUKIES_HEALTH_URL: https://cukieshub.eurekand.com/api/health
       BUILDX_BUILDER: cukies-ci
-      CUKIES_RUN_DIR: ${{ runner.temp }}/cukies-staging-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
+      - name: Initialize release directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/cukies-staging-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$release_dir"
+          echo "CUKIES_RUN_DIR=$release_dir" >> "$GITHUB_ENV"
+
       - name: Checkout exact push SHA
         uses: actions/checkout@v4
         with:
