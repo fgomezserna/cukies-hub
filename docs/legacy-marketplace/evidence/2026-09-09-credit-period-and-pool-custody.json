@@ -948,7 +948,14 @@
       "applicationId": 28,
       "reason": "srv filesystem exhausted during Marketplace deployment; no new deployment window authorized by the operator while capacity remains below guard floor",
       "marketplaceDeploymentUuid": "dc0s484w4gg0o0oos4o0c0o4",
-      "newDeployTriggered": false
+      "newDeployTriggered": false,
+      "latestOperatorReport": {
+        "observedAt": "2026-09-09T12:07:00Z",
+        "freeBytes": 19150913536,
+        "controlPlane": "reported_healthy",
+        "window": "reserved_by_marketplace_for_followup_fix_and_deployment",
+        "nextDeploymentCondition": "operator handoff plus verified headroom for build consumption above the 10 GiB runtime floor"
+      }
     }
   }
 }
