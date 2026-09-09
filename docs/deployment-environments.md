@@ -24,6 +24,7 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 
 - Staging/integracion: Coolify app `game-hub-staging`, application ID `28`, UUID `u4s804o4wwcckowgk0woo4wg`, rama `staging`, URL `https://cukieshub.eurekand.com`.
 - El iframe Treasure Hunt de staging se despliega como recurso Coolify independiente `game-treasurehunt-staging` (application ID `31`, UUID `lc04cw8gs4koo4swwws0c4ss`) desde la misma rama y se publica bajo `https://cukieshub.eurekand.com/treasurehunt-game`, con `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y `NEXT_PUBLIC_DAPP_ORIGIN=https://cukieshub.eurekand.com`.
+- Treasure Hunt de producción tiene un recurso Coolify independiente `game-treasurehunt` (application ID `13`, UUID `tkkggwcosc4gksckcc480cwg`) sobre `main`, con destino `https://treasurehunt.cukies.world` y `NEXT_PUBLIC_GAME_BASE_PATH` vacío. El target de imagen está preparado; el recurso live conserva su configuración actual hasta completar snapshot, conversión y ensayo.
 - Live actual: Coolify app `game-hub`, application ID `12`, UUID `jookw8ow8woks088s44404ok`, rama `main`, URL `https://cukies.world`.
 - La topología fuente es `docker-compose.coolify.yml`. La entrega gradual separa web Docker Image (app33/app32) y `docker-compose.workers.yml` (app12/app28); consultar [el procedimiento y estado de bootstrap](deployment-rolling-transition.md).
 - Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.

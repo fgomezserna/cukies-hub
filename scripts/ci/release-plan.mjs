@@ -12,6 +12,7 @@ const IMAGE_ENV = Object.freeze({
   dapp: 'CUKIES_IMAGE_DAPP',
   'chain-indexer': 'CUKIES_IMAGE_CHAIN_INDEXER',
   'cuki-card-worker': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
+  'treasure-hunt': 'CUKIES_IMAGE_TREASURE_HUNT',
 });
 
 const PROJECT_COMPONENT = Object.freeze({
@@ -20,6 +21,9 @@ const PROJECT_COMPONENT = Object.freeze({
   'chain-indexer': 'chain-indexer',
   '@cukies/cuki-card-worker': 'cuki-card-worker',
   'cuki-card-worker': 'cuki-card-worker',
+  'sybil-slayer': 'treasure-hunt',
+  '@cukies/sybil-slayer': 'treasure-hunt',
+  'treasure-hunt': 'treasure-hunt',
 });
 
 const ALL_REASON = 'first-run-or-invalid-base';
@@ -37,6 +41,8 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/rolling-web.test.mjs',
   'scripts/ci/env-ci.test.mjs',
   'scripts/ci/worker-compose.test.mjs',
+  'scripts/ci/game-lane.test.mjs',
+  'scripts/ci/game-cache-contract.test.mjs',
   'scripts/ci/image-ref.mjs',
 ]);
 
@@ -51,12 +57,14 @@ function unique(values) {
 }
 
 export function componentForPath(path) {
-  if (path === 'scripts/docker-dapp-server.mjs') return ['dapp'];
+  if (path === 'scripts/docker-dapp-server.mjs') return ['dapp', 'treasure-hunt'];
+  if (path === 'scripts/docker-start-game-ci.mjs') return ['treasure-hunt'];
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|\.npmrc|\.dockerignore|Dockerfile\.ci|docker-compose\.coolify\.yml|docker-compose\.images\.yml|scripts\/docker-start(?:-ci)?\.sh|scripts\/assert-.*\.mjs)$/.test(path)) return [...COMPONENTS];
   if (path.startsWith('dapp/scripts/')) return ['dapp'];
   if (path.startsWith('dapp/')) return ['dapp'];
   if (path.startsWith('packages/chain-indexer/')) return ['chain-indexer'];
   if (path.startsWith('packages/cuki-card-worker/')) return ['cuki-card-worker'];
+  if (path.startsWith('games/sybil-slayer/')) return ['treasure-hunt'];
   if (path.startsWith('scripts/ci/')) return ORCHESTRATION_ONLY_PATHS.has(path) ? [] : [...COMPONENTS];
   return [];
 }
@@ -119,7 +127,7 @@ export function chooseReleasePlan({ state, head, configHash, environment, change
   const effectiveNxAffected = refinedDappOnly ? [] : nxAffected;
   const affected = firstOrInvalid
     ? [...COMPONENTS]
-    : unique([...pathAffected, ...effectiveNxAffected, ...(configChanged ? ['dapp'] : [])]);
+    : unique([...pathAffected, ...effectiveNxAffected, ...(configChanged ? ['dapp', 'treasure-hunt'] : [])]);
   const build = firstOrInvalid ? [...COMPONENTS] : affected;
   const reuse = [];
   if (!firstOrInvalid) {
@@ -152,7 +160,7 @@ export function chooseReleasePlan({ state, head, configHash, environment, change
     planReason,
     refinement: refinedDappOnly ? {
       reason: DAPP_DOCKERFILE_REFINEMENT_REASON,
-      detail: 'Dockerfile.ci solo cambia el stage final dapp; se ignoran los Nx afectados globales y se reutilizan los otros dos componentes.',
+      detail: 'Dockerfile.ci solo cambia el stage final dapp; se ignoran los Nx afectados globales y se reutilizan los otros tres componentes.',
     } : null,
     configHash,
     nx: { available: nxAvailable, projects: nxProjects, affected: effectiveNxAffected },

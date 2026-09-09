@@ -71,6 +71,12 @@ function requireString(value, name) {
   return value;
 }
 
+function resourceCommitOf(manifest, component = 'dapp') {
+  const key = component === 'dapp' ? 'webCommit' : component === 'treasure-hunt' ? 'gameCommit' : null;
+  const value = key ? manifest?.[key] : null;
+  return SHA40.test(value ?? '') ? value : manifest?.commit;
+}
+
 function assertTarget(target, deployment) {
   if (!target || typeof target !== 'object') throw new Error('target Coolify es obligatorio.');
   for (const key of ['resourceUuid', 'applicationId', 'gitBranch', 'repository', 'healthUrl', 'readyUrl']) {
@@ -90,18 +96,18 @@ function assertTarget(target, deployment) {
   }
 }
 
-function assertManifest(manifest) {
+function assertManifest(manifest, component = 'dapp') {
   if (!manifest || typeof manifest !== 'object') throw new Error('release manifest es obligatorio.');
   const deployment = assertEnvironmentMetadata(manifest, manifest.environment, { context: 'release manifest' });
   if (!SHA40.test(manifest.commit ?? '')) throw new Error('release manifest contiene un commit inválido.');
   if (!HASH64.test(manifest.configHash ?? '')) throw new Error('release manifest contiene un configHash inválido.');
-  const dappEntry = assertImmutableImageEntry('dapp', manifest.components?.dapp);
-  const dapp = { ...dappEntry, ...parseImmutableImage(dappEntry.image) };
-  if (dapp.configHash !== manifest.configHash) throw new Error('La imagen web no corresponde a la configuración pública del manifest.');
-  return { deployment, dapp };
+  const imageEntry = assertImmutableImageEntry(component, manifest.components?.[component]);
+  const image = { ...imageEntry, ...parseImmutableImage(imageEntry.image) };
+  if (image.configHash !== manifest.configHash) throw new Error(`La imagen ${component} no corresponde a la configuración pública del manifest.`);
+  return { deployment, image, resourceCommit: resourceCommitOf(manifest, component) };
 }
 
-function assertPreviousManifest(previousManifest, deployment) {
+function assertPreviousManifest(previousManifest, deployment, component = 'dapp') {
   if (!previousManifest || typeof previousManifest !== 'object') {
     throw new Error('previousManifest es obligatorio para una aplicación ya configurada.');
   }
@@ -111,9 +117,9 @@ function assertPreviousManifest(previousManifest, deployment) {
   }
   if (!SHA40.test(previousManifest.commit ?? '')) throw new Error('previousManifest contiene un commit inválido.');
   if (!HASH64.test(previousManifest.configHash ?? '')) throw new Error('previousManifest contiene un configHash inválido.');
-  const dappEntry = assertImmutableImageEntry('dapp', previousManifest.components?.dapp);
-  const dapp = { ...dappEntry, ...parseImmutableImage(dappEntry.image) };
-  return { dapp };
+  const imageEntry = assertImmutableImageEntry(component, previousManifest.components?.[component]);
+  const image = { ...imageEntry, ...parseImmutableImage(imageEntry.image) };
+  return { image, resourceCommit: resourceCommitOf(previousManifest, component) };
 }
 
 function assertApplicationShape(application, target) {
@@ -146,13 +152,14 @@ function assertApplicationShape(application, target) {
     throw new Error('Coolify aplicación debe tener health check habilitado.');
   }
   const healthPath = valueOf(application, 'health_check_path', 'healthCheckPath', 'healthcheck_path', 'healthcheckPath');
-  if (healthPath !== '/api/ready') throw new Error('Coolify aplicación debe usar health check path /api/ready.');
+  const expectedHealthPath = target.healthPath ?? new URL(target.readyUrl).pathname;
+  if (healthPath !== expectedHealthPath) throw new Error(`Coolify aplicación debe usar health check path ${expectedHealthPath}.`);
 }
 
-function imageConfig(dapp) {
-  const imageRepository = `${dapp.repository}/cukies-hub/dapp`;
-  const imageTag = `sha256-${dapp.digest.slice('sha256:'.length)}`;
-  if (!IMAGE_TAG.test(imageTag.slice('sha256-'.length))) throw new Error('digest dapp inválido.');
+function imageConfig(image) {
+  const imageRepository = `${image.repository}/cukies-hub/${image.component}`;
+  const imageTag = `sha256-${image.digest.slice('sha256:'.length)}`;
+  if (!IMAGE_TAG.test(imageTag.slice('sha256-'.length))) throw new Error('digest de imagen inválido.');
   return { imageRepository, imageTag };
 }
 
@@ -171,15 +178,15 @@ function metadataEntries(commit, configHash) {
   }));
 }
 
-function assertPinnedImage(application, expected, expectedCommit) {
+function assertPinnedImage(application, expected, expectedCommit, component = 'dapp') {
   if (commitOf(application) !== expectedCommit) {
     throw new Error(`Coolify no confirmó git_commit_sha=${expectedCommit}; API devolvió ${commitOf(application) ?? '(ausente)'}.`);
   }
   if (valueOf(application, 'docker_registry_image_name', 'dockerRegistryImageName') !== expected.imageRepository) {
-    throw new Error('Coolify no confirmó docker_registry_image_name del dapp.');
+    throw new Error(`Coolify no confirmó docker_registry_image_name de ${component}.`);
   }
   if (valueOf(application, 'docker_registry_image_tag', 'dockerRegistryImageTag') !== expected.imageTag) {
-    throw new Error('Coolify no confirmó docker_registry_image_tag del digest dapp.');
+    throw new Error(`Coolify no confirmó docker_registry_image_tag del digest ${component}.`);
   }
 }
 
@@ -190,7 +197,7 @@ async function readJson(fetchImpl, url) {
   return { response, body };
 }
 
-async function verifyPublicRelease({ fetchImpl, target, manifest, attempts, sleep }) {
+async function verifyPublicRelease({ fetchImpl, target, manifest, resourceCommit, expectedImageSha, attempts, sleep }) {
   let lastHealth;
   let lastReady;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -198,9 +205,10 @@ async function verifyPublicRelease({ fetchImpl, target, manifest, attempts, slee
       lastHealth = await readJson(fetchImpl, target.healthUrl);
       if (lastHealth.response.ok
         && lastHealth.body?.status === 'ok'
-        && lastHealth.body?.gitSha === manifest.commit
+        && lastHealth.body?.gitSha === resourceCommit
         && lastHealth.body?.environment === manifest.environment
-        && lastHealth.body?.coolify?.resourceUuid === target.resourceUuid) {
+        && lastHealth.body?.coolify?.resourceUuid === target.resourceUuid
+        && (!target.appName || lastHealth.body?.app === target.appName)) {
         // Keep polling ready in the same bounded window; old instances may answer health first.
       }
     } catch (error) {
@@ -214,15 +222,17 @@ async function verifyPublicRelease({ fetchImpl, target, manifest, attempts, slee
     const healthOk = Boolean(
       lastHealth?.response?.ok
       && lastHealth.body?.status === 'ok'
-      && lastHealth.body?.gitSha === manifest.commit
+      && lastHealth.body?.gitSha === resourceCommit
       && lastHealth.body?.environment === manifest.environment
-      && lastHealth.body?.coolify?.resourceUuid === target.resourceUuid,
+      && lastHealth.body?.coolify?.resourceUuid === target.resourceUuid
+      && (!target.appName || lastHealth.body?.app === target.appName),
     );
     const readyOk = Boolean(
       lastReady?.response?.status === 200
       && lastReady.body?.status === 'ready'
-      && lastReady.body?.gitSha === manifest.commit
-      && lastReady.body?.configHash === manifest.configHash,
+      && lastReady.body?.gitSha === resourceCommit
+      && lastReady.body?.configHash === manifest.configHash
+      && (!target.requireImageSha || lastReady.body?.imageSha === expectedImageSha),
     );
     if (healthOk && readyOk) {
       return {
@@ -234,25 +244,28 @@ async function verifyPublicRelease({ fetchImpl, target, manifest, attempts, slee
     }
     if (attempt < attempts - 1) await sleep(0);
   }
-  throw new Error(`la aplicación no confirmó health/ready para el SHA ${manifest.commit}.`);
+  throw new Error(`la aplicación no confirmó health/ready para el SHA ${resourceCommit}.`);
 }
 
-function rollbackState(application, previousManifest) {
+function rollbackState(application, previousManifest, component = 'dapp') {
   const previousCommit = commitOf(application);
   const bootstrap = !SHA40.test(previousCommit ?? '');
   if (bootstrap) return { bootstrap: true, application: null, envs: null };
   if (!previousManifest) throw new Error('previousManifest es obligatorio para recuperar una aplicación existente.');
-  if (previousManifest.commit !== previousCommit) throw new Error('El estado previo no coincide con la release configurada en Coolify.');
-  const previous = assertPreviousManifest(previousManifest, { environment: previousManifest.environment, chainId: previousManifest.chainId });
-  const image = imageConfig(previous.dapp);
+  if (!previousManifest.components?.[component]) {
+    throw new Error(`previousManifest no contiene imagen previa de ${component}.`);
+  }
+  const previous = assertPreviousManifest(previousManifest, { environment: previousManifest.environment, chainId: previousManifest.chainId }, component);
+  if (previous.resourceCommit !== previousCommit) throw new Error('El estado previo no coincide con la release configurada en Coolify.');
+  const image = imageConfig(previous.image);
   return {
     bootstrap: false,
     application: {
-      git_commit_sha: previousCommit,
+      git_commit_sha: previous.resourceCommit,
       docker_registry_image_name: image.imageRepository,
       docker_registry_image_tag: image.imageTag,
     },
-    envs: metadataEntries(previousCommit, previousManifest.configHash),
+    envs: metadataEntries(previous.resourceCommit, previousManifest.configHash),
   };
 }
 
@@ -273,7 +286,8 @@ export async function deployRollingWeb({
   timeoutMs = 30 * 60 * 1000,
   allowRuntimeRollback = true,
 } = {}) {
-  const { deployment, dapp } = assertManifest(manifest);
+  const component = target?.component ?? 'dapp';
+  const { deployment, image: releaseImage, resourceCommit } = assertManifest(manifest, component);
   assertTarget(target, deployment);
   const releaseClient = client ?? createCoolifyReleaseClient({ fetchImpl });
   const attempts = Math.max(1, Math.ceil(timeoutMs / Math.max(1, pollMs)));
@@ -286,22 +300,22 @@ export async function deployRollingWeb({
   try {
     application = await releaseClient.getApplication(target.resourceUuid);
     assertApplicationShape(application, target);
-    rollback = rollbackState(application, previousManifest);
+    rollback = rollbackState(application, previousManifest, component);
     if (!rollback.bootstrap && previousManifest.environment !== deployment.environment) {
       throw new Error('previousManifest no corresponde al entorno de despliegue.');
     }
 
-    const image = imageConfig(dapp);
+    const image = imageConfig(releaseImage);
     await releaseClient.patchApplication(target.resourceUuid, {
-      git_commit_sha: manifest.commit,
+      git_commit_sha: resourceCommit,
       docker_registry_image_name: image.imageRepository,
       docker_registry_image_tag: image.imageTag,
     });
-    await releaseClient.patchEnvs(target.resourceUuid, metadataEntries(manifest.commit, manifest.configHash));
+    await releaseClient.patchEnvs(target.resourceUuid, metadataEntries(resourceCommit, manifest.configHash));
 
     const pinned = await releaseClient.getApplication(target.resourceUuid);
     assertApplicationShape(pinned, target);
-    assertPinnedImage(pinned, image, manifest.commit);
+    assertPinnedImage(pinned, image, resourceCommit, component);
 
     startAttempted = true;
     const startedPayload = await releaseClient.start(target.resourceUuid);
@@ -313,8 +327,8 @@ export async function deployRollingWeb({
       const current = await releaseClient.getDeployment(deploymentUuid);
       const status = statusOf(current);
       const commit = deploymentCommitOf(current);
-      if (!isHead(commit) && commit !== manifest.commit) {
-        throw new Error(`Coolify deployment ${deploymentUuid} corresponde a ${commit}, no al SHA ${manifest.commit}.`);
+      if (!isHead(commit) && commit !== resourceCommit) {
+        throw new Error(`Coolify deployment ${deploymentUuid} corresponde a ${commit}, no al SHA ${resourceCommit}.`);
       }
       if (TERMINAL_FAILURES.has(status)) {
         terminal = true;
@@ -322,8 +336,8 @@ export async function deployRollingWeb({
       }
       if (status === 'finished') {
         terminal = true;
-        if (!isHead(commit) && commit !== manifest.commit) {
-          throw new Error(`Coolify deployment ${deploymentUuid} terminó sin confirmar el SHA ${manifest.commit}.`);
+        if (!isHead(commit) && commit !== resourceCommit) {
+          throw new Error(`Coolify deployment ${deploymentUuid} terminó sin confirmar el SHA ${resourceCommit}.`);
         }
         finished = current;
         break;
@@ -339,13 +353,15 @@ export async function deployRollingWeb({
     // pin and immutable image fields remain the artifact/config proof.
     const finishedApplication = await releaseClient.getApplication(target.resourceUuid);
     assertApplicationShape(finishedApplication, target);
-    assertPinnedImage(finishedApplication, image, manifest.commit);
+    assertPinnedImage(finishedApplication, image, resourceCommit, component);
     let publicProof;
     try {
       publicProof = await verifyPublicRelease({
         fetchImpl,
         target,
         manifest,
+        resourceCommit,
+        expectedImageSha: releaseImage.sourceSha,
         attempts,
         sleep: (ms) => sleep(ms || pollMs),
       });
@@ -358,6 +374,7 @@ export async function deployRollingWeb({
             target,
             manifest: previousManifest,
             previousManifest: manifest,
+            component,
             fetchImpl,
             sleep,
             pollMs,
@@ -380,7 +397,7 @@ export async function deployRollingWeb({
     return {
       status: 'finished',
       deploymentUuid,
-      commit: manifest.commit,
+      commit: resourceCommit,
       imageRepository: image.imageRepository,
       imageTag: image.imageTag,
       ...publicProof,
@@ -393,7 +410,7 @@ export async function deployRollingWeb({
     // Its configuration must not be overwritten by the outer attempt.
     if (!runtimeRollbackAttempted && (startAttempted || rollback)) {
       try {
-        await restorePrevious({ client: releaseClient, target, rollback: rollback ?? rollbackState(application ?? {}, previousManifest) });
+        await restorePrevious({ client: releaseClient, target, rollback: rollback ?? rollbackState(application ?? {}, previousManifest, component) });
       } catch (restoreError) {
         throw new Error(`${errorText(error)}; rollback de configuración fallido: ${errorText(restoreError)}`);
       }
