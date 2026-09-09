@@ -35,6 +35,7 @@ import { useMobileGameShell } from '@/hooks/use-mobile-game-shell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
+import { AppRuntimeNotice } from './app-runtime-notice';
 
 const SidebarLogo = () => {
   return (
@@ -246,6 +247,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               hideDisconnectedWalletTrigger={pathname.startsWith('/cukie-master')}
             />
           ) : null}
+          {!isTreasureHuntGameView ? <AppRuntimeNotice /> : null}
           <main
             data-app-main
             data-testid="app-main"

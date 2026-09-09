@@ -21,6 +21,7 @@ import {
   type CreditHistoryData,
 } from '@/components/cukie-master/credit-history';
 import { useAuth } from '@/providers/auth-provider';
+import { appRuntimeEndpoint, useAppRuntime, useAppRuntimeResource } from '@/providers/app-runtime-provider';
 
 type CreditConfiguration = {
   slotId: string;
@@ -94,7 +95,10 @@ function slotStatusLabel(status: CreditConfiguration['status']) {
 
 export function CompetitionCreditPanel() {
   const { user, isLoading: authLoading } = useAuth();
+  const runtime = useAppRuntime();
   const walletAddress = user?.walletAddress ?? null;
+  const sessionWallet = walletAddress?.toLowerCase() ?? null;
+  const identityMatches = Boolean(sessionWallet && runtime.sessionReady && runtime.address === sessionWallet);
   const [status, setStatus] = useState<CreditStatus | null>(null);
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
   const [drafts, setDrafts] = useState<Record<string, number>>({});
@@ -111,6 +115,62 @@ export function CompetitionCreditPanel() {
   const statusRef = useRef<CreditStatus | null>(null);
   const draftsRef = useRef<Record<string, number>>({});
   const historyRef = useRef<CreditHistoryData | null>(null);
+  const identityKeyRef = useRef<string | null>(null);
+  const onlineRef = useRef(runtime.online);
+  identityKeyRef.current = identityMatches ? sessionWallet : null;
+  onlineRef.current = runtime.online;
+  const applyIncomingStatus = useCallback((incomingStatus: CreditStatus, preserveDrafts = true, preserveHistory = false) => {
+    const previousStatus = statusRef.current;
+    const currentDrafts = draftsRef.current;
+    const previousConfigurations = new Map(
+      previousStatus?.configurations.map((configuration) => [configuration.slotId, configuration]) ?? [],
+    );
+    const nextDrafts = Object.fromEntries(incomingStatus.configurations.map((configuration) => {
+      const previousConfiguration = previousConfigurations.get(configuration.slotId);
+      const hasUnsavedDraft = preserveDrafts
+        && previousConfiguration
+        && currentDrafts[configuration.slotId] !== previousConfiguration.poolCreditsPerSlot;
+      return [configuration.slotId, hasUnsavedDraft ? currentDrafts[configuration.slotId] : configuration.poolCreditsPerSlot];
+    }));
+
+    const incomingHistory = incomingStatus.history;
+    const previousHistory = historyRef.current;
+    const nextHistory = preserveHistory
+      && previousHistory?.available
+      && incomingHistory.available
+      && previousHistory.page > 0
+      ? (() => {
+          const eventIds = new Set(incomingHistory.entries.map((entry) => entry.eventId));
+          return {
+            ...incomingHistory,
+            page: previousHistory.page,
+            hasMore: previousHistory.hasMore,
+            entries: [...incomingHistory.entries, ...previousHistory.entries.filter((entry) => !eventIds.has(entry.eventId))],
+          };
+        })()
+      : incomingHistory;
+
+    statusRef.current = incomingStatus;
+    draftsRef.current = nextDrafts;
+    historyRef.current = nextHistory;
+    setStatus(incomingStatus);
+    setHistory(nextHistory);
+    setHistoryLoadError(false);
+    setDrafts(nextDrafts);
+    setState('ready');
+  }, []);
+  const statusResource = useAppRuntimeResource<CreditStatus>('credits', {
+    enabled: Boolean(walletAddress) && !authLoading,
+  });
+  const nextHistoryPage = history?.page ? history.page + 1 : null;
+  const historyResource = useAppRuntimeResource<CreditStatus>('credits', {
+    enabled: false,
+    endpoint: nextHistoryPage && walletAddress
+      ? `${appRuntimeEndpoint('credits', walletAddress)}&historyPage=${nextHistoryPage}`
+      : undefined,
+    cacheKeySuffix: `history:${nextHistoryPage ?? 'none'}`,
+  });
+  const refreshStatus = statusResource.refresh;
 
   useEffect(() => {
     statusRef.current = status;
@@ -123,7 +183,7 @@ export function CompetitionCreditPanel() {
     expectedRequestId = requestIdRef.current,
     options: { force?: boolean; preserveDrafts?: boolean } = {},
   ) => {
-    if (!walletAddress) return;
+    if (!walletAddress || !identityMatches || !runtime.online) return;
     if (activeLoadRef.current?.requestId === expectedRequestId && !options.force) return;
     const requestedWallet = walletAddress;
     const loadSequence = loadSequenceRef.current + 1;
@@ -137,65 +197,17 @@ export function CompetitionCreditPanel() {
     );
     try {
       if (!silent) setState('loading');
-      const response = await fetch(
-        `/api/economy/v1/credits?walletAddress=${encodeURIComponent(walletAddress)}`,
-        { cache: 'no-store', credentials: 'same-origin', signal },
-      );
-      const body = await response.json() as { data?: CreditStatus };
-      if (!response.ok || !body.data) throw new Error('CREDIT_STATUS_UNAVAILABLE');
+      const result = await refreshStatus();
+      const incomingStatus = result.data;
+      if (!incomingStatus) throw new Error('CREDIT_STATUS_UNAVAILABLE');
+      if (incomingStatus.walletNormalized.toLowerCase() !== identityKeyRef.current) throw new Error('CREDIT_STATUS_IDENTITY_MISMATCH');
       if (!isCurrentRequest()) return;
 
-      const previousStatus = statusRef.current;
-      const currentDrafts = draftsRef.current;
-      const previousConfigurations = new Map(
-        previousStatus?.configurations.map((configuration) => [configuration.slotId, configuration]) ?? [],
-      );
-      const nextDrafts = Object.fromEntries(body.data.configurations.map((configuration) => {
-        const previousConfiguration = previousConfigurations.get(configuration.slotId);
-        const hasUnsavedDraft = options.preserveDrafts !== false
-          && previousConfiguration
-          && currentDrafts[configuration.slotId] !== previousConfiguration.poolCreditsPerSlot;
-        return [
-          configuration.slotId,
-          hasUnsavedDraft
-            ? currentDrafts[configuration.slotId]
-            : configuration.poolCreditsPerSlot,
-        ];
-      }));
-
-      const incomingHistory = body.data.history;
-      const previousHistory = historyRef.current;
-      const nextHistory = silent
-        && options.preserveDrafts !== false
-        && previousHistory?.available
-        && incomingHistory.available
-        && previousHistory.page > 0
-        ? (() => {
-            const eventIds = new Set(incomingHistory.entries.map((entry) => entry.eventId));
-            return {
-              ...incomingHistory,
-              page: previousHistory.page,
-              hasMore: previousHistory.hasMore,
-              entries: [
-                ...incomingHistory.entries,
-                ...previousHistory.entries.filter((entry) => !eventIds.has(entry.eventId)),
-              ],
-            };
-          })()
-        : incomingHistory;
-
-      statusRef.current = body.data;
-      draftsRef.current = nextDrafts;
-      historyRef.current = nextHistory;
-      setStatus(body.data);
-      setHistory(nextHistory);
-      setHistoryLoadError(false);
-      setDrafts(nextDrafts);
-      setState('ready');
+      applyIncomingStatus(incomingStatus, options.preserveDrafts !== false, silent && options.preserveDrafts !== false);
     } finally {
       if (activeLoadRef.current?.sequence === loadSequence) activeLoadRef.current = null;
     }
-  }, [walletAddress]);
+  }, [applyIncomingStatus, identityMatches, refreshStatus, runtime.online, walletAddress]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -212,35 +224,29 @@ export function CompetitionCreditPanel() {
     setHistory(null);
     setDrafts({});
     setHistoryLoadError(false);
-    if (!walletAddress) {
+    if (!walletAddress || !identityMatches) {
       setState('idle');
       return;
     }
-    const controller = new AbortController();
-    load(controller.signal, false, requestId).catch((error: unknown) => {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      if (requestIdRef.current !== requestId) return;
-      setStatus(null);
-      setHistory(null);
-      setState('unavailable');
-    });
-    const refresh = () => {
-      if (document.visibilityState !== 'visible') return;
-      void load(undefined, true, requestId).catch(() => undefined);
-    };
-    const interval = window.setInterval(refresh, 30_000);
-    window.addEventListener('focus', refresh);
     return () => {
-      controller.abort();
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refresh);
       saveOperationRef.current += 1;
       historyOperationRef.current += 1;
       setIsSaving(false);
       setIsLoadingMoreHistory(false);
       if (requestIdRef.current === requestId) requestIdRef.current += 1;
     };
-  }, [authLoading, load, walletAddress]);
+  }, [authLoading, identityMatches, walletAddress]);
+
+  useEffect(() => {
+    if (!identityMatches || authLoading) return;
+    if (!statusResource.data) {
+      if (statusResource.state === 'loading') setState('loading');
+      else if (statusResource.state === 'unavailable') setState('unavailable');
+      return;
+    }
+    if (statusResource.data.walletNormalized.toLowerCase() !== identityKeyRef.current) return;
+    applyIncomingStatus(statusResource.data, true, true);
+  }, [applyIncomingStatus, authLoading, identityMatches, statusResource.data, statusResource.dataUpdatedAt, statusResource.state]);
 
   const routeState = useMemo(() => {
     const getRouteState = (route: 'uki' | 'nft'): 'healthy' | 'blocked' | 'unknown' => {
@@ -337,15 +343,18 @@ export function CompetitionCreditPanel() {
   }
 
   async function saveAll() {
-    if (!walletAddress || !status || isSaving || changedConfigurations.length === 0) return;
+    if (!walletAddress || !identityMatches || !runtime.online || !status || isSaving || changedConfigurations.length === 0) return;
     const requestId = requestIdRef.current;
     const requestedWallet = walletAddress;
+    const requestedIdentity = identityKeyRef.current;
     const operationId = saveOperationRef.current + 1;
     saveOperationRef.current = operationId;
     const isCurrentRequest = () => (
       requestIdRef.current === requestId
       && saveOperationRef.current === operationId
       && walletAddress === requestedWallet
+      && identityKeyRef.current === requestedIdentity
+      && onlineRef.current
     );
     setIsSaving(true);
     setSaveResult('idle');
@@ -374,12 +383,14 @@ export function CompetitionCreditPanel() {
           }),
         });
         if (!response.ok) throw new Error('CREDIT_CONFIG_REJECTED');
+        if (!isCurrentRequest()) return;
       }
-      await load(undefined, true, requestId, { force: true, preserveDrafts: false });
+      if (!isCurrentRequest()) return;
+      await runtime.refreshAfterTransaction('credits');
       if (isCurrentRequest()) setSaveResult('saved');
     } catch {
       if (!isCurrentRequest()) return;
-      await load(undefined, true, requestId, { force: true, preserveDrafts: false }).catch(() => undefined);
+      await runtime.invalidate('credits').catch(() => undefined);
       if (isCurrentRequest()) setSaveResult('error');
     } finally {
       if (isCurrentRequest()) setIsSaving(false);
@@ -401,13 +412,9 @@ export function CompetitionCreditPanel() {
     setHistoryLoadError(false);
     try {
       const nextPage = history.page + 1;
-      const response = await fetch(
-        `/api/economy/v1/credits?walletAddress=${encodeURIComponent(walletAddress)}&historyPage=${nextPage}`,
-        { cache: 'no-store', credentials: 'same-origin' },
-      );
-      const body = await response.json() as { data?: CreditStatus };
-      const nextHistory = body.data?.history;
-      if (!response.ok || !nextHistory?.available || nextHistory.page !== nextPage) {
+      const result = await historyResource.refresh();
+      const nextHistory = result.data?.history;
+      if (!nextHistory?.available || nextHistory.page !== nextPage) {
         throw new Error('CREDIT_HISTORY_UNAVAILABLE');
       }
       if (!isCurrentRequest()) return;
@@ -434,7 +441,7 @@ export function CompetitionCreditPanel() {
     }
   }
 
-  if (!authLoading && state === 'idle' && !walletAddress) {
+  if (!authLoading && (!walletAddress || !identityMatches)) {
     return (
       <section id="competition-credits" className="relative z-[2] w-full scroll-mt-24 pb-14">
         <Panel innerClassName="p-5 sm:p-7 lg:p-8">

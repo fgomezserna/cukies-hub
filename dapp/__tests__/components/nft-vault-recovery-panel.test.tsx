@@ -1,12 +1,18 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
+import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi';
 
 import { NftVaultRecoveryPanel } from '@/components/nft-vault/recovery-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
+import { useAuth } from '@/providers/auth-provider';
+import { usePathname } from 'next/navigation';
 
+jest.mock('@/providers/auth-provider');
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
   usePublicClient: jest.fn(),
+  useSwitchChain: jest.fn(),
   useWriteContract: jest.fn(),
 }));
 jest.mock('@/lib/contracts/uki-nft-vaults', () => ({
@@ -29,7 +35,10 @@ jest.mock('@/lib/contracts/uki-nft-vaults', () => ({
 
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
 const mockUsePublicClient = usePublicClient as jest.MockedFunction<typeof usePublicClient>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
 const mockUseWriteContract = useWriteContract as jest.MockedFunction<typeof useWriteContract>;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 
 const walletAddress = '0x1111111111111111111111111111111111111111';
 const otherWallet = '0x5555555555555555555555555555555555555555';
@@ -124,7 +133,15 @@ function openRecoveryPanel() {
 describe('NftVaultRecoveryPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     global.fetch = fetchMock;
+    mockUseAuth.mockReturnValue({
+      user: { walletAddress } as never,
+      isLoading: false,
+      isWaitingForApproval: false,
+      walletType: 'evm',
+      fetchUser: jest.fn(),
+    });
     Object.assign(mutableVaultConfig, {
       chainId: 97,
       cukieMasterNftVaultAddress: masterVaultAddress,
@@ -138,6 +155,8 @@ describe('NftVaultRecoveryPanel', () => {
       mode: { cukieMaster: 'custodial', cukiePool: 'custodial' },
     });
     configureConnectedWallet();
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUsePathname.mockReturnValue('/cukie-master');
     mockUseWriteContract.mockReturnValue({
       writeContractAsync,
     } as unknown as ReturnType<typeof useWriteContract>);

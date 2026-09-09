@@ -1,15 +1,19 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
+import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi';
 
 import { CukiePoolStatusPanel } from '@/components/cukie-pool/status-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
+import { usePathname } from 'next/navigation';
 
 jest.mock('@/providers/auth-provider');
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
   usePublicClient: jest.fn(),
+  useSwitchChain: jest.fn(),
   useWriteContract: jest.fn(),
 }));
 jest.mock('@/lib/contracts/uki-nft-vaults', () => ({
@@ -49,7 +53,9 @@ jest.mock('lucide-react', () => ({
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
 const mockUsePublicClient = usePublicClient as jest.MockedFunction<typeof usePublicClient>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
 const mockUseWriteContract = useWriteContract as jest.MockedFunction<typeof useWriteContract>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const fetchMock = jest.fn();
 const writeContractAsync = jest.fn();
 
@@ -187,6 +193,7 @@ function successfulResponse(data: ReturnType<typeof poolStatus>) {
 describe('CukiePoolStatusPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     window.localStorage.clear();
     global.fetch = fetchMock;
     Object.assign(mutableVaultConfig, {
@@ -206,6 +213,8 @@ describe('CukiePoolStatusPanel', () => {
       chainId: undefined,
       isConnected: false,
     } as unknown as ReturnType<typeof useAccount>);
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUsePathname.mockReturnValue('/cukie-hodler');
     mockUsePublicClient.mockReturnValue(null as unknown as ReturnType<typeof usePublicClient>);
     mockUseWriteContract.mockReturnValue({
       writeContractAsync,
@@ -293,7 +302,7 @@ describe('CukiePoolStatusPanel', () => {
       args: [collectionAddress, BigInt(7)],
     }));
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(2);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('unlocks other NFTs after the first deposit receipt while keeping that asset pending', async () => {
@@ -446,7 +455,7 @@ describe('CukiePoolStatusPanel', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(10_000);
+        await jest.advanceTimersByTimeAsync(30_000);
       });
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -457,7 +466,7 @@ describe('CukiePoolStatusPanel', () => {
     }
   });
 
-  it('stops retrying after 180 seconds and a manual refresh starts a new window', async () => {
+  it('pausa el polling al ocultar la página y permite una lectura manual', async () => {
     jest.useFakeTimers();
     try {
       configureVault();
@@ -475,30 +484,33 @@ describe('CukiePoolStatusPanel', () => {
         indexerStatus: 'unavailable',
       })));
 
-      render(<CukiePoolStatusPanel />);
+      const view = render(<CukiePoolStatusPanel />);
 
       expect(await screen.findByText(/Los depósitos están bloqueados/i)).toBeInTheDocument();
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(180_000);
+        await jest.advanceTimersByTimeAsync(30_000);
       });
-      const callsAtWindowEnd = fetchMock.mock.calls.length;
-      expect(callsAtWindowEnd).toBeGreaterThan(1);
+      const callsBeforePause = fetchMock.mock.calls.length;
+      expect(callsBeforePause).toBe(2);
 
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+      fireEvent(document, new Event('visibilitychange'));
       await act(async () => {
         await jest.advanceTimersByTimeAsync(60_000);
       });
-      expect(fetchMock).toHaveBeenCalledTimes(callsAtWindowEnd);
+      expect(fetchMock).toHaveBeenCalledTimes(callsBeforePause);
 
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
         await Promise.resolve();
       });
-      expect(fetchMock).toHaveBeenCalledTimes(callsAtWindowEnd + 1);
+      expect(fetchMock).toHaveBeenCalledTimes(callsBeforePause + 1);
 
+      view.unmount();
       await act(async () => {
-        await jest.advanceTimersByTimeAsync(10_000);
+        await jest.advanceTimersByTimeAsync(30_000);
       });
-      expect(fetchMock).toHaveBeenCalledTimes(callsAtWindowEnd + 2);
+      expect(fetchMock).toHaveBeenCalledTimes(callsBeforePause + 1);
     } finally {
       jest.useRealTimers();
     }

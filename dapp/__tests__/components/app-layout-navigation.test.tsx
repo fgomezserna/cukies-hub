@@ -1,8 +1,20 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 
 import AppLayout from '@/components/layout/app-layout';
 import { useMobileGameShell } from '@/hooks/use-mobile-game-shell';
+import { useAuth } from '@/providers/auth-provider';
 import { usePathname } from 'next/navigation';
+import { useAccount, useSwitchChain } from 'wagmi';
+
+jest.mock('@/providers/auth-provider');
+jest.mock('wagmi', () => ({
+  useAccount: jest.fn(),
+  useConnect: jest.fn(() => ({ connectAsync: jest.fn(), connectors: [], isPending: false })),
+  useDisconnect: jest.fn(() => ({ disconnect: jest.fn() })),
+  useSignMessage: jest.fn(() => ({ signMessageAsync: jest.fn() })),
+  useSwitchChain: jest.fn(),
+}));
 
 jest.mock('next/link', () => {
   const React = jest.requireActual('react');
@@ -44,6 +56,10 @@ jest.mock('@/components/layout/header', () => ({
 }));
 
 jest.mock('lucide-react', () => ({
+  AlertTriangle: () => null,
+  CheckCircle2: () => null,
+  ShieldAlert: () => null,
+  Wallet: () => null,
   PanelLeft: () => null,
   X: () => null,
   LayoutDashboard: () => null,
@@ -56,12 +72,19 @@ jest.mock('lucide-react', () => ({
   Coins: () => null,
   Gift: () => null,
   UsersRound: () => null,
+  CloudOff: () => null,
+  Wifi: () => null,
+  Loader2: () => null,
+  RefreshCw: () => null,
 }));
 
 const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const mockUseMobileGameShell = useMobileGameShell as jest.MockedFunction<
   typeof useMobileGameShell
 >;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
 
 describe('AppLayout launch navigation', () => {
   const originalInnerWidth = window.innerWidth;
@@ -71,6 +94,9 @@ describe('AppLayout launch navigation', () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     mockUsePathname.mockReturnValue('/games/treasure-hunt');
     mockUseMobileGameShell.mockReturnValue(false);
+    mockUseAuth.mockReturnValue({ user: null, isLoading: false, isWaitingForApproval: false, walletType: null, fetchUser: jest.fn() });
+    mockUseAccount.mockReturnValue({ address: undefined, isConnected: false, chainId: undefined } as unknown as ReturnType<typeof useAccount>);
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
   });
 
   afterEach(() => {

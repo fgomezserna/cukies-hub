@@ -20,24 +20,10 @@ import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { useAuth } from '@/providers/auth-provider';
+import { useAppRuntime, useAppRuntimeResource, useGuardedOperation } from '@/providers/app-runtime-provider';
 import { CUKIE_MASTER_DAILY_CREDITS_PER_SLOT } from '@/lib/uki-economy/rules';
 
 const MAX_ROUTE_SLOTS = 5;
-const CUKIE_MASTER_REFRESH_EVENT = 'cukies:cukie-master:refresh';
-const STAKING_REFRESH_DELAYS_MS = [
-  0,
-  3_000,
-  8_000,
-  15_000,
-  30_000,
-  60_000,
-  90_000,
-  120_000,
-  180_000,
-] as const;
-const SYNCHRONIZATION_POLL_MS = 10_000;
-const SYNCHRONIZATION_POLL_WINDOW_MS = 180_000;
-const INITIAL_LOAD_RETRY_DELAYS_MS = [750, 2_000, 5_000] as const;
 
 type RouteKey = 'uki' | 'nft';
 
@@ -160,134 +146,22 @@ export function CukieMasterStatusPanel({
   ukiOnly?: boolean;
 } = {}) {
   const { user, isLoading: authLoading } = useAuth();
-  const [status, setStatus] = useState<PublicStatus | null>(null);
-  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'stale' | 'unavailable'>('idle');
+  const runtime = useAppRuntime();
+  const operationGuard = useGuardedOperation('master-write');
+  const operationGuardRef = useRef(operationGuard);
+  operationGuardRef.current = operationGuard;
+  const runtimeIdentityRef = useRef<string | null>(null);
+  runtimeIdentityRef.current = runtime.sessionReady ? runtime.address : null;
   const [activeRoute, setActiveRoute] = useState<RouteKey>('uki');
-  const [reloadNonce, setReloadNonce] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [mutatingAsset, setMutatingAsset] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const hasReadyStatusRef = useRef(false);
-  const loadedWalletRef = useRef<string | null>(null);
-  const requestIdRef = useRef(0);
-  const refreshTimersRef = useRef<number[]>([]);
-  const synchronizationStartedAtRef = useRef<number | null>(null);
-  const initialRetryCountRef = useRef(0);
-  const retryWalletRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user?.walletAddress) {
-      requestIdRef.current += 1;
-      hasReadyStatusRef.current = false;
-      loadedWalletRef.current = null;
-      initialRetryCountRef.current = 0;
-      retryWalletRef.current = null;
-      setStatus(null);
-      setState('idle');
-      setIsRefreshing(false);
-      return;
-    }
-    const walletNormalized = user.walletAddress.toLowerCase();
-    if (retryWalletRef.current !== walletNormalized) {
-      retryWalletRef.current = walletNormalized;
-      initialRetryCountRef.current = 0;
-    }
-    const backgroundRefresh = hasReadyStatusRef.current
-      && loadedWalletRef.current === walletNormalized;
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    const controller = new AbortController();
-    let retryTimer: number | null = null;
-    if (backgroundRefresh) setIsRefreshing(true);
-    else {
-      setStatus(null);
-      setState('loading');
-    }
-    fetch(
-      `/api/economy/v1/cukie-master?walletAddress=${encodeURIComponent(user.walletAddress)}`,
-      { cache: 'no-store', credentials: 'same-origin', signal: controller.signal },
-    )
-      .then(async (response) => {
-        const body = await response.json() as { data?: PublicStatus };
-        if (!response.ok || !body.data) throw new Error('CUKIE_MASTER_UNAVAILABLE');
-        if (requestIdRef.current !== requestId) return;
-        hasReadyStatusRef.current = true;
-        loadedWalletRef.current = walletNormalized;
-        initialRetryCountRef.current = 0;
-        setStatus(body.data);
-        setState('ready');
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        if (requestIdRef.current !== requestId) return;
-        if (backgroundRefresh) {
-          setState('stale');
-        } else {
-          hasReadyStatusRef.current = false;
-          loadedWalletRef.current = null;
-          setStatus(null);
-          setState('unavailable');
-        }
-        const retryDelay = INITIAL_LOAD_RETRY_DELAYS_MS[initialRetryCountRef.current];
-        if (retryDelay !== undefined) {
-          initialRetryCountRef.current += 1;
-          retryTimer = window.setTimeout(
-            () => setReloadNonce((value) => value + 1),
-            retryDelay,
-          );
-        }
-      })
-      .finally(() => {
-        if (requestIdRef.current === requestId) setIsRefreshing(false);
-      });
-    return () => {
-      controller.abort();
-      if (retryTimer !== null) window.clearTimeout(retryTimer);
-    };
-  }, [authLoading, reloadNonce, user?.walletAddress]);
-
-  useEffect(() => {
-    const clearRefreshTimers = () => {
-      refreshTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      refreshTimersRef.current = [];
-    };
-    const refresh = () => {
-      clearRefreshTimers();
-      refreshTimersRef.current = STAKING_REFRESH_DELAYS_MS.map((delay) => window.setTimeout(
-        () => setReloadNonce((value) => value + 1),
-        delay,
-      ));
-    };
-    window.addEventListener(CUKIE_MASTER_REFRESH_EVENT, refresh);
-    return () => {
-      window.removeEventListener(CUKIE_MASTER_REFRESH_EVENT, refresh);
-      clearRefreshTimers();
-    };
-  }, []);
-
-  useEffect(() => {
-    const needsSynchronization = state === 'ready' && Boolean(status) && (
-      status!.routes.uki.synchronizing
-      || !status!.routes.uki.source.complete
-      || (!ukiOnly && (
-        status!.routes.nft.synchronizing
-        || !status!.routes.nft.source.complete
-      ))
-    );
-    if (!needsSynchronization) {
-      synchronizationStartedAtRef.current = null;
-      return;
-    }
-    const startedAt = synchronizationStartedAtRef.current ?? Date.now();
-    synchronizationStartedAtRef.current = startedAt;
-    if (Date.now() - startedAt >= SYNCHRONIZATION_POLL_WINDOW_MS) return;
-    const timer = window.setTimeout(
-      () => setReloadNonce((value) => value + 1),
-      SYNCHRONIZATION_POLL_MS,
-    );
-    return () => window.clearTimeout(timer);
-  }, [state, status, ukiOnly]);
+  const statusResource = useAppRuntimeResource<PublicStatus>('master', {
+    enabled: Boolean(user?.walletAddress) && !authLoading,
+  });
+  const status = statusResource.data ?? null;
+  const state = statusResource.state;
+  const refreshStatus = statusResource.refresh;
+  const isRefreshing = statusResource.isFetching;
 
   useEffect(() => {
     const route = status?.routes.uki;
@@ -319,17 +193,23 @@ export function CukieMasterStatusPanel({
   }), [status?.nftInventory]);
 
   async function mutateNft(asset: PublicNft, operation: 'soft_stake' | 'unstake') {
-    if (!user?.walletAddress || mutatingAsset) return;
+    const requestedIdentity = user?.walletAddress?.toLowerCase() ?? null;
+    if (
+      !requestedIdentity
+      || mutatingAsset
+      || !operationGuardRef.current.ready
+      || runtimeIdentityRef.current !== requestedIdentity
+    ) return;
     setMutatingAsset(asset.assetId);
     setMutationError(null);
     try {
-      const idempotencyKey = `cukie-master-ui:${user.walletAddress.toLowerCase()}:${operation}:${asset.assetId}:${crypto.randomUUID()}`;
+      const idempotencyKey = `cukie-master-ui:${requestedIdentity}:${operation}:${asset.assetId}:${crypto.randomUUID()}`;
       const response = await fetch('/api/economy/v1/cukie-master', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          walletAddress: user.walletAddress,
+          walletAddress: requestedIdentity,
           operation,
           assetId: asset.assetId,
           ...(operation === 'unstake' && asset.lock ? {
@@ -340,7 +220,8 @@ export function CukieMasterStatusPanel({
         }),
       });
       if (!response.ok) throw new Error('NFT_OPERATION_FAILED');
-      setReloadNonce((value) => value + 1);
+      if (runtimeIdentityRef.current !== requestedIdentity) return;
+      await runtime.refreshAfterTransaction('master');
     } catch {
       setMutationError('No se pudo completar la operación. El estado del NFT no ha cambiado; inténtalo de nuevo.');
     } finally {
@@ -419,7 +300,7 @@ export function CukieMasterStatusPanel({
               <button
                 type="button"
                 disabled={isRefreshing}
-                onClick={() => setReloadNonce((value) => value + 1)}
+                onClick={() => void refreshStatus()}
                 className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-[7px] border border-white/10 px-3 text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] disabled:cursor-wait disabled:opacity-60"
               >
                 {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
@@ -467,8 +348,7 @@ export function CukieMasterStatusPanel({
             <button
               type="button"
               onClick={() => {
-                initialRetryCountRef.current = 0;
-                setReloadNonce((value) => value + 1);
+                void refreshStatus();
               }}
               className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[7px] border border-amber-200/30 px-3 text-xs font-black uppercase text-amber-100"
             >
