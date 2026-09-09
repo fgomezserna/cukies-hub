@@ -483,6 +483,7 @@ function BridgeOperationsClient({
       }
       return;
     }
+    clearSnapshot();
 
     try {
       const [price, paused, approval] = await Promise.all([
@@ -507,10 +508,6 @@ function BridgeOperationsClient({
         ),
       ]);
       if (!contextIsCurrent()) {
-        clearSnapshot();
-        if (getLegacyTronWalletRpcOrigin(getLegacyTronWeb()) !== tronRpcUrl) {
-          setStatus(`Cambia TronLink a ${tronNetworkLabel} para consultar el bridge.`);
-        }
         return;
       }
       setTronSnapshot({
@@ -520,10 +517,7 @@ function BridgeOperationsClient({
         approved: Boolean(approval),
       });
     } catch (error) {
-      if (!contextIsCurrent()) {
-        clearSnapshot();
-        return;
-      }
+      if (!contextIsCurrent()) return;
       clearSnapshot();
       setStatus(getErrorMessage(error));
     }

@@ -553,12 +553,7 @@ export function BreedingClient({
       ),
     );
 
-    if (!contextIsCurrent()) {
-      if (getLegacyTronWalletRpcOrigin(getLegacyTronWeb()) !== LEGACY_TRON_MAINNET_RPC_URL) {
-        setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
-      }
-      return [];
-    }
+    if (!contextIsCurrent()) return [];
 
     return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
   }, [tronAddress, tronWalletRpcOrigin]);
@@ -566,6 +561,7 @@ export function BreedingClient({
   const refreshActiveBreeds = useCallback(async () => {
     const requestId = activeBreedsRequestRef.current + 1;
     activeBreedsRequestRef.current = requestId;
+    setActiveBreeds([]);
     setIsLoadingBreeds(true);
     try {
       const breeds =
@@ -579,7 +575,7 @@ export function BreedingClient({
       setStatus(getErrorMessage(error));
       setActiveBreeds([]);
     } finally {
-      setIsLoadingBreeds(false);
+      if (requestId === activeBreedsRequestRef.current) setIsLoadingBreeds(false);
     }
   }, [fetchBscActiveBreeds, fetchTronActiveBreeds, network]);
 
@@ -620,6 +616,7 @@ export function BreedingClient({
       }
       return;
     }
+    clearSnapshot();
 
     try {
       const [max, userPoints, approval] = await Promise.all([
@@ -639,20 +636,13 @@ export function BreedingClient({
         ),
       ]);
       if (!contextIsCurrent()) {
-        clearSnapshot();
-        if (getLegacyTronWalletRpcOrigin(getLegacyTronWeb()) !== LEGACY_TRON_MAINNET_RPC_URL) {
-          setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
-        }
         return;
       }
       setTronMaxBreeds(Number(max));
       setTronPoints(formatPoints(String(userPoints)));
       setTronApproved(Boolean(approval));
     } catch (error) {
-      if (!contextIsCurrent()) {
-        clearSnapshot();
-        return;
-      }
+      if (!contextIsCurrent()) return;
       clearSnapshot();
       setStatus(getErrorMessage(error));
     }

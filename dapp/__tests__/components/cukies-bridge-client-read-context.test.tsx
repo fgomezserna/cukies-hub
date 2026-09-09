@@ -154,10 +154,10 @@ describe('Bridge Legacy: estado y contexto de lecturas', () => {
     expect(screen.getAllByText('1 TRX').length).toBeGreaterThan(0);
   });
 
-  it('descarta la respuesta de la cuenta A después de renderizar la cuenta B', async () => {
-    const pending: Array<{ address: string; name: string; resolve: (value: unknown) => void }> = [];
+  it('mantiene sin verificar mientras carga B y descarta la respuesta tardía de A', async () => {
+    const pending: Array<{ address: string; name: string; resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
     mockReadTronContractAt.mockImplementation((_web: unknown, _abi: unknown, _address: string, name: string) => (
-      new Promise((resolve) => pending.push({ address: walletAddress, name, resolve }))
+      new Promise((resolve, reject) => pending.push({ address: walletAddress, name, resolve, reject }))
     ));
 
     const view = render(<BridgeClient />);
@@ -167,16 +167,42 @@ describe('Bridge Legacy: estado y contexto de lecturas', () => {
     setTronWallet(walletAddress);
     view.rerender(<BridgeClient />);
     await waitFor(() => expect(pending).toHaveLength(6));
+    expect(screen.getAllByText('Sin verificar').length).toBeGreaterThan(0);
 
-    for (const request of pending.filter(({ address }) => address === 'TA')) {
-      request.resolve(request.name === 'bridgePrice' ? '111' : request.name === 'paused' ? false : false);
-    }
     for (const request of pending.filter(({ address }) => address === 'TB')) {
       request.resolve(request.name === 'bridgePrice' ? '222' : request.name === 'paused' ? false : false);
     }
-
     await waitFor(() => expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0));
+    for (const request of pending.filter(({ address }) => address === 'TA')) {
+      request.resolve(request.name === 'bridgePrice' ? '111' : request.name === 'paused' ? false : false);
+    }
+
     expect(screen.getAllByText('Disponible').length).toBeGreaterThan(0);
     expect(screen.queryByText('0.000111 TRX')).not.toBeInTheDocument();
+  });
+
+  it('conserva el snapshot B si la petición A termina con error después', async () => {
+    const pending: Array<{ address: string; name: string; resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
+    mockReadTronContractAt.mockImplementation((_web: unknown, _abi: unknown, _address: string, name: string) => (
+      new Promise((resolve, reject) => pending.push({ address: walletAddress, name, resolve, reject }))
+    ));
+
+    const view = render(<BridgeClient />);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    walletAddress = 'TB';
+    setTronWallet(walletAddress);
+    view.rerender(<BridgeClient />);
+    await waitFor(() => expect(pending).toHaveLength(6));
+
+    for (const request of pending.filter(({ address }) => address === 'TB')) {
+      request.resolve(request.name === 'bridgePrice' ? '222' : false);
+    }
+    await waitFor(() => expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0));
+    for (const request of pending.filter(({ address }) => address === 'TA')) {
+      request.reject(new Error('respuesta antigua'));
+    }
+
+    await waitFor(() => expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0));
+    expect(screen.queryByText('respuesta antigua')).not.toBeInTheDocument();
   });
 });
