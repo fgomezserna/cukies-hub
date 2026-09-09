@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-09T21:18:00Z",
+  "observedAt": "2026-09-09T23:20:06Z",
   "scope": "staging rolling handoff; production unchanged",
   "ciRun": "https://github.com/fgomezserna/cukies-hub/actions/runs/34388372470",
   "handoff": {
@@ -85,9 +85,8 @@
     ]
   },
   "outstanding": [
-    "graceful drain deployment and continuity rehearsal",
-    "documentation-only no-op",
-    "production migration (PR361 draft; main/app12 unchanged)"
+    "production registry migration (PR361 draft; main/app12/app13 unchanged)",
+    "anonymous practice authority mismatch is a pre-existing functional issue; authenticated gameplay not tested in this infrastructure rehearsal"
   ],
   "automaticDappRelease": {
     "commit": "c7b33c12da931b027f68a49e7cd87a8cc397c248",
@@ -182,5 +181,441 @@
       ]
     },
     "interpretation": "Origin 502 and timeout coincide with old web SIGTERM. Continuity not validated before drain patch. Selective NFT replay handled by the data task."
+  },
+  "registryGameTransition": {
+    "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+    "initialCi": {
+      "url": "https://github.com/fgomezserna/cukies-hub/actions/runs/34412775416",
+      "builds": "all six passed",
+      "delivery": "failed after web at game bootstrap; workers untouched until explicit recovery",
+      "cause": "Docker Image omitted COOLIFY_BRANCH; strict game guard rejected startup",
+      "correction": "delivery injects target.gitBranch in runtime metadata and restore; guard unchanged",
+      "stageNodeTests": 113,
+      "productionNodeTests": 95
+    },
+    "recovery": {
+      "startedAt": "2026-09-09T23:04:07.126Z",
+      "previousCommit": "bdab82c715c13f62f8170b0e68d37ee32149e825",
+      "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+      "web": {
+        "status": "finished",
+        "deploymentUuid": "q8skwo0wcgkwocww0ckg88wg",
+        "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "imageRepository": "192.168.1.207:5000/cukies-hub/dapp",
+        "imageTag": "sha256-baf30dfc431f191eb93614f131f2a3850bce6c0848651c0fe6e18cc4f785e67d",
+        "healthSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "readyStatus": "ready",
+        "environment": "staging",
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk"
+      },
+      "game": {
+        "status": "finished",
+        "deploymentUuid": "qk0w04owoo84c8oowk0ok884",
+        "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "imageRepository": "192.168.1.207:5000/cukies-hub/treasure-hunt",
+        "imageTag": "sha256-d5483660d030ed09b64d1bd735522a190aa2a596326a2b815e36cf4d9e2255f9",
+        "healthSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "readyStatus": "ready",
+        "environment": "staging",
+        "resourceUuid": "lc04cw8gs4koo4swwws0c4ss"
+      },
+      "workers": {
+        "deploymentUuid": "oo0c8kkc8ccs4skkc8sk0440",
+        "status": "finished",
+        "commit": "dc4c21e4fe66b1d574046de5177367e35919d427"
+      },
+      "finishedAt": "2026-09-09T23:10:11.353Z",
+      "decision": {
+        "deliveryMode": "rolling",
+        "web": true,
+        "workers": true,
+        "game": true,
+        "skip": false,
+        "changed": [
+          "dapp",
+          "chain-indexer",
+          "cuki-card-worker",
+          "schedulers",
+          "cukies-bridge-relayer",
+          "treasure-hunt"
+        ],
+        "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+      }
+    },
+    "finalRuntime": {
+      "observedAt": "2026-09-09T23:20:06.124295+00:00",
+      "webAndWorkersUnchanged": true,
+      "productionUnchanged": true,
+      "gameReplaced": true,
+      "digests": [
+        {
+          "name": "lc04cw8gs4koo4swwws0c4ss-231822152325",
+          "component": "treasure-hunt",
+          "digest": "sha256:d5483660d030ed09b64d1bd735522a190aa2a596326a2b815e36cf4d9e2255f9"
+        },
+        {
+          "name": "rwwsc4kkwc0ck84cgk40s8kk-231734569945",
+          "component": "dapp",
+          "digest": "sha256:baf30dfc431f191eb93614f131f2a3850bce6c0848651c0fe6e18cc4f785e67d"
+        },
+        {
+          "name": "reward-batch-publisher-u4s804o4wwcckowgk0woo4wg-230547100653",
+          "component": "schedulers",
+          "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+        },
+        {
+          "name": "weekly-ranking-scheduler-u4s804o4wwcckowgk0woo4wg-230547039158",
+          "component": "schedulers",
+          "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+        },
+        {
+          "name": "cuki-card-worker-u4s804o4wwcckowgk0woo4wg-230547168925",
+          "component": "cuki-card-worker",
+          "digest": "sha256:9b0085867b33a1590446f3d57c01a086a36426957c76cf2e4217385cc7f20bbd"
+        },
+        {
+          "name": "competition-credit-scheduler-u4s804o4wwcckowgk0woo4wg-230546952571",
+          "component": "schedulers",
+          "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+        },
+        {
+          "name": "cukie-pool-scheduler-u4s804o4wwcckowgk0woo4wg-230547012663",
+          "component": "schedulers",
+          "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+        },
+        {
+          "name": "game-economy-scheduler-u4s804o4wwcckowgk0woo4wg-230546980291",
+          "component": "schedulers",
+          "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+        },
+        {
+          "name": "chain-indexer-u4s804o4wwcckowgk0woo4wg-230546768063",
+          "component": "chain-indexer",
+          "digest": "sha256:202d1c85528c3c6cd8f16ded63948e0949c09f90092ae60bbd24f49ab6281344"
+        },
+        {
+          "name": "cukie-master-scheduler-u4s804o4wwcckowgk0woo4wg-230546924007",
+          "component": "schedulers",
+          "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+        },
+        {
+          "name": "reward-accounting-scheduler-u4s804o4wwcckowgk0woo4wg-230547069871",
+          "component": "schedulers",
+          "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+        },
+        {
+          "name": "cuki-card-worker-legacy-u4s804o4wwcckowgk0woo4wg-230547213559",
+          "component": "cuki-card-worker",
+          "digest": "sha256:9b0085867b33a1590446f3d57c01a086a36426957c76cf2e4217385cc7f20bbd"
+        }
+      ]
+    },
+    "rehearsals": [
+      {
+        "mode": "unhealthy-web",
+        "startedAt": "2026-09-09T23:14:25.077Z",
+        "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "error": "Coolify deployment ck0gs84sgs4848kcg44w8ko0 terminó en failed.",
+        "passed": true,
+        "finishedAt": "2026-09-09T23:15:47.198Z",
+        "healthPort": "3000",
+        "webProbes": {
+          "requests": 324,
+          "status": {
+            "origin:200": 162,
+            "public:200": 162
+          },
+          "failures": []
+        },
+        "gameProbes": {
+          "requests": 326,
+          "status": {
+            "origin:200": 163,
+            "public:200": 163
+          },
+          "failures": []
+        }
+      },
+      {
+        "mode": "rollback-web",
+        "startedAt": "2026-09-09T23:16:09.302Z",
+        "commit": "b4b7c941c09ccbae823b33ced410fda197f1d2e2",
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "deployment": {
+          "status": "finished",
+          "deploymentUuid": "ao4g4sgk0ocssscw040gkkk8",
+          "commit": "b4b7c941c09ccbae823b33ced410fda197f1d2e2",
+          "imageRepository": "192.168.1.207:5000/cukies-hub/dapp",
+          "imageTag": "sha256-9fb10f849d696507d4e8d070bb22b81d00855ba5affa9c435e8cb56993fe3822",
+          "healthSha": "b4b7c941c09ccbae823b33ced410fda197f1d2e2",
+          "readyStatus": "ready",
+          "environment": "staging",
+          "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk"
+        },
+        "passed": true,
+        "finishedAt": "2026-09-09T23:16:51.046Z",
+        "healthPort": "3000",
+        "webProbes": {
+          "requests": 166,
+          "status": {
+            "origin:200": 83,
+            "public:200": 83
+          },
+          "failures": []
+        },
+        "gameProbes": {
+          "requests": 166,
+          "status": {
+            "origin:200": 83,
+            "public:200": 83
+          },
+          "failures": []
+        },
+        "outgoingDrain": {
+          "readiness503Samples": 14,
+          "first503": "2026-09-09T23:16:42.983707+00:00",
+          "last503": "2026-09-09T23:16:47.777064+00:00",
+          "health200DuringDrain": 14
+        }
+      },
+      {
+        "mode": "forward-web",
+        "startedAt": "2026-09-09T23:17:34.057Z",
+        "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "deployment": {
+          "status": "finished",
+          "deploymentUuid": "nw8wckg4wcs8sksswoos4ckc",
+          "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+          "imageRepository": "192.168.1.207:5000/cukies-hub/dapp",
+          "imageTag": "sha256-baf30dfc431f191eb93614f131f2a3850bce6c0848651c0fe6e18cc4f785e67d",
+          "healthSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+          "readyStatus": "ready",
+          "environment": "staging",
+          "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk"
+        },
+        "passed": true,
+        "finishedAt": "2026-09-09T23:18:05.323Z",
+        "healthPort": "3000",
+        "webProbes": {
+          "requests": 124,
+          "status": {
+            "origin:200": 62,
+            "public:200": 62
+          },
+          "failures": []
+        },
+        "gameProbes": {
+          "requests": 122,
+          "status": {
+            "origin:200": 61,
+            "public:200": 61
+          },
+          "failures": []
+        },
+        "outgoingDrain": {
+          "readiness503Samples": 13,
+          "first503": "2026-09-09T23:17:57.366277+00:00",
+          "last503": "2026-09-09T23:18:02.003421+00:00",
+          "health200DuringDrain": 12
+        }
+      },
+      {
+        "mode": "replace-game",
+        "startedAt": "2026-09-09T23:18:21.582Z",
+        "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "resourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+        "deployment": {
+          "status": "finished",
+          "deploymentUuid": "is4kco0o8o8wk8sk8w080ks0",
+          "commit": "dc4c21e4fe66b1d574046de5177367e35919d427",
+          "imageRepository": "192.168.1.207:5000/cukies-hub/treasure-hunt",
+          "imageTag": "sha256-d5483660d030ed09b64d1bd735522a190aa2a596326a2b815e36cf4d9e2255f9",
+          "healthSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+          "readyStatus": "ready",
+          "environment": "staging",
+          "resourceUuid": "lc04cw8gs4koo4swwws0c4ss"
+        },
+        "passed": true,
+        "finishedAt": "2026-09-09T23:18:52.892Z",
+        "healthPort": "3000",
+        "webProbes": {
+          "requests": 122,
+          "status": {
+            "origin:200": 61,
+            "public:200": 61
+          },
+          "failures": []
+        },
+        "gameProbes": {
+          "requests": 122,
+          "status": {
+            "origin:200": 61,
+            "public:200": 61
+          },
+          "failures": []
+        },
+        "outgoingDrain": {
+          "readiness503Samples": 14,
+          "first503": "2026-09-09T23:18:45.410878+00:00",
+          "last503": "2026-09-09T23:18:50.104440+00:00",
+          "health200DuringDrain": 12
+        }
+      }
+    ],
+    "gameImageBytes": {
+      "beforeNixpacks": 4313917949,
+      "afterStandalone": 509855221,
+      "reductionPercent": 88.18
+    },
+    "assets": {
+      "observedAt": "2026-09-09T23:05:45.961545+00:00",
+      "html": {
+        "url": "https://cukieshub.eurekand.com/treasurehunt-game/",
+        "http": "200",
+        "exit": 0
+      },
+      "htmlSha256": "c674a58d3bed702c870b0e38db44a2698836beb0de57ccae6ee5de632a8f1493",
+      "nextAssets": 12,
+      "publicAssets": 551,
+      "failures": [],
+      "canaries": [
+        {
+          "url": "https://cukieshub.eurekand.com/treasurehunt-game/assets/characters/1p.png",
+          "http": "200",
+          "exit": 0,
+          "path": "assets/characters/1p.png",
+          "bytes": 369488,
+          "sha256": "4ac883d395cf4fca2c21da7d30ca8653e8be94e2adfdb87e47d18267c0cd9234",
+          "matchesRepository": true
+        },
+        {
+          "url": "https://cukieshub.eurekand.com/treasurehunt-game/assets/sounds/Sonidos/Goat/Goat%200.mp3",
+          "http": "200",
+          "exit": 0,
+          "path": "assets/sounds/Sonidos/Goat/Goat 0.mp3",
+          "bytes": 24352,
+          "sha256": "8e9b6faa4bd358be354b58df74e6e6226ad9f084f1324a3dee8b462d0fb95411",
+          "matchesRepository": true
+        },
+        {
+          "url": "https://cukieshub.eurekand.com/treasurehunt-game/assets/ui/game-container/treasure-vault-background.webp",
+          "http": "200",
+          "exit": 0,
+          "path": "assets/ui/game-container/treasure-vault-background.webp",
+          "bytes": 302342,
+          "sha256": "fc1c18eb1bc36642887a51bd58d041f05212d5d537b290d4b239769af72e2cad",
+          "matchesRepository": true
+        }
+      ],
+      "health": [
+        {
+          "url": "https://cukieshub.eurekand.com/treasurehunt-game/api/health",
+          "http": "200",
+          "exit": 0,
+          "payload": {
+            "status": "ok",
+            "app": "treasure-hunt",
+            "environment": "staging",
+            "gitSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+            "coolify": {
+              "resourceUuid": "lc04cw8gs4koo4swwws0c4ss"
+            }
+          }
+        },
+        {
+          "url": "https://cukieshub.eurekand.com/treasurehunt-game/api/ready",
+          "http": "200",
+          "exit": 0,
+          "payload": {
+            "status": "ready",
+            "configHash": "42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b",
+            "imageSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+            "gitSha": "dc4c21e4fe66b1d574046de5177367e35919d427"
+          }
+        }
+      ]
+    },
+    "indexer": {
+      "observedAt": "2026-09-09T23:17:35.342Z",
+      "database": "cukieshub-new-staging",
+      "recentRuns": "five complete loops after deploy",
+      "safeBlocks": [
+        130109312,
+        130109375,
+        130109437,
+        130109500,
+        130109562
+      ],
+      "sourceCommit": "dc4c21e4fe66b1d574046de5177367e35919d427"
+    },
+    "journal": {
+      "bootstrap": "reconciled",
+      "rehearsals": "reconciled",
+      "pending": false
+    },
+    "browser": {
+      "oldTabAndFreshTab": "menu, character images and audio controls loaded; no JavaScript console errors",
+      "practice": "both anonymous standalone contexts hit existing session-authority guard; no practice/session-completion claimed",
+      "cause": "practice response lacks sessionId/economyRunId required by existing authority guard",
+      "unchangedSince": "bdab82c",
+      "source": [
+        "games/sybil-slayer/src/components/game-container.tsx",
+        "games/sybil-slayer/src/lib/single-player-result-authority.ts"
+      ],
+      "authenticatedGameplay": "not tested"
+    },
+    "limits": [
+      "Game-only rehearsal replaced the same immutable image; it was not a game-code push. Component selection is covered by CI regression tests.",
+      "HTTP continuity is bounded to observed probes; it is not a general zero-downtime guarantee.",
+      "The b4b7c941 rollback artifact was built by failed CI363 but first served during this rehearsal. Only web rolled back; workers stayed dc4c21e."
+    ],
+    "production": {
+      "pr": "https://github.com/fgomezserna/cukies-hub/pull/361",
+      "head": "72ba26a",
+      "draft": true,
+      "main": "4475baaa9a9d560711b8b9e14a38055aecb79c1f",
+      "app12App13ContainersUnchanged": true,
+      "app33": "not started",
+      "deliveryGate": false
+    },
+    "localCleanup": {
+      "removedLocalImageIds": [
+        "sha256:15d669eb12ecb95d74d8dd261256b0a57d3a46a37e61cd2d3dbf862c1c74ed61",
+        "sha256:444e07115624b0886a6eddbb34094fde5d2d5da8a695c61965d4ac8cbc354269",
+        "sha256:753db9f1ae87d7915ecb3fc30826bcf29ebf3dd909907c959914b1d0d57ae521",
+        "sha256:9ec52414dfb1f24605ca7cedaad3e23d2a52c2f701c1bf55d0b71428b6d932db"
+      ],
+      "freeBefore": 10913693696,
+      "freeAfter": 11641675776,
+      "reclaimed": 727982080
+    }
+  },
+  "builderRecovery": {
+    "failedRun": "34409614718",
+    "reason": "BuildKit cgroup OOM at 6 GiB, exit137; not disk exhaustion",
+    "vm": 1012,
+    "vmMemoryMiBBefore": 8192,
+    "vmMemoryMiBAfter": 12288,
+    "buildkitGiBBefore": 6,
+    "buildkitGiBAfter": 9,
+    "maxParallelism": 1,
+    "parallelismWasAlreadyOne": true,
+    "cacheVolumePreserved": "buildx_buildkit_cukies-ci0_state",
+    "schedulerSmoke": {
+      "startedAt": "2026-09-09T22:25:34.342337Z",
+      "endedAt": "2026-09-09T22:27:10.894377Z",
+      "seconds": 96.55,
+      "result": "passed without push or deploy"
+    }
+  },
+  "unrelatedTunnelIncident": {
+    "startedAt": "2026-09-09T21:35:04Z",
+    "recoveryVerifiedAt": "2026-09-09T21:53:49Z",
+    "resource": "LXC2002 cloudflared",
+    "cause": "2026.9.0 autoupdate removed --transport-loglevel; service override still supplied it",
+    "repair": "removed obsolete argument from existing service override; backup retained; ingress and credentials unchanged",
+    "excludedFromDeploymentContinuity": true
   }
 }

@@ -1,0 +1,776 @@
+{
+  "scope": "Recuperacion selectiva del Transfer NFT98000007 en Stage y coherencia de lectura de la misma wallet; no cierre global de economia/UX.",
+  "sourceArtifacts": [
+    {
+      "path": "/tmp/cukies-nft-recovery-execution-20260909/05-after-resolve.json",
+      "sha256": "b299a20b426faeeb0a316bf6343cf1d88908e3b449b26f26e6bf95d580e14976"
+    },
+    {
+      "path": "/tmp/cukies-nft-recovery-execution-20260909/07-after-next-cutoff.json",
+      "sha256": "21fb725176bf707dae991228ae62d2f492e30d74ebd48d503d73a6fbf94afe93"
+    },
+    {
+      "path": "/tmp/cukies-nft-recovery-execution-20260909/11-authenticated-ui.json",
+      "sha256": "56688bff9b051de3bdd9055adea20a193bb509404ab014b2279f465867243f1e"
+    },
+    {
+      "path": "/tmp/cukies-nft-recovery-execution-20260909/12-wallet-ledger-reconciliation.json",
+      "sha256": "8239d0d1f4c3e1d0ee93e2407d6a401a9a836cd3c93f34c4b818f9b42776bcfd"
+    }
+  ],
+  "afterEventResolution": {
+    "observedAt": "2026-09-09T21:47:13.480Z",
+    "sourceCommit": "bdab82c715c13f62f8170b0e68d37ee32149e825",
+    "readOnly": true,
+    "event": {
+      "_id": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+      "attempts": 6,
+      "status": "projected",
+      "updatedAt": "2026-09-09T21:45:11.841Z",
+      "projectedAt": "2026-09-09T21:45:11.841Z"
+    },
+    "deadLetterCount": 0,
+    "nft": {
+      "_id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000007",
+      "chainId": 97,
+      "collectionAddressNormalized": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+      "lastEventId": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+      "ownerNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+      "price": 0,
+      "state": "available"
+    },
+    "txCount": 1,
+    "watermarks": [
+      {
+        "_id": "cukie-master-slots:nft",
+        "status": "healthy",
+        "observedThrough": "2026-09-09T16:52:46.401Z",
+        "updatedAt": "2026-09-09T16:53:09.529Z"
+      },
+      {
+        "_id": "cukie-master-slots:uki",
+        "status": "healthy",
+        "observedThrough": "2026-09-09T21:34:13.028Z",
+        "updatedAt": "2026-09-09T21:34:34.791Z"
+      }
+    ],
+    "creditRuntime": [
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T21:34:34.750Z",
+        "result": {
+          "status": "blocked",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            },
+            {
+              "route": "nft",
+              "status": "blocked",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "errorCode": "DOMAIN_CONFLICT",
+              "reasonCodes": [
+                "SOURCE_UNHEALTHY",
+                "CHAIN_DEAD_LETTERS_OPEN",
+                "CHAIN_EVENTS_NOT_PROJECTED"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T21:34:04.384Z",
+        "result": {
+          "status": "blocked",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            },
+            {
+              "route": "nft",
+              "status": "blocked",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "errorCode": "DOMAIN_CONFLICT",
+              "reasonCodes": [
+                "SOURCE_UNHEALTHY",
+                "CHAIN_DEAD_LETTERS_OPEN",
+                "CHAIN_EVENTS_NOT_PROJECTED"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "masterRuntime": [
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T21:34:57.891Z",
+        "result": {
+          "ownership": {
+            "scanned": 0,
+            "invalidated": 0,
+            "incidents": 0,
+            "deferred": true
+          }
+        }
+      },
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T21:33:57.530Z",
+        "result": {
+          "ownership": {
+            "scanned": 0,
+            "invalidated": 0,
+            "incidents": 0,
+            "deferred": true
+          }
+        }
+      }
+    ],
+    "ledger": []
+  },
+  "nextCutoff": {
+    "observedAt": "2026-09-09T22:02:00.604Z",
+    "sourceCommit": "bdab82c715c13f62f8170b0e68d37ee32149e825",
+    "readOnly": true,
+    "event": {
+      "_id": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+      "attempts": 6,
+      "status": "projected",
+      "updatedAt": "2026-09-09T21:45:11.841Z",
+      "projectedAt": "2026-09-09T21:45:11.841Z"
+    },
+    "deadLetterCount": 0,
+    "nft": {
+      "_id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000007",
+      "chainId": 97,
+      "collectionAddressNormalized": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+      "lastEventId": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+      "ownerNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+      "price": 0,
+      "state": "available"
+    },
+    "txCount": 1,
+    "watermarks": [
+      {
+        "_id": "cukie-master-slots:nft",
+        "status": "healthy",
+        "observedThrough": "2026-09-09T22:01:22.466Z",
+        "updatedAt": "2026-09-09T22:01:48.195Z"
+      },
+      {
+        "_id": "cukie-master-slots:uki",
+        "status": "healthy",
+        "observedThrough": "2026-09-09T22:01:26.502Z",
+        "updatedAt": "2026-09-09T22:01:48.119Z"
+      }
+    ],
+    "creditRuntime": [
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T22:01:48.077Z",
+        "result": {
+          "status": "waiting",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            },
+            {
+              "route": "nft",
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            }
+          ]
+        }
+      },
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T22:01:17.219Z",
+        "result": {
+          "status": "open",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "open",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+              "creditRunId": "69c04e8f92b490cd98104fdde04f8469eefd432302d0f2045f3b8ad01b24996d",
+              "batchesProcessed": 1,
+              "itemsApplied": 2,
+              "pendingItems": 0
+            },
+            {
+              "route": "nft",
+              "status": "open",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+              "creditRunId": "73e8a7054546f5a2e4abbdda96a131d430faa35b0c39ff3738f77f605bd17bfe",
+              "batchesProcessed": 1,
+              "itemsApplied": 3,
+              "pendingItems": 0
+            }
+          ]
+        }
+      }
+    ],
+    "masterRuntime": [
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T22:01:03.193Z",
+        "result": {
+          "ownership": {
+            "scanned": 6,
+            "invalidated": 0,
+            "incidents": 0,
+            "deferred": false
+          }
+        }
+      },
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T22:00:02.591Z",
+        "result": {
+          "ownership": {
+            "scanned": 6,
+            "invalidated": 0,
+            "incidents": 0,
+            "deferred": false
+          }
+        }
+      }
+    ],
+    "ledger": [
+      {
+        "_id": {
+          "operation": "pool_deposit",
+          "period": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z"
+        },
+        "count": 4,
+        "amount": 200,
+        "first": "2026-09-09T22:01:17.766Z",
+        "last": "2026-09-09T22:01:17.766Z"
+      },
+      {
+        "_id": {
+          "operation": "grant",
+          "period": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z"
+        },
+        "count": 3,
+        "amount": 300,
+        "first": "2026-09-09T22:01:17.766Z",
+        "last": "2026-09-09T22:01:17.766Z"
+      },
+      {
+        "_id": {
+          "operation": "expire",
+          "period": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z"
+        },
+        "count": 30,
+        "amount": 3800,
+        "first": "2026-09-09T22:00:15.977Z",
+        "last": "2026-09-09T22:00:15.977Z"
+      },
+      {
+        "_id": {
+          "operation": "grant",
+          "period": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z"
+        },
+        "count": 30,
+        "amount": 3000,
+        "first": "2026-09-09T21:53:39.332Z",
+        "last": "2026-09-09T21:58:14.168Z"
+      },
+      {
+        "_id": {
+          "operation": "pool_deposit",
+          "period": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z"
+        },
+        "count": 40,
+        "amount": 3800,
+        "first": "2026-09-09T21:53:39.332Z",
+        "last": "2026-09-09T21:58:14.168Z"
+      },
+      {
+        "_id": {
+          "operation": "late_compensation",
+          "period": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z"
+        },
+        "count": 27,
+        "amount": 2700,
+        "first": "2026-09-09T21:53:39.332Z",
+        "last": "2026-09-09T21:57:43.631Z"
+      }
+    ]
+  },
+  "authenticatedUi": {
+    "verifiedAt": "2026-09-09 22:08:59 UTC",
+    "observationMethod": "Native Microsoft Edge accessibility via cua.getApp, existing session",
+    "stagingSha": "bdab82c715c13f62f8170b0e68d37ee32149e825",
+    "walletVerifiedInProfileMenu": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "master": {
+      "url": "https://cukieshub.eurekand.com/cukie-master",
+      "heading": "TIENES 3 CUPOS CUKIE MASTER",
+      "ukiSlots": 0,
+      "nftSlots": 3,
+      "active": 3,
+      "validating": 0,
+      "grace": 0,
+      "creditsPerPeriod": 300,
+      "ukiStaked": 5000,
+      "ukiNeededForNextSlot": 15000,
+      "networkBanner": "Las acciones de esta sección necesitan BNB Smart Chain Testnet. Tus lecturas siguen disponibles.",
+      "originals": [
+        {
+          "tokenId": "98000001",
+          "points": 1,
+          "custodyMessage": "Ya está depositado en el Cukie Pool"
+        },
+        {
+          "tokenId": "98000003",
+          "points": 4,
+          "custodyMessage": "Ya está depositado en el Cukie Pool"
+        },
+        {
+          "tokenId": "98000004",
+          "points": 7,
+          "custodyMessage": "Ya está depositado en el Cukie Pool"
+        },
+        {
+          "tokenId": "98000005",
+          "points": 10,
+          "visibleAction": "RETIRAR INMEDIATAMENTE",
+          "actionDisabled": true
+        }
+      ],
+      "nftSourceBlockingBannerPresent": false
+    },
+    "credits": {
+      "url": "https://cukieshub.eurekand.com/credits",
+      "nextCutoffDisplayed": "9 sept 2026, 22:30 UTC",
+      "currentBalance": {
+        "play": 200,
+        "reserved": 0,
+        "spent": 0,
+        "poolContributed": 100,
+        "expired": 0
+      },
+      "nextCutoffPlan": {
+        "play": 200,
+        "pool": 100,
+        "total": 300
+      },
+      "slots": [
+        {
+          "route": "nft",
+          "ordinal": 1,
+          "status": "Activo",
+          "play": 50,
+          "pool": 50
+        },
+        {
+          "route": "nft",
+          "ordinal": 2,
+          "status": "Activo",
+          "play": 50,
+          "pool": 50
+        },
+        {
+          "route": "nft",
+          "ordinal": 3,
+          "status": "Activo",
+          "play": 100,
+          "pool": 0
+        }
+      ],
+      "saveState": "Tu reparto está guardado.",
+      "latestVisibleGrants": [
+        {
+          "ordinal": 1,
+          "amount": 100,
+          "atDisplayed": "9 sept 2026, 22:01 UTC"
+        },
+        {
+          "ordinal": 2,
+          "amount": 100,
+          "atDisplayed": "9 sept 2026, 22:01 UTC"
+        },
+        {
+          "ordinal": 3,
+          "amount": 100,
+          "atDisplayed": "9 sept 2026, 22:01 UTC"
+        }
+      ],
+      "latestVisiblePoolContributions": [
+        {
+          "ordinal": 1,
+          "amount": 50
+        },
+        {
+          "ordinal": 2,
+          "amount": 50
+        }
+      ]
+    },
+    "correction": "Confirmed by 12-wallet-ledger-reconciliation.json: current-period pool_deposit has two own-bucket debits totalling 100 and two pool-bucket credits totalling 100. The user's actual contribution is 100, matching the UI. The raw all-bucket sum 200 is not another grant or a 200 contribution.",
+    "limits": [
+      "Read-only existing wallet session. No signatures, wallet/network changes, deposits, withdrawals or allocation edits.",
+      "Authenticated HTTP responses were not separately captured; application values were read from the authenticated UI.",
+      "Initial CDP failure was bypassed using supported native accessibility, without bypassing app authentication."
+    ],
+    "browserWindowReleased": true,
+    "restoredForegroundUrl": "https://cukieshub.eurekand.com/cukiepoints"
+  },
+  "walletLedgerReconciliation": {
+    "observedAt": "2026-09-09T22:18:01.252Z",
+    "readOnly": true,
+    "sourceCommit": "bdab82c715c13f62f8170b0e68d37ee32149e825",
+    "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "window": {
+      "from": "2026-09-09T21:00:00.000Z",
+      "throughExclusive": "2026-09-09T22:09:00.000Z"
+    },
+    "counts": {
+      "ledger": 134,
+      "items": 33,
+      "lots": 33
+    },
+    "missingItemReferences": [],
+    "duplicateIdempotencyKeys": [],
+    "duplicateNaturalItems": [],
+    "duplicateLedgerNatural": [],
+    "mismatches": [],
+    "ledgerByAccountRoutePeriod": [
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "bucket": "own",
+        "operation": "expire",
+        "count": 30,
+        "credits": 3800
+      },
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "bucket": "own",
+        "operation": "grant",
+        "count": 30,
+        "credits": 3000
+      },
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "bucket": "own",
+        "operation": "pool_deposit",
+        "count": 20,
+        "credits": 1900
+      },
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "bucket": "pool",
+        "operation": "pool_deposit",
+        "count": 20,
+        "credits": 1900
+      },
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "bucket": "own",
+        "operation": "late_compensation",
+        "count": 27,
+        "credits": 2700
+      },
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "route": "nft",
+        "bucket": "own",
+        "operation": "grant",
+        "count": 3,
+        "credits": 300
+      },
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "route": "nft",
+        "bucket": "own",
+        "operation": "pool_deposit",
+        "count": 2,
+        "credits": 100
+      },
+      {
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "route": "nft",
+        "bucket": "pool",
+        "operation": "pool_deposit",
+        "count": 2,
+        "credits": 100
+      }
+    ],
+    "itemsByEarnedRouteSettlement": [
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T17:00:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T17:30:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T18:00:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T18:30:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T19:00:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T19:30:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T20:00:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T20:30:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:00:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 300,
+        "granted": 600,
+        "personal": 400,
+        "pool": 200,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T21:30:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 0,
+        "granted": 300,
+        "personal": 200,
+        "pool": 100,
+        "applied": 3
+      },
+      {
+        "earnedPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "settlementPeriod": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "route": "nft",
+        "count": 3,
+        "base": 300,
+        "compensation": 0,
+        "granted": 300,
+        "personal": 200,
+        "pool": 100,
+        "applied": 3
+      }
+    ],
+    "currentItems": [
+      {
+        "itemId": "567b90f91cd6b262ff3f799e94a56b9edbcb89ac6818b759cc08c51ca7ecf372",
+        "earnedPeriodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "slotId": "0x26789b9743d187174c3e3a87729730824a4d0c13:nft:1",
+        "slotRoute": "nft",
+        "slotOrdinal": 1,
+        "eligibilityEpoch": 6,
+        "creditEligibleFrom": "2026-09-09T11:08:02.510Z",
+        "baseGrantCredits": 100,
+        "compensationCredits": 0,
+        "grantCredits": 100,
+        "ownCredits": 50,
+        "poolCredits": 50,
+        "status": "applied",
+        "appliedAt": "2026-09-09T22:01:17.766Z"
+      },
+      {
+        "itemId": "5ff68ae88ae3edb3b6f05600c92e5dd67a30a03d03d2051df9e0b5a67eb23917",
+        "earnedPeriodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "slotId": "0x26789b9743d187174c3e3a87729730824a4d0c13:nft:2",
+        "slotRoute": "nft",
+        "slotOrdinal": 2,
+        "eligibilityEpoch": 6,
+        "creditEligibleFrom": "2026-09-09T11:08:02.510Z",
+        "baseGrantCredits": 100,
+        "compensationCredits": 0,
+        "grantCredits": 100,
+        "ownCredits": 50,
+        "poolCredits": 50,
+        "status": "applied",
+        "appliedAt": "2026-09-09T22:01:17.766Z"
+      },
+      {
+        "itemId": "7b658d0c59846c2d2b4ae356109d6020f3279bba9184552b5e55cfdef88f01dd",
+        "earnedPeriodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "slotId": "0x26789b9743d187174c3e3a87729730824a4d0c13:nft:3",
+        "slotRoute": "nft",
+        "slotOrdinal": 3,
+        "eligibilityEpoch": 6,
+        "creditEligibleFrom": "2026-09-09T11:08:02.510Z",
+        "baseGrantCredits": 100,
+        "compensationCredits": 0,
+        "grantCredits": 100,
+        "ownCredits": 100,
+        "poolCredits": 0,
+        "status": "applied",
+        "appliedAt": "2026-09-09T22:01:17.766Z"
+      }
+    ],
+    "currentPersonalLots": [
+      {
+        "bucket": "own",
+        "route": "nft",
+        "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "runItemId": "567b90f91cd6b262ff3f799e94a56b9edbcb89ac6818b759cc08c51ca7ecf372",
+        "totalCredits": 100,
+        "poolDepositedCredits": 50,
+        "availableCredits": 50,
+        "reservedCredits": 0,
+        "spentCredits": 0,
+        "expiredCredits": 0,
+        "expiresAt": "2026-09-09T22:30:00.000Z"
+      },
+      {
+        "bucket": "own",
+        "route": "nft",
+        "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "runItemId": "5ff68ae88ae3edb3b6f05600c92e5dd67a30a03d03d2051df9e0b5a67eb23917",
+        "totalCredits": 100,
+        "poolDepositedCredits": 50,
+        "availableCredits": 50,
+        "reservedCredits": 0,
+        "spentCredits": 0,
+        "expiredCredits": 0,
+        "expiresAt": "2026-09-09T22:30:00.000Z"
+      },
+      {
+        "bucket": "own",
+        "route": "nft",
+        "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T22:00:00.000Z",
+        "runItemId": "7b658d0c59846c2d2b4ae356109d6020f3279bba9184552b5e55cfdef88f01dd",
+        "totalCredits": 100,
+        "poolDepositedCredits": 0,
+        "availableCredits": 100,
+        "reservedCredits": 0,
+        "spentCredits": 0,
+        "expiredCredits": 0,
+        "expiresAt": "2026-09-09T22:30:00.000Z"
+      }
+    ],
+    "allReferencedPersonalLots": {
+      "totalCredits": 6000,
+      "poolDepositedCredits": 2000,
+      "availableCredits": 200,
+      "reservedCredits": 0,
+      "spentCredits": 0,
+      "expiredCredits": 3800
+    },
+    "pass": true
+  },
+  "accountingInterpretation": "El pool_deposit bruto de 200 incluye debito personal de 100 y credito pool de 100. El aporte del usuario es 100, no 200. Los totales acumulados de lotes no son el saldo actual."
+}

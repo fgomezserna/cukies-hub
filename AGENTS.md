@@ -224,18 +224,27 @@ The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through
   - Branch: `main`
   - Public URL: `https://cukies.world`
 
-Staging apps 32 and 28 use `.github/workflows/cukies-images.yml`: a push to
-`staging` builds affected images on the dedicated runner, publishes immutable
-digests and rolls the web in app32, then reconciles app28 with `docker-compose.workers.yml` only when worker images or topology change. Keep Coolify Git
-autodeploy disabled; do not start a legacy build manually. Read
-`docs/deployment-environments.md` before operating this pipeline. Production app
-12 keeps `docker-compose.coolify.yml`. Treasure Hunt (`games/sybil-slayer`) has
-its own `treasure-hunt` image and delivery target: staging app31
-(`lc04cw8gs4koo4swwws0c4ss`), production app13
-(`tkkggwcosc4gksckcc480cwg`). Its image lane is prepared; verify the live migration
-record before assuming either resource has left Nixpacks. A game-only delivery
-must preserve Hub web/workers containers. Keep `webCommit` and `gameCommit`
-separate from the aggregate release commit and each image's `sourceSha`.
+Staging apps 32, 28 and 31 use `.github/workflows/cukies-images.yml`: a push to
+`staging` selects affected components, builds on VM1012 with Nx/BuildKit cache,
+publishes immutable registry digests and updates web32, game31 or workers28.
+Treasure Hunt is a separate Docker Image resource in the same workflow; it stays
+outside `docker-compose.workers.yml`. The six image components are listed in
+`infrastructure/ci/components.json`. Coolify pulls images; keep its Git autodeploy
+OFF and do not start a legacy build manually.
+
+A game-only delivery must preserve Hub web/workers containers. Keep `webCommit`
+and `gameCommit` separate from the aggregate release commit and each image's
+`sourceSha`. Delivery injects the validated `COOLIFY_BRANCH`; Docker Image does not
+supply it automatically. Never weaken the game's environment/resource guard.
+Read `docs/deployment-environments.md` for the pipeline and the canonical INFRA
+row in `docs/antes-del-15-seguimiento.md` for current runtime evidence.
+
+Production still serves the legacy app12 Compose and app13 Nixpacks resources.
+The separate web app33 is provisioned but has not started; the production registry
+migration remains inactive. Before the first infrastructure merge into `main`,
+follow `docs/deployment-rolling-transition.md`: snapshots, Git autodeploy OFF on
+app12/app13 and CI delivery gate false, then verified candidate/cutover. Preserve
+current production traffic throughout this preparation.
 
 `docker-compose.coolify.yml` is the topology source; regenerate the image-only
 Compose with `node scripts/ci/generate-images-compose.mjs --write` after changing

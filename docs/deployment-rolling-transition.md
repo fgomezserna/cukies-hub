@@ -7,10 +7,10 @@ se completan antes de habilitar el mismo proceso en producción. El estado live 
 
 ## Recursos y responsabilidades
 
-| Entorno | Web Docker Image | Workers Compose | Destino público |
-| --- | --- | --- | --- |
-| Staging | App32 `rwwsc4kkwc0ck84cgk40s8kk` | App28 `u4s804o4wwcckowgk0woo4wg` | `https://cukieshub.eurekand.com` |
-| Producción | App33 `uo8gswsg84c488cowko0kkkg`, provisionada sin tráfico; activación pendiente | App12 `jookw8ow8woks088s44404ok` | `https://cukies.world` |
+| Entorno | Web Docker Image | Treasure Hunt Docker Image | Workers Compose | Estado y destino público |
+| --- | --- | --- | --- | --- |
+| Staging | App32 `rwwsc4kkwc0ck84cgk40s8kk` | App31 `lc04cw8gs4koo4swwws0c4ss`, imagen por digest activa | App28 `u4s804o4wwcckowgk0woo4wg` | `https://cukieshub.eurekand.com`; runtime y ensayos en la evidencia INFRA |
+| Producción | App33 `uo8gswsg84c488cowko0kkkg`, nuevo recurso aún sin arrancar | App13 `tkkggwcosc4gksckcc480cwg`, Nixpacks/`e6e136b` sigue sirviendo; target registry preparado pero inactivo | App12 `jookw8ow8woks088s44404ok`, legacy/`main`/`4475baa` sigue sirviendo | `https://cukies.world`; PR361 draft, CI gate `false`, tráfico actual intacto |
 
 La web no publica un puerto del host ni usa un nombre fijo de contenedor.
 Coolify arranca su reemplazo, exige `/api/ready` y después termina la instancia
@@ -50,10 +50,13 @@ No se copian las credenciales ni los perfiles de staging a producción.
 ## CI y selección de componentes
 
 `.github/workflows/cukies-images.yml` procesa pushes de `staging` y `main`.
-Cada rama usa su GitHub Environment (`cukies-staging` / `cukies-production`),
-configuración pública, secretos y estado durable independientes. Las PR ejecutan
-las pruebas de invariantes sin credenciales de despliegue. La web afectada debe
-pasar lint, typecheck y Jest antes de construir su imagen.
+Staging selecciona entre seis componentes (incluida la lane `treasure-hunt` de
+app31); la preparación de producción de PR361 (`72ba26a`) conserva cuatro
+componentes y no entrega mientras `CUKIES_IMAGE_DEPLOY_ENABLED=false`. Cada rama usa
+su GitHub Environment (`cukies-staging` / `cukies-production`), configuración pública,
+secretos y estado durable independientes. Las PR ejecutan las pruebas de invariantes
+sin credenciales de despliegue. La web o el juego afectados deben pasar sus checks
+antes de construir la imagen.
 
 Variables del Environment:
 
@@ -118,6 +121,19 @@ Antes de registrar la migración como activa: verificar digest/SHA/guard,
 health/ready, página y assets bajo basePath, manifest y CSP `frame-ancestors`;
 después ensayar un cambio sólo del juego y un push documental sin reinicios.
 La prueba de HTTP no sustituye jugar una sesión autenticada completa.
+
+La entrega publica `COOLIFY_BRANCH` desde el target validado tanto al desplegar
+como al restaurar metadata: Coolify Docker Image no la inyecta automáticamente.
+El guard del juego sigue exigiendo rama, recurso, entorno y basePath correctos.
+
+### Primer merge de infraestructura en producción
+
+PR361 (`72ba26a`) permanece draft. Antes del primer merge a `main`, conservar
+snapshots privados, desactivar el autodeploy Git de app12 y app13 y mantener
+`CUKIES_IMAGE_DEPLOY_ENABLED=false`; app12 legacy y app13 Nixpacks deben seguir
+sirviendo su tráfico actual hasta verificar app33 y el relevo de app13. No iniciar
+app33 con tráfico público antes de comprobarla: primero arrancarla como candidata
+sin ruta pública, validar health/ready y después transferir el tráfico.
 
 ### Hub y workers
 

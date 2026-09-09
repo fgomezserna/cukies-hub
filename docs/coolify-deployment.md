@@ -10,13 +10,14 @@ datos de staging está en
 
 | Recurso | Ruta activa | Compose | Alcance |
 | --- | --- | --- | --- |
-| Coolify app32 web + app28 workers | `staging` -> workflow `.github/workflows/cukies-images.yml` | Web Docker Image; `docker-compose.workers.yml` generado | Imágenes por digest, web gradual y workers independientes. Autodeploy Git desactivado; `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. |
-| Coolify app 12, `game-hub` | `main` -> build/deploy existente | `docker-compose.coolify.yml` | Producción live; conserva la ruta legacy de Coolify. |
-| Coolify app 31, `game-treasurehunt-staging` | `staging` -> recurso independiente | No aplica; Nixpacks (`build_pack=nixpacks`, rama `staging`) | Treasure Hunt se mantiene separado del hub y sigue su build/deploy independiente. |
+| Coolify app32 web + app28 workers + app31 game | `staging` -> workflow `.github/workflows/cukies-images.yml` | Web Docker Image; `docker-compose.workers.yml` generado; app31 Docker Image independiente | Lane afectada entre seis componentes, con app31 fuera del Compose de workers. Autodeploy Git desactivado; `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. |
+| Coolify app 12, `game-hub` | `main` -> build/deploy legacy existente | `docker-compose.coolify.yml` | App12 sigue sirviendo `main`/`4475baa`; la ruta registry/CI de PR361 está preparada pero inactiva. |
+| Coolify app 31, `game-treasurehunt-staging` | `staging` -> mismo workflow, recurso independiente | Target Docker Image `treasure-hunt`; fuera del Compose de workers | Imagen del registry activa; relevo gradual y conservación de web/workers verificados. La evidencia INFRA registra el bootstrap y su recuperación. |
 
-En staging se publica app32 y en producción todavía `dapp` de app12;
-workers y schedulers son internos. App 31 es un recurso independiente y no se
-incluye en el Compose del hub. App 28 usa Mongo externo en LXC 2007
+En staging se publican app32 y app31 mediante imágenes del registry; en producción siguen sirviendo `dapp` de app12 (`main`/`4475baa`) y
+Treasure Hunt app13 (Nixpacks/`e6e136b`). App33 es el nuevo recurso web, aún sin
+arrancar. Workers y schedulers son internos. App 31 es un recurso independiente y no se
+incluye en el Compose del hub, aunque sí usa este workflow. App 28 usa Mongo externo en LXC 2007
 (`192.168.1.221:27018`); el Compose de imágenes no crea ni administra Mongo.
 
 ## Flujo de staging app 28
@@ -36,17 +37,23 @@ node scripts/ci/generate-images-compose.mjs --check
 Los detalles de Nx affected, BuildKit, límites, reutilización de digests,
 storage, gates, rollback y postflight viven únicamente en la guía principal.
 
-## Ruta legacy aplicable a main y juegos
+## Ruta legacy de producción
 
-La app 12 continúa usando el despliegue Compose/build de Coolify basado en
+La app 12 continúa sirviendo el despliegue Compose/build de Coolify basado en
 `docker-compose.coolify.yml`, con sus variables runtime y sus servicios legacy.
-No debe tomar imágenes, Mongo, secretos ni flags de staging.
+No debe tomar imágenes, Mongo, secretos ni flags de staging durante la preparación
+de PR361; el tráfico actual se conserva hasta verificar el cutover.
 
-Treasure Hunt app 31 es un recurso Coolify independiente. Mantiene su build
-propio y sus variables de build (`NEXT_PUBLIC_GAME_BASE_PATH` y
-`NEXT_PUBLIC_DAPP_ORIGIN`) según el entorno. Su publicación bajo
+Treasure Hunt app 31 es un recurso Coolify independiente con target Docker Image
+en el workflow común. Mantiene sus variables de build (`NEXT_PUBLIC_GAME_BASE_PATH`
+y `NEXT_PUBLIC_DAPP_ORIGIN`) según el entorno. Su publicación bajo
 `/treasurehunt-game` no convierte el juego en parte del Compose del hub ni de
-la promoción de imágenes de app 28.
+la promoción de imágenes de app 28. Su selección y entrega se realizan en el mismo CI.
+
+La preparación de producción de PR361 (`72ba26a`) usa cuatro componentes y mantiene
+`CUKIES_IMAGE_DEPLOY_ENABLED=false`; la secuencia de snapshots, autodeploy y cutover
+está en [la guía de entrega gradual](deployment-rolling-transition.md). El tráfico
+legacy se conserva hasta verificar app33 y el relevo de app13.
 
 ## Secretos y validación
 
