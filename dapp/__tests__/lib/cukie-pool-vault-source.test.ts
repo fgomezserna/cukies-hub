@@ -4,6 +4,7 @@ import {
   loadCukiePoolVaultCandidates,
   loadCukiePoolVaultRewardParticipants,
   resolveCukiePoolVaultPeriod,
+  isPoolRecoverySourceFailure,
   type CukiePoolVaultConfig,
 } from '@/lib/uki-economy/cukie-pool/vault-source';
 import { SchemaNotReadyError } from '@/lib/uki-economy/errors';
@@ -67,6 +68,21 @@ function position(input: {
 }
 
 describe('Cukie Pool custodial source', () => {
+  it('distinguishes source transport failures from item-level owner ambiguity', () => {
+    expect(isPoolRecoverySourceFailure({
+      status: 'unknown',
+      reason: 'POOL_RECOVERY_RPC_READ_FAILED',
+    })).toBe(true);
+    expect(isPoolRecoverySourceFailure({
+      status: 'unknown',
+      reason: 'POOL_RECOVERY_OWNER_MISMATCH',
+    })).toBe(false);
+    expect(isPoolRecoverySourceFailure({
+      status: 'current_custody',
+      reason: 'POOL_RECOVERY_RPC_READ_FAILED',
+    })).toBe(false);
+  });
+
   it('derives periods from append-only calendars, including a configurable short transition', () => {
     const calendars = [
       {

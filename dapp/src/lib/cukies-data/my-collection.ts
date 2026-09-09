@@ -64,7 +64,11 @@ function actionsForItem(input: {
     }
     return actions;
   }
-  if (input.custody === 'cukie_master') return ['withdraw_master'] satisfies CollectionAction[];
+  if (input.custody === 'cukie_master') {
+    return input.state === 'cukie_master'
+      ? ['withdraw_master'] satisfies CollectionAction[]
+      : [];
+  }
   if (input.state === 'listed') {
     if (input.saleKind) actions.push('cancel_sale');
     return actions;
@@ -100,6 +104,8 @@ function requiredConfig(config: UkiNftVaultPublicConfig) {
   return {
     chainId: config.chainId,
     collections: config.collectionAddresses.map((address) => address.toLowerCase()),
+    poolVaultAddress: config.cukiePoolNftVaultAddress?.toLowerCase() ?? null,
+    masterVaultAddress: config.cukieMasterNftVaultAddress?.toLowerCase() ?? null,
     poolReady: config.ready.cukiePool && config.mode.cukiePool === 'custodial',
     masterReady: config.ready.cukieMaster && config.mode.cukieMaster === 'custodial',
   };
@@ -173,7 +179,14 @@ export async function listMyCukieCollectionFromDb(input: {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new DomainValidationError('now no es una fecha válida.');
   }
-  const { chainId, collections, poolReady, masterReady } = requiredConfig(input.config ?? ukiNftVaults);
+  const {
+    chainId,
+    collections,
+    poolVaultAddress,
+    masterVaultAddress,
+    poolReady,
+    masterReady,
+  } = requiredConfig(input.config ?? ukiNftVaults);
   const activeUkiOrders = await input.db.collection<IndexedUkiMarketplaceOrder>('uki_marketplace_orders')
     .find({
       chainId,
@@ -276,6 +289,9 @@ export async function listMyCukieCollectionFromDb(input: {
 
   const recovery = await readPoolRecoveryPositions({
     walletNormalized,
+    activeVaultAddress: poolVaultAddress,
+    activeVaultAddresses: masterVaultAddress ? [masterVaultAddress] : [],
+    activeVaultChainId: chainId,
     assets: canonical
       .filter(({ assetId }) => !positionAssetIds.has(assetId))
       .map(({ collection, tokenId: id }) => ({
@@ -313,9 +329,12 @@ export async function listMyCukieCollectionFromDb(input: {
     const pool = poolByAsset.get(assetId);
     const master = masterByAsset.get(assetId);
     const recoveryPosition = recoveryByAsset.get(assetId);
+    const currentMaster = Boolean(recoveryPosition?.status === 'current_custody'
+      && masterVaultAddress
+      && recoveryPosition.vaultAddress?.toLowerCase() === masterVaultAddress);
     const legacySale = legacySaleKind(document, walletNormalized, normalized.canonicalState);
     const ukiSale = ukiSaleByAsset.has(assetId);
-    const saleKind = master || pool || recoveryPosition?.status === 'custodied'
+    const saleKind = master || pool || recoveryPosition?.status === 'custodied' || recoveryPosition?.status === 'current_custody'
       ? null
       : ukiSale
         ? 'uki' as const
@@ -324,6 +343,8 @@ export async function listMyCukieCollectionFromDb(input: {
       ? 'unknown' as const
       : recoveryPosition?.status === 'custodied'
         ? 'in_pool' as const
+        : recoveryPosition?.status === 'current_custody'
+          ? 'unknown' as const
         : master
       ? 'cukie_master'
       : pool
@@ -333,6 +354,8 @@ export async function listMyCukieCollectionFromDb(input: {
           : normalized.canonicalState;
     const custody = recoveryPosition?.status === 'custodied'
       ? 'cukie_pool_recovery'
+      : recoveryPosition?.status === 'current_custody'
+        ? currentMaster ? 'cukie_master' : 'cukie_pool'
       : master ? 'cukie_master' : pool ? 'cukie_pool' : 'wallet';
     const poolState = pool ? poolStatus(pool, now) : null;
     return {

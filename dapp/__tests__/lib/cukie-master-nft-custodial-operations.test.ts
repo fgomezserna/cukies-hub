@@ -6,6 +6,15 @@ import {
   buildCukieMasterCustodialDepositInventory,
   custodialInventoryFromDb,
 } from '@/lib/uki-economy/cukie-master/nft-operations';
+import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
+
+jest.mock('@/lib/uki-economy/cukie-pool/recovery-read', () => ({
+  readPoolRecoveryPositions: jest.fn().mockResolvedValue([]),
+}));
+
+const mockRecovery = readPoolRecoveryPositions as jest.MockedFunction<
+  typeof readPoolRecoveryPositions
+>;
 
 const wallet = '0x1111111111111111111111111111111111111111';
 const masterVault = '0x2222222222222222222222222222222222222222';
@@ -219,6 +228,27 @@ describe('Cukie Master custodial inventory identity', () => {
     });
   });
 
+  it('blocks an ownerOf-confirmed current or former vault asset before projection', () => {
+    const assetId = `97:${collectionA}:14`;
+    const inventory = buildCukieMasterCustodialDepositInventory({
+      walletAddress: wallet,
+      now,
+      documents: [metadata('transition', '14', collectionA)],
+      locks: [],
+      openVaultPositions: [],
+      custodyBlockers: new Map([[assetId, 'unknown_state']]),
+      config: config(),
+    });
+
+    expect(inventory).toMatchObject([{
+      assetId,
+      state: 'unknown',
+      blockers: ['unknown_state'],
+      canDeposit: false,
+      canSoftStake: false,
+    }]);
+  });
+
   it('keeps a known Master position withdrawable when metadata is duplicated and ineligible', async () => {
     const position = openMasterPosition('21');
     const duplicateMetadata = [
@@ -241,5 +271,37 @@ describe('Cukie Master custodial inventory identity', () => {
       canWithdraw: true,
       blockers: expect.arrayContaining(['missing_rarity', 'missing_generation']),
     });
+  });
+
+  it('applies the shared owner guard to the real Master inventory path', async () => {
+    const assetId = `97:${collectionA}:22`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'current_custody',
+      vaultAddress: masterVault,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('ahead-of-projection', '22', collectionA)],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [],
+      nft_asset_locks: [],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(mockRecovery).toHaveBeenCalledWith(expect.objectContaining({
+      activeVaultAddress: masterVault,
+      activeVaultAddresses: [poolVault],
+      activeVaultChainId: 97,
+      assets: [{ chainId: 97, collectionAddress: collectionA, tokenId: '22' }],
+    }));
+    expect(inventory).toMatchObject([{
+      assetId,
+      state: 'unknown',
+      blockers: ['unknown_state'],
+      canDeposit: false,
+      canSoftStake: false,
+    }]);
   });
 });

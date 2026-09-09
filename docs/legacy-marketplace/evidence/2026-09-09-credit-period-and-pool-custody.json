@@ -811,5 +811,125 @@
         "context": "Wagmi durante recarga; sesion recuperada y pantallas operativas. Causa del aviso sin aislar."
       }
     }
+  },
+  "nftOperationRecurrence": {
+    "status": "verified_recurrence_fix_in_progress",
+    "observedAt": "2026-09-09T11:23:34.575Z",
+    "servedCommit": "bae6f3b022297ac431aa417ac8e8127d82d1913c",
+    "chainId": 97,
+    "collectionSummary": {
+      "total": 12,
+      "inWallet": 3,
+      "available": 3,
+      "onSale": 0,
+      "inPool": 8,
+      "inCukieMaster": 1,
+      "otherInUse": 0
+    },
+    "masterUiOfferedInvalidDeposits": [
+      "98000001",
+      "98000003",
+      "98000004"
+    ],
+    "confirmedPreviousPoolCustody": [
+      "98000001",
+      "98000003",
+      "98000004",
+      "98000007"
+    ],
+    "currentPoolPositions": [
+      "98000002",
+      "98000006",
+      "98000008",
+      "98000009"
+    ],
+    "currentMasterPositions": [
+      "98000005"
+    ],
+    "availableWalletAssets": [
+      "98000010",
+      "98000011",
+      "98000012"
+    ],
+    "verification": "Authenticated browser DOM and read-only Mongo / BSC custody probe. No transaction submitted. Pool transient list disappearance reported by user; unhealthy payload replacement verified in code, not replayed live.",
+    "candidateReadOnlyVerification": {
+      "observedAt": "2026-09-09T11:40:49.945Z",
+      "bundleSha256": "b44dfcd7d6ca1396db8a8a9d8bb060b8e6795d67978771576fea42e77492201a",
+      "masterInventory": [
+        {
+          "tokenId": "98000001",
+          "custody": "wallet",
+          "canDeposit": false,
+          "canWithdraw": false,
+          "state": "unknown"
+        },
+        {
+          "tokenId": "98000003",
+          "custody": "wallet",
+          "canDeposit": false,
+          "canWithdraw": false,
+          "state": "unknown"
+        },
+        {
+          "tokenId": "98000004",
+          "custody": "wallet",
+          "canDeposit": false,
+          "canWithdraw": false,
+          "state": "unknown"
+        },
+        {
+          "tokenId": "98000005",
+          "custody": "cukie_master_nft_vault",
+          "canDeposit": false,
+          "canWithdraw": true,
+          "state": "custodied"
+        },
+        {
+          "tokenId": "98000006",
+          "custody": "wallet",
+          "canDeposit": true,
+          "canWithdraw": false,
+          "state": "available"
+        },
+        {
+          "tokenId": "98000007",
+          "custody": "wallet",
+          "canDeposit": false,
+          "canWithdraw": false,
+          "state": "unknown"
+        },
+        {
+          "tokenId": "98000010",
+          "custody": "wallet",
+          "canDeposit": false,
+          "canWithdraw": false,
+          "state": "available"
+        },
+        {
+          "tokenId": "98000011",
+          "custody": "wallet",
+          "canDeposit": false,
+          "canWithdraw": false,
+          "state": "available"
+        },
+        {
+          "tokenId": "98000012",
+          "custody": "wallet",
+          "canDeposit": false,
+          "canWithdraw": false,
+          "state": "available"
+        }
+      ],
+      "collectionSummary": {
+        "total": 12,
+        "inWallet": 4,
+        "available": 4,
+        "onSale": 0,
+        "inPool": 7,
+        "inCukieMaster": 1,
+        "otherInUse": 0
+      },
+      "limitation": "Uncommitted candidate run against Stage data; not proof of code deployed or wallet transaction completion."
+    }
   }
 }

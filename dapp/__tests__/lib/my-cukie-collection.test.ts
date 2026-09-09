@@ -1,10 +1,14 @@
 jest.mock('server-only', () => ({}), { virtual: true });
 jest.mock('@/lib/indexer-db/mongodb', () => ({ getEconomyDb: jest.fn() }));
+jest.mock('@/lib/uki-economy/cukie-pool/recovery-read', () => ({
+  readPoolRecoveryPositions: jest.fn(),
+}));
 
 import type { Db } from 'mongodb';
 
 import { parseUkiNftVaultPublicConfig } from '@/lib/contracts/uki-nft-vaults';
 import { listMyCukieCollectionFromDb } from '@/lib/cukies-data/my-collection';
+import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
 
 const wallet = '0x1111111111111111111111111111111111111111';
 const collection = '0x3333333333333333333333333333333333333333';
@@ -16,6 +20,7 @@ const config = parseUkiNftVaultPublicConfig({
   cukiePoolNftVaultAddress: poolVault,
   cukieMasterNftVaultAddress: masterVault,
 });
+const recoveryReadMock = readPoolRecoveryPositions as jest.MockedFunction<typeof readPoolRecoveryPositions>;
 
 function cursor<T>(rows: T[]) {
   const value = {
@@ -57,6 +62,10 @@ function position(tokenId: string, lifecycle: string) {
 }
 
 describe('my canonical Cukie collection', () => {
+  beforeEach(() => {
+    recoveryReadMock.mockResolvedValue([]);
+  });
+
   it('excludes old fixtures and reconciles wallet, pool and Cukie Master custody', async () => {
     const canonical = Array.from({ length: 12 }, (_, index) => inventory(`980000${String(index + 1).padStart(2, '0')}`));
     const oldFixtures = Array.from({ length: 6 }, (_, index) => ({
@@ -170,6 +179,50 @@ describe('my canonical Cukie collection', () => {
     expect(result.items[0]).toMatchObject({
       custody: 'cukie_pool',
       poolStatus: 'exit_requested',
+      availableActions: [],
+    });
+  });
+
+  it('bloquea Pool y Master actuales aunque ownerOf vaya por delante de Mongo', async () => {
+    const currentAssetId = `97:${collection}:4`;
+    const currentPoolAssetId = `97:${collection}:5`;
+    recoveryReadMock.mockResolvedValue([{
+      assetId: currentAssetId,
+      status: 'current_custody',
+      vaultAddress: masterVault,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }, {
+      assetId: currentPoolAssetId,
+      status: 'current_custody',
+      vaultAddress: poolVault,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+    const db = {
+      collection: (name: string) => ({
+        find: () => {
+          if (name === 'cukie_pool_nft_vault_positions') return cursor([]);
+          if (name === 'cukie_master_nft_positions') return cursor([]);
+          if (name === 'uki_marketplace_orders') return cursor([]);
+      if (name === 'nft_asset_locks') return cursor([]);
+          return cursor([inventory('4'), inventory('5')]);
+        },
+      }),
+    } as unknown as Db;
+
+    const result = await listMyCukieCollectionFromDb({ db, walletAddress: wallet, config });
+
+    expect(result.items.find((item) => item.tokenId === '4')).toMatchObject({
+      custody: 'cukie_master',
+      state: 'unknown',
+      availableActions: [],
+    });
+    expect(result.items.find((item) => item.tokenId === '5')).toMatchObject({
+      custody: 'cukie_pool',
+      state: 'unknown',
       availableActions: [],
     });
   });
