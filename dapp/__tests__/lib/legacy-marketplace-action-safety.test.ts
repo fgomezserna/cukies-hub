@@ -9,6 +9,7 @@ import {
 } from '@/lib/legacy-marketplace/action-safety';
 import { buildLegacyMarketplaceReconciliation } from '@/lib/legacy-marketplace/reconciliation';
 import { sendLegacyTronContract } from '@/lib/legacy-marketplace/tron';
+import type { LegacyTronWebLike } from '@/lib/legacy-marketplace/tron';
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
 
 const baseItem: LegacyMarketplaceCukiItem = {
@@ -104,14 +105,15 @@ describe('seguridad de acciones Legacy', () => {
         releaseContract = resolve;
       })),
     };
-    const context = captureTronActionContext(tronWeb, 'https://api.trongrid.io');
+    const tronClient = tronWeb as unknown as LegacyTronWebLike;
+    const context = captureTronActionContext(tronClient, 'https://api.trongrid.io');
     const action = sendLegacyTronContract(
-      tronWeb,
+      tronClient,
       'marketplace',
       'buyToken',
       ['1'],
       { callValue: 1 },
-      () => assertTronActionContext(tronWeb, context),
+      () => assertTronActionContext(tronClient, context),
     );
 
     tronWeb.fullNode.host = 'https://nile.trongrid.io';
