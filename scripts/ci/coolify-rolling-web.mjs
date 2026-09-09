@@ -163,12 +163,14 @@ function imageConfig(image) {
   return { imageRepository, imageTag };
 }
 
-function metadataEntries(commit, configHash) {
+function metadataEntries(commit, configHash, gitBranch) {
+  requireString(gitBranch, 'target.gitBranch');
   return [
     ['SOURCE_COMMIT', commit],
     ['GIT_COMMIT_SHA', commit],
     ['IMAGE_REVISION', commit],
     ['CUKIES_BUILD_ENV_HASH', configHash],
+    ['COOLIFY_BRANCH', gitBranch],
   ].map(([key, value]) => ({
     key,
     value,
@@ -247,7 +249,7 @@ async function verifyPublicRelease({ fetchImpl, target, manifest, resourceCommit
   throw new Error(`la aplicación no confirmó health/ready para el SHA ${resourceCommit}.`);
 }
 
-function rollbackState(application, previousManifest, component = 'dapp') {
+function rollbackState(application, previousManifest, gitBranch, component = 'dapp') {
   const previousCommit = commitOf(application);
   const bootstrap = !SHA40.test(previousCommit ?? '');
   if (bootstrap) return { bootstrap: true, application: null, envs: null };
@@ -265,7 +267,7 @@ function rollbackState(application, previousManifest, component = 'dapp') {
       docker_registry_image_name: image.imageRepository,
       docker_registry_image_tag: image.imageTag,
     },
-    envs: metadataEntries(previous.resourceCommit, previousManifest.configHash),
+    envs: metadataEntries(previous.resourceCommit, previousManifest.configHash, gitBranch),
   };
 }
 
@@ -300,7 +302,7 @@ export async function deployRollingWeb({
   try {
     application = await releaseClient.getApplication(target.resourceUuid);
     assertApplicationShape(application, target);
-    rollback = rollbackState(application, previousManifest, component);
+    rollback = rollbackState(application, previousManifest, target.gitBranch, component);
     if (!rollback.bootstrap && previousManifest.environment !== deployment.environment) {
       throw new Error('previousManifest no corresponde al entorno de despliegue.');
     }
@@ -311,7 +313,7 @@ export async function deployRollingWeb({
       docker_registry_image_name: image.imageRepository,
       docker_registry_image_tag: image.imageTag,
     });
-    await releaseClient.patchEnvs(target.resourceUuid, metadataEntries(resourceCommit, manifest.configHash));
+    await releaseClient.patchEnvs(target.resourceUuid, metadataEntries(resourceCommit, manifest.configHash, target.gitBranch));
 
     const pinned = await releaseClient.getApplication(target.resourceUuid);
     assertApplicationShape(pinned, target);
@@ -410,7 +412,7 @@ export async function deployRollingWeb({
     // Its configuration must not be overwritten by the outer attempt.
     if (!runtimeRollbackAttempted && (startAttempted || rollback)) {
       try {
-        await restorePrevious({ client: releaseClient, target, rollback: rollback ?? rollbackState(application ?? {}, previousManifest, component) });
+        await restorePrevious({ client: releaseClient, target, rollback: rollback ?? rollbackState(application ?? {}, previousManifest, target.gitBranch, component) });
       } catch (restoreError) {
         throw new Error(`${errorText(error)}; rollback de configuración fallido: ${errorText(restoreError)}`);
       }
