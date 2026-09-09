@@ -41,6 +41,9 @@ Chain id: `97`.
 Fuente de direcciones: `docker-compose.coolify.yml` y `docs/coolify-deployment.md`.
 Comprobacion: RPC publico de BSC testnet.
 
+Este inventario conserva su comprobacion original. Para operar el despliegue actual,
+consultar [deployment-environments.md](deployment-environments.md).
+
 | Alias | Contract / wallet address | Owner/admin observado | Nota |
 | --- | --- | --- | --- |
 | `ASM_TESTNET` | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` | No expone `owner()` en la comprobacion usada | Token ASM testnet / `tASM`. |

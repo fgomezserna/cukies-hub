@@ -1,226 +1,64 @@
 # Coolify deployment
 
-Los despliegues de staging y produccion deben usar `docker-compose.coolify.yml` como compose del proyecto.
+Esta página es una entrada corta. La guía operativa única de entornos, imágenes,
+Mongo, límites del builder, secretos y validación está en
+[docs/deployment-environments.md](deployment-environments.md). El handoff de
+datos de staging está en
+[infrastructure/ci/staging-data-handoff.md](../infrastructure/ci/staging-data-handoff.md).
 
-## Servicios
+## Alcance actual
 
-- `dapp`: Next.js publico. Es el unico servicio con dominio, proxy y puerto HTTP.
-- `chain-indexer`: worker interno. Lee blockchain, procesa historicos/live y proyecta en Mongo.
-- `cuki-card-worker`: worker interno. Genera cards PNG, las sube a S3 y actualiza `cukies.img`.
-- Los schedulers de Cukie Master, creditos, juego, pool, ranking y rewards son procesos
-  internos que reutilizan la imagen de `dapp` con comandos diferentes.
-- `staging-mongo` pertenece exclusivamente al perfil aislado `staging-runtime`. La base
-  de datos de produccion es externa y nunca debe construirse ni gestionarse desde este
-  compose.
+| Recurso | Ruta activa | Compose | Alcance |
+| --- | --- | --- | --- |
+| Coolify app 28, `game-hub-staging` | `staging` -> workflow `.github/workflows/cukies-staging-images.yml` | `docker-compose.images.yml` generado | Hub de integración; CI publica imágenes inmutables y llama a Coolify. El autodeploy Git de app 28 está desactivado y `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. |
+| Coolify app 12, `game-hub` | `main` -> build/deploy existente | `docker-compose.coolify.yml` | Producción live; conserva la ruta legacy de Coolify. |
+| Coolify app 31, `game-treasurehunt-staging` | `staging` -> recurso independiente | No aplica; Nixpacks (`build_pack=nixpacks`, rama `staging`) | Treasure Hunt se mantiene separado del hub y sigue su build/deploy independiente. |
 
-Los workers no necesitan dominio ni Traefik. Deben quedar con `restart: unless-stopped`.
+En los recursos hub app 28 y app 12, solo `dapp` se publica mediante Traefik;
+workers y schedulers son internos. App 31 es un recurso independiente y no se
+incluye en el Compose del hub. App 28 usa Mongo externo en LXC 2007
+(`192.168.1.221:27018`); el Compose de imágenes no crea ni administra Mongo.
 
-`dapp` es el unico servicio que construye la imagen compartida
-`cukies-hub-dapp-runtime-${COOLIFY_RESOURCE_UUID}:latest`. Los siete schedulers no deben
-declarar `build`: consumen esa imagen con `pull_policy: never`. Esto mantiene una sola
-compilacion de Next.js por despliegue y evita mezclar imagenes entre recursos de Coolify.
+## Flujo de staging app 28
 
-## Auto deploy
-
-En Coolify:
-
-1. Crear o editar el recurso como Docker Compose.
-2. Repo: `fgomezserna/cukies-hub`.
-3. Branch: `staging` para integracion y `main` para el live actual.
-4. Compose file: `docker-compose.coolify.yml`.
-5. Activar webhook/auto deploy solo para la rama asignada al recurso.
-6. Configurar dominio solo en `dapp`.
-
-## Variables obligatorias
-
-Compartidas:
+El pipeline recorre `staging` en el runner `cukies-builder-1012` de VM1012
+(`192.168.1.244`), reutiliza el builder/cache cuando corresponde, publica
+referencias con digest en el registry de VM1007 (`192.168.1.207:5000`) y aplica
+`docker-compose.images.yml` mediante la API de Coolify en VM1001
+(`192.168.1.201`). La fuente de topología es
+`docker-compose.coolify.yml`; la regeneración reproducible es:
 
 ```bash
-DATABASE_URL=...
-CHAIN_INDEXER_MONGO_URL=...
-CHAIN_INDEXER_DB_NAME=cukieshub-new
+node scripts/ci/generate-images-compose.mjs --write
+node scripts/ci/generate-images-compose.mjs --check
 ```
 
-Dapp presale testnet:
+Los detalles de Nx affected, BuildKit, límites, reutilización de digests,
+storage, gates, rollback y postflight viven únicamente en la guía principal.
 
-```bash
-NEXT_PUBLIC_APP_ENV=staging
-NEXT_PUBLIC_UKI_CHAIN_ID=97
-NEXT_PUBLIC_ASM_TOKEN_ADDRESS=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C
-NEXT_PUBLIC_UKI_TOKEN_ADDRESS=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c
-NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS=0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154
-NEXT_PUBLIC_UKI_PRESALE_ADDRESS=0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA
-NEXT_PUBLIC_UKI_STAKING_ADDRESS=0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205
-NEXT_PUBLIC_BSCSCAN_BASE_URL=https://testnet.bscscan.com
-NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS=0x8fa397B4E1DED911161f13C128DF369cE9a95B3A
-NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS=
-NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL=
-NEXT_PUBLIC_UKI_SWAP_URL=https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c
-NEXT_PUBLIC_UKI_PRESALE_START_ISO=2026-08-05T10:59:20.000Z
-NEXT_PUBLIC_UKI_PRESALE_START_LABEL=testnet abierta
-NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL=abierta
-```
+## Ruta legacy aplicable a main y juegos
 
-Antes del despliegue ejecuta `pnpm --filter @cukies/contracts
-verify:testnet:pancake-liquidity`. La home de Stage habilita exclusivamente el
-swap directo ASM/UKI del pair verificado en chain 97. No anuncia compra con BNB
-o USDT porque el router no tiene una ruta demostrada. El locker y su etiqueta
-permanecen vacíos hasta verificar públicamente un lock activo; nunca se reutilizan
-el pair o el locker de mainnet.
+La app 12 continúa usando el despliegue Compose/build de Coolify basado en
+`docker-compose.coolify.yml`, con sus variables runtime y sus servicios legacy.
+No debe tomar imágenes, Mongo, secretos ni flags de staging.
 
-Las variables `NEXT_PUBLIC_*` se inyectan tambien como build args. Tras cambiarlas en Coolify hay que reconstruir la imagen, no solo reiniciar el contenedor.
+Treasure Hunt app 31 es un recurso Coolify independiente. Mantiene su build
+propio y sus variables de build (`NEXT_PUBLIC_GAME_BASE_PATH` y
+`NEXT_PUBLIC_DAPP_ORIGIN`) según el entorno. Su publicación bajo
+`/treasurehunt-game` no convierte el juego en parte del Compose del hub ni de
+la promoción de imágenes de app 28.
 
-Treasure Hunt multiplayer (solo staging):
+## Secretos y validación
 
-Antes de activar el flag servidor es obligatorio ejecutar este preflight en la base indicada por `DATABASE_URL`. La coleccion `TreasureHuntMultiplayerMatch` debe ser nueva/vacia o ambas agregaciones deben devolver cero documentos:
+Las credenciales CI del registry y Coolify viven en el GitHub Environment
+`cukies-staging`. Los secretos runtime de Mongo, OAuth, HMAC, RPC y S3/MinIO
+viven en Coolify o en el entorno local ignorado. Los nombres
+de variables, hashes de configuración, SHA, tags y digests del manifest son
+metadatos operativos; nunca se documentan sus valores secretos.
 
-```javascript
-// Un GameSession no puede estar ligado a mas de un match, incluidos terminales.
-db.TreasureHuntMultiplayerMatch.aggregate([
-  { $unwind: "$players" },
-  { $match: { "players.gameSessionId": { $type: "string" } } },
-  { $group: { _id: "$players.gameSessionId", matches: { $addToSet: "$matchId" } } },
-  { $match: { "matches.1": { $exists: true } } }
-])
-
-// Una wallet solo puede estar activa en un match. La expresion reproduce el backfill legacy.
-db.TreasureHuntMultiplayerMatch.aggregate([
-  {
-    $set: {
-      effectiveActiveUserIds: {
-        $cond: [
-          { $in: ["$status", ["finished", "abandoned"]] },
-          [],
-          { $ifNull: ["$activeUserIds", "$players.userId"] }
-        ]
-      }
-    }
-  },
-  { $unwind: "$effectiveActiveUserIds" },
-  { $group: { _id: "$effectiveActiveUserIds", matches: { $addToSet: "$matchId" } } },
-  { $match: { "matches.1": { $exists: true } } }
-])
-```
-
-Si aparece cualquier fila, no activar `TREASURE_HUNT_MULTIPLAYER_ENABLED`: exportar/respaldar la coleccion y limpiar o terminalizar los duplicados de forma explicita, o usar una coleccion nueva. El arranque crea indices unicos sobre `players.gameSessionId` y wallets activas y debe fallar cerrado si el dataset no cumple estas invariantes.
-
-```bash
-TREASURE_HUNT_MULTIPLAYER_ENABLED=true
-```
-
-El compose mantiene este flag servidor en `false` por defecto. Solo debe activarse en el recurso de staging/integracion mientras el modo siga siendo `staging_unranked`; produccion debe conservarlo en `false`. El rate limiter de estas rutas vive en memoria del proceso y presupone una unica replica de `dapp`. Antes de escalar a varias replicas hay que mover los buckets a un almacenamiento compartido y distribuido.
-
-El juego `sybil-slayer` se despliega como recurso separado y necesita estas variables de build para el mismo gate:
-
-```bash
-NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED=true
-NEXT_PUBLIC_DAPP_ORIGIN=https://cukieshub.eurekand.com
-```
-
-Ambas se incorporan al bundle de Next.js: tras cambiarlas hay que reconstruir la imagen del juego. En produccion, `NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED` debe seguir en `false` y `NEXT_PUBLIC_DAPP_ORIGIN` debe ser el origen real de la dapp de produccion. Ese origen tambien delimita el `frame-ancestors` del CSP; no se debe usar `*` ni mezclar el origen de staging con produccion.
-
-Indexer:
-
-```bash
-CHAIN_INDEXER_CHAINS=BSC
-CHAIN_INDEXER_CONTRACT_ALIASES=PRESALE
-CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID=97
-CHAIN_INDEXER_BSC_RPC_URLS=https://bsc-testnet-rpc.publicnode.com,https://data-seed-prebsc-1-s1.bnbchain.org:8545,https://data-seed-prebsc-2-s1.bnbchain.org:8545
-CHAIN_INDEXER_BSC_RPC_URL=https://bsc-testnet-rpc.publicnode.com
-CHAIN_INDEXER_TRON_API_BASE_URL=https://api.trongrid.io/v1
-CHAIN_INDEXER_PRESALE_ADDRESS=0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA
-CHAIN_INDEXER_START_BSC_BLOCK=123291898
-CHAIN_INDEXER_BSC_CONFIRMATIONS=12
-```
-
-Para habilitar aliases BSC con verificacion de identidad, Coolify debe inyectar
-explicitamente la address y los cuatro campos de bootstrap de cada contrato.
-Complemento de configuracion staging para estos dos contratos; conservar la
-lista completa de aliases habilitados del entorno:
-
-```bash
-CHAIN_INDEXER_UKI_TOKEN_ADDRESS=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c
-
-CHAIN_INDEXER_PRESALE_ADDRESS=0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA
-CHAIN_INDEXER_PRESALE_START_BSC_BLOCK=123291898
-CHAIN_INDEXER_PRESALE_DEPLOYMENT_BSC_BLOCK=123291898
-CHAIN_INDEXER_PRESALE_DEPLOYMENT_TX_HASH=0x846987138438bc3e77bfa8a957011b7cf6bbfc7b8fae59a548949102a0abc80e
-CHAIN_INDEXER_PRESALE_RUNTIME_CODE_HASH=0xb913b21342f583078dc890e77a2e0bb43b4e77ae02f04a180284aee3ceb7b8a3
-
-CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS=0xc2252D797Da294D16b84282d213604b4Bcf6EE09
-CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK=123359171
-CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_BSC_BLOCK=123359171
-CHAIN_INDEXER_REWARDS_DISTRIBUTOR_DEPLOYMENT_TX_HASH=0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639
-CHAIN_INDEXER_REWARDS_DISTRIBUTOR_RUNTIME_CODE_HASH=0x654fa2495a76004361c98bf51a10d5b9e7a50564ca4b89ee9e95af04cb92b4fc
-```
-
-Los dos bloques de cada contrato deben ser iguales y el recibo debe resolver la
-address y el runtime hash configurados. No se debe activar un alias usando solo
-la address, el bloque global ni un fallback de otra variable pública; el
-fallback anidado de `UKI_TOKEN_ADDRESS` generaba una plantilla truncada y queda
-prohibido.
-
-`CHAIN_INDEXER_PRESALE_ADDRESS` debe ser el contrato `Presale` real del entorno. Si `PRESALE` esta habilitado y falta su address o identidad, el worker rechaza el arranque; no se debe quitar el alias para eludir esa validacion.
-
-`CHAIN_INDEXER_PRESALE_START_BSC_BLOCK` debe ser su bloque exacto de despliegue; el bloque global no sustituye la identidad por contrato. Para backfill historico amplio, usar un RPC que soporte rangos de logs suficientemente antiguos.
-
-### Escenario de preventa staging 2026-08-05
-
-- Vault: `0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154`; deploy tx `0x14292fc576ddff260572c4d7de7a7538d8f0aed8f3147d20f65d2cb77a0fa00b`.
-- Presale: `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`; deploy tx `0x846987138438bc3e77bfa8a957011b7cf6bbfc7b8fae59a548949102a0abc80e`.
-- Parametros: `100 UKI/ASM`, minimo `5 ASM`, cap `250,000,000 UKI`, ventana de 30 dias y vesting lineal de 9 meses.
-- Vault financiado: tx `0xaafce634b0221268ced2d9e64a1ab8438365072e09cd11aa016dafadf3e65444`.
-- Rol y apertura: tx `0x51117e37bf957a911626d797c7045c03e6ab27d9e98a21a9632d81a74e7a7b1a` y `0x4e8c4ec8ca66c7b2c449a68f60eec23b4a27b7ccbf8d8204ad1f901015cf3ed8`.
-- Compra smoke: `5 tASM -> 500 UKI` en tx `0x9b5f3a5724028f464fa582be7d3178dbf872964b6161123cd0987daf3010f9bd`.
-- Source verificado mediante Etherscan API V2: [VestingVault](https://testnet.bscscan.com/address/0xE7cFcebA1342946ff8c382Be8D7B55F0323b1154#code) y [Presale](https://testnet.bscscan.com/address/0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA#code).
-
-Config inicial en Mongo para referidos de preventa:
-
-```js
-db.presale_referral_campaign_config.updateOne(
-  { active: true },
-  {
-    $set: {
-      active: true,
-      minimumUkiToUnlockLink: 0,
-      levelOneWeight: 1,
-      levelTwoWeight: 0.5,
-      levelThreeWeight: 0.25,
-      updatedAt: new Date()
-    },
-    $setOnInsert: {
-      createdAt: new Date()
-    }
-  },
-  { upsert: true }
-)
-```
-
-Cambiar `minimumUkiToUnlockLink` y pesos por los valores finales antes de abrir la campana.
-
-Card worker:
-
-```bash
-CARD_WORKER_MONGO_URL=...
-CARD_WORKER_DB_NAME=cukieshub-new
-CARD_WORKER_UPLOAD=false
-CARD_WORKER_PUBLIC_BASE_URL=...
-CARD_WORKER_S3_BUCKET=...
-CARD_WORKER_S3_REGION=...
-CARD_WORKER_S3_PREFIX=png/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-```
-
-En staging, el destino exclusivo es el bucket MinIO `cukies-cards-staging`. Las URLs inmutables de #216 y el smoke real quedaron validados, por lo que `CARD_WORKER_UPLOAD=true` y `COMPOSE_PROFILES=card-worker` estan activos solo en la app Coolify 28 desde el despliegue 1109. El valor `false` del ejemplo sigue siendo el default seguro para cualquier recurso nuevo. No usar nunca el destino compartido de produccion ni copiar las credenciales de app 28.
-
-## Validacion post deploy
-
-- Abrir la web publica y revisar `/api/health`.
-- Abrir `/indexer?collection=chain_indexer_runs`.
-- Abrir `/indexer?collection=presale_purchases` tras una compra de prueba confirmada.
-- Abrir `/indexer?collection=presale_participants` y comprobar `totalUkiPurchased`, `referralUnlockedAt`, sponsor provisional/bloqueado y acumulados N1/N2/N3.
-- Abrir `/indexer?collection=presale_referral_contributions` y verificar que una compra atribuida crea hasta tres filas, una por nivel.
-- Abrir `/indexer?collection=card_generation_jobs`.
-- Revisar logs de `chain-indexer` y confirmar que ejecuta `setup` y luego `run`.
-- Revisar logs de `cuki-card-worker` y confirmar que ejecuta `setup` y luego `run`.
+Para comprobar un despliegue de staging hay que validar el manifest, el digest
+que corre en cada servicio, `/api/health`, el endpoint Mongo de staging y los
+logs de los workers. Un build verde o un job terminado no demuestra por sí solo
+que el runtime servido sea el esperado. La última fuente de releases es el
+[workflow de imágenes de staging](https://github.com/fgomezserna/cukies-hub/actions/workflows/cukies-staging-images.yml);
+no se duplican aquí cronologías de runs.
