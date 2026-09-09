@@ -19,6 +19,7 @@ import { isAddress, type Address, type Hash } from 'viem';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 import { Panel } from '@/components/landing/primitives';
+import { useAppRuntime, useAppRuntimeResource, useGuardedOperation } from '@/providers/app-runtime-provider';
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
 import {
   cukiePoolNftVaultAbi,
@@ -118,8 +119,6 @@ type PoolStatus = CustodialStatus | LegacyStatus;
 type MutationPhase = 'idle' | 'approving' | 'depositing' | 'requesting_exit' | 'withdrawing' | 'syncing';
 type PendingAsset = Pick<AvailableAsset, 'assetId' | 'collectionAddress' | 'tokenId'>;
 
-const POOL_STATUS_RETRY_MS = 10_000;
-const POOL_STATUS_RETRY_WINDOW_MS = 180_000;
 
 function sameAddress(left: string | undefined | null, right: string | undefined | null) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -270,24 +269,15 @@ function JourneyStep({ number, label }: { number: string; label: string }) {
   );
 }
 
-async function requestPoolStatus(walletAddress: string, signal?: AbortSignal) {
-  const response = await fetch(
-    `/api/economy/v1/cukie-pool?walletAddress=${encodeURIComponent(walletAddress)}`,
-    { cache: 'no-store', credentials: 'same-origin', signal },
-  );
-  const body = await response.json() as { data?: PoolStatus };
-  if (!response.ok || !body.data) throw new Error('CUKIE_POOL_UNAVAILABLE');
-  return body.data;
-}
-
 export function CukiePoolStatusPanel() {
   const { user, isLoading: authLoading, walletType } = useAuth();
+  const runtime = useAppRuntime();
   const { address, chainId, isConnected } = useAccount();
   const publicClient = usePublicClient({ chainId: ukiNftVaults.chainId ?? undefined });
   const { writeContractAsync } = useWriteContract();
-  const [status, setStatus] = useState<PoolStatus | null>(null);
-  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
-  const [reloadNonce, setReloadNonce] = useState(0);
+  const operationGuard = useGuardedOperation('pool-write');
+  const operationGuardRef = useRef(operationGuard);
+  operationGuardRef.current = operationGuard;
   const [mutatingAssetId, setMutatingAssetId] = useState<string | null>(null);
   const [phase, setPhase] = useState<MutationPhase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -296,61 +286,17 @@ export function CukiePoolStatusPanel() {
   const [latestTxHash, setLatestTxHash] = useState<Hash | null>(null);
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
-  const retryStartedAtRef = useRef<number | null>(null);
   const operationLocksRef = useRef(new Set<string>());
   const walletOperationLockRef = useRef(false);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user?.walletAddress) {
-      setStatus(null);
-      setLoadState('idle');
-      return;
-    }
-    const controller = new AbortController();
-    setLoadState('loading');
-    requestPoolStatus(user.walletAddress, controller.signal)
-      .then((result) => {
-        setStatus(result);
-        setLoadState('ready');
-      })
-      .catch((caught: unknown) => {
-        if (caught instanceof DOMException && caught.name === 'AbortError') return;
-        setStatus(null);
-        setLoadState('unavailable');
-      });
-    return () => controller.abort();
-  }, [authLoading, reloadNonce, user?.walletAddress]);
-
-  useEffect(() => {
-    const shouldRetry = loadState === 'unavailable'
-      || (
-        loadState === 'ready'
-        && status?.mode === 'custodial_vault'
-        && status.nftCustody.indexer.status !== 'ready'
-      );
-    if (authLoading || !user?.walletAddress) {
-      retryStartedAtRef.current = null;
-      return;
-    }
-    if (loadState === 'loading') return;
-    if (!shouldRetry) {
-      retryStartedAtRef.current = null;
-      return;
-    }
-    const startedAt = retryStartedAtRef.current ?? Date.now();
-    retryStartedAtRef.current = startedAt;
-    if (Date.now() - startedAt >= POOL_STATUS_RETRY_WINDOW_MS) return;
-    const timer = window.setTimeout(
-      () => setReloadNonce((value) => value + 1),
-      POOL_STATUS_RETRY_MS,
-    );
-    return () => window.clearTimeout(timer);
-  }, [authLoading, loadState, status, user?.walletAddress]);
+  const statusResource = useAppRuntimeResource<PoolStatus>('pool', {
+    enabled: Boolean(user?.walletAddress) && !authLoading,
+  });
+  const status = statusResource.data ?? null;
+  const loadState = statusResource.state === 'stale' ? 'ready' : statusResource.state;
+  const refreshStatusQuery = statusResource.refresh;
 
   function refreshStatus() {
-    retryStartedAtRef.current = Date.now();
-    setReloadNonce((value) => value + 1);
+    void refreshStatusQuery();
   }
 
   const custody = status?.mode === 'custodial_vault' ? status.nftCustody : null;
@@ -496,9 +442,9 @@ export function CukiePoolStatusPanel() {
 
         if (operations.some((item) => item.phase === 'syncing_projection')) {
           try {
-            const refreshed = await requestPoolStatus(user.walletAddress);
+            const refreshed = (await refreshStatusQuery()).data;
+            if (!refreshed) throw new Error('CUKIE_POOL_UNAVAILABLE');
             if (disposed) return;
-            setStatus(refreshed);
             for (const operation of operations) {
               if (projectionMatchesPoolOperation(operation, refreshed)) {
                 clearPending(operation.assetId);
@@ -519,13 +465,18 @@ export function CukiePoolStatusPanel() {
       disposed = true;
       window.clearInterval(interval);
     };
-  }, [clearPending, pendingByAsset, pendingContext, pendingHydrated, persistPending, publicClient, user?.walletAddress]);
+  }, [clearPending, pendingByAsset, pendingContext, pendingHydrated, persistPending, publicClient, refreshStatusQuery, user?.walletAddress]);
 
   async function writeAndConfirm(
     input: Parameters<typeof writeContractAsync>[0],
     asset: PendingAsset,
     action: NftVaultPendingAction,
   ) {
+    const currentGuard = operationGuardRef.current;
+    if (!currentGuard.ready) {
+      if (currentGuard.reason === 'wrong_chain') await currentGuard.switchToTarget();
+      throw new Error(`POOL_OPERATION_${currentGuard.reason.toUpperCase()}`);
+    }
     if (!publicClient) throw new Error('PUBLIC_CLIENT_UNAVAILABLE');
     const hash = await writeContractAsync(input);
     setLatestTxHash(hash);
@@ -624,6 +575,7 @@ export function CukiePoolStatusPanel() {
         args: [identity.collection, identity.tokenId],
       }, asset, 'deposit');
       setPhase('syncing');
+      await runtime.refreshAfterTransaction('pool');
       setNotice('Depósito confirmado en BSC. Este Cukie seguirá bloqueado mientras actualizamos el inventario; ya puedes operar con otro.');
     } catch {
       const persisted = pendingContext
@@ -680,6 +632,7 @@ export function CukiePoolStatusPanel() {
         args: [identity.collection, identity.tokenId],
       }, position, operation);
       setPhase('syncing');
+      await runtime.refreshAfterTransaction('pool');
       setNotice(operation === 'request_exit'
         ? 'Salida confirmada en BSC. Este Cukie ya no participa en el reparto y seguirá bloqueado mientras actualizamos su estado.'
         : 'Retirada confirmada en BSC. Estamos actualizando el inventario; ya puedes operar con otro Cukie.');

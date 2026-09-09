@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
+import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi';
 
 import { CukieMasterNftVaultPanel } from '@/components/cukie-master/nft-vault-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
@@ -8,11 +9,14 @@ import {
   type NftVaultPendingOperation,
 } from '@/lib/nft-vault/pending-operations';
 import { useAuth } from '@/providers/auth-provider';
+import { usePathname } from 'next/navigation';
 
 jest.mock('@/providers/auth-provider');
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
   usePublicClient: jest.fn(),
+  useSwitchChain: jest.fn(),
   useWriteContract: jest.fn(),
 }));
 jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
@@ -48,7 +52,9 @@ jest.mock('lucide-react', () => ({
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
 const mockUsePublicClient = usePublicClient as jest.MockedFunction<typeof usePublicClient>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
 const mockUseWriteContract = useWriteContract as jest.MockedFunction<typeof useWriteContract>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const wallet = '0x1111111111111111111111111111111111111111';
 const vault = '0x2222222222222222222222222222222222222222';
 const collection = '0x3333333333333333333333333333333333333333';
@@ -115,6 +121,7 @@ function pendingOperation(
 describe('CukieMasterNftVaultPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     localStorage.clear();
     global.fetch = fetchMock;
     mockUseAuth.mockReturnValue({
@@ -125,8 +132,10 @@ describe('CukieMasterNftVaultPanel', () => {
       fetchUser: jest.fn(),
     } as never);
     mockUseAccount.mockReturnValue({ address: wallet, chainId: 97, isConnected: true } as never);
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as never);
     mockUsePublicClient.mockReturnValue({ readContract, getTransactionReceipt, waitForTransactionReceipt } as never);
     mockUseWriteContract.mockReturnValue({ writeContractAsync } as never);
+    mockUsePathname.mockReturnValue('/cukie-master');
     waitForTransactionReceipt.mockResolvedValue({ status: 'success' });
     getTransactionReceipt.mockRejectedValue(new Error('receipt not available yet'));
   });
@@ -315,7 +324,7 @@ describe('CukieMasterNftVaultPanel', () => {
       expect(screen.getByRole('button', { name: /Hacer staking/i })).toBeDisabled();
 
       await act(async () => {
-        jest.advanceTimersByTime(10_000);
+        jest.advanceTimersByTime(30_000);
         await Promise.resolve();
       });
 
@@ -338,10 +347,8 @@ describe('CukieMasterNftVaultPanel', () => {
         .mockResolvedValueOnce(response(status()));
 
       render(<CukieMasterNftVaultPanel />);
-      expect(await screen.findByText(/No hemos podido actualizar tus Cukies/i)).toBeInTheDocument();
-
       await act(async () => {
-        jest.advanceTimersByTime(750);
+        jest.advanceTimersByTime(1);
         await Promise.resolve();
       });
 
@@ -363,7 +370,7 @@ describe('CukieMasterNftVaultPanel', () => {
       expect(await screen.findByText(/Estamos actualizando tus Cukies/i)).toBeInTheDocument();
 
       await act(async () => {
-        jest.advanceTimersByTime(10_000);
+        jest.advanceTimersByTime(30_000);
         await Promise.resolve();
       });
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));

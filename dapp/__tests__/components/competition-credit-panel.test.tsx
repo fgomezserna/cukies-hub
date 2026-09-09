@@ -1,10 +1,18 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 
 import { CompetitionCreditPanel } from '@/components/cukie-master/credit-panel';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { usePathname } from 'next/navigation';
 
 jest.mock('@/providers/auth-provider');
+jest.mock('wagmi', () => ({
+  useAccount: jest.fn(),
+  useSwitchChain: jest.fn(),
+}));
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('lucide-react', () => ({
   ArrowRight: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Lock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
@@ -25,15 +33,22 @@ jest.mock('@phosphor-icons/react', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const fetchMock = jest.fn();
 const wallet = '0x1111111111111111111111111111111111111111';
+
+function setVisibilityState(value: 'visible' | 'hidden') {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value });
+}
 
 function authValue() {
   return {
     user: { walletAddress: wallet } as User,
     isLoading: false,
     isWaitingForApproval: false,
-    walletType: null,
+    walletType: 'evm' as const,
     fetchUser: jest.fn(),
   };
 }
@@ -123,12 +138,18 @@ function statusResponse() {
 describe('CompetitionCreditPanel', () => {
   afterEach(() => {
     jest.useRealTimers();
+    setVisibilityState('visible');
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     mockUseAuth.mockReturnValue(authValue());
+    mockUseAccount.mockReturnValue({ address: wallet, isConnected: true, chainId: 97 } as unknown as ReturnType<typeof useAccount>);
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUsePathname.mockReturnValue('/credits');
     global.fetch = fetchMock;
+    setVisibilityState('visible');
   });
 
   it('renders persisted balances and saves a multiple-of-ten pool configuration', async () => {
@@ -252,7 +273,7 @@ describe('CompetitionCreditPanel', () => {
     await screen.findByRole('heading', { name: 'Historial de créditos' });
     fireEvent.click(screen.getByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' }));
 
-    fireEvent.focus(window);
+    await act(async () => { jest.advanceTimersByTime(30_000); });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('button', { name: 'Guardar 1 cambio' })).toBeEnabled();
     await waitFor(() => expect(screen.getAllByText('99')[0]).toBeInTheDocument());
@@ -265,6 +286,7 @@ describe('CompetitionCreditPanel', () => {
   });
 
   it('conserva la página abierta del historial durante un refresco en foco', async () => {
+    jest.useFakeTimers();
     const initialResponse = statusResponse();
     const initial = await initialResponse.json();
     initial.data.history.hasMore = true;
@@ -290,12 +312,13 @@ describe('CompetitionCreditPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cargar movimientos anteriores' }));
     expect(await screen.findByText('+40')).toBeInTheDocument();
 
-    fireEvent.focus(window);
+    await act(async () => { jest.advanceTimersByTime(30_000); });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(screen.getByText('+40')).toBeInTheDocument();
   });
 
   it('no solapa refrescos de foco mientras la petición anterior sigue abierta', async () => {
+    jest.useFakeTimers();
     let resolveRefresh: ((value: unknown) => void) | undefined;
     fetchMock
       .mockResolvedValueOnce(statusResponse())
@@ -305,15 +328,20 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
     await screen.findByRole('heading', { name: 'Historial de créditos' });
-    fireEvent.focus(window);
-    fireEvent.focus(window);
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    await act(async () => { jest.advanceTimersByTime(30_000); });
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    resolveRefresh?.(statusResponse());
+    await act(async () => {
+      resolveRefresh?.(statusResponse());
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     await waitFor(() => expect(screen.getByText('Tu reparto está guardado.')).toBeInTheDocument());
   });
 
   it('fuerza una lectura posterior al guardado aunque haya un GET de foco en vuelo', async () => {
+    jest.useFakeTimers();
     let resolveRefresh: ((value: unknown) => void) | undefined;
     const savedResponse = statusResponse();
     const saved = await savedResponse.json();
@@ -328,30 +356,42 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
     await screen.findByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' });
-    fireEvent.focus(window);
+    await act(async () => { jest.advanceTimersByTime(30_000); });
     fireEvent.click(screen.getByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar 1 cambio' }));
 
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      resolveRefresh?.(statusResponse());
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
     await waitFor(() => expect(screen.getByText(/Reparto guardado\. Se aplicará/i)).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    resolveRefresh?.(statusResponse());
-    await act(async () => { await Promise.resolve(); });
     expect(screen.queryByRole('button', { name: 'Guardar 1 cambio' })).not.toBeInTheDocument();
   });
 
   it('descarta una respuesta tardía al cambiar de wallet y reinicia operaciones locales', async () => {
     let resolveFirst: ((value: unknown) => void) | undefined;
+    const newWalletResponse = statusResponse();
+    const newWalletBody = await newWalletResponse.json();
+    newWalletBody.data.walletNormalized = '0x2222222222222222222222222222222222222222';
     fetchMock
       .mockImplementationOnce(() => new Promise((resolve) => {
         resolveFirst = resolve;
       }))
-      .mockResolvedValueOnce(statusResponse());
+      .mockResolvedValueOnce({ ok: true, json: async () => newWalletBody });
 
     const view = render(<CompetitionCreditPanel />);
     mockUseAuth.mockReturnValue({
       ...authValue(),
       user: { walletAddress: '0x2222222222222222222222222222222222222222' } as User,
     });
+    mockUseAccount.mockReturnValue({
+      address: '0x2222222222222222222222222222222222222222',
+      isConnected: true,
+      chainId: 97,
+    } as unknown as ReturnType<typeof useAccount>);
     view.rerender(<CompetitionCreditPanel />);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));

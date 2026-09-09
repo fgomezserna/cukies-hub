@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 import { parseUnits } from 'viem';
 import {
   useAccount,
@@ -12,6 +13,8 @@ import { UkiStakingPanel } from '@/components/cukie-master/uki-staking-panel';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/auth-provider';
+import { usePathname } from 'next/navigation';
+import { useAppRuntime, useGuardedOperation } from '@/providers/app-runtime-provider';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
@@ -23,6 +26,12 @@ jest.mock('wagmi', () => ({
 jest.mock('@/hooks/use-has-mounted');
 jest.mock('@/hooks/use-toast');
 jest.mock('@/providers/auth-provider');
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
+jest.mock('@/providers/app-runtime-provider', () => ({
+  ...jest.requireActual('@/providers/app-runtime-provider'),
+  useAppRuntime: jest.fn(),
+  useGuardedOperation: jest.fn(),
+}));
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
   LandingWalletConnectButton: ({ evmOnly, label }: { evmOnly?: boolean; label?: string }) => (
     <button type="button" data-evm-only={String(Boolean(evmOnly))}>
@@ -66,6 +75,9 @@ const mockUseWriteContract = useWriteContract as jest.MockedFunction<typeof useW
 const mockUseHasMounted = useHasMounted as jest.MockedFunction<typeof useHasMounted>;
 const mockUseToast = useToast as jest.MockedFunction<typeof useToast>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
+const mockUseAppRuntime = useAppRuntime as jest.MockedFunction<typeof useAppRuntime>;
+const mockUseGuardedOperation = useGuardedOperation as jest.MockedFunction<typeof useGuardedOperation>;
 
 const walletAddress = '0x3333333333333333333333333333333333333333';
 const tokenAddress = '0x1111111111111111111111111111111111111111';
@@ -74,6 +86,7 @@ const writeContract = jest.fn();
 const switchChain = jest.fn();
 const reset = jest.fn();
 const toast = jest.fn();
+const refreshAfterTransaction = jest.fn().mockResolvedValue(undefined);
 const routePreview = {
   currentRequirementRaw: parseUnits('20000', 18).toString(),
   presaleLockedRaw: parseUnits('40000', 18).toString(),
@@ -126,6 +139,13 @@ describe('UkiStakingPanel', () => {
       walletType: 'evm',
       fetchUser: jest.fn(),
     } as never);
+    mockUsePathname.mockReturnValue('/cukie-master');
+    mockUseAppRuntime.mockReturnValue({
+      address: walletAddress,
+      sessionReady: true,
+      refreshAfterTransaction,
+    } as never);
+    mockUseGuardedOperation.mockReturnValue({ ready: true } as never);
     mockUseReadContract.mockImplementation((config) => {
       switch (config?.functionName) {
         case 'ukiToken':
@@ -331,9 +351,7 @@ describe('UkiStakingPanel', () => {
 
   it('refresca el resumen económico tras un staking confirmado', async () => {
     allowance = parseUnits('50000', 18);
-    const cukieMasterRefresh = jest.fn();
     const tournamentRefresh = jest.fn();
-    window.addEventListener('cukies:cukie-master:refresh', cukieMasterRefresh);
     window.addEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
     const { rerender } = render(<UkiStakingPanel />);
 
@@ -351,13 +369,12 @@ describe('UkiStakingPanel', () => {
     } as never);
     rerender(<UkiStakingPanel />);
 
-    await waitFor(() => expect(cukieMasterRefresh).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(refreshAfterTransaction).toHaveBeenCalledWith('master'));
     expect(tournamentRefresh).toHaveBeenCalledTimes(1);
     expect(toast).toHaveBeenCalledWith({
       title: 'Staking confirmado',
       description: 'Tu staking está confirmado. Estamos actualizando tus cupos Cukie Master.',
     });
-    window.removeEventListener('cukies:cukie-master:refresh', cukieMasterRefresh);
     window.removeEventListener('cukies:treasure-hunt:competition:refresh', tournamentRefresh);
   });
 

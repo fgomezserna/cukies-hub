@@ -1,16 +1,19 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 
 import { DashboardOverviewPanel } from '@/components/wallet/dashboard-overview-panel';
 import type { DashboardSummary } from '@/lib/dashboard/summary';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
 import { useAccount, useSwitchChain } from 'wagmi';
+import { usePathname } from 'next/navigation';
 
 jest.mock('@/providers/auth-provider');
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
   useSwitchChain: jest.fn(),
 }));
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
   LandingWalletConnectButton: () => <button type="button">Conectar wallet</button>,
 }));
@@ -35,6 +38,7 @@ jest.mock('lucide-react', () => {
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
 const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const fetchMock = jest.fn();
 const switchChain = jest.fn();
 const wallet = '0x1111111111111111111111111111111111111111';
@@ -148,10 +152,12 @@ function response(data: DashboardSummary, ok = true) {
 describe('DashboardOverviewPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     global.fetch = fetchMock;
     mockUseAuth.mockReturnValue(authValue());
-    mockUseAccount.mockReturnValue({ chainId: 97, isConnected: true } as ReturnType<typeof useAccount>);
+    mockUseAccount.mockReturnValue({ address: wallet, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
     mockUseSwitchChain.mockReturnValue({ switchChain, isPending: false } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUsePathname.mockReturnValue('/dashboard');
     fetchMock.mockResolvedValue(response(summary()));
     setVisibilityState('visible');
   });
@@ -206,14 +212,14 @@ describe('DashboardOverviewPanel', () => {
     expect(screen.getByText(/Puedes seguir usando el resto de tu cuenta/)).toBeInTheDocument();
   });
 
-  it('detecta la red del navegador y permite cambiar a la configurada', async () => {
-    mockUseAccount.mockReturnValue({ chainId: 56, isConnected: true } as ReturnType<typeof useAccount>);
+  it('muestra la lectura agregada aunque la wallet esté en otra red', async () => {
+    mockUseAccount.mockReturnValue({ address: wallet, chainId: 56, isConnected: true } as unknown as ReturnType<typeof useAccount>);
 
     render(<DashboardOverviewPanel />);
 
-    const button = await screen.findByRole('button', { name: 'Cambiar de red' });
-    fireEvent.click(button);
-    expect(switchChain).toHaveBeenCalledWith({ chainId: 97 });
+    expect(await screen.findByText('tester')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cambiar de red' })).not.toBeInTheDocument();
+    expect(switchChain).not.toHaveBeenCalled();
   });
 
   it('distinguishes a calendar awaiting confirmation from missing financial data', async () => {
@@ -254,6 +260,7 @@ describe('DashboardOverviewPanel', () => {
   });
 
   it('actualiza los datos al recuperar el foco de la pestaña', async () => {
+    jest.useFakeTimers();
     const initial = summary({
       cukieMaster: module({
         allocatedSlots: 5,
@@ -282,7 +289,7 @@ describe('DashboardOverviewPanel', () => {
     const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
     expect(await within(masterCard).findByText('5')).toBeInTheDocument();
 
-    fireEvent(window, new Event('focus'));
+    await act(async () => { jest.advanceTimersByTime(30_000); });
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
@@ -351,6 +358,7 @@ describe('DashboardOverviewPanel', () => {
 
     const view = render(<DashboardOverviewPanel />);
     mockUseAuth.mockReturnValue(authValue({ walletAddress: otherWallet } as User));
+    mockUseAccount.mockReturnValue({ address: otherWallet, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
     view.rerender(<DashboardOverviewPanel />);
 
     const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
@@ -364,6 +372,7 @@ describe('DashboardOverviewPanel', () => {
   });
 
   it('retira la última lectura mientras cambia la sesión y descarta la respuesta antigua', async () => {
+    jest.useFakeTimers();
     let resolveOld!: (value: ReturnType<typeof response>) => void;
     fetchMock
       .mockResolvedValueOnce(response(summary()))
@@ -372,7 +381,7 @@ describe('DashboardOverviewPanel', () => {
     const view = render(<DashboardOverviewPanel />);
     const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
     expect(await within(masterCard).findByText('2')).toBeInTheDocument();
-    fireEvent(window, new Event('focus'));
+    await act(async () => { jest.advanceTimersByTime(30_000); });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
     mockUseAuth.mockReturnValue({ ...authValue(null), isLoading: true });
@@ -408,19 +417,21 @@ describe('DashboardOverviewPanel', () => {
     fetchMock
       .mockResolvedValueOnce(response(summary()))
       .mockRejectedValueOnce(new Error('network'))
+      .mockRejectedValueOnce(new Error('network'))
+      .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce(response(recovered));
 
     render(<DashboardOverviewPanel />);
     const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
     expect(await within(masterCard).findByText('2')).toBeInTheDocument();
 
-    fireEvent(window, new Event('focus'));
+    await act(async () => { jest.advanceTimersByTime(30_005); });
     await waitFor(() => expect(screen.getByText('No hemos podido actualizar tu cuenta')).toBeInTheDocument());
     expect(within(masterCard).getByText('2')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText(/última lectura disponible/i)).toBeInTheDocument();
 
-    fireEvent(window, new Event('focus'));
+    await act(async () => { jest.advanceTimersByTime(30_000); });
     await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
     expect(screen.queryByText('No hemos podido actualizar tu cuenta')).not.toBeInTheDocument();
   });
@@ -436,25 +447,28 @@ describe('DashboardOverviewPanel', () => {
         nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
       },
     }) });
+    const aborted = (_input: string, init: RequestInit) => new Promise((_, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+    });
     fetchMock
-      .mockImplementationOnce((_input: string, init: RequestInit) => new Promise((_, reject) => {
-        init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
-      }))
+      .mockImplementationOnce(aborted)
+      .mockImplementationOnce(aborted)
+      .mockImplementationOnce(aborted)
       .mockResolvedValueOnce(response(recovered));
 
     render(<DashboardOverviewPanel />);
-    await act(async () => {
-      jest.advanceTimersByTime(20_000);
-      await Promise.resolve();
-    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(async () => { await jest.advanceTimersByTimeAsync(20_005); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(20_005); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(20_005); });
     expect(screen.getByRole('alert')).toHaveTextContent('No podemos cargar tu cuenta ahora');
 
     await act(async () => {
-      jest.advanceTimersByTime(10_000);
+      fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
       await Promise.resolve();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const masterCard = screen.getByText('Cukie Master').closest('article') as HTMLElement;
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
     await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
   });
 
@@ -470,24 +484,29 @@ describe('DashboardOverviewPanel', () => {
         nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: true, synchronizing: false },
       },
     }) });
+    const lateResponse = {
+      ok: true,
+      json: () => new Promise((resolve) => { resolveJson = resolve; }),
+    };
     fetchMock
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => new Promise((resolve) => { resolveJson = resolve; }),
-      })
+      .mockResolvedValueOnce(lateResponse)
+      .mockResolvedValueOnce(lateResponse)
+      .mockResolvedValueOnce(lateResponse)
       .mockResolvedValueOnce(response(recovered));
 
     render(<DashboardOverviewPanel />);
-    await act(async () => { await Promise.resolve(); });
-    await act(async () => { jest.advanceTimersByTime(20_000); });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(async () => { await jest.advanceTimersByTimeAsync(20_005); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(20_005); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(20_005); });
     expect(screen.getByRole('alert')).toHaveTextContent('No podemos cargar tu cuenta ahora');
 
     await act(async () => {
-      jest.advanceTimersByTime(10_000);
+      fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
       await Promise.resolve();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const masterCard = screen.getByText('Cukie Master').closest('article') as HTMLElement;
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
     await waitFor(() => expect(within(masterCard).getByText('0')).toBeInTheDocument());
 
     await act(async () => {

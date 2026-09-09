@@ -20,6 +20,7 @@ import {
   type NftVaultPendingContext,
   type NftVaultPendingOperation,
 } from '@/lib/nft-vault/pending-operations';
+import { useAppRuntime, useGuardedOperation } from '@/providers/app-runtime-provider';
 
 type VaultKind = 'cukie_master' | 'cukie_pool';
 type MutationPhase = 'idle' | 'checking' | 'requesting_exit' | 'withdrawing';
@@ -114,8 +115,12 @@ function utcTimestampLabel(timestamp: bigint) {
 
 export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const { address, chainId, isConnected } = useAccount();
+  const runtime = useAppRuntime();
   const publicClient = usePublicClient({ chainId: ukiNftVaults.chainId ?? undefined });
   const { writeContractAsync } = useWriteContract();
+  const operationGuard = useGuardedOperation('recovery-write');
+  const operationGuardRef = useRef(operationGuard);
+  operationGuardRef.current = operationGuard;
   const configuredCollections = ukiNftVaults.recoveryCollectionAddresses;
   const configuredCollectionKey = configuredCollections
     .map((collection) => collection.toLowerCase())
@@ -394,6 +399,11 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   }
 
   async function execute(operation: 'request_exit' | 'withdraw') {
+    const currentGuard = operationGuardRef.current;
+    if (!currentGuard.ready) {
+      if (currentGuard.reason === 'wrong_chain') await currentGuard.switchToTarget();
+      return;
+    }
     if (
       result.kind !== 'position'
       || !publicConfigReady
@@ -477,6 +487,12 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         tokenId: result.position.tokenId,
         txHash: hash,
       });
+      try {
+        await runtime.refreshAfterTransaction(isPool ? 'pool' : 'master');
+      } catch {
+        // La comprobación directa del contrato sigue siendo la fuente de verdad
+        // de recuperación aunque la proyección compartida no esté disponible.
+      }
 
       setNotice(operation === 'request_exit'
         ? 'Salida confirmada en BSC. La fecha retirable se ha vuelto a leer directamente del contrato.'

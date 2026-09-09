@@ -7,6 +7,7 @@ import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
 
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
 import { Panel } from '@/components/landing/primitives';
+import { useAppRuntime, useAppRuntimeResource, useGuardedOperation } from '@/providers/app-runtime-provider';
 import { NftVaultRecoveryPanel } from '@/components/nft-vault/recovery-panel';
 import {
   cukieMasterNftVaultAbi,
@@ -34,9 +35,6 @@ const erc721CustodyAbi = [
   { type: 'function', name: 'approve', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [] },
 ] as const;
 
-const NFT_INDEXER_SYNC_RETRY_MS = 10_000;
-const NFT_INDEXER_SYNC_RETRY_WINDOW_MS = 180_000;
-const INITIAL_LOAD_RETRY_DELAYS_MS = [750, 2_000, 5_000] as const;
 
 type PublicNft = {
   assetId: string;
@@ -125,23 +123,15 @@ function pendingLabel(operation: NftVaultPendingOperation) {
   } as const)[operation.action];
 }
 
-async function requestStatus(walletAddress: string, signal?: AbortSignal) {
-  const response = await fetch(
-    `/api/economy/v1/cukie-master?walletAddress=${encodeURIComponent(walletAddress)}`,
-    { cache: 'no-store', credentials: 'same-origin', signal },
-  );
-  const body = await response.json() as { data?: PublicStatus };
-  if (!response.ok || !body.data) throw new Error('CUKIE_MASTER_UNAVAILABLE');
-  return body.data;
-}
-
 export function CukieMasterNftVaultPanel() {
   const { user, isLoading: authLoading, walletType } = useAuth();
+  const runtime = useAppRuntime();
   const { address, chainId, isConnected } = useAccount();
   const publicClient = usePublicClient({ chainId: ukiNftVaults.chainId ?? undefined });
   const { writeContractAsync } = useWriteContract();
-  const [status, setStatus] = useState<PublicStatus | null>(null);
-  const [loading, setLoading] = useState(false);
+  const operationGuard = useGuardedOperation('nft-write');
+  const operationGuardRef = useRef(operationGuard);
+  operationGuardRef.current = operationGuard;
   const [phase, setPhase] = useState<Phase>('idle');
   const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -151,55 +141,16 @@ export function CukieMasterNftVaultPanel() {
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const operationLocksRef = useRef(new Set<string>());
-  const refreshRequestIdRef = useRef(0);
-
-  const refresh = useCallback(async (signal?: AbortSignal, background = false) => {
-    const requestId = refreshRequestIdRef.current + 1;
-    refreshRequestIdRef.current = requestId;
-    if (!user?.walletAddress) {
-      setStatus(null);
-      return null;
-    }
-    if (!background) setLoading(true);
-    try {
-      const nextStatus = await requestStatus(user.walletAddress, signal);
-      if (refreshRequestIdRef.current !== requestId) return null;
-      setStatus(nextStatus);
-      return nextStatus;
-    } catch (reason) {
-      if (
-        refreshRequestIdRef.current === requestId
-        && !(reason instanceof DOMException && reason.name === 'AbortError')
-        && !background
-      ) setStatus(null);
-      throw reason;
-    } finally {
-      if (refreshRequestIdRef.current === requestId && !background) setLoading(false);
-    }
-  }, [user?.walletAddress]);
-
-  useEffect(() => {
-    if (authLoading || !user?.walletAddress) return;
-    const controller = new AbortController();
-    let retryTimer: number | null = null;
-    let retryIndex = 0;
-    const load = async () => {
-      try {
-        await refresh(controller.signal);
-      } catch (reason) {
-        if (reason instanceof DOMException && reason.name === 'AbortError') return;
-        const retryDelay = INITIAL_LOAD_RETRY_DELAYS_MS[retryIndex];
-        if (retryDelay === undefined) return;
-        retryIndex += 1;
-        retryTimer = window.setTimeout(() => void load(), retryDelay);
-      }
-    };
-    void load();
-    return () => {
-      controller.abort();
-      if (retryTimer !== null) window.clearTimeout(retryTimer);
-    };
-  }, [authLoading, refresh, user?.walletAddress]);
+  const statusResource = useAppRuntimeResource<PublicStatus>('master-nft', {
+    enabled: Boolean(user?.walletAddress) && !authLoading,
+  });
+  const status = statusResource.data ?? null;
+  const loading = statusResource.state === 'loading';
+  const refreshStatus = statusResource.refresh;
+  const refresh = useCallback(async (_signal?: AbortSignal, _background = false) => {
+    const result = await refreshStatus();
+    return result.data ?? null;
+  }, [refreshStatus]);
 
   const assets = useMemo(
     () => (status?.nftInventory ?? []).filter(isVisibleCukieMasterAsset),
@@ -254,40 +205,8 @@ export function CukieMasterNftVaultPanel() {
   const depositsReady = Boolean(identityReady && serverConfig?.indexer.status === 'ready');
 
   useEffect(() => {
-    if (serverConfig?.indexer.status !== 'syncing') {
-      setIndexerSyncRetryExhausted(false);
-      return;
-    }
-    let disposed = false;
-    let running = false;
-    const controller = new AbortController();
     setIndexerSyncRetryExhausted(false);
-
-    const retry = async () => {
-      if (disposed || running) return;
-      running = true;
-      try {
-        await refresh(controller.signal, true);
-      } catch {
-        // Conservamos el último estado seguro y volvemos a intentarlo dentro de la ventana.
-      } finally {
-        running = false;
-      }
-    };
-
-    const interval = window.setInterval(() => void retry(), NFT_INDEXER_SYNC_RETRY_MS);
-    const timeout = window.setTimeout(() => {
-      if (!disposed) setIndexerSyncRetryExhausted(true);
-      window.clearInterval(interval);
-      controller.abort();
-    }, NFT_INDEXER_SYNC_RETRY_WINDOW_MS);
-    return () => {
-      disposed = true;
-      controller.abort();
-      window.clearInterval(interval);
-      window.clearTimeout(timeout);
-    };
-  }, [refresh, serverConfig?.indexer.status, user?.walletAddress]);
+  }, [serverConfig?.indexer.status]);
 
   useEffect(() => {
     operationLocksRef.current.clear();
@@ -429,6 +348,11 @@ export function CukieMasterNftVaultPanel() {
     asset: PublicNft,
     action: NftVaultPendingAction,
   ) {
+    const currentGuard = operationGuardRef.current;
+    if (!currentGuard.ready) {
+      if (currentGuard.reason === 'wrong_chain') await currentGuard.switchToTarget();
+      throw new Error(`NFT_OPERATION_${currentGuard.reason.toUpperCase()}`);
+    }
     if (!publicClient) throw new Error('PUBLIC_CLIENT_UNAVAILABLE');
     const hash = await writeContractAsync(input);
     setLatestTxHash(hash);
@@ -519,22 +443,8 @@ export function CukieMasterNftVaultPanel() {
       }
       setPhase('syncing');
       setNotice('Operación confirmada. Actualizando el estado de tu Cukie…');
-      const nextStatus = await refresh(undefined, true);
-      window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
-      const persisted = loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
-        .find((item) => item.assetId === asset.assetId);
-      const projected = Boolean(
-        persisted
-        && nextStatus
-        && projectionMatchesPendingOperation(
-          persisted,
-          nextStatus.nftInventory.find((candidate) => candidate.assetId === asset.assetId),
-        )
-      );
-      if (projected) clearPending(asset.assetId);
-      setNotice(projected
-        ? 'Operación confirmada y reflejada en el inventario.'
-        : 'Transacción confirmada. Estamos actualizando el inventario; no repitas la operación.');
+      await runtime.refreshAfterTransaction('master-nft');
+      setNotice('Transacción confirmada. Estamos actualizando el inventario; no repitas la operación.');
     } catch {
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)

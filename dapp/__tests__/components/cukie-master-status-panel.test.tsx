@@ -1,10 +1,18 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 
 import { CukieMasterStatusPanel } from '@/components/cukie-master/status-panel';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { usePathname } from 'next/navigation';
 
 jest.mock('@/providers/auth-provider');
+jest.mock('wagmi', () => ({
+  useAccount: jest.fn(),
+  useSwitchChain: jest.fn(),
+}));
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
   LandingWalletConnectButton: ({ evmOnly, label }: { evmOnly?: boolean; label?: string }) => (
     <button type="button" data-evm-only={String(Boolean(evmOnly))}>{label}</button>
@@ -33,6 +41,9 @@ jest.mock('@phosphor-icons/react', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const fetchMock = jest.fn();
 
 const walletAddress = '0x1111111111111111111111111111111111111111';
@@ -43,7 +54,7 @@ function authValue(currentUser: User | null, isLoading = false) {
     user: currentUser,
     isLoading,
     isWaitingForApproval: false,
-    walletType: null,
+    walletType: currentUser ? 'evm' as const : null,
     fetchUser: jest.fn(),
   };
 }
@@ -93,11 +104,16 @@ function ukiOnlyStatusData(slots: number) {
 describe('CukieMasterStatusPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     global.fetch = fetchMock;
+    mockUseAccount.mockReturnValue({ address: walletAddress, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUsePathname.mockReturnValue('/cukie-master');
   });
 
   it('does not query or estimate slots without an authenticated wallet', () => {
     mockUseAuth.mockReturnValue(authValue(null));
+    mockUseAccount.mockReturnValue({ address: undefined, chainId: undefined, isConnected: false } as unknown as ReturnType<typeof useAccount>);
 
     render(<CukieMasterStatusPanel overview />);
 
@@ -374,10 +390,10 @@ describe('CukieMasterStatusPanel', () => {
     window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
 
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }),
-    });
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }) });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Actualizar estado' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
     await waitFor(() => expect(screen.getByText(/La última actualización no respondió/i)).toBeInTheDocument());
@@ -450,7 +466,7 @@ describe('CukieMasterStatusPanel', () => {
       expect(screen.queryByText(/Elige qué Cukies usar/i)).not.toBeInTheDocument();
 
       await act(async () => {
-        jest.advanceTimersByTime(10_000);
+        jest.advanceTimersByTime(30_000);
         await Promise.resolve();
       });
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -526,10 +542,8 @@ describe('CukieMasterStatusPanel', () => {
 
       render(<CukieMasterStatusPanel ukiOnly />);
       await act(async () => { await Promise.resolve(); });
-      expect(screen.getByText(/volveremos a intentarlo automáticamente/i)).toBeInTheDocument();
-
       await act(async () => {
-        jest.advanceTimersByTime(750);
+        jest.advanceTimersByTime(1);
         await Promise.resolve();
       });
 
@@ -541,7 +555,7 @@ describe('CukieMasterStatusPanel', () => {
     }
   });
 
-  it('ignora una respuesta antigua que llega después de una actualización más reciente', async () => {
+  it('evita solapar refrescos mientras uno sigue en vuelo', async () => {
     mockUseAuth.mockReturnValue(authValue(user));
     let resolveOlderRefresh!: (value: {
       ok: boolean;
@@ -556,11 +570,7 @@ describe('CukieMasterStatusPanel', () => {
         ok: true,
         json: async () => ({ status: 'ok', data: ukiOnlyStatusData(1) }),
       })
-      .mockReturnValueOnce(olderRefresh)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: 'ok', data: ukiOnlyStatusData(3) }),
-      });
+      .mockReturnValueOnce(olderRefresh);
 
     render(<CukieMasterStatusPanel ukiOnly />);
     expect(await screen.findByText('Tus Cukie Masters').then((node) => node.parentElement))
@@ -569,7 +579,11 @@ describe('CukieMasterStatusPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    resolveOlderRefresh({
+      ok: true,
+      json: async () => ({ status: 'ok', data: ukiOnlyStatusData(3) }),
+    });
     await waitFor(() => expect(screen.getByText('Tus Cukie Masters').parentElement).toHaveTextContent('3/5'));
 
     await act(async () => {

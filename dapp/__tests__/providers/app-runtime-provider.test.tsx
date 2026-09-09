@@ -1,0 +1,251 @@
+import React from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { usePathname } from 'next/navigation';
+import {
+  appRuntimeEndpoint,
+  appRuntimeQueryKey,
+  AppRuntimeProvider,
+  useAppRuntime,
+  useAppRuntimeResource,
+  useGuardedOperation,
+} from '@/providers/app-runtime-provider';
+import { useAuth } from '@/providers/auth-provider';
+
+jest.mock('wagmi');
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
+jest.mock('@/providers/auth-provider', () => ({ useAuth: jest.fn() }));
+jest.mock('@/lib/contracts/uki-nft-vaults', () => ({ ukiNftVaults: { chainId: 97 } }));
+
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockFetch = global.fetch as jest.MockedFunction<typeof global.fetch>;
+
+const user = { walletAddress: '0xaaa', username: 'alice' } as never;
+const runtimeStatus = {
+  status: 'ok',
+  data: {
+    checkedAt: '2026-09-09T00:00:00.000Z',
+    services: {
+      indexer: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+      master: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+      credits: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+    },
+  },
+};
+
+function response(body: unknown, ok = true) {
+  return { ok, status: ok ? 200 : 503, json: async () => body } as Response;
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  const client = React.useMemo(() => new QueryClient({ defaultOptions: { queries: { retryDelay: 1 } } }), []);
+  return <QueryClientProvider client={client}><AppRuntimeProvider>{children}</AppRuntimeProvider></QueryClientProvider>;
+}
+
+function ResourceProbe({ resource = 'master' as const }: { resource?: 'master' | 'master-nft' }) {
+  const query = useAppRuntimeResource<{ value: string }>(resource);
+  return <span data-testid="resource">{query.data?.value ?? query.state}</span>;
+}
+
+function DualResourceProbe() {
+  return <><ResourceProbe resource="master" /><ResourceProbe resource="master-nft" /></>;
+}
+
+function RefreshProbe() {
+  const query = useAppRuntimeResource<{ value: string }>('master');
+  return <><span data-testid="resource">{query.data?.value ?? 'empty'}</span><span data-testid="state">{query.state}</span><button onClick={() => void query.refresh()}>refresh</button></>;
+}
+
+function RuntimeRefreshProbe() {
+  const runtime = useAppRuntime();
+  const master = useAppRuntimeResource<{ value: string }>('master');
+  const pool = useAppRuntimeResource<{ value: string }>('pool');
+  return <><span data-testid="master-resource">{master.data?.value ?? master.state}</span><span data-testid="pool-resource">{pool.data?.value ?? pool.state}</span><button onClick={() => { void runtime.refreshAfterTransaction('pool'); void runtime.refreshAfterTransaction('master'); }}>refresh dependencies</button></>;
+}
+
+function TransactionRefreshProbe() {
+  const runtime = useAppRuntime();
+  const query = useAppRuntimeResource<{ value: string }>('master');
+  const [completed, setCompleted] = React.useState(false);
+  return <><span data-testid="transaction-resource">{query.data?.value ?? query.state}</span><span data-testid="transaction-refresh">{completed ? 'done' : 'idle'}</span><button onClick={async () => { await runtime.refreshAfterTransaction('master'); setCompleted(true); }}>refresh after transaction</button></>;
+}
+
+function ResourceKeyProbe() {
+  const query = useAppRuntimeResource<{ value: string }>('credits');
+  return <span data-testid="resource-key">{String(query.queryKey[3])}</span>;
+}
+
+function ManualRefreshProbe() {
+  const query = useAppRuntimeResource<{ value: string }>('credits', { enabled: false });
+  const [result, setResult] = React.useState('idle');
+  return <><span data-testid="manual-result">{result}</span><button onClick={async () => { const refreshed = await query.refresh(); setResult(refreshed.data?.value ?? 'missing'); }}>manual refresh</button></>;
+}
+
+function SwitchProbe({ onSign }: { onSign: () => void }) {
+  const operation = useGuardedOperation('nft-write');
+  const [result, setResult] = React.useState('idle');
+  return <><span data-testid="readiness">{operation.reason}</span><button onClick={async () => { if (!operation.ready) { setResult(String(await operation.switchToTarget())); return; } onSign(); }}>execute</button><span data-testid="switch-result">{result}</span></>;
+}
+
+function configureWallet(address: string | undefined = '0xaaa', pathname = '/dashboard', chainId = 97) {
+  mockUseAuth.mockReturnValue({ user: address ? user : null, walletType: address ? 'evm' : null, isLoading: false } as never);
+  mockUseAccount.mockReturnValue({ address, isConnected: Boolean(address), chainId } as never);
+  mockUsePathname.mockReturnValue(pathname);
+  mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as never);
+}
+
+describe('AppRuntimeProvider shared resource contract', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    configureWallet();
+  });
+
+  it('deduplicates master and master-nft through one canonical key', () => {
+    expect(appRuntimeQueryKey('master', '0xABC', null)).toEqual(appRuntimeQueryKey('master-nft', '0xabc', null));
+  });
+
+  it('isolates each wallet and target chain in the cache key', () => {
+    expect(appRuntimeQueryKey('credits', '0xabc', null)).not.toEqual(appRuntimeQueryKey('credits', '0xdef', null));
+    expect(appRuntimeQueryKey('credits', '0xabc', 56)).not.toEqual(appRuntimeQueryKey('credits', '0xabc', 97));
+  });
+
+  it('keeps wallet query parameters explicit and leaves dashboard aggregated', () => {
+    expect(appRuntimeEndpoint('master', '0xABC')).toContain('walletAddress=0xABC');
+    expect(appRuntimeEndpoint('credits', null)).toBe('/api/economy/v1/credits');
+    expect(appRuntimeEndpoint('dashboard', '0xABC')).toBe('/api/dashboard/v1/summary');
+  });
+
+  it('does not fetch private runtime status on the public landing with a persisted session', () => {
+    configureWallet('0xaaa', '/');
+    mockFetch.mockResolvedValue(response(runtimeStatus));
+    render(<Shell><ResourceProbe /></Shell>);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('allows an explicit refresh for a manually enabled history variant', async () => {
+    mockFetch.mockImplementation(async (input) => String(input).includes('runtime-status') ? response(runtimeStatus) : response({ status: 'ok', data: { value: 'manual' } }));
+    render(<Shell><ManualRefreshProbe /></Shell>);
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('/api/economy/v1/credits'))).toHaveLength(0);
+    fireEvent.click(screen.getByText('manual refresh'));
+    await waitFor(() => expect(screen.getByTestId('manual-result')).toHaveTextContent('manual'));
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('/api/economy/v1/credits'))).toHaveLength(1);
+  });
+
+  it('keeps the source chain in resource keys when the wallet changes network', async () => {
+    mockFetch.mockImplementation(async (input) => String(input).includes('runtime-status') ? response(runtimeStatus) : response({ status: 'ok', data: { value: 'credits' } }));
+    const view = render(<Shell><ResourceKeyProbe /></Shell>);
+    const sourceChain = await screen.findByTestId('resource-key');
+    const initialKey = sourceChain.textContent;
+    configureWallet('0xaaa', '/dashboard', 56);
+    view.rerender(<Shell><ResourceKeyProbe /></Shell>);
+    expect(screen.getByTestId('resource-key')).toHaveTextContent(initialKey ?? '');
+  });
+
+  it('shares one GET between two mounted consumers', async () => {
+    mockFetch.mockImplementation(async (input) => String(input).includes('runtime-status') ? response(runtimeStatus) : response({ status: 'ok', data: { value: 'shared' } }));
+    render(<Shell><DualResourceProbe /></Shell>);
+    await waitFor(() => expect(screen.getAllByTestId('resource')[0]).toHaveTextContent('shared'));
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-master'))).toHaveLength(1);
+  });
+
+  it('does not publish a late A response after wagmi moves to B while auth remains A', async () => {
+    let resolveA: ((value: Response) => void) | undefined;
+    mockFetch.mockImplementation((input, init) => {
+      if (String(input).includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      return new Promise((resolve, reject) => {
+        resolveA = resolve;
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+      });
+    });
+    const view = render(<Shell><ResourceProbe /></Shell>);
+    await waitFor(() => expect(mockFetch.mock.calls.some(([input]) => String(input).includes('cukie-master'))).toBe(true));
+    mockUseAccount.mockReturnValue({ address: '0xbbb', isConnected: true, chainId: 97 } as never);
+    view.rerender(<Shell><ResourceProbe /></Shell>);
+    await act(async () => resolveA?.(response({ status: 'ok', data: { value: 'stale-A' } })));
+    expect(screen.getByTestId('resource')).not.toHaveTextContent('stale-A');
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-master'))).toHaveLength(1);
+  });
+
+  it('cancels private polling when leaving the runtime route after logout', async () => {
+    let runtimeSignal: AbortSignal | undefined;
+    mockFetch.mockImplementation((input, init) => {
+      if (!String(input).includes('runtime-status')) return Promise.resolve(response({ status: 'ok', data: { value: 'private' } }));
+      runtimeSignal = init?.signal ?? undefined;
+      return new Promise((resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+    });
+    const view = render(<Shell><ResourceProbe /></Shell>);
+    await waitFor(() => expect(runtimeSignal).toBeDefined());
+    configureWallet(undefined, '/');
+    view.rerender(<Shell><ResourceProbe /></Shell>);
+    await waitFor(() => expect(runtimeSignal?.aborted).toBe(true));
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('runtime-status'))).toHaveLength(1);
+  });
+
+  it('keeps confirmed data marked stale when a refresh fails', async () => {
+    let masterCalls = 0;
+    mockFetch.mockImplementation(async (input) => {
+      if (String(input).includes('runtime-status')) return response(runtimeStatus);
+      masterCalls += 1;
+      return masterCalls === 1 ? response({ status: 'ok', data: { value: 'confirmed' } }) : response({}, false);
+    });
+    render(<Shell><RefreshProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('resource')).toHaveTextContent('confirmed'));
+    fireEvent.click(screen.getByText('refresh'));
+    await waitFor(() => expect(screen.getByTestId('resource')).toHaveTextContent('confirmed'), { timeout: 5_000 });
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('stale'), { timeout: 5_000 });
+  });
+
+  it('deduplicates concurrent dependency refreshes without dropping pool', async () => {
+    mockFetch.mockImplementation(async (input) => {
+      if (String(input).includes('runtime-status')) return response(runtimeStatus);
+      if (String(input).includes('cukie-pool')) return response({ status: 'ok', data: { value: 'pool' } });
+      return response({ status: 'ok', data: { value: 'master' } });
+    });
+    render(<Shell><RuntimeRefreshProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('pool-resource')).toHaveTextContent('pool'));
+    mockFetch.mockClear();
+    fireEvent.click(screen.getByText('refresh dependencies'));
+    await waitFor(() => expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-pool'))).toHaveLength(1));
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('runtime-status'))).toHaveLength(1);
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-master'))).toHaveLength(1);
+  });
+
+  it('waits for a pre-transaction GET before issuing the post-transaction read', async () => {
+    let resolveOld: ((value: Response) => void) | undefined;
+    let masterCalls = 0;
+    mockFetch.mockImplementation((input) => {
+      if (String(input).includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      masterCalls += 1;
+      if (masterCalls === 1) {
+        return new Promise((resolve) => { resolveOld = resolve; });
+      }
+      return Promise.resolve(response({ status: 'ok', data: { value: 'saved' } }));
+    });
+    render(<Shell><TransactionRefreshProbe /></Shell>);
+    await waitFor(() => expect(masterCalls).toBe(1));
+    fireEvent.click(screen.getByText('refresh after transaction'));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(masterCalls).toBe(1);
+    await act(async () => resolveOld?.(response({ status: 'ok', data: { value: 'old' } })));
+    await waitFor(() => expect(screen.getByTestId('transaction-resource')).toHaveTextContent('saved'));
+    expect(screen.getByTestId('transaction-refresh')).toHaveTextContent('done');
+    expect(masterCalls).toBe(2);
+  });
+
+  it('reports a rejected contextual switch and never signs the transaction', async () => {
+    configureWallet('0xaaa', '/cukie-master', 56);
+    const switchChainAsync = jest.fn().mockRejectedValue(new Error('user rejected'));
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync } as never);
+    const onSign = jest.fn();
+    render(<Shell><SwitchProbe onSign={onSign} /></Shell>);
+    expect(screen.getByTestId('readiness')).toHaveTextContent('wrong_chain');
+    fireEvent.click(screen.getByText('execute'));
+    await waitFor(() => expect(screen.getByTestId('switch-result')).toHaveTextContent('false'));
+    expect(switchChainAsync).toHaveBeenCalledWith({ chainId: 97 });
+    expect(onSign).not.toHaveBeenCalled();
+  });
+});

@@ -32,6 +32,7 @@ import {
   ukiStakingAbi,
 } from '@/lib/contracts/uki-sale';
 import { useAuth } from '@/providers/auth-provider';
+import { useAppRuntime, useGuardedOperation } from '@/providers/app-runtime-provider';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '20000';
@@ -85,6 +86,9 @@ export function UkiStakingPanel({
   routePreview?: UkiRoutePreview | null;
 }) {
   const { address, chainId, isConnected } = useAccount();
+  const runtime = useAppRuntime();
+  const refreshAfterTransaction = runtime.refreshAfterTransaction;
+  const operationGuard = useGuardedOperation('uki-write');
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { writeContract, data: txHash, error, isPending, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -211,6 +215,7 @@ export function UkiStakingPanel({
   const canTransact = Boolean(
     hasMounted &&
     isConnected &&
+    operationGuard.ready &&
     !isWrongChain &&
     !isUnsafeStagingChain &&
     !authLoading &&
@@ -306,7 +311,7 @@ export function UkiStakingPanel({
       setAmount(DEFAULT_AMOUNT);
       setApprovedAmount(null);
       setLastCompletedAction('stake');
-      window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+      void refreshAfterTransaction('master');
       window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Staking confirmado',
@@ -315,7 +320,7 @@ export function UkiStakingPanel({
     } else if (lastAction === 'unstake') {
       setAmount(DEFAULT_AMOUNT);
       setLastCompletedAction('unstake');
-      window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+      void refreshAfterTransaction('master');
       window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Retirada confirmada',
@@ -333,6 +338,7 @@ export function UkiStakingPanel({
     refetchPaused,
     refetchStakedBalance,
     refetchStakingToken,
+    refreshAfterTransaction,
     stakingAddress,
     toast,
     txHash,
@@ -403,7 +409,20 @@ export function UkiStakingPanel({
   }
 
   function handleSubmit() {
-    if (!tokenAddress || !stakingAddress || !parsedAmount || !canTransact) return;
+    if (
+      !tokenAddress
+      || !stakingAddress
+      || !parsedAmount
+      || !canTransact
+      || !operationGuard.ready
+      || !runtime.sessionReady
+      || !runtime.address
+      || !user?.walletAddress
+      || !sameAddress(runtime.address, user.walletAddress)
+      || !address
+      || !sameAddress(address, user.walletAddress)
+      || chainId !== UKI_PRESALE_CHAIN_ID
+    ) return;
     reset();
     handledReceiptHashRef.current = null;
     setLastCompletedAction(null);

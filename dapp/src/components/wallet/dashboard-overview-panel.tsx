@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -18,7 +18,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { formatUnits } from 'viem';
-import { useAccount, useSwitchChain } from 'wagmi';
 
 import { Panel } from '@/components/landing/primitives';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
@@ -29,15 +28,13 @@ import type {
   DashboardSummary,
 } from '@/lib/dashboard/summary';
 import { useAuth } from '@/providers/auth-provider';
+import { useAppRuntime, useAppRuntimeResource } from '@/providers/app-runtime-provider';
 
 type RequestState =
   | { state: 'idle'; summary: null }
   | { state: 'loading'; summary: DashboardSummary | null }
   | { state: 'ready'; summary: DashboardSummary }
   | { state: 'unavailable'; summary: DashboardSummary | null };
-
-const DASHBOARD_REFRESH_INTERVAL_MS = 30_000;
-const DASHBOARD_REQUEST_TIMEOUT_MS = 20_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -122,7 +119,7 @@ const MODULE_DATA_VALIDATORS: Record<DashboardModuleId, (value: unknown) => bool
     && isNullableNonNegativeInteger(value.totalTickets),
 };
 
-function isDashboardSummary(value: unknown): value is DashboardSummary {
+function isDashboardSummary(value: unknown, expectedWallet?: string | null): value is DashboardSummary {
   if (
     !isRecord(value)
     || value.schemaVersion !== 'dashboard-v1'
@@ -130,6 +127,9 @@ function isDashboardSummary(value: unknown): value is DashboardSummary {
     || (value.overallState !== 'ready' && value.overallState !== 'partial')
     || !isRecord(value.identity)
     || typeof value.identity.walletNormalized !== 'string'
+    || (expectedWallet !== undefined
+      && expectedWallet !== null
+      && value.identity.walletNormalized.toLowerCase() !== expectedWallet.toLowerCase())
     || (value.identity.username !== null && typeof value.identity.username !== 'string')
     || !isTimestamp(value.identity.sessionExpiresAt)
     || !isRecord(value.network)
@@ -212,124 +212,19 @@ const MODULE_LABELS: Record<DashboardModuleId, string> = {
 
 export function DashboardOverviewPanel() {
   const { user, walletType, isLoading: authLoading } = useAuth();
-  const { chainId, isConnected } = useAccount();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
-  const [request, setRequest] = useState<RequestState>({ state: 'idle', summary: null });
-  const [reloadNonce, setReloadNonce] = useState(0);
+  const runtime = useAppRuntime();
   const hasSignedEvmSession = Boolean(user && walletType === 'evm');
-  const walletNeedsSignature = Boolean(isConnected && !hasSignedEvmSession);
-  const sessionKey = hasSignedEvmSession && user?.walletAddress
-    ? `${walletType}:${user.walletAddress.toLowerCase()}`
-    : null;
-  const requestSummaryRef = useRef<DashboardSummary | null>(null);
-  requestSummaryRef.current = request.summary;
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!sessionKey || !user?.walletAddress) {
-      setRequest({ state: 'idle', summary: null });
-      return;
-    }
-    let disposed = false;
-    let requestInFlight = false;
-    let activeController: AbortController | null = null;
-    let activeTimeout: number | null = null;
-    let requestGeneration = 0;
-    let interval: number | null = null;
-    const walletNormalized = user.walletAddress.toLowerCase();
-    const retainedSummary = requestSummaryRef.current?.identity.walletNormalized.toLowerCase() === walletNormalized
-      ? requestSummaryRef.current
-      : null;
-
-    setRequest({ state: 'loading', summary: retainedSummary });
-
-    const refresh = async (initial = false) => {
-      if (disposed || requestInFlight || (!initial && document.visibilityState !== 'visible')) return;
-      requestInFlight = true;
-      const requestId = requestGeneration + 1;
-      requestGeneration = requestId;
-      const controller = new AbortController();
-      let timedOut = false;
-      const timeout = window.setTimeout(() => {
-        timedOut = true;
-        if (requestGeneration === requestId) {
-          requestInFlight = false;
-          activeController = null;
-          activeTimeout = null;
-          setRequest((current) => ({ state: 'unavailable', summary: current.summary }));
-        }
-        controller.abort();
-      }, DASHBOARD_REQUEST_TIMEOUT_MS);
-      activeController = controller;
-      activeTimeout = timeout;
-      setRequest((current) => ({ state: 'loading', summary: current.summary }));
-      try {
-        const response = await fetch('/api/dashboard/v1/summary', {
-          cache: 'no-store',
-          credentials: 'same-origin',
-          signal: controller.signal,
-        });
-        const body: unknown = await response.json();
-        if (
-          !response.ok
-          || !isRecord(body)
-          || body.status !== 'ok'
-          || !isDashboardSummary(body.data)
-        ) throw new Error('DASHBOARD_RESPONSE_INVALID');
-        if (disposed || timedOut || requestGeneration !== requestId) return;
-        if (body.data.identity.walletNormalized.toLowerCase() !== walletNormalized) {
-          throw new Error('DASHBOARD_RESPONSE_IDENTITY_MISMATCH');
-        }
-        setRequest({ state: 'ready', summary: body.data });
-      } catch (error: unknown) {
-        if (disposed || requestGeneration !== requestId || timedOut || (error instanceof DOMException && error.name === 'AbortError')) return;
-        setRequest((current) => ({ state: 'unavailable', summary: current.summary }));
-      } finally {
-        window.clearTimeout(timeout);
-        if (requestGeneration === requestId) {
-          activeTimeout = null;
-          requestInFlight = false;
-          activeController = null;
-        }
-      }
-    };
-    const stopPolling = () => {
-      if (interval !== null) {
-        window.clearInterval(interval);
-        interval = null;
-      }
-    };
-    const startPolling = () => {
-      stopPolling();
-      if (!disposed && document.visibilityState === 'visible') {
-        interval = window.setInterval(() => void refresh(), DASHBOARD_REFRESH_INTERVAL_MS);
-      }
-    };
-    const handleFocus = () => {
-      if (document.visibilityState === 'visible') void refresh();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void refresh();
-        startPolling();
-      } else {
-        stopPolling();
-      }
-    };
-
-    void refresh(true);
-    startPolling();
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      disposed = true;
-      stopPolling();
-      if (activeTimeout !== null) window.clearTimeout(activeTimeout);
-      activeController?.abort();
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [authLoading, reloadNonce, sessionKey, user?.walletAddress]);
+  const walletNeedsSignature = Boolean(runtime.connected && !hasSignedEvmSession);
+  const dashboardResource = useAppRuntimeResource<DashboardSummary>('dashboard', {
+    enabled: hasSignedEvmSession,
+    validate: (value) => isDashboardSummary(value, user?.walletAddress),
+  });
+  const request = useMemo<RequestState>(() => {
+    if (dashboardResource.state === 'ready') return { state: 'ready', summary: dashboardResource.data! };
+    if (dashboardResource.state === 'loading') return { state: 'loading', summary: dashboardResource.data ?? null };
+    if (dashboardResource.state === 'stale' || dashboardResource.state === 'unavailable') return { state: 'unavailable', summary: dashboardResource.data ?? null };
+    return { state: 'idle', summary: null };
+  }, [dashboardResource.data, dashboardResource.state]);
 
   const currentWalletNormalized = user?.walletAddress?.toLowerCase();
   const summary = request.summary
@@ -341,7 +236,6 @@ export function DashboardOverviewPanel() {
     : null;
   const unavailableModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_UNAVAILABLE') ?? [];
   const reviewModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_DEGRADED') ?? [];
-  const wrongChain = Boolean(summary && isConnected && chainId !== summary.network.chainId);
   const master = summary ? moduleData(summary.modules.cukieMaster) : null;
   const masterDataReady = Boolean(
     master
@@ -372,7 +266,7 @@ export function DashboardOverviewPanel() {
           {hasSignedEvmSession ? (
             <button
               type="button"
-              onClick={() => setReloadNonce((current) => current + 1)}
+              onClick={() => void dashboardResource.refresh()}
               disabled={request.state === 'loading'}
               className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] disabled:opacity-50"
             >
@@ -432,9 +326,7 @@ export function DashboardOverviewPanel() {
                 <span className="ml-2 font-semibold text-[var(--uki-muted)]">{shortWallet(summary.identity.walletNormalized)}</span>
               </p>
               <div className="flex flex-col gap-1 sm:items-end">
-                <p className={wrongChain ? 'text-xs font-black text-amber-200' : 'text-xs font-semibold text-[var(--uki-muted)]'}>
-                  {wrongChain ? 'Cambia de red para continuar' : 'BNB Smart Chain'}
-                </p>
+                <p className="text-xs font-semibold text-[var(--uki-muted)]">BNB Smart Chain</p>
                 <time
                   dateTime={summary.generatedAt}
                   className="text-[11px] font-semibold text-[var(--uki-muted)]"
@@ -443,23 +335,6 @@ export function DashboardOverviewPanel() {
                 </time>
               </div>
             </div>
-
-            {wrongChain ? (
-              <div role="alert" className="mt-4 flex flex-col gap-3 rounded-[8px] border border-amber-300/30 bg-amber-400/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-black text-amber-200">Cambia a la red correcta</p>
-                  <p className="mt-1 text-xs font-semibold text-amber-100/80">La cambiaremos desde tu wallet para que puedas continuar.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => switchChain({ chainId: summary.network.chainId })}
-                  disabled={isSwitchingChain}
-                  className="text-xs font-black uppercase tracking-[0.08em] text-amber-100 disabled:opacity-50"
-                >
-                  {isSwitchingChain ? 'Cambiando…' : 'Cambiar de red'}
-                </button>
-              </div>
-            ) : null}
 
             {unavailableModules.length > 0 ? (
               <div role="status" className="mt-4 rounded-[8px] border border-amber-300/25 bg-amber-400/10 p-4">
