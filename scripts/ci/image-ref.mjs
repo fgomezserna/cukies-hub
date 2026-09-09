@@ -6,6 +6,7 @@ export const KNOWN_CI_COMPONENTS = Object.freeze([
   'cuki-card-worker',
   'schedulers',
   'cukies-bridge-relayer',
+  'treasure-hunt',
 ]);
 
 function loadCiComponents() {

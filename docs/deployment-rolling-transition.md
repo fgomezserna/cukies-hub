@@ -83,7 +83,55 @@ la metadata de release y se verifica antes de reconciliar su único recurso.
 Seleccionar una sola imagen para build no garantiza que Coolify reinicie sólo
 ese servicio del Compose: hay que comprobar los contenedores reales.
 
+## Capacidad del builder
+
+VM1012 dispone de 12 GiB de RAM; BuildKit tiene un límite de 9 GiB y
+`max-parallelism=1`. El 2026-09-09, el límite anterior de 6 GiB agotó memoria
+al ejecutar `pnpm deploy` de schedulers y produjo exit 137/EOF antes de desplegar.
+La caché reside en el volumen persistente del builder. El descriptor de
+`docker buildx inspect` puede conservar una configuración antigua: contrastar
+los límites del contenedor y `/etc/buildkit/buildkitd.toml` del daemon activo.
+`prepare-buildx.sh` usa 9 GiB al crear un builder; los existentes se revisan antes
+de modificarlos, con el runner inactivo y conservando su volumen de caché.
+
 ## Migración y ensayo
+
+### Juego independiente
+
+`treasure-hunt` se construye desde `games/sybil-slayer` con Nx y una caché Next
+propia. Su imagen standalone incluye servidor, chunks y assets públicos; Coolify
+sólo descarga el digest. Un cambio del juego selecciona su imagen sin reiniciar
+la web ni `docker-compose.workers.yml`. El manifest conserva `webCommit`,
+`gameCommit` y el `sourceSha` de cada imagen reutilizada.
+
+La migración de app31 y app13 desde Nixpacks exige snapshot privado de la
+configuración existente, desactivar autodeploy Git y preparar el recurso como
+Docker Image sin iniciarlo ni retirar el contenedor actual. El entregador no
+convierte automáticamente un recurso Nixpacks ni modifica Coolify fuera de la
+release autorizada. El bootstrap conserva `git_commit_sha=HEAD` mientras el estado
+previo no incluye una imagen del juego; un SHA fijado sin manifest verificable
+exige reconciliación previa. App31 conserva basePath `/treasurehunt-game`; app13 usa
+basePath vacío. Sus endpoints son `/api/health` y `/api/ready` (con el prefijo
+de staging cuando se publican detrás del Hub) y sólo comprueban identidad,
+versión y drenaje del juego.
+
+Las [labels de staging](../infrastructure/ci/staging-game.labels) y
+[producción](../infrastructure/ci/production-game.labels) mantienen routers y
+health checks independientes. Antes de registrar la migración como activa hay
+que verificar digest/SHA/guard, health/ready, página, assets y CSP. Este
+backport deja ambos recursos preparados y no activa tráfico de producción.
+
+### Primer merge de infraestructura en main
+
+Antes de integrar este backport en `main`, conservar snapshots y desactivar el
+autodeploy Git de app12 y app13. Mantener sus contenedores actuales y
+`CUKIES_IMAGE_DEPLOY_ENABLED=false`: el push debe construir candidatos en CI sin
+activar un build legacy ni sustituir producción. Validar app33 sin tráfico y
+preparar el juego por digest con el procedimiento anterior. Activar la entrega
+y persistir el estado de producción sólo después del relevo verificado; los
+siguientes pushes de `main` utilizarán exclusivamente ese carril de CI.
+
+### Hub y workers
 
 1. Conservar snapshots privados de configuración, último manifest y estado
    durable. Mantener Mongo externo, volúmenes y credenciales existentes.
@@ -130,13 +178,15 @@ intervalo efectivamente medidos durante el ensayo.
 
 ## Backport de producción sin promoción de producto
 
-La rama main declara tres imágenes en `infrastructure/ci/components.json`: dapp,
-chain-indexer y cuki-card-worker. Conserva las aplicaciones y perfiles ya existentes;
-los schedulers legacy usan la imagen dapp y siguen sujetos a sus gates. El backport
-no añade las nuevas funciones, contratos ni paquetes económicos de staging.
+La rama main declara cuatro imágenes en `infrastructure/ci/components.json`: dapp,
+chain-indexer, cuki-card-worker y treasure-hunt. Conserva las aplicaciones y
+perfiles ya existentes; los schedulers legacy siguen usando la imagen dapp y sus
+perfiles permanecen desactivados. El backport no añade funciones, contratos ni
+paquetes económicos de staging.
 
 La primera publicación CI se hace con entrega deshabilitada y Git autodeploy de
 app12 apagado, manteniendo su web actual. La imagen productiva se prueba en app33
 sin dominios, con las mismas credenciales y bases de producción, antes de cambiar
-el router y retirar dapp del Compose. Sólo tras verificar ambas partes se habilita
-la entrega automática y se guarda el estado de producción.
+el router y retirar dapp del Compose. Treasure Hunt app13 requiere un snapshot y
+una preparación independiente antes de fijar la imagen. Sólo tras verificar ambas
+partes se habilita la entrega automática y se guarda el estado de producción.

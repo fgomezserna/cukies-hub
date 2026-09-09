@@ -27,7 +27,7 @@ jobs:
       - name: Verify deployment invariants
         run: |
           node scripts/ci/generate-images-compose.mjs --check
-          node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs
+          node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs scripts/docker-start-game-ci.test.mjs
 
   build-push-deploy:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
@@ -124,9 +124,10 @@ jobs:
             --config-hash "$CUKIES_BUILD_ENV_HASH" \
             --output "$CUKIES_RUN_DIR/plan.json"
           node -e 'const fs=require("fs"); const plan=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); fs.appendFileSync(process.env.GITHUB_OUTPUT,`dapp=${plan.build.includes("dapp")}\n`)' "$CUKIES_RUN_DIR/plan.json"
+          node -e 'const fs=require("fs"); const plan=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); fs.appendFileSync(process.env.GITHUB_OUTPUT,`game=${plan.build.includes("treasure-hunt")}\n`)' "$CUKIES_RUN_DIR/plan.json"
 
       - name: Verify deployment invariants
-        run: node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs
+        run: node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs scripts/docker-start-game-ci.test.mjs
 
       - name: Validate affected web application
         if: steps.plan.outputs.dapp == 'true'
@@ -137,6 +138,15 @@ jobs:
           pnpm dapp lint
           pnpm dapp typecheck
           pnpm dapp test --runInBand
+
+      - name: Validate affected treasure hunt game
+        if: steps.plan.outputs.game == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter sybil-slayer install --frozen-lockfile
+          pnpm sybil-slayer lint
+          pnpm sybil-slayer typecheck
 
       - name: Prepare persistent BuildKit builder
         shell: bash
@@ -192,7 +202,7 @@ jobs:
             --manifest "$CUKIES_RUN_DIR/manifest.json" \
             --health-sha "$GITHUB_SHA"
 
-      - name: Deliver web and affected workers
+      - name: Deliver affected web, game and workers
         if: env.CUKIES_IMAGE_DEPLOY_ENABLED == 'true' && env.CUKIES_DELIVERY_MODE == 'rolling'
         shell: bash
         run: |

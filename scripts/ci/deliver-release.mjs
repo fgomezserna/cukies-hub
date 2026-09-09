@@ -44,12 +44,17 @@ export async function deployWorkers({ client, targets, manifest, compose, sleepI
   throw new Error(`Timeout esperando workers ${deploymentUuid}.`);
 }
 
-export async function deliverRelease({ client, manifest, previous, compose, targets = resolveCoolifyTargets(manifest.environment), webDeploy = deployRollingWeb, workerDeploy = deployWorkers, recordProgress = async () => {}, sleepImpl = sleep }) {
+export async function deliverRelease({ client, manifest, previous, compose, targets = resolveCoolifyTargets(manifest.environment), webDeploy = deployRollingWeb, gameDeploy = deployRollingWeb, workerDeploy = deployWorkers, recordProgress = async () => {}, sleepImpl = sleep }) {
   const decision = chooseDelivery({ manifest, previous, compose });
   if (decision.skip) return { status: 'skipped', reason: 'images-and-workers-compose-unchanged', servedSha: previous.commit, decision };
-  await recordProgress({ phase: 'web-starting', commit: manifest.commit, environment: manifest.environment, webResourceUuid: targets.web.resourceUuid, workersResourceUuid: targets.workers.resourceUuid });
-  const web = await webDeploy({ client, target: targets.web, manifest, previousManifest: previous });
-  await recordProgress({ phase: 'web-verified', web, candidate: manifest });
+  if (decision.web && !targets.web) throw new Error(`El recurso web de ${manifest.environment} todavía no está configurado.`);
+  if (decision.game && !targets.game) throw new Error(`El recurso game de ${manifest.environment} todavía no está configurado.`);
+  await recordProgress({ phase: decision.web ? 'web-starting' : decision.game ? 'game-starting' : 'workers-starting', commit: manifest.commit, environment: manifest.environment, webResourceUuid: targets.web?.resourceUuid ?? null, gameResourceUuid: targets.game?.resourceUuid ?? null, workersResourceUuid: targets.workers?.resourceUuid ?? null });
+  const web = decision.web ? await webDeploy({ client, target: targets.web, manifest, previousManifest: previous }) : null;
+  if (web) await recordProgress({ phase: 'web-verified', web, candidate: manifest });
+  if (decision.game && decision.web) await recordProgress({ phase: 'game-starting', candidate: manifest });
+  const game = decision.game ? await gameDeploy({ client, target: targets.game, manifest, previousManifest: previous }) : null;
+  if (game) await recordProgress({ phase: 'game-verified', game, candidate: manifest });
   if (decision.workers) {
     // During the initial split the old web belongs to the workers resource.
     // Give requests routed before the switch time to finish before Compose stops it.
@@ -57,9 +62,20 @@ export async function deliverRelease({ client, manifest, previous, compose, targ
     await recordProgress({ phase: 'workers-starting' });
   }
   const workers = decision.workers ? await workerDeploy({ client, targets, manifest, compose }) : null;
-  await recordProgress({ phase: 'delivery-verified', web, workers });
-  Object.assign(manifest, { deliveryMode: 'rolling', workersComposeHash: decision.workersComposeHash, deploymentUuid: web.deploymentUuid, webResourceUuid: targets.web.resourceUuid, workersResourceUuid: targets.workers.resourceUuid });
-  return { status: 'finished', environment: manifest.environment, healthSha: manifest.commit, web, workers, decision };
+  await recordProgress({ phase: 'delivery-verified', web, game, workers });
+  Object.assign(manifest, {
+    deliveryMode: 'rolling',
+    workersComposeHash: decision.workersComposeHash,
+    deploymentUuid: web?.deploymentUuid ?? previous?.deploymentUuid ?? null,
+    webResourceUuid: targets.web?.resourceUuid ?? previous?.webResourceUuid ?? null,
+    gameDeploymentUuid: game?.deploymentUuid ?? previous?.gameDeploymentUuid ?? null,
+    gameResourceUuid: targets.game?.resourceUuid ?? previous?.gameResourceUuid ?? null,
+    workersResourceUuid: targets.workers?.resourceUuid ?? previous?.workersResourceUuid ?? null,
+    webCommit: web?.healthSha ?? previous?.webCommit ?? previous?.commit ?? null,
+    gameCommit: game?.healthSha ?? previous?.gameCommit
+      ?? (previous?.components?.['treasure-hunt'] ? previous.commit : null),
+  });
+  return { status: 'finished', environment: manifest.environment, healthSha: web?.healthSha ?? game?.healthSha ?? manifest.commit, web, game, workers, decision };
 }
 
 export async function assertNoPendingDelivery(path) {

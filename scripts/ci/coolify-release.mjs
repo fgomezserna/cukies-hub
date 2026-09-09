@@ -107,14 +107,19 @@ export function buildImageEnvironment(manifest) {
   if (!/^[0-9a-f]{40}$/i.test(manifest?.commit ?? '') || !/^[0-9a-f]{64}$/i.test(manifest?.configHash ?? '')) {
     throw new Error('manifest con commit o config hash inválido.');
   }
-  const entries = CI_COMPONENTS.map((component) => {
+  const entries = CI_COMPONENTS.flatMap((component) => {
+    // El estado previo de producción puede no contener aún el carril de juego.
+    // La primera release que lo construye añade la imagen; los workers legacy
+    // siguen siendo desplegables durante la transición.
+    if (!manifest.components?.[component] && component === 'treasure-hunt') return [];
     const value = assertImmutableImageEntry(component, manifest.components?.[component]);
     const env = {
       dapp: 'CUKIES_IMAGE_DAPP',
       'chain-indexer': 'CUKIES_IMAGE_CHAIN_INDEXER',
       'cuki-card-worker': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
+      'treasure-hunt': 'CUKIES_IMAGE_TREASURE_HUNT',
     }[component];
-    return { key: env, value: value.image, is_literal: true, is_runtime: true, is_buildtime: true };
+    return [{ key: env, value: value.image, is_literal: true, is_runtime: true, is_buildtime: true }];
   });
   entries.push({ key: 'IMAGE_REVISION', value: manifest.commit, is_literal: true, is_runtime: true, is_buildtime: true });
   entries.push({ key: 'CUKIES_BUILD_ENV_HASH', value: manifest.configHash, is_literal: true, is_runtime: true, is_buildtime: true });

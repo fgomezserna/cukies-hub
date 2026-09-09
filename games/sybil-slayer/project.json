@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "sybil-slayer",
+  "projectType": "application",
+  "sourceRoot": "games/sybil-slayer/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.next"],
+      "options": {
+        "command": "pnpm exec next build",
+        "cwd": "games/sybil-slayer"
+      },
+      "inputs": ["production", "gameBuildEnv"]
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec next lint",
+        "cwd": "games/sybil-slayer"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit",
+        "cwd": "games/sybil-slayer"
+      }
+    }
+  },
+  "tags": ["scope:sybil-slayer"]
+}

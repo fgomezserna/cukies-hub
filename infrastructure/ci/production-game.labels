@@ -1,0 +1,12 @@
+traefik.enable=true
+traefik.docker.network=coolify
+traefik.http.routers.cukies-production-game-v2.entrypoints=websecure
+traefik.http.routers.cukies-production-game-v2.rule=Host(`treasurehunt.cukies.world`)
+traefik.http.routers.cukies-production-game-v2.priority=101
+traefik.http.routers.cukies-production-game-v2.tls=true
+traefik.http.routers.cukies-production-game-v2.service=cukies-production-game-v2
+traefik.http.services.cukies-production-game-v2.loadbalancer.server.port=3000
+traefik.http.services.cukies-production-game-v2.loadbalancer.healthcheck.path=/api/ready
+traefik.http.services.cukies-production-game-v2.loadbalancer.healthcheck.port=3000
+traefik.http.services.cukies-production-game-v2.loadbalancer.healthcheck.interval=2s
+traefik.http.services.cukies-production-game-v2.loadbalancer.healthcheck.timeout=1s

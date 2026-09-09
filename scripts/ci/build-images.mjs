@@ -12,6 +12,7 @@ const TARGETS = Object.freeze({
   dapp: 'dapp',
   'chain-indexer': 'chain-indexer',
   'cuki-card-worker': 'cuki-card-worker',
+  'treasure-hunt': 'treasure-hunt',
 });
 
 function run(command, args, { capture = false } = {}) {
