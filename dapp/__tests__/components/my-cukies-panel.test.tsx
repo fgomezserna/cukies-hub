@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { MyCukiesPanel } from '@/components/cukies/my-cukies-panel';
+import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
 
@@ -47,6 +48,7 @@ function item(overrides: Record<string, unknown> = {}) {
     state: 'available',
     custody: 'wallet',
     poolStatus: null,
+    marketplaceSurface: 'uki',
     ...overrides,
   };
 }
@@ -144,7 +146,7 @@ describe('MyCukiesPanel', () => {
 
   it('muestra acciones de estado y permite filtrar la colección', async () => {
     fetchMock.mockResolvedValue(response([
-      item({ state: 'listed', saleKind: 'legacy', network: 'BSC', collectionAddress: '0x3333333333333333333333333333333333333333', availableActions: ['cancel_sale'] }),
+      item({ state: 'listed', saleKind: 'legacy', marketplaceSurface: 'legacy', network: 'BSC', chainId: 56, assetId: `56:${legacyMarketplaceContracts.bsc.contracts.token.toLowerCase()}:98000005`, collectionAddress: legacyMarketplaceContracts.bsc.contracts.token, availableActions: ['cancel_sale'] }),
       item({ assetId: '97:0x3333333333333333333333333333333333333333:98000006', tokenId: '98000006', availableActions: ['deposit_pool', 'sell', 'stake_master'] }),
     ]));
 
@@ -152,12 +154,49 @@ describe('MyCukiesPanel', () => {
 
     expect(await screen.findByRole('link', { name: /Cancelar venta/i })).toHaveAttribute(
       'href',
-      '/marketplace/98000005?source=legacy&network=BSC&collection=0x3333333333333333333333333333333333333333',
+      `/marketplace/98000005?source=legacy&network=BSC&collection=${legacyMarketplaceContracts.bsc.contracts.token}`,
     );
     expect(screen.getByRole('link', { name: 'Hacer staking Master' })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('combobox', { name: 'Filtrar colección' }), { target: { value: 'listed' } });
     expect(screen.getByRole('heading', { name: 'Cukie #98000005' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Cukie #98000006' })).not.toBeInTheDocument();
+  });
+
+  it('dirige vender a la superficie cuya identidad está resuelta', async () => {
+    fetchMock.mockResolvedValue(response([
+      item({
+        tokenId: '56',
+        assetId: `56:${legacyMarketplaceContracts.bsc.contracts.token.toLowerCase()}:56`,
+        chainId: 56,
+        network: 'BSC',
+        collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+        marketplaceSurface: 'legacy',
+        availableActions: ['sell'],
+      }),
+      item({
+        tokenId: '97',
+        assetId: '97:0x3333333333333333333333333333333333333333:97',
+        chainId: 97,
+        network: 'BSC',
+        collectionAddress: '0x3333333333333333333333333333333333333333',
+        marketplaceSurface: 'uki',
+        availableActions: ['sell'],
+      }),
+    ]));
+
+    render(<MyCukiesPanel />);
+
+    await screen.findByRole('heading', { name: 'Cukie #56' });
+    const sellLinks = (await screen.findAllByRole('link', { name: /Vender/i }))
+      .filter((link) => link.getAttribute('href')?.includes('tokenId=') || link.getAttribute('href')?.includes('/marketplace/56'));
+    expect(sellLinks[0]).toHaveAttribute(
+      'href',
+      `/marketplace/56?source=legacy&network=BSC&collection=${legacyMarketplaceContracts.bsc.contracts.token}`,
+    );
+    expect(sellLinks[1]).toHaveAttribute(
+      'href',
+      '/marketplace?tokenId=97&collection=0x3333333333333333333333333333333333333333&chainId=97#mis-anuncios',
+    );
   });
 
   it('mantiene visible una custodia Pool histórica con acceso contextual', async () => {

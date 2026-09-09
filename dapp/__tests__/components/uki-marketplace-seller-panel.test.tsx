@@ -159,6 +159,11 @@ describe('zona vendedor marketplace UKI', () => {
     requiresApproval = false;
     jest.clearAllMocks();
     global.fetch = fetchMock as never;
+    window.history.replaceState({}, '', '/');
+  });
+
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
   });
 
   it('aprueba por token y crea la orden solo tras verificar chain, owner y colección', async () => {
@@ -232,5 +237,65 @@ describe('zona vendedor marketplace UKI', () => {
     await waitFor(() => {
       expect(screen.getByText('Aprobación restaurada; la orden vuelve a estar activa.')).toBeInTheDocument();
     });
+  });
+
+  it('preselecciona el activo solicitado por identidad completa y no otro token homónimo', async () => {
+    const otherCollection = '0x3333333333333333333333333333333333333333';
+    const targetInventory = {
+      ...inventoryItem,
+      assetId: `97:${collection}:73`,
+    };
+    const wrongInventory = {
+      ...inventoryItem,
+      assetId: `97:${otherCollection}:73`,
+      collectionAddress: otherCollection,
+    };
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/inventory')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ status: 'ok', data: { items: [wrongInventory, targetInventory] } }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ status: 'ok', data: { orders: [] } }) };
+    }) as never;
+    window.history.pushState({}, '', `/marketplace?tokenId=73&collection=${collection}&chainId=97#mis-anuncios`);
+
+    render(<UkiMarketplaceSellerPanel />);
+
+    await waitFor(() => expect(screen.getAllByText('Cukie #73')).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText('Precio del vendedor en UKI'), {
+      target: { value: '1250' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y publicar' }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      address: collection,
+      functionName: 'approve',
+    })));
+    expect(writeContractAsync).not.toHaveBeenCalledWith(expect.objectContaining({
+      address: otherCollection,
+      functionName: 'approve',
+    }));
+    window.history.pushState({}, '', '/');
+  });
+
+  it('falla cerrado cuando la identidad de destino no coincide con el inventario', async () => {
+    window.history.pushState({}, '', `/marketplace?tokenId=999&collection=${collection}&chainId=97#mis-anuncios`);
+    render(<UkiMarketplaceSellerPanel />);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('no está disponible para publicar'));
+    expect(writeContractAsync).not.toHaveBeenCalled();
+    window.history.pushState({}, '', '/');
+  });
+
+  it('falla cerrado con parámetros de destino incompletos o malformados', async () => {
+    window.history.pushState({}, '', '/marketplace?tokenId=73&collection=invalid&chainId=97#mis-anuncios');
+    render(<UkiMarketplaceSellerPanel />);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('no se puede identificar'));
+    expect(writeContractAsync).not.toHaveBeenCalled();
   });
 });

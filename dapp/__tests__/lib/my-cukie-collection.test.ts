@@ -7,7 +7,11 @@ jest.mock('@/lib/uki-economy/cukie-pool/recovery-read', () => ({
 import type { Db } from 'mongodb';
 
 import { parseUkiNftVaultPublicConfig } from '@/lib/contracts/uki-nft-vaults';
-import { listMyCukieCollectionFromDb } from '@/lib/cukies-data/my-collection';
+import {
+  listMyCukieCollectionFromDb,
+  resolveCukieSaleEligibility,
+} from '@/lib/cukies-data/my-collection';
+import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
 
 const wallet = '0x1111111111111111111111111111111111111111';
@@ -21,6 +25,80 @@ const config = parseUkiNftVaultPublicConfig({
   cukieMasterNftVaultAddress: masterVault,
 });
 const recoveryReadMock = readPoolRecoveryPositions as jest.MockedFunction<typeof readPoolRecoveryPositions>;
+
+const v2Marketplace = {
+  ready: true,
+  chainId: 97 as const,
+  collectionAddresses: [collection],
+};
+
+function saleEligibility(overrides: Partial<Parameters<typeof resolveCukieSaleEligibility>[0]> = {}) {
+  return resolveCukieSaleEligibility({
+    chainId: 97,
+    network: 'BSC',
+    collectionAddress: collection,
+    ownerMatches: true,
+    custody: 'wallet',
+    state: 'available',
+    marketplace: v2Marketplace,
+    ...overrides,
+  });
+}
+
+describe('eligibilidad de venta por identidad', () => {
+  it('permite Legacy BSC56 y Legacy TRON aunque V2 no esté listo', () => {
+    expect(saleEligibility({
+      chainId: 56,
+      network: 'BSC',
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplace: { ...v2Marketplace, ready: false },
+    })).toEqual({ canSell: true, surface: 'legacy' });
+    expect(saleEligibility({
+      chainId: null,
+      network: 'TRON',
+      collectionAddress: legacyMarketplaceContracts.tron.contracts.token,
+      marketplace: { ...v2Marketplace, ready: false },
+    })).toEqual({ canSell: true, surface: 'legacy' });
+  });
+
+  it('exige colección exacta y readiness para V2 BSC97', () => {
+    expect(saleEligibility()).toEqual({ canSell: true, surface: 'uki' });
+    expect(saleEligibility({ marketplace: { ...v2Marketplace, ready: false } }))
+      .toEqual({ canSell: false, surface: 'uki' });
+    expect(saleEligibility({ collectionAddress: '0x9999999999999999999999999999999999999999' }))
+      .toEqual({ canSell: false, surface: null });
+    expect(saleEligibility({
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+    })).toEqual({ canSell: false, surface: null });
+    expect(saleEligibility({
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplace: {
+        ...v2Marketplace,
+        collectionAddresses: [legacyMarketplaceContracts.bsc.contracts.token],
+      },
+    })).toEqual({ canSell: false, surface: null });
+  });
+
+  it('admite V2 BSC56 cuando la configuración de Marketplace coincide', () => {
+    expect(saleEligibility({
+      chainId: 56,
+      marketplace: {
+        ready: true,
+        chainId: 56,
+        collectionAddresses: [collection],
+      },
+    })).toEqual({ canSell: true, surface: 'uki' });
+  });
+
+  it.each([
+    ['owner mismatch', { ownerMatches: false }],
+    ['custody', { custody: 'cukie_pool' as const }],
+    ['listing', { state: 'listed' as const }],
+    ['staking', { state: 'soft_staked' as const }],
+  ])('falla cerrado ante %s', (_label, overrides) => {
+    expect(saleEligibility(overrides)).toEqual({ canSell: false, surface: 'uki' });
+  });
+});
 
 function cursor<T>(rows: T[]) {
   const value = {

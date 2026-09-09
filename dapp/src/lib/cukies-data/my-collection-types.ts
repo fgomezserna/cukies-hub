@@ -16,6 +16,7 @@ export type MyCukieAction =
   | 'stake_master';
 
 export type MyCukieSaleKind = 'legacy' | 'uki' | null;
+export type MyCukieMarketplaceSurface = 'legacy' | 'uki' | null;
 
 export type MyCukieCollectionItem = {
   assetId: string;
@@ -31,6 +32,8 @@ export type MyCukieCollectionItem = {
   chainId: 56 | 97;
   collectionAddress: string;
   saleKind: MyCukieSaleKind;
+  /** Superficie que resuelve la identidad del activo, también cuando aún no está listado. */
+  marketplaceSurface: MyCukieMarketplaceSurface;
   availableActions: MyCukieAction[];
   recoveryVaultAddress?: string | null;
   recoveryExitRequestedAt?: string | null;

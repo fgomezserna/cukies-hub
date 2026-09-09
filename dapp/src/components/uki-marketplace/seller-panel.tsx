@@ -65,6 +65,14 @@ type TransactionPhase =
   | 'cancelling'
   | 'syncing';
 
+type MarketplaceTarget = {
+  tokenId: string;
+  collection: string;
+  chainId: 56 | 97;
+} | {
+  invalid: true;
+};
+
 function sameAddress(left: string | null | undefined, right: string | null | undefined) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
@@ -155,7 +163,22 @@ export function UkiMarketplaceSellerPanel() {
   const [error, setError] = useState<string | null>(null);
   const [latestTxHash, setLatestTxHash] = useState<Hash | null>(null);
   const [currentFeeBps, setCurrentFeeBps] = useState<number | null>(null);
+  const [marketplaceTarget, setMarketplaceTarget] = useState<MarketplaceTarget | null>(null);
   const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenId = params.get('tokenId')?.trim() ?? '';
+    const collection = params.get('collection')?.trim() ?? '';
+    const rawChainId = params.get('chainId')?.trim() ?? '';
+    if (!tokenId && !collection && !rawChainId) return;
+    const chainId = Number(rawChainId);
+    if (!/^\d+$/.test(tokenId) || !/^0x[0-9a-f]{40}$/i.test(collection) || (chainId !== 56 && chainId !== 97)) {
+      setMarketplaceTarget({ invalid: true });
+      return;
+    }
+    setMarketplaceTarget({ tokenId, collection, chainId });
+  }, []);
 
   const configReady = ukiMarketplacePublicConfig.ready
     && expectedChainId !== null
@@ -223,6 +246,17 @@ export function UkiMarketplaceSellerPanel() {
       };
       setDataState(next);
       setSelectedAssetId((current) => {
+        if (marketplaceTarget && 'invalid' in marketplaceTarget) return null;
+        if (marketplaceTarget) {
+          const requested = next.inventory.find((item) => (
+            item.tokenId === marketplaceTarget.tokenId
+            && sameAddress(item.collectionAddress, marketplaceTarget.collection)
+            && item.assetId.startsWith(`${marketplaceTarget.chainId}:`)
+            && marketplaceTarget.chainId === expectedChainId
+            && ukiMarketplacePublicConfig.collectionAddresses.some((address) => sameAddress(address, marketplaceTarget.collection))
+          ));
+          return requested?.assetId ?? null;
+        }
         if (current && next.inventory.some((item) => item.assetId === current)) return current;
         return next.inventory.find((item) => item.listingEligible)?.assetId
           ?? next.inventory[0]?.assetId
@@ -233,7 +267,7 @@ export function UkiMarketplaceSellerPanel() {
       if (requestIdRef.current === requestId) setDataState({ kind: 'error' });
       return null;
     }
-  }, [address, authenticatedWallet]);
+  }, [address, authenticatedWallet, expectedChainId, marketplaceTarget]);
 
   useEffect(() => {
     if (!configReady || authLoading || !authenticatedWallet) {
@@ -259,6 +293,25 @@ export function UkiMarketplaceSellerPanel() {
       disposed = true;
     };
   }, [configReady, publicClient]);
+
+  useEffect(() => {
+    if (!marketplaceTarget || dataState.kind !== 'ready') return;
+    if ('invalid' in marketplaceTarget) {
+      setError('El Cukie solicitado no se puede identificar para esta superficie.');
+      return;
+    }
+    const requested = dataState.inventory.find((item) => (
+      item.tokenId === marketplaceTarget.tokenId
+      && sameAddress(item.collectionAddress, marketplaceTarget.collection)
+      && item.assetId.startsWith(`${marketplaceTarget.chainId}:`)
+      && marketplaceTarget.chainId === expectedChainId
+      && ukiMarketplacePublicConfig.collectionAddresses.some((address) => sameAddress(address, marketplaceTarget.collection))
+    ));
+    if (!requested) {
+      setSelectedAssetId(null);
+      setError('El Cukie solicitado no está disponible para publicar con esta configuración.');
+    }
+  }, [dataState, expectedChainId, marketplaceTarget]);
 
   const selectedAsset = useMemo(() => (
     dataState.kind === 'ready'

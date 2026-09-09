@@ -12,6 +12,7 @@ import type {
   MyCukieCollectionResponse,
   MyCukieAction,
 } from '@/lib/cukies-data/my-collection-types';
+import { getLegacyMarketplaceDetailHref } from '@/lib/legacy-marketplace/identity';
 import { useAuth } from '@/providers/auth-provider';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
@@ -180,8 +181,8 @@ function actionLabel(action: MyCukieAction) {
 function actionHref(cukie: MyCukieCollectionItem, action: MyCukieAction) {
   if (action === 'cancel_sale') {
     return cukie.saleKind === 'uki'
-      ? `/marketplace?tokenId=${encodeURIComponent(cukie.tokenId)}#mis-anuncios`
-      : `/marketplace/${encodeURIComponent(cukie.tokenId)}?source=legacy${cukie.network ? `&network=${encodeURIComponent(cukie.network)}` : ''}${cukie.collectionAddress ? `&collection=${encodeURIComponent(cukie.collectionAddress)}` : ''}`;
+      ? ukiMarketplaceHref(cukie)
+      : legacyMarketplaceHref(cukie);
   }
   if (action === 'request_pool_exit' || action === 'withdraw_pool') {
     return `/cukie-hodler?tokenId=${encodeURIComponent(cukie.tokenId)}#pool-cukie-${encodeURIComponent(cukie.tokenId)}`;
@@ -192,10 +193,28 @@ function actionHref(cukie: MyCukieCollectionItem, action: MyCukieAction) {
   if (action === 'deposit_pool') {
     return `/cukie-hodler?tokenId=${encodeURIComponent(cukie.tokenId)}#pool-available-${encodeURIComponent(cukie.tokenId)}`;
   }
-  if (cukie.network?.toUpperCase() === 'TRON') {
-    return `/marketplace/${encodeURIComponent(cukie.tokenId)}?source=legacy&network=TRON`;
+  return cukie.marketplaceSurface === 'legacy'
+    ? legacyMarketplaceHref(cukie)
+    : cukie.marketplaceSurface === 'uki'
+      ? ukiMarketplaceHref(cukie)
+      : null;
+}
+
+function legacyMarketplaceHref(cukie: MyCukieCollectionItem) {
+  if (cukie.network !== 'BSC' && cukie.network !== 'TRON') return null;
+  return getLegacyMarketplaceDetailHref({ tokenId: cukie.tokenId, network: cukie.network });
+}
+
+function ukiMarketplaceHref(cukie: MyCukieCollectionItem) {
+  if (cukie.network !== 'BSC' || !cukie.collectionAddress || (cukie.chainId !== 56 && cukie.chainId !== 97)) {
+    return null;
   }
-  return `/marketplace?tokenId=${encodeURIComponent(cukie.tokenId)}#mis-anuncios`;
+  const query = new URLSearchParams({
+    tokenId: cukie.tokenId,
+    collection: cukie.collectionAddress,
+    chainId: String(cukie.chainId),
+  });
+  return `/marketplace?${query.toString()}#mis-anuncios`;
 }
 
 function filterMatches(cukie: MyCukieCollectionItem, filter: CollectionFilter) {
@@ -385,7 +404,7 @@ export function MyCukiesPanel() {
               <article key={cukie.assetId} className="group overflow-hidden rounded-[16px] border border-white/10 bg-black/25">
                 <div className="relative aspect-[4/5] bg-[#0d0914]">
                   <CukiImage src={cukie.imageUrl} alt={`Cukie #${cukie.tokenId}`} sizes="(min-width: 1280px) 30vw, (min-width: 640px) 50vw, 100vw" className="object-contain p-3 transition-transform duration-300 group-hover:scale-[1.015]" />
-                  <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/75 px-3 py-1 text-xs font-black text-[var(--uki-cream)] backdrop-blur">BSC</span>
+                  <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/75 px-3 py-1 text-xs font-black text-[var(--uki-cream)] backdrop-blur">{cukie.network ?? 'Red no identificada'}</span>
                   <span className="absolute right-3 top-3 rounded-full border border-[var(--uki-lilac)]/35 bg-[#130b19]/85 px-3 py-1 text-xs font-black text-[var(--uki-lilac)] backdrop-blur">{stateLabel(cukie)}</span>
                 </div>
                 <div className="p-5">
@@ -397,13 +416,29 @@ export function MyCukiesPanel() {
                   <p className="mt-3 text-xs font-bold text-[var(--uki-lilac)]">{stateLabel(cukie)}</p>
                   <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">{itemActionDescription(cukie)}</p>
                   <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                    <Link href={`/marketplace/${cukie.tokenId}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-white/15 bg-white/[0.04] px-3 text-sm font-black text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac)]/45">
-                      Ver ficha <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
-                    </Link>
-                    {actionsFor(cukie).length > 0 ? actionsFor(cukie).map((action) => (
-                      <Link key={action} href={actionHref(cukie, action)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
-                        {actionLabel(action)} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                    {cukie.marketplaceSurface === 'legacy' ? (
+                      <Link href={legacyMarketplaceHref(cukie) ?? '/marketplace'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-white/15 bg-white/[0.04] px-3 text-sm font-black text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac)]/45">
+                        Ver ficha <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
                       </Link>
+                    ) : cukie.marketplaceSurface === 'uki' ? (
+                      <Link href={ukiMarketplaceHref(cukie) ?? '/marketplace'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-white/15 bg-white/[0.04] px-3 text-sm font-black text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac)]/45">
+                        Ver marketplace <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                      </Link>
+                    ) : (
+                      <span className="inline-flex min-h-11 items-center justify-center rounded-[9px] border border-white/10 px-3 text-center text-xs font-black uppercase text-[var(--uki-muted)]">
+                        Ficha no disponible
+                      </span>
+                    )}
+                    {actionsFor(cukie).length > 0 ? actionsFor(cukie).map((action) => (
+                      actionHref(cukie, action) ? (
+                        <Link key={action} href={actionHref(cukie, action) as string} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                          {actionLabel(action)} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                        </Link>
+                      ) : (
+                        <span key={action} className="inline-flex min-h-11 items-center justify-center rounded-[9px] border border-white/10 px-3 text-center text-xs font-black uppercase text-[var(--uki-muted)]">
+                          Acción no disponible
+                        </span>
+                      )
                     )) : cukie.custody === 'cukie_pool_recovery' ? (
                       <Link href={itemAction(cukie).href} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
                         {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
