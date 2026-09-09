@@ -198,18 +198,37 @@ la seleccion de que construir permanece selectiva, pero los servicios del mismo 
 reiniciarse juntos. El flujo no promete que los workers permanezcan levantados ni intenta cambiar
 esa politica.
 
-La activacion operativa queda para el coordinador despues de validar el parche: debe pasar el
-archivo Compose generado a la aplicacion y desactivar el webhook de build Git antes de aceptar
-el primer rollout. El estado actual de activacion es pendiente: root mantiene
-`CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=false`. Mientras siga ausente o en `false`, el workflow
-construye y adjunta el manifest, pero omite Coolify y no avanza el estado durable. Root puede
-ponerlo en `true` solo despues de verificar que la BBDD live funciona en el LXC independiente,
-que sus clientes usan el nuevo endpoint y que el autodeploy Git esta desactivado. Los volumenes
-originales se conservan para rollback; no forman parte del nuevo Compose. Health debe devolver
-`status=ok`, `environment=staging`, el SHA exacto y `coolify.resourceUuid` igual a
-`u4s804o4wwcckowgk0woo4wg`; el resultado conserva URL, timeouts, entorno y UUID verificados.
-El carril de produccion no cambia. Coolify conserva el despliegue de la aplicacion; este trabajo
-no incorpora autoescalado de servicios.
+El pipeline de staging se activa con `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true` en el
+Environment `cukies-staging`; el autodeploy Git de app 28 permanece desactivado para evitar
+builds duplicados. Las cinco referencias `CUKIES_IMAGE_*`, `IMAGE_REVISION` y
+`CUKIES_BUILD_ENV_HASH` deben estar disponibles tanto en buildtime como runtime: Coolify
+interpola el Compose durante ambas fases aunque no exista ningún `build`. Son metadatos
+públicos; los secretos runtime siguen en Coolify.
+
+Coolify puede devolver `commit=HEAD` al crear un job. Se considera identidad pendiente
+solo en `queued`/`in_progress`; un SHA concreto diferente se rechaza y `finished` exige
+el SHA exacto. Health debe confirmar `status=ok`, `environment=staging`, el mismo SHA y
+`coolify.resourceUuid=u4s804o4wwcckowgk0woo4wg`. Un fallo no avanza el estado durable.
+Los cambios exclusivos del monitor, selector, persistencia de estado y sus tests se
+revisan desde el checkout CI y pueden reutilizar las imágenes; no alteran el runtime.
+Un cambio limitado al stage final `dapp` de `Dockerfile.ci`, acompañado solo de
+documentación/orquestación, puede reconstruir únicamente dapp. La comparación exige
+prefijo y sufijo idénticos fuera de ese stage; cualquier otro cambio conserva la
+selección conservadora. El manifest registra esta selección por componente.
+
+La primera publicación completa fue el run `34352921601`: construyó y publicó las cinco
+imágenes de `0896fbd`, pero quedó `failure` por el HEAD transitorio y la interpolación de
+las referencias marcadas solo runtime. Se conserva ese resultado. La recuperación
+Coolify `1462` (`a76af1841ccb57fbdc12d071`) terminó el 2026-09-09 a las 13:16:47 UTC con
+los mismos digests, sin reconstruir. Se adoptó el estado inicial solo después de verificar
+health, los once contenedores contra el manifest, Prisma y avance del indexador en LXC.
+[La evidencia de esta primera entrega](../infrastructure/ci/2026-09-09-image-deployment-evidence.json)
+distingue la recuperación del resultado de GitHub; cada release posterior publica su
+manifest y postflight en [el workflow](https://github.com/fgomezserna/cukies-hub/actions/workflows/cukies-staging-images.yml).
+
+El carril de producción no cambia. Coolify conserva el despliegue de la aplicación;
+este trabajo no incorpora autoescalado. La retención y GC de versiones del registry
+requieren su propia política; el límite de 40 GB corresponde a la caché del builder.
 
 El builder dedicado ya está instalado en VM1012 (`192.168.1.244`, 4 vCPU, 8 GiB RAM,
 120 GiB disco). El runner `cukies-builder-1012` está registrado. Mongo de staging

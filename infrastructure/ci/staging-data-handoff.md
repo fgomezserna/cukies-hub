@@ -6,9 +6,11 @@ el Mongo original está detenido con sus volúmenes conservados.
 [Evidencia de reconciliación y servicio](2026-09-09-mongo-lxc-evidence.json):
 577.434 documentos, hashes de colecciones, índices y vistas sin diferencias antes
 de reabrir escrituras; cinco conexiones autenticadas, Prisma y avance del indexador
-verificados. El Compose operativo protegido vive en VM1001 como
-`/root/cukies-mongo-migration-20260909/runtime-lxc.json`. El CI de imágenes sigue
-pendiente de integración y activación.
+verificados. App 28 usa ahora `docker-compose.images.yml`; el primer rollout de
+imágenes verificado es Coolify `1462`, SHA `0896fbd`. El Compose protegido
+`/root/cukies-mongo-migration-20260909/runtime-lxc.json` conserva la configuración
+del corte de Mongo previo a ese rollout. El flujo vigente y su evidencia están en
+`docs/deployment-environments.md`.
 
 ## Destino
 
@@ -55,7 +57,9 @@ pendiente de integración y activación.
 
 Los datos originales y la configuración anterior permanecen en VM1001. El
 contenedor preservado se llama `cukies-mongo-rollback-20260909`, está detenido
-y tiene `restart=no`. Sus volúmenes siguen montados y no se han eliminado. Antes de
+y tiene `restart=no`. Se recreó sin labels de Coolify/Compose tras el primer rollout,
+que retiró el contenedor huérfano pero conservó sus dos volúmenes; así las siguientes
+releases no lo asocian al proyecto. Sus volúmenes siguen montados y no se han eliminado. Antes de
 aceptar escrituras en el destino, se puede volver a los endpoints originales y
 arrancar los clientes con la configuración guardada. Tras aceptar escrituras en
 el LXC, no volver al origen sin reconciliar el delta: hacerlo perdería datos nuevos.

@@ -26,6 +26,15 @@ const PROJECT_COMPONENT = Object.freeze({
 });
 
 const ALL_REASON = 'first-run-or-invalid-base';
+const ORCHESTRATION_ONLY_PATHS = new Set([
+  'scripts/ci/coolify-release.mjs',
+  'scripts/ci/release-plan.mjs',
+  'scripts/ci/release-state.mjs',
+  'scripts/ci/ci.test.mjs',
+  'scripts/ci/standalone-assets.test.mjs',
+]);
+
+const DAPP_DOCKERFILE_REFINEMENT_REASON = 'dockerfile-ci-final-dapp-stage-only';
 
 function validSha(value) {
   return typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value);
@@ -42,7 +51,7 @@ export function componentForPath(path) {
   if (path.startsWith('packages/chain-indexer/')) return ['chain-indexer'];
   if (path.startsWith('packages/cuki-card-worker/')) return ['cuki-card-worker'];
   if (path.startsWith('packages/cukies-bridge-relayer/')) return ['cukies-bridge-relayer'];
-  if (path.startsWith('scripts/ci/')) return [...COMPONENTS];
+  if (path.startsWith('scripts/ci/')) return ORCHESTRATION_ONLY_PATHS.has(path) ? [] : [...COMPONENTS];
   return [];
 }
 
@@ -56,16 +65,52 @@ export function mapNxProjects(projectNames) {
   return unique(result);
 }
 
-export function chooseReleasePlan({ state, head, configHash, changedFiles = [], nxProjects = [], nxAvailable = true, baseAncestor = true }) {
+function stageBounds(source) {
+  if (typeof source !== 'string') return null;
+  const dapp = /^FROM base AS dapp\r?\n/m.exec(source);
+  const chainIndexer = /^FROM base AS chain-indexer\r?\n/m.exec(source);
+  if (!dapp || !chainIndexer || dapp.index < 0 || chainIndexer.index <= dapp.index) return null;
+  if ((source.slice(dapp.index, chainIndexer.index).match(/^[ \t]*FROM\s/gim) ?? []).length !== 1) return null;
+  return { start: dapp.index, end: chainIndexer.index };
+}
+
+export function isDappFinalStageOnlyChange(baseDockerfile, headDockerfile) {
+  const base = stageBounds(baseDockerfile);
+  const head = stageBounds(headDockerfile);
+  if (!base || !head) return false;
+  if (baseDockerfile.slice(0, base.start) !== headDockerfile.slice(0, head.start)) return false;
+  if (baseDockerfile.slice(base.end) !== headDockerfile.slice(head.end)) return false;
+  const outside = headDockerfile.slice(0, head.start) + headDockerfile.slice(head.end);
+  if (/--from=(?:["']?dapp["']?(?=\s|$)|[0-9$])|^[ \t]*FROM(?:\s+--\S+)*\s+(?:["']?dapp["']?(?=\s|$)|[0-9$])/im.test(outside)) return false;
+  return baseDockerfile.slice(base.start, base.end) !== headDockerfile.slice(head.start, head.end);
+}
+
+function isSafeRefinementPath(path) {
+  return path.startsWith('docs/')
+    || path === 'AGENTS.md'
+    || /^infrastructure\/ci\/[^/]+\.(?:md|json)$/.test(path)
+    || ORCHESTRATION_ONLY_PATHS.has(path);
+}
+
+function canRefineDappOnly({ changedFiles, dockerfileBefore, dockerfileAfter }) {
+  if (!changedFiles.includes('Dockerfile.ci')) return false;
+  const otherFiles = changedFiles.filter((path) => path !== 'Dockerfile.ci');
+  return otherFiles.every(isSafeRefinementPath)
+    && isDappFinalStageOnlyChange(dockerfileBefore, dockerfileAfter);
+}
+
+export function chooseReleasePlan({ state, head, configHash, changedFiles = [], nxProjects = [], nxAvailable = true, baseAncestor = true, dockerfileBefore = null, dockerfileAfter = null }) {
   const previousCommit = state?.commit ?? state?.deployedSha ?? null;
   const hasUsableBase = validSha(previousCommit) && validSha(head) && baseAncestor;
-  const pathAffected = changedFiles.flatMap(componentForPath);
   const nxAffected = mapNxProjects(nxProjects);
   const configChanged = Boolean(state && state.configHash !== configHash);
   const firstOrInvalid = !hasUsableBase;
+  const refinedDappOnly = !firstOrInvalid && canRefineDappOnly({ changedFiles, dockerfileBefore, dockerfileAfter });
+  const pathAffected = refinedDappOnly ? ['dapp'] : changedFiles.flatMap(componentForPath);
+  const effectiveNxAffected = refinedDappOnly ? [] : nxAffected;
   const affected = firstOrInvalid
     ? [...COMPONENTS]
-    : unique([...pathAffected, ...nxAffected, ...(configChanged ? ['dapp'] : [])]);
+    : unique([...pathAffected, ...effectiveNxAffected, ...(configChanged ? ['dapp'] : [])]);
   const build = firstOrInvalid ? [...COMPONENTS] : affected;
   const reuse = [];
   if (!firstOrInvalid) {
@@ -78,12 +123,25 @@ export function chooseReleasePlan({ state, head, configHash, changedFiles = [], 
     }
   }
 
+  const planReason = firstOrInvalid
+    ? ALL_REASON
+    : refinedDappOnly
+      ? DAPP_DOCKERFILE_REFINEMENT_REASON
+      : configChanged
+        ? 'build-config-changed'
+        : 'component-changes';
+
   return {
     head,
     base: hasUsableBase ? previousCommit : null,
     baseReason: firstOrInvalid ? ALL_REASON : configChanged ? 'build-config-changed' : 'last-successful-deploy',
+    planReason,
+    refinement: refinedDappOnly ? {
+      reason: DAPP_DOCKERFILE_REFINEMENT_REASON,
+      detail: 'Dockerfile.ci solo cambia el stage final dapp; se ignoran los Nx afectados globales y se reutilizan los otros cuatro componentes.',
+    } : null,
     configHash,
-    nx: { available: nxAvailable, projects: nxProjects, affected: nxAffected },
+    nx: { available: nxAvailable, projects: nxProjects, affected: effectiveNxAffected },
     changedFiles,
     build: unique(build),
     reuse: reuse.map((entry) => ({ component: entry.component, image: entry.image, digest: entry.digest, tag: entry.tag, configHash: entry.configHash, sourceSha: entry.sourceSha })),
@@ -108,6 +166,13 @@ async function gitFiles(base, head) {
   const result = await execCapture('git', ['diff', '--name-only', `${base}..${head}`]);
   if (result.status !== 0) throw new Error(`git diff no pudo calcular cambios entre ${base} y ${head}: ${result.stderr.trim()}`);
   return result.stdout.split('\n').map((line) => line.trim()).filter(Boolean);
+}
+
+async function gitShowFile(commit, path) {
+  if (!validSha(commit)) throw new Error(`git show requiere SHA completo para ${path}.`);
+  const result = await execCapture('git', ['show', `${commit}:${path}`]);
+  if (result.status !== 0) throw new Error(`git show no pudo leer ${path} en ${commit}: ${result.stderr.trim()}`);
+  return result.stdout;
 }
 
 async function isAncestor(base, head) {
@@ -143,9 +208,14 @@ async function main() {
   const state = await readFile(statePath, 'utf8').then(JSON.parse).catch(() => null);
   const previousCommit = state?.commit ?? null;
   const ancestor = await isAncestor(previousCommit, head);
-  const files = await gitFiles(previousCommit && ancestor ? previousCommit : null, head);
-  const nx = await nxAffected(previousCommit && ancestor ? previousCommit : null, head);
-  const plan = chooseReleasePlan({ state, head, configHash, changedFiles: files, nxProjects: nx.projects, nxAvailable: nx.available, baseAncestor: ancestor });
+  const baseForDiff = previousCommit && ancestor ? previousCommit : null;
+  const files = await gitFiles(baseForDiff, head);
+  const nx = await nxAffected(baseForDiff, head);
+  const dockerfileBefore = baseForDiff && files.includes('Dockerfile.ci')
+    ? await gitShowFile(baseForDiff, 'Dockerfile.ci')
+    : null;
+  const dockerfileAfter = dockerfileBefore === null ? null : await gitShowFile(head, 'Dockerfile.ci');
+  const plan = chooseReleasePlan({ state, head, configHash, changedFiles: files, nxProjects: nx.projects, nxAvailable: nx.available, baseAncestor: ancestor, dockerfileBefore, dockerfileAfter });
   plan.nx.stderr = nx.stderr ?? null;
   await writeFile(outputPath, `${JSON.stringify(plan, null, 2)}\n`);
   console.log(JSON.stringify({ base: plan.base, baseReason: plan.baseReason, build: plan.build, reuse: plan.reuse.map((entry) => entry.component) }));

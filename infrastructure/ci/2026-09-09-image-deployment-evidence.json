@@ -1,0 +1,105 @@
+{
+  "observedAt": "2026-09-09T13:24:49.731483+00:00",
+  "environment": "staging",
+  "applicationId": 28,
+  "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
+  "runtimeSourceSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5",
+  "firstGithubRun": {
+    "id": 34352921601,
+    "conclusion": "failure",
+    "imagesPublished": 5,
+    "failureCause": "HEAD was still transient at the first deployment poll"
+  },
+  "verifiedRecovery": {
+    "deploymentId": 1462,
+    "deploymentUuid": "a76af1841ccb57fbdc12d071",
+    "status": "finished",
+    "finishedAt": "2026-09-09T13:16:47Z",
+    "rebuiltImages": false,
+    "mode": "operator recovery with published CI digests"
+  },
+  "components": {
+    "dapp": {
+      "image": "192.168.1.207:5000/cukies-hub/dapp:0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5473ba16c2f45aa77f822c37c7f1412b128cc7af0372c8e932c7858a5d2dc1ee",
+      "digest": "sha256:5473ba16c2f45aa77f822c37c7f1412b128cc7af0372c8e932c7858a5d2dc1ee",
+      "tag": "0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "sourceSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5"
+    },
+    "chain-indexer": {
+      "image": "192.168.1.207:5000/cukies-hub/chain-indexer:0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:0a46439561b4b9d041873614d5468eda6ec3216e0393738b7b724cd2938ef6aa",
+      "digest": "sha256:0a46439561b4b9d041873614d5468eda6ec3216e0393738b7b724cd2938ef6aa",
+      "tag": "0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "sourceSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5"
+    },
+    "cuki-card-worker": {
+      "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5f5391ed69c808659ac3be415878c826430146a0a0d7e399078efee8e5b99258",
+      "digest": "sha256:5f5391ed69c808659ac3be415878c826430146a0a0d7e399078efee8e5b99258",
+      "tag": "0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "sourceSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5"
+    },
+    "schedulers": {
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:c1b7ea03d109587fbea057defe4a76ea4f57a6ceeea1411a3c5231f5f2b0dbba",
+      "digest": "sha256:c1b7ea03d109587fbea057defe4a76ea4f57a6ceeea1411a3c5231f5f2b0dbba",
+      "tag": "0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "sourceSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5"
+    },
+    "cukies-bridge-relayer": {
+      "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:13576a6853e60886680421b6a7ad210ce214f960e1f5d1a276da75f4591f3088",
+      "digest": "sha256:13576a6853e60886680421b6a7ad210ce214f960e1f5d1a276da75f4591f3088",
+      "tag": "0896fbd708617311a8db17a3e05387c1ae5ad2c5-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "sourceSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5"
+    }
+  },
+  "postflight": {
+    "publicHealthSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5",
+    "runningServices": 11,
+    "matchingServiceImageReferences": 11,
+    "healthyServices": 9,
+    "cardWorkersWithoutDeclaredHealthcheck": 2,
+    "prismaUserCount": 335,
+    "indexerSafeBlocks": [
+      130029761,
+      130029827,
+      130029891
+    ],
+    "mongoEndpoint": "192.168.1.221:27018",
+    "mongoPrimary": true,
+    "cardStorageFloorErrors": 0,
+    "srvFreeBytes": 17022701568,
+    "productionSha": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e"
+  },
+  "releaseState": {
+    "path": "/srv/cukies-ci/state/staging/release.json",
+    "initialSeed": "adopted after recovery postflight; failed GitHub run did not advance state"
+  },
+  "rollback": {
+    "container": "cukies-mongo-rollback-20260909",
+    "started": false,
+    "restartPolicy": "no",
+    "composeLabels": false,
+    "originalVolumesPreserved": true
+  },
+  "validation": {
+    "dappLint": "pass",
+    "dappTypecheck": "pass",
+    "dappSuites": 228,
+    "dappTests": 1844,
+    "ciTests": 19,
+    "nxRealIndexerCacheHits": "1/1",
+    "nxRealIndexerTaskMs": 49,
+    "dappSha": "0896fbd708617311a8db17a3e05387c1ae5ad2c5",
+    "ciPatchSha": "775f911"
+  },
+  "firstCoolifyDeployment": {
+    "id": 1461,
+    "uuid": "focwck8040so0o0s004ww0w8",
+    "status": "failed",
+    "resolvedCommit": "0896fbd708617311a8db17a3e05387c1ae5ad2c5",
+    "cause": "CUKIES_IMAGE_SCHEDULERS unavailable during buildtime Compose interpolation"
+  }
+}
