@@ -52,16 +52,27 @@ function integer(value: unknown) {
   return BigInt(normalized);
 }
 
+export function selectLegacyMarketplaceOwner(
+  tokenOwner: unknown,
+  listingOwner: unknown,
+  isOnSale: boolean,
+) {
+  const escrowAwareOwner = isOnSale ? listingOwner : tokenOwner;
+  const normalized = String(escrowAwareOwner ?? '').trim();
+  return normalized || String(tokenOwner ?? '').trim();
+}
+
 function bscLiveState(
   owner: string,
   listing: BscMarketToken,
   paused: boolean,
 ): LegacyMarketplaceLiveState {
   const priceOriginal = listing[1].toString();
+  const isOnSale = listing[3] && listing[1] > BigInt(0);
   return {
     network: 'BSC',
-    owner,
-    isOnSale: listing[3] && listing[1] > BigInt(0),
+    owner: selectLegacyMarketplaceOwner(owner, listing[0], isOnSale),
+    isOnSale,
     paused,
     price: Number(formatEther(listing[1])) * 10_000,
     priceOriginal,
@@ -76,7 +87,11 @@ function tronLiveState(
 ): LegacyMarketplaceLiveState {
   const price = integer(tronField(listing, 'price', 1));
   const isOnSale = tronField(listing, 'isOnSale', 3) === true && price > BigInt(0);
-  const ownerHex = String(ownerValue ?? tronField(listing, 'owner', 0) ?? '');
+  const ownerHex = selectLegacyMarketplaceOwner(
+    ownerValue,
+    tronField(listing, 'owner', 0),
+    isOnSale,
+  );
   let owner = item.owner ?? ownerHex;
   try {
     owner = TronWeb.address.fromHex(ownerHex);
