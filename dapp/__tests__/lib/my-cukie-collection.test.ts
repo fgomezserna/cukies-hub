@@ -5,6 +5,7 @@ jest.mock('@/lib/uki-economy/cukie-pool/recovery-read', () => ({
 }));
 
 import type { Db } from 'mongodb';
+import type { Address } from 'viem';
 
 import { parseUkiNftVaultPublicConfig } from '@/lib/contracts/uki-nft-vaults';
 import {
@@ -15,7 +16,7 @@ import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
 
 const wallet = '0x1111111111111111111111111111111111111111';
-const collection = '0x3333333333333333333333333333333333333333';
+const collection: Address = '0x3333333333333333333333333333333333333333';
 const poolVault = '0x4444444444444444444444444444444444444444';
 const masterVault = '0x5555555555555555555555555555555555555555';
 const config = parseUkiNftVaultPublicConfig({
