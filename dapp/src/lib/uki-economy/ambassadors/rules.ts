@@ -153,7 +153,12 @@ export function buildAmbassadorAttribution(input: {
     input.sourceReferenceHash,
     "sourceReferenceHash",
   );
-  if (input.source !== "presale_locked" && input.source !== "signed_wallet_session") {
+  if (
+    input.source !== "presale_locked"
+    && input.source !== "presale_default"
+    && input.source !== "signed_wallet_session"
+    && input.source !== "admin_override"
+  ) {
     throw new DomainValidationError("La fuente de atribucion ambassador no esta soportada.");
   }
   const policy = AMBASSADOR_ATTRIBUTION_POLICIES[

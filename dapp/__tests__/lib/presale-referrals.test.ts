@@ -29,6 +29,7 @@ describe('toPublicPresaleParticipantStatus', () => {
       campaignConfig,
       referralCounts,
       'https://cukiesworld.com',
+      true,
     );
 
     expect(status.unlockProgress).toBe(1);
@@ -49,6 +50,7 @@ describe('toPublicPresaleParticipantStatus', () => {
       campaignConfig,
       referralCounts,
       'https://cukiesworld.com',
+      true,
     );
 
     expect(status.referralCode).toBe('uki-test');
@@ -68,6 +70,7 @@ describe('toPublicPresaleParticipantStatus', () => {
       { ...campaignConfig, minimumUkiToUnlockLink: 0 },
       referralCounts,
       'https://cukiesworld.com',
+      true,
     );
 
     expect(status.unlockProgress).toBe(0);
@@ -85,10 +88,31 @@ describe('toPublicPresaleParticipantStatus', () => {
       { ...campaignConfig, minimumUkiToUnlockLink: 0 },
       referralCounts,
       'https://cukiesworld.com',
+      true,
     );
 
     expect(status.unlockProgress).toBe(1);
     expect(status.referralCode).toBe('uki-test');
     expect(status.referralLink).toBe('https://cukiesworld.com/ref/uki-test');
+  });
+
+  it('conserva el codigo y el historial pero oculta el enlace sin el gate ambassador actual', () => {
+    const status = toPublicPresaleParticipantStatus(
+      {
+        walletAddress: '0xabc',
+        normalizedWalletAddress: '0xabc',
+        referralCode: 'uki-test',
+        referralUnlockedAt: new Date('2026-06-09T10:00:00Z'),
+        totalUkiPurchased: 1200,
+        referralWeightedScore: 250,
+      },
+      campaignConfig,
+      referralCounts,
+      'https://cukiesworld.com',
+    );
+
+    expect(status.referralCode).toBe('uki-test');
+    expect(status.referralLink).toBeNull();
+    expect(status.referralWeightedScore).toBe(250);
   });
 });

@@ -3,6 +3,14 @@ import 'server-only';
 import type { Db, Document } from 'mongodb';
 
 import { getIndexerDb } from '@/lib/indexer-db/mongodb';
+import { getAmbassadorEligibility } from '@/lib/uki-economy/ambassadors/eligibility';
+import {
+  resolveMongoAmbassadorAttribution,
+} from '@/lib/uki-economy/ambassadors/repository';
+import {
+  getDefaultAmbassadorWallet,
+  stableAmbassadorHash,
+} from '@/lib/uki-economy/ambassadors/rules';
 
 import type { CompetitionAttemptStatus, CompetitionConfig } from '..';
 import {
@@ -452,6 +460,103 @@ export class MongoCompetitionSettlementSource implements CompetitionSettlementCl
       .toArray();
 
     return rows.map(participantFromDocument);
+  }
+
+  /**
+   * Resolves the sponsor used by a new economic snapshot. The legacy
+   * presale participant row remains available as audit input, but it is never
+   * authoritative once the lifecycle gate is active: admin overrides and the
+   * canonical presale attribution are resolved at the actual close time.
+   */
+  async resolveAmbassadorSponsors(input: {
+    walletAddresses: readonly string[];
+    effectiveAt: string;
+  }) {
+    const effectiveAt = queryBoundary(input.effectiveAt, 'effectiveAt');
+    const db = await this.getDb();
+    const legacyRows = await this.listParticipants(input);
+    const legacyByWallet = new Map(legacyRows.map((row) => [row.walletAddress, row]));
+    let defaultWallet: string | null = null;
+    if (process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()) {
+      try {
+        defaultWallet = getDefaultAmbassadorWallet();
+      } catch (error) {
+        throw new CompetitionSettlementCloseError(
+          'settlement_source_not_ready',
+          error instanceof Error ? error.message : 'Invalid Cukies World root wallet',
+        );
+      }
+    }
+
+    const normalizedWallets = [...new Set(
+      input.walletAddresses.map((wallet) => wallet.trim().toLowerCase()),
+    )];
+    return Promise.all(normalizedWallets.map(async (walletAddress) => {
+      const legacy = legacyByWallet.get(walletAddress) ?? { walletAddress };
+      const attribution = await resolveMongoAmbassadorAttribution(
+        db,
+        walletAddress,
+        effectiveAt,
+        undefined,
+        effectiveAt,
+      );
+      if (!attribution) {
+        return {
+          ...legacy,
+          effectiveSponsorWalletAddress: null,
+          sponsorCommissionEligible: false,
+        } satisfies SettlementParticipantRecord;
+      }
+
+      const sponsorWalletAddress = attribution.ambassadorWalletNormalized;
+      const isCukiesWorldRoot = defaultWallet === sponsorWalletAddress;
+      if (isCukiesWorldRoot) {
+        return {
+          ...legacy,
+          effectiveSponsorWalletAddress: sponsorWalletAddress,
+          sponsorAttributionSource: attribution.source,
+          sponsorAttributionSourceReferenceHash: attribution.sourceReferenceHash,
+          sponsorAttributionAcceptedAt: attribution.acceptedAt.toISOString(),
+          sponsorAttributionEvidenceHash: attribution.evidenceHash,
+          sponsorAttributionPolicyVersion: attribution.policyVersion,
+          sponsorCommissionEligible: true,
+          sponsorEligibilityReason: 'CUKIES_WORLD_ROOT_EXEMPT',
+          sponsorEligibilitySourceHash: stableAmbassadorHash({
+            kind: 'ambassador-cukies-world-root-exemption-v1',
+            walletAddress: sponsorWalletAddress,
+            observedAt: effectiveAt.toISOString(),
+          }),
+          sponsorEligibilityObservedAt: effectiveAt.toISOString(),
+        } satisfies SettlementParticipantRecord;
+      }
+
+      const [eligibility, sponsorAttribution] = await Promise.all([
+        getAmbassadorEligibility(sponsorWalletAddress, effectiveAt),
+        resolveMongoAmbassadorAttribution(db, sponsorWalletAddress, effectiveAt, undefined, effectiveAt),
+      ]);
+      if (eligibility.isCukieMaster === null) {
+        throw new CompetitionSettlementCloseError(
+          'settlement_source_not_ready',
+          `Cukie Master eligibility is unknown for ambassador ${sponsorWalletAddress}`,
+        );
+      }
+      const hasConfirmedSponsor = sponsorAttribution !== null;
+      return {
+        ...legacy,
+        effectiveSponsorWalletAddress: sponsorWalletAddress,
+        sponsorAttributionSource: attribution.source,
+        sponsorAttributionSourceReferenceHash: attribution.sourceReferenceHash,
+        sponsorAttributionAcceptedAt: attribution.acceptedAt.toISOString(),
+        sponsorAttributionEvidenceHash: attribution.evidenceHash,
+        sponsorAttributionPolicyVersion: attribution.policyVersion,
+        sponsorCommissionEligible: eligibility.isCukieMaster === true && hasConfirmedSponsor,
+        sponsorEligibilityReason: hasConfirmedSponsor
+          ? eligibility.reason
+          : 'AMBASSADOR_SPONSOR_NOT_CONFIRMED',
+        sponsorEligibilitySourceHash: eligibility.sourceHash,
+        sponsorEligibilityObservedAt: eligibility.observedAt.toISOString(),
+      } satisfies SettlementParticipantRecord;
+    }));
   }
 }
 

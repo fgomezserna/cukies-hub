@@ -27,7 +27,7 @@ import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-
 import { Panel } from '@/components/landing/primitives';
 import { useAuth } from '@/providers/auth-provider';
 
-type AttributionSource = 'presale_locked' | 'signed_wallet_session';
+type AttributionSource = 'presale_locked' | 'presale_default' | 'signed_wallet_session' | 'admin_override';
 type CommissionStatus =
   | 'registered'
   | 'preparing'
@@ -39,7 +39,14 @@ type CommissionStatus =
 type AmbassadorDashboard = {
   walletNormalized: string;
   profile: { invitationCode: string } | null;
-  enrollment: { isPresaleParticipant: boolean; canChooseSponsor: boolean; canInvite: boolean };
+  enrollment: {
+    isPresaleParticipant: boolean;
+    canChooseSponsor: boolean;
+    canInvite: boolean;
+    isCukieMaster?: boolean | null;
+    hasConfirmedSponsor?: boolean;
+    eligibilityReason?: string | null;
+  };
   defaultAmbassador: { ambassadorWalletMasked: string } | null;
   ownAttribution: {
     attributionId: string;
@@ -134,9 +141,10 @@ const STATUS_COPY: Record<CommissionStatus, { label: string; helper: string }> =
 };
 
 function sourceCopy(source: AttributionSource) {
-  return source === 'presale_locked'
-    ? 'Vinculado automáticamente desde la preventa'
-    : 'Confirmado con tu wallet';
+  if (source === 'presale_locked') return 'Vinculado automáticamente desde la preventa';
+  if (source === 'presale_default') return 'Vinculado automáticamente a Cukies World';
+  if (source === 'admin_override') return 'Asignado por administración';
+  return 'Confirmado con tu wallet';
 }
 
 function Metric({ label, value, helper }: { label: string; value: string; helper: string }) {
@@ -308,7 +316,12 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   }, [pendingInvitationCode]);
 
   const invitationUrl = useMemo(() => {
-    if (!currentDashboard?.enrollment.canInvite || !currentDashboard.profile || typeof window === 'undefined') return null;
+    if (
+      !currentDashboard?.enrollment.canInvite ||
+      currentDashboard.enrollment.isCukieMaster === false ||
+      !currentDashboard.profile ||
+      typeof window === 'undefined'
+    ) return null;
     return `${window.location.origin}/embajadores/${currentDashboard.profile.invitationCode}`;
   }, [currentDashboard]);
 
@@ -345,6 +358,18 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const isOwnInvitation = Boolean(
     invitation && currentDashboard?.profile?.invitationCode === invitation.invitationCode,
   );
+  const hasConfirmedSponsor = Boolean(
+    currentDashboard && (
+      (currentDashboard.enrollment.hasConfirmedSponsor
+      ?? Boolean(currentDashboard.ownAttribution))
+    ),
+  );
+  const isEligibilityUnknown = Boolean(
+    currentDashboard &&
+    currentDashboard.enrollment.isCukieMaster === null &&
+    !currentDashboard.enrollment.canInvite,
+  );
+  const canShowDashboard = Boolean(currentDashboard && hasConfirmedSponsor);
 
   async function acceptInvitation() {
     if (!proposedAmbassador || !consent || activeConfirmation.current || !walletAddress || !currentDashboard?.enrollment.canChooseSponsor || currentDashboard.ownAttribution || isOwnInvitation) return;
@@ -418,7 +443,11 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
               Invita y recibe una parte adicional de sus premios
             </h1>
             <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-              Recibes el {commissionPercent.toLocaleString('es-ES')}% de los premios elegibles que generen tus invitados. Ellos mantienen el 100% de lo que ganen.
+              {currentDashboard?.enrollment.isCukieMaster === false
+                ? 'Conservas tu código, tus referidos y el historial de comisiones. Activa Cukie Master para volver a invitar y generar nuevas comisiones.'
+                : isEligibilityUnknown
+                  ? 'No podemos comprobar ahora si cumples el requisito Cukie Master. Reintenta para conocer el estado de tu programa.'
+                  : `Recibes el ${commissionPercent.toLocaleString('es-ES')}% de los premios elegibles que generen tus invitados. Ellos mantienen el 100% de lo que ganen.`}
             </p>
           </div>
           <div className="border-l-2 border-[var(--uki-lilac)] pl-4">
@@ -430,13 +459,16 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
         </div>
       </header>
 
-      {pendingInvitationCode || (currentDashboard?.enrollment.canChooseSponsor && defaultAmbassador) ? (
+      {pendingInvitationCode || (currentDashboard?.enrollment.canChooseSponsor && requestState === 'ready') ? (
         <section aria-labelledby="invitation-title" className="pt-7">
           <Panel innerClassName="p-5 sm:p-7">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)] lg:items-center">
               <div>
                 <p className="uki-label">{pendingInvitationCode ? 'Has recibido una invitación' : 'Tu embajador propuesto'}</p>
                 <h2 id="invitation-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">{pendingInvitationCode ? 'Confirma quién te invitó' : 'Confirma tu embajador'}</h2>
+                {!hasConfirmedSponsor && !pendingInvitationCode && defaultAmbassador ? (
+                  <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-lilac)]">Confirmación de embajador pendiente</p>
+                ) : null}
                 {invitationState === 'loading' ? (
                   <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-[var(--uki-muted)]">
                     <SpinnerGap className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" /> Comprobando la invitación…
@@ -456,6 +488,8 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                       <p className="mt-0.5 text-xs font-semibold text-[var(--uki-muted)]">{currentDashboard && !currentDashboard.enrollment.canChooseSponsor ? 'Wallet que te invita' : 'Será tu embajador directo'}</p>
                     </div>
                   </div>
+                ) : !pendingInvitationCode ? (
+                  <p className="mt-4 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">Ahora no podemos ofrecerte un embajador. Puedes seguir navegando y volver a intentarlo más adelante.</p>
                 ) : null}
               </div>
 
@@ -548,7 +582,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
         </div>
       ) : null}
 
-      {requestState === 'ready' && currentDashboard ? (
+      {requestState === 'ready' && canShowDashboard && currentDashboard ? (
         <>
           <section aria-labelledby="summary-title" className="pt-7">
             <div className="flex items-end justify-between gap-4 pb-4">
@@ -577,11 +611,27 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 </div>
                 <LinkSimple className="h-7 w-7 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
               </div>
-              <p className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                {invitationUrl
-                  ? 'La persona invitada verá tu wallet abreviada y decidirá si confirma la relación. Tu dirección completa no aparece en el enlace.'
-                  : 'Confirma primero tu embajador con una firma en tu wallet, sin gas. Después se activará tu enlace para invitar.'}
-              </p>
+              <div className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                {invitationUrl ? (
+                  'La persona invitada verá tu wallet abreviada y decidirá si confirma la relación. Tu dirección completa no aparece en el enlace.'
+                ) : currentDashboard.enrollment.isCukieMaster === false ? (
+                  <>
+                    <p>Tus referidos, tu código y el historial de comisiones se conservan. Activa Cukie Master para volver a usar el mismo enlace y generar nuevas comisiones.</p>
+                    <Link href="/cukie-master" className="mt-4 inline-flex items-center gap-2 font-black text-[var(--uki-lilac)]">
+                      Activar Cukie Master <ArrowRight className="h-4 w-4" weight="bold" />
+                    </Link>
+                  </>
+                ) : isEligibilityUnknown ? (
+                  <>
+                    <p>No se puede comprobar ahora si cumples el requisito Cukie Master. Tus datos se conservan; reintenta para volver a comprobarlo.</p>
+                    <button type="button" onClick={loadDashboard} className="mt-4 inline-flex items-center gap-2 font-black text-[var(--uki-lilac)]">
+                      Reintentar <ArrowClockwise className="h-4 w-4" weight="bold" />
+                    </button>
+                  </>
+                ) : (
+                  'Tu enlace todavía no está disponible. Actualiza para volver a comprobar el estado de tu programa.'
+                )}
+              </div>
               {invitationUrl ? <div className="mt-5 overflow-hidden rounded-[10px] border border-white/10 bg-black/25">
                 <p className="break-all px-4 py-3 font-mono text-xs text-[var(--uki-text)]">{invitationUrl}</p>
                 <div className="grid border-t border-white/10 sm:grid-cols-2">
@@ -593,7 +643,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                     <ShareNetwork className="h-4 w-4" weight="bold" /> Compartir
                   </button>
                 </div>
-              </div> : <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[var(--uki-lilac)]"><LockKey className="h-5 w-5 shrink-0" weight="fill" /> Confirmación de embajador pendiente</p>}
+              </div> : !hasConfirmedSponsor ? <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[var(--uki-lilac)]"><LockKey className="h-5 w-5 shrink-0" weight="fill" /> Confirmación de embajador pendiente</p> : null}
             </Panel>
 
             <Panel innerClassName="p-5 sm:p-7">
@@ -609,7 +659,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                   {currentDashboard.ownAttribution.isCukiesWorld ? <p className="mb-1 font-black">Cukies World</p> : null}
                   <p className="font-mono text-lg font-black">{currentDashboard.ownAttribution.ambassadorWalletMasked}</p>
                   <p className="mt-2 text-sm font-semibold text-[var(--uki-lilac)]">{sourceCopy(currentDashboard.ownAttribution.source)}</p>
-                  <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Desde el {formatDate(currentDashboard.ownAttribution.acceptedAt)}. Esta relación no puede sustituirse.</p>
+                  <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Desde el {formatDate(currentDashboard.ownAttribution.acceptedAt)}. No puedes sustituirla desde tu cuenta; administración o soporte puede corregirla con autorización y trazabilidad.</p>
                 </div>
               ) : (
                 <div className="mt-5 flex items-start gap-3 rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
@@ -617,7 +667,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                   <div>
                     <p className="font-black">{currentDashboard.enrollment.isPresaleParticipant ? 'Sin embajador en la preventa' : 'Embajador pendiente de confirmar'}</p>
                     <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{currentDashboard.enrollment.isPresaleParticipant
-                      ? 'Tu participación en la preventa conserva tu enlace para invitar, pero ya no permite asignarte un patrocinador.'
+                      ? 'Tu participación en la preventa ya no permite asignarte un patrocinador desde aquí.'
                       : proposedAmbassador
                         ? 'Conectar tu wallet y navegar no confirma la relación. Solo se guardará cuando la confirmes con una firma específica, sin gas.'
                         : pendingInvitationCode
@@ -642,7 +692,13 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
               <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
                 <UsersThree className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
                 <p className="mt-4 font-headline text-xl font-black">Todavía no tienes invitados confirmados</p>
-                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{invitationUrl ? 'Comparte tu enlace. La relación aparecerá aquí en cuanto la otra wallet la confirme.' : 'Podrás invitar cuando confirmes tu embajador y se active tu enlace.'}</p>
+                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{invitationUrl
+                  ? 'Comparte tu enlace. La relación aparecerá aquí en cuanto la otra wallet la confirme.'
+                  : currentDashboard.enrollment.isCukieMaster === false
+                    ? 'Tus referidos se conservan. Activa Cukie Master para volver a invitar.'
+                    : isEligibilityUnknown
+                      ? 'No se puede comprobar ahora si puedes invitar. Reintenta para actualizar el estado.'
+                      : 'Tu enlace todavía no está disponible. Actualiza para volver a comprobar el estado.'}</p>
               </div>
             ) : (
               <div className="divide-y divide-white/10 border-b border-white/10">
@@ -669,7 +725,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
               <div>
                 <p className="uki-label">Movimientos de embajador</p>
                 <h2 id="commissions-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">Tus comisiones</h2>
-                <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Cada fila explica cuándo se registró y en qué estado se encuentra.</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Cada fila explica cuándo se registró y en qué estado se encuentra. El historial se conserva aunque ahora no puedas generar nuevas comisiones.</p>
               </div>
               <Link href="/premios?category=ambassador" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-[var(--uki-lilac)]/35 px-4 text-sm font-black text-[var(--uki-lilac)]">
                 Ver en Premios <ArrowRight className="h-4 w-4" weight="bold" />
@@ -679,7 +735,11 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
               <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
                 <Gift className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
                 <p className="mt-4 font-headline text-xl font-black">Aún no se han generado comisiones</p>
-                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">Aparecerán cuando un invitado confirmado reciba un premio elegible.</p>
+                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{currentDashboard.enrollment.isCukieMaster === false
+                  ? 'No se generan nuevas comisiones mientras no cumplas el requisito Cukie Master.'
+                  : isEligibilityUnknown
+                    ? 'No podemos comprobar ahora si puedes generar nuevas comisiones. Reintenta para actualizar el estado.'
+                    : 'Aparecerán cuando un invitado confirmado reciba un premio elegible.'}</p>
               </div>
             ) : (
               <div className="divide-y divide-white/10 border-b border-white/10">
@@ -721,7 +781,9 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 <ol className="divide-y divide-white/10 bg-[#0d0914]">
                   {[
                     ['01', 'Una sola confirmación', 'Los nuevos usuarios confirman a su embajador con una firma específica, sin gas. Las relaciones de preventa se conservan y ya no pueden añadirse ni cambiarse.'],
-                    ['02', 'El invitado no pierde nada', `El invitado recibe su premio completo y tú recibes un ${commissionPercent.toLocaleString('es-ES')}% adicional.`],
+                    ['02', 'El invitado no pierde nada', currentDashboard.enrollment.isCukieMaster === true || (currentDashboard.enrollment.isCukieMaster === null && currentDashboard.enrollment.canInvite)
+                      ? `El invitado recibe su premio completo y tú recibes un ${commissionPercent.toLocaleString('es-ES')}% adicional.`
+                      : 'El historial se conserva, pero las nuevas comisiones solo se generan mientras mantienes el requisito Cukie Master.'],
                     ['03', 'Sin cambios retroactivos', 'La vinculación nueva solo afecta a premios posteriores. No hay segundo nivel ni comisión sobre otra comisión.'],
                     ['04', 'Cobro desde Premios', 'La comisión se registra con el cierre correspondiente y se cobra mediante el mismo sistema de premios UKI.'],
                   ].map(([number, title, description]) => (

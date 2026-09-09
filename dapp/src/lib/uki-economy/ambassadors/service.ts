@@ -68,7 +68,7 @@ function fromLockedPresale(locked: LockedPresaleAmbassador, now: Date) {
   });
 }
 
-async function assertAttributionDoesNotCreateCycle(
+export async function assertAttributionDoesNotCreateCycle(
   repository: AmbassadorAttributionRepository,
   referredWalletNormalized: string,
   ambassadorWalletNormalized: string,
@@ -119,7 +119,12 @@ export async function resolveAmbassadorAttribution(
   const locked = await repository.findLockedPresaleAmbassador(
     referredWalletNormalized
   );
-  const current = await repository.findAttribution(referredWalletNormalized);
+  const current = await repository.findAttribution(referredWalletNormalized, now);
+  // Administrative corrections are effective from their own timestamp and
+  // intentionally take precedence over the immutable presale projection.
+  if (current?.source === "admin_override") {
+    return assertAmbassadorAttribution(current);
+  }
   if (!locked) return current ? assertAmbassadorAttribution(current) : null;
 
   const candidate = fromLockedPresale(locked, now);

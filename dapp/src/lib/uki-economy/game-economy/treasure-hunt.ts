@@ -51,11 +51,9 @@ import { rewardAccountingService } from "../rewards/accounting-repository";
 import type { WeeklyGameResult } from "../rewards/accounting-types";
 import { resolveAppliedArenaRanking } from "../rewards/arena-ranking";
 import type { RewardRule } from "../rewards/types";
-
-type PresaleParticipantReferral = {
-  normalizedWalletAddress: string;
-  lockedSponsorWalletAddress?: string | null;
-};
+import { getAmbassadorEligibility } from "../ambassadors/eligibility";
+import { resolveMongoAmbassadorAttribution } from "../ambassadors/repository";
+import { getDefaultAmbassadorWallet } from "../ambassadors/rules";
 
 type CompetitionAttemptAuthority = {
   attemptId: string;
@@ -288,7 +286,7 @@ export async function assertTreasureHuntAuthorityGameSession(input: {
   return current;
 }
 
-async function loadReservedResources(session: GameEconomySession) {
+async function loadReservedResources(session: GameEconomySession, observedAt = new Date()) {
   if (
     session.status !== "started" ||
     !session.startedAt ||
@@ -318,10 +316,13 @@ async function loadReservedResources(session: GameEconomySession) {
   if (assignment.sessionId !== session.sessionId) {
     throw new DomainConflictError("La asignacion Cukie pertenece a otra sesion.");
   }
-  const referral = await db.collection<PresaleParticipantReferral>("presale_participants")
-    .findOne({ normalizedWalletAddress: session.walletNormalized });
-  const ambassadorWalletNormalized = referral?.lockedSponsorWalletAddress
-    ? validGameWallet(referral.lockedSponsorWalletAddress)
+  const attribution = await resolveMongoAmbassadorAttribution(
+    db,
+    session.walletNormalized,
+    observedAt,
+  );
+  const ambassadorWalletNormalized = attribution?.ambassadorWalletNormalized
+    ? validGameWallet(attribution.ambassadorWalletNormalized)
     : null;
   if (ambassadorWalletNormalized === session.walletNormalized) {
     throw new DomainConflictError("La autorreferencia no puede fijarse como ambassador.");
@@ -372,13 +373,46 @@ export async function openTreasureHuntEconomyRun(input: {
     idempotencyKey: `treasure-open-${stableGameEconomyHash({ runId })}`,
     now,
   });
-  const resources = await loadReservedResources(gameSession);
+  const resources = await loadReservedResources(gameSession, now);
   const daily = getTreasureHuntDailyPeriod(gameSession.createdAt);
   const weekly = getTreasureHuntWeeklyPeriod(gameSession.createdAt);
   const quotaId = resources.credit.bucket === "pool"
     ? quotaReservationId(runId)
     : null;
-  const ambassadorCapturedAt = gameSession.createdAt;
+  const ambassadorCapturedAt = now;
+  const defaultAmbassador = process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()
+    ? getDefaultAmbassadorWallet()
+    : null;
+  const ambassadorEligibilitySnapshot = resources.ambassadorWalletNormalized
+    ? resources.ambassadorWalletNormalized === defaultAmbassador
+      ? {
+        isCukieMaster: null,
+        commissionEligible: true,
+        reason: "CUKIE_WORLD_ROOT_EXEMPT",
+        sourceHash: stableGameEconomyHash({
+          kind: "ambassador-root-commission-eligibility-v1",
+          walletNormalized: resources.ambassadorWalletNormalized,
+          capturedAt: ambassadorCapturedAt,
+        }),
+        observedAt: ambassadorCapturedAt,
+      }
+      : await getAmbassadorEligibility(resources.ambassadorWalletNormalized, ambassadorCapturedAt).then((eligibility) => ({
+        ...eligibility,
+        commissionEligible: eligibility.isCukieMaster === true,
+      }))
+    : null;
+  if (
+    ambassadorEligibilitySnapshot?.isCukieMaster === null
+    && ambassadorEligibilitySnapshot.commissionEligible !== true
+  ) {
+    // No se persiste un snapshot desconocido que luego se convierta en una
+    // comisión cero permanente. La sesión reservada conserva su idempotencia
+    // para que el mismo runId pueda reintentarse cuando vuelva la evidencia.
+    throw new DomainConflictError(
+      "La elegibilidad del embajador no está disponible; reintenta cuando la fuente canónica se recupere.",
+      { reason: "CUKIE_MASTER_SOURCE_UNKNOWN", retryable: true },
+    );
+  }
   const run: TreasureHuntEconomyRun = {
     _id: runId,
     runId,
@@ -418,6 +452,19 @@ export async function openTreasureHuntEconomyRun(input: {
       ambassadorWalletNormalized: resources.ambassadorWalletNormalized,
       capturedAt: ambassadorCapturedAt,
     }),
+    ambassadorEligibilitySnapshot: ambassadorEligibilitySnapshot ? {
+      policyVersion: "ambassador-lifecycle-v2",
+      isCukieMaster: ambassadorEligibilitySnapshot.isCukieMaster,
+      commissionEligible: ambassadorEligibilitySnapshot.commissionEligible,
+      capturedAt: ambassadorEligibilitySnapshot.observedAt,
+      evidenceHash: ambassadorEligibilitySnapshot.sourceHash
+        ?? stableGameEconomyHash({
+          kind: "ambassador-eligibility-unknown",
+          walletNormalized: resources.ambassadorWalletNormalized,
+          capturedAt: ambassadorCapturedAt,
+          reason: ambassadorEligibilitySnapshot.reason,
+        }),
+    } : undefined,
     quotaReservationId: quotaId,
     evidence: [],
     lastEvidenceHash: stableGameEconomyHash({ kind: "treasure-genesis", runId }),
@@ -487,6 +534,8 @@ export async function openTreasureHuntEconomyRun(input: {
     const winner = await existingDb.collection<TreasureHuntEconomyRun>("treasure_hunt_economy_runs")
       .findOne({ runId });
     if (!winner) {
+      const retryable = error instanceof UkiEconomyError && error.details?.retryable === true;
+      if (retryable) throw error;
       try {
         const cleanup = createMongoGameEconomyService(createMongoGameEconomyPorts());
         await cleanup.rejectSession({
@@ -770,6 +819,13 @@ async function weeklyResultFor(
       walletNormalized: run.ambassadorWalletNormalized,
       capturedAt: run.ambassadorCapturedAt,
       evidenceHash: run.ambassadorEvidenceHash,
+      ...(run.ambassadorEligibilitySnapshot ? {
+        policyVersion: run.ambassadorEligibilitySnapshot.policyVersion,
+        isCukieMaster: run.ambassadorEligibilitySnapshot.isCukieMaster,
+        commissionEligible: run.ambassadorEligibilitySnapshot.commissionEligible,
+        eligibilityCapturedAt: run.ambassadorEligibilitySnapshot.capturedAt,
+        eligibilityEvidenceHash: run.ambassadorEligibilitySnapshot.evidenceHash,
+      } : {}),
     },
     arenaRankingSnapshot,
   };
