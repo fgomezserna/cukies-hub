@@ -211,6 +211,10 @@ el SHA exacto. Health debe confirmar `status=ok`, `environment=staging`, el mism
 `coolify.resourceUuid=u4s804o4wwcckowgk0woo4wg`. Un fallo no avanza el estado durable.
 Los cambios exclusivos del monitor, selector, persistencia de estado y sus tests se
 revisan desde el checkout CI y pueden reutilizar las imágenes; no alteran el runtime.
+Un cambio limitado al stage final `dapp` de `Dockerfile.ci`, acompañado solo de
+documentación/orquestación, puede reconstruir únicamente dapp. La comparación exige
+prefijo y sufijo idénticos fuera de ese stage; cualquier otro cambio conserva la
+selección conservadora. El manifest registra esta selección por componente.
 
 La primera publicación completa fue el run `34352921601`: construyó y publicó las cinco
 imágenes de `0896fbd`, pero quedó `failure` por el HEAD transitorio y la interpolación de

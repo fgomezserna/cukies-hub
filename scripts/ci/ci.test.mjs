@@ -10,7 +10,7 @@ import { requireValue } from './cli-args.mjs';
 import { canonicalizeBuildEnv } from './build-env.mjs';
 import { assertStagingApplication, buildImageEnvironment, deployAndVerify } from './coolify-release.mjs';
 import { generateImagesCompose } from './generate-images-compose.mjs';
-import { COMPONENTS, chooseReleasePlan } from './release-plan.mjs';
+import { COMPONENTS, chooseReleasePlan, isDappFinalStageOnlyChange } from './release-plan.mjs';
 import { createSuccessfulState, readReleaseState, writeReleaseStateAtomic } from './release-state.mjs';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -50,6 +50,91 @@ test('release plan construye todo en primera ejecución y con una base inválida
   const invalid = chooseReleasePlan({ state: completeState, head: SHA_B, configHash: HASH_A, baseAncestor: false });
   assert.deepEqual(invalid.build, first.build);
   assert.equal(invalid.baseReason, 'first-run-or-invalid-base');
+});
+
+test('el comparador de Dockerfile limita el refinamiento al stage final dapp', () => {
+  const baseDockerfile = [
+    'FROM node:22-bookworm-slim AS base',
+    '',
+    'FROM base AS dapp',
+    'COPY old /app',
+    '',
+    'FROM base AS chain-indexer',
+    'CMD ["old"]',
+    '',
+  ].join('\n');
+  const dappChange = baseDockerfile.replace('COPY old /app', 'COPY new /app');
+  const prefixChange = baseDockerfile.replace('node:22-bookworm-slim', 'node:22-bookworm');
+  const suffixChange = baseDockerfile.replace('CMD ["old"]', 'CMD ["new"]');
+
+  assert.equal(isDappFinalStageOnlyChange(baseDockerfile, dappChange), true);
+  assert.equal(isDappFinalStageOnlyChange(baseDockerfile, prefixChange), false);
+  assert.equal(isDappFinalStageOnlyChange(baseDockerfile, suffixChange), false);
+  assert.equal(isDappFinalStageOnlyChange(baseDockerfile, dappChange.replace('COPY new /app', 'FROM base AS replacement\nCOPY new /app')), false);
+  const dependent = baseDockerfile.replace('CMD ["old"]', 'COPY --from=dapp /app /app');
+  assert.equal(isDappFinalStageOnlyChange(dependent, dependent.replace('COPY old /app', 'COPY new /app')), false);
+});
+
+test('Dockerfile solo en dapp descarta Nx global y conserva cuatro imágenes', () => {
+  const baseDockerfile = [
+    'FROM node:22-bookworm-slim AS base',
+    '',
+    'FROM base AS dapp',
+    'COPY old /app',
+    '',
+    'FROM base AS chain-indexer',
+    'CMD ["old"]',
+    '',
+  ].join('\n');
+  const plan = chooseReleasePlan({
+    state: completeState,
+    head: SHA_B,
+    configHash: HASH_A,
+    changedFiles: [
+      'Dockerfile.ci',
+      'scripts/ci/release-plan.mjs',
+      'scripts/ci/ci.test.mjs',
+      'scripts/ci/standalone-assets.test.mjs',
+      'docs/release-workflow.md',
+      'AGENTS.md',
+      'infrastructure/ci/evidence.json',
+    ],
+    nxProjects: ['dapp', 'chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer'],
+    dockerfileBefore: baseDockerfile,
+    dockerfileAfter: baseDockerfile.replace('COPY old /app', 'COPY new /app'),
+    baseAncestor: true,
+  });
+
+  assert.deepEqual(plan.build, ['dapp']);
+  assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer']);
+  assert.deepEqual(plan.nx.affected, []);
+  assert.equal(plan.planReason, 'dockerfile-ci-final-dapp-stage-only');
+  assert.equal(plan.refinement.reason, plan.planReason);
+});
+
+test('una fuente adicional fuera de la lista segura conserva el fallback global', () => {
+  const dockerfile = [
+    'FROM node:22-bookworm-slim AS base',
+    '',
+    'FROM base AS dapp',
+    'COPY old /app',
+    '',
+    'FROM base AS chain-indexer',
+    'CMD ["old"]',
+    '',
+  ].join('\n');
+  const plan = chooseReleasePlan({
+    state: completeState,
+    head: SHA_B,
+    configHash: HASH_A,
+    changedFiles: ['Dockerfile.ci', 'packages/contracts/src/guard.sol'],
+    nxProjects: ['dapp'],
+    dockerfileBefore: dockerfile,
+    dockerfileAfter: dockerfile.replace('COPY old /app', 'COPY new /app'),
+    baseAncestor: true,
+  });
+  assert.deepEqual(plan.build, COMPONENTS);
+  assert.equal(plan.refinement, null);
 });
 
 test('release plan selecciona dapp por config nueva y reutiliza los demás digests', () => {
