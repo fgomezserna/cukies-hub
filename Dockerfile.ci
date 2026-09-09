@@ -157,6 +157,35 @@ RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
     --mount=type=cache,id=cukies-next-cache-dapp,target=/app/dapp/.next/cache,sharing=locked \
     NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run dapp:build
 
+FROM deps AS treasure-hunt-build
+
+ARG CUKIES_BUILD_ENV_HASH
+ARG IMAGE_REVISION
+ARG NEXT_PUBLIC_APP_ENV
+ARG NEXT_PUBLIC_GAME_BASE_PATH
+ARG NEXT_PUBLIC_DAPP_ORIGIN
+ARG NEXT_PUBLIC_PARENT_URL
+ARG NEXT_PUBLIC_PUSHER_KEY
+ARG NEXT_PUBLIC_PUSHER_CLUSTER
+ARG NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED
+
+ENV CUKIES_BUILD_ENV_HASH=$CUKIES_BUILD_ENV_HASH \
+    SOURCE_COMMIT=$IMAGE_REVISION \
+    IMAGE_REVISION=$IMAGE_REVISION \
+    NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    NEXT_PUBLIC_GAME_BASE_PATH=$NEXT_PUBLIC_GAME_BASE_PATH \
+    NEXT_PUBLIC_DAPP_ORIGIN=$NEXT_PUBLIC_DAPP_ORIGIN \
+    NEXT_PUBLIC_PARENT_URL=$NEXT_PUBLIC_PARENT_URL \
+    NEXT_PUBLIC_PUSHER_KEY=$NEXT_PUBLIC_PUSHER_KEY \
+    NEXT_PUBLIC_PUSHER_CLUSTER=$NEXT_PUBLIC_PUSHER_CLUSTER \
+    NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED=$NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED
+
+COPY . .
+
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+    --mount=type=cache,id=cukies-next-cache-treasure-hunt,target=/app/games/sybil-slayer/.next/cache,sharing=locked \
+    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run sybil-slayer:build
+
 FROM deps AS chain-indexer-build
 
 COPY . .
@@ -305,3 +334,44 @@ LABEL coolify.managed="true" \
       org.opencontainers.image.revision="${IMAGE_REVISION}"
 
 CMD ["sh", "scripts/docker-start-ci.sh"]
+
+FROM base AS treasure-hunt
+
+ARG IMAGE_REVISION
+ARG NEXT_PUBLIC_APP_ENV
+
+ENV NODE_ENV=production \
+    HOSTNAME=0.0.0.0 \
+    NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    SOURCE_COMMIT=$IMAGE_REVISION \
+    IMAGE_REVISION=$IMAGE_REVISION \
+    CUKIES_IMAGE_REVISION=$IMAGE_REVISION \
+    CUKIES_SERVICE=treasure-hunt
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=treasure-hunt-build /app/games/sybil-slayer/.next/standalone /app
+COPY --from=treasure-hunt-build /app/games/sybil-slayer/.next/static /tmp/cukies-game-static/
+COPY --from=treasure-hunt-build /app/games/sybil-slayer/public /tmp/cukies-game-public/
+COPY --from=treasure-hunt-build /app/scripts/docker-dapp-server.mjs /app/scripts/docker-dapp-server.mjs
+COPY --from=treasure-hunt-build /app/scripts/docker-start-game-ci.mjs /app/scripts/docker-start-game-ci.mjs
+
+RUN if [ -f /app/games/sybil-slayer/server.js ]; then \
+      mkdir -p /app/games/sybil-slayer/.next; \
+      rm -rf /app/games/sybil-slayer/.next/static /app/games/sybil-slayer/public; \
+      mv /tmp/cukies-game-static /app/games/sybil-slayer/.next/static; \
+      mv /tmp/cukies-game-public /app/games/sybil-slayer/public; \
+    else \
+      mkdir -p /app/.next; \
+      rm -rf /app/.next/static /app/public; \
+      mv /tmp/cukies-game-static /app/.next/static; \
+      mv /tmp/cukies-game-public /app/public; \
+    fi
+
+LABEL coolify.managed="true" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}"
+
+EXPOSE 3000
+CMD ["node", "/app/scripts/docker-start-game-ci.mjs"]

@@ -10,7 +10,8 @@
       "options": {
         "command": "pnpm exec next build",
         "cwd": "games/sybil-slayer"
-      }
+      },
+      "inputs": ["production", "gameBuildEnv"]
     },
     "lint": {
       "executor": "nx:run-commands",

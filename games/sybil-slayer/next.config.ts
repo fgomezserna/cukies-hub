@@ -6,16 +6,20 @@ if (configuredBasePath && !/^\/[a-z0-9][a-z0-9/_-]*$/i.test(configuredBasePath))
   throw new Error('NEXT_PUBLIC_GAME_BASE_PATH must be empty or an absolute URL path');
 }
 
+const gameCacheVersion =
+  process.env.NEXT_PUBLIC_GAME_CACHE_VERSION?.trim() ||
+  process.env.SOURCE_COMMIT?.trim() ||
+  process.env.IMAGE_REVISION?.trim() ||
+  'dev';
+
 const nextConfig: NextConfig = {
 
   basePath: configuredBasePath,
+  output: 'standalone',
 
   /* config options here */
   env: {
-    NEXT_PUBLIC_GAME_CACHE_VERSION:
-      process.env.NEXT_PUBLIC_GAME_CACHE_VERSION ??
-      process.env.SOURCE_COMMIT ??
-      'dev',
+    NEXT_PUBLIC_GAME_CACHE_VERSION: gameCacheVersion,
   },
   typescript: {
     ignoreBuildErrors: true,
