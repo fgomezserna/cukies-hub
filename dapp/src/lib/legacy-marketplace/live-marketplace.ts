@@ -57,9 +57,15 @@ export function selectLegacyMarketplaceOwner(
   listingOwner: unknown,
   isOnSale: boolean,
 ) {
-  const escrowAwareOwner = isOnSale ? listingOwner : tokenOwner;
-  const normalized = String(escrowAwareOwner ?? '').trim();
-  return normalized || String(tokenOwner ?? '').trim();
+  const normalizedTokenOwner = String(tokenOwner ?? '').trim();
+  if (!isOnSale) return normalizedTokenOwner;
+
+  const normalizedListingOwner = String(listingOwner ?? '').trim();
+  if (!normalizedListingOwner) {
+    throw new Error('INVALID_LEGACY_MARKETPLACE_LISTING_OWNER');
+  }
+
+  return normalizedListingOwner;
 }
 
 function bscLiveState(

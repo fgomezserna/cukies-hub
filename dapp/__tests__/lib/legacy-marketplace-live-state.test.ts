@@ -17,11 +17,11 @@ describe('propietario autoritativo del marketplace Legacy', () => {
     )).toBe('current-token-owner');
   });
 
-  it('no sustituye un ownerOf válido por un vendedor vacío', () => {
-    expect(selectLegacyMarketplaceOwner(
-      'current-token-owner',
+  it('falla cerrado si una venta activa no expone vendedor', () => {
+    expect(() => selectLegacyMarketplaceOwner(
+      'marketplace-contract',
       '',
       true,
-    )).toBe('current-token-owner');
+    )).toThrow('INVALID_LEGACY_MARKETPLACE_LISTING_OWNER');
   });
 });
