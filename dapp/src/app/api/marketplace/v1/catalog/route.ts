@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { listLegacyMarketplaceCukies } from '@/lib/legacy-marketplace/data';
+import {
+  listLegacyMarketplaceCukies,
+  reconcileLegacyMarketplaceCatalogCandidates,
+} from '@/lib/legacy-marketplace/data';
 import {
   verifyLegacyMarketplaceListingsByNetwork,
   type LegacyMarketplaceUnavailableNetwork,
@@ -67,7 +70,22 @@ async function listVerifiedLegacyPage(input: {
       )),
     );
     verification.unavailableNetworks.forEach((network) => unavailableNetworks.add(network));
-    verified.push(...verification.items);
+    const reconciliableCandidates = candidates.filter((item) => (
+      (item.network === 'BSC' || item.network === 'TRON')
+      && !verification.unavailableNetworks.includes(item.network)
+    ));
+    await reconcileLegacyMarketplaceCatalogCandidates(
+      reconciliableCandidates,
+      verification.items,
+    );
+    const liveItems = [...verification.items];
+    if (input.sort === 'price-asc' || input.sort === 'price-desc') {
+      liveItems.sort((left, right) => {
+        const difference = (left.price ?? 0) - (right.price ?? 0);
+        return input.sort === 'price-asc' ? difference : -difference;
+      });
+    }
+    verified.push(...liveItems);
     cursor += page.items.length;
     if (page.items.length < input.limit || cursor >= page.total) break;
   }

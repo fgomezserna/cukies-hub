@@ -22,6 +22,7 @@ export type LegacyTronWebLike = {
   };
   defaultAddress?: {
     base58?: string;
+    hex?: string;
   };
   contract: (
     abi: unknown,

@@ -1,5 +1,6 @@
 jest.mock('@/lib/legacy-marketplace/data', () => ({
   listLegacyMarketplaceCukies: jest.fn(),
+  reconcileLegacyMarketplaceCatalogCandidates: jest.fn(),
 }));
 jest.mock('@/lib/uki-marketplace', () => ({
   listPublicUkiMarketplacePage: jest.fn(),
@@ -15,11 +16,15 @@ jest.mock('@/lib/legacy-marketplace/live-marketplace', () => ({
 import { NextRequest } from 'next/server';
 
 import { GET } from '@/app/api/marketplace/v1/catalog/route';
-import { listLegacyMarketplaceCukies } from '@/lib/legacy-marketplace/data';
+import {
+  listLegacyMarketplaceCukies,
+  reconcileLegacyMarketplaceCatalogCandidates,
+} from '@/lib/legacy-marketplace/data';
 import { verifyLegacyMarketplaceListingsByNetwork } from '@/lib/legacy-marketplace/live-marketplace';
 import { listPublicUkiMarketplacePage } from '@/lib/uki-marketplace';
 
 const legacyList = listLegacyMarketplaceCukies as jest.Mock;
+const reconcileLegacy = reconcileLegacyMarketplaceCatalogCandidates as jest.Mock;
 const ukiList = listPublicUkiMarketplacePage as jest.Mock;
 const verifyLegacy = verifyLegacyMarketplaceListingsByNetwork as jest.Mock;
 
@@ -81,6 +86,7 @@ describe('/api/marketplace/v1/catalog', () => {
       items,
       unavailableNetworks: [],
     }));
+    reconcileLegacy.mockResolvedValue(undefined);
   });
 
   it('avanza por páginas reales sin duplicar ni omitir más de cien resultados', async () => {
@@ -227,5 +233,44 @@ describe('/api/marketplace/v1/catalog', () => {
     expect(body.data.items.map((entry: { item: { tokenId: string } }) => entry.item.tokenId)).toEqual(['1']);
     expect(body.data.sources.legacy).toBe('ready');
     expect(body.data.legacyNetworks).toEqual({ BSC: 'ready', TRON: 'unavailable' });
+    expect(reconcileLegacy).toHaveBeenCalledWith(
+      [expect.objectContaining({ tokenId: '1', network: 'BSC' })],
+      [bsc],
+    );
+  });
+
+  it('ordena con el precio vivo y persiste la reconciliación de los candidatos', async () => {
+    const expensive = { ...legacyItem('1', 2_000_000_000), price: 1, priceOriginal: '1' };
+    const cheap = { ...legacyItem('2', 1_999_999_999), price: 2, priceOriginal: '2' };
+    legacyList.mockResolvedValue({
+      source: 'mongo',
+      items: [expensive, cheap],
+      total: 2,
+      offset: 0,
+      limit: 24,
+      facets,
+    });
+    verifyLegacy.mockResolvedValue({
+      items: [
+        { ...expensive, price: 10, priceOriginal: '10' },
+        { ...cheap, price: 5, priceOriginal: '5' },
+      ],
+      unavailableNetworks: [],
+    });
+
+    const response = await GET(request('scope=legacy&network=BSC&limit=24&sort=price-asc'));
+    const body = await response.json();
+
+    expect(body.data.items.map((entry: { item: { tokenId: string } }) => entry.item.tokenId)).toEqual(['2', '1']);
+    expect(reconcileLegacy).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ tokenId: '1', priceOriginal: '1' }),
+        expect.objectContaining({ tokenId: '2', priceOriginal: '2' }),
+      ],
+      expect.arrayContaining([
+        expect.objectContaining({ tokenId: '1', priceOriginal: '10' }),
+        expect.objectContaining({ tokenId: '2', priceOriginal: '5' }),
+      ]),
+    );
   });
 });

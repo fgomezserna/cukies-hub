@@ -8,6 +8,14 @@ import type { LegacyMarketplaceCukiItem } from './types';
 
 type BscMarketToken = readonly [string, bigint, bigint, boolean, bigint, bigint];
 export type LegacyMarketplaceUnavailableNetwork = 'BSC' | 'TRON';
+export type LegacyMarketplaceLiveState = {
+  network: LegacyMarketplaceUnavailableNetwork;
+  owner: string;
+  isOnSale: boolean;
+  paused: boolean;
+  price: number;
+  priceOriginal: string;
+};
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 5_000) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -41,6 +49,98 @@ function integer(value: unknown) {
       : '';
   if (!/^\d+$/.test(normalized)) throw new Error('INVALID_LEGACY_MARKETPLACE_VALUE');
   return BigInt(normalized);
+}
+
+function bscLiveState(
+  owner: string,
+  listing: BscMarketToken,
+  paused: boolean,
+): LegacyMarketplaceLiveState {
+  const priceOriginal = listing[1].toString();
+  return {
+    network: 'BSC',
+    owner,
+    isOnSale: listing[3] && listing[1] > BigInt(0),
+    paused,
+    price: Number(formatEther(listing[1])) * 10_000,
+    priceOriginal,
+  };
+}
+
+function tronLiveState(
+  item: LegacyMarketplaceCukiItem,
+  ownerValue: unknown,
+  listing: unknown,
+  pausedValue: unknown,
+): LegacyMarketplaceLiveState {
+  const price = integer(tronField(listing, 'price', 1));
+  const isOnSale = tronField(listing, 'isOnSale', 3) === true && price > BigInt(0);
+  const ownerHex = String(ownerValue ?? tronField(listing, 'owner', 0) ?? '');
+  let owner = item.owner ?? ownerHex;
+  try {
+    owner = TronWeb.address.fromHex(ownerHex);
+  } catch {
+    owner = item.owner ?? ownerHex;
+  }
+  return {
+    network: 'TRON',
+    owner,
+    isOnSale,
+    paused:
+      pausedValue === true
+      || pausedValue === 1
+      || pausedValue === '1'
+      || pausedValue === 'true',
+    price: Number(price) / 1_000_000,
+    priceOriginal: price.toString(),
+  };
+}
+
+export async function readLegacyMarketplaceLiveState(
+  item: LegacyMarketplaceCukiItem,
+): Promise<LegacyMarketplaceLiveState> {
+  if (item.network === 'BSC') {
+    const [paused, owner, listing] = await withTimeout(Promise.all([
+      legacyBscPublicClient.readContract({
+        address: legacyMarketplaceContracts.bsc.contracts.marketplace,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'paused',
+      }),
+      legacyBscPublicClient.readContract({
+        address: legacyMarketplaceContracts.bsc.contracts.token,
+        abi: legacyMarketplaceBscAbis.token,
+        functionName: 'ownerOf',
+        args: [BigInt(item.tokenId)],
+      }),
+      legacyBscPublicClient.readContract({
+        address: legacyMarketplaceContracts.bsc.contracts.marketplace,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'marketTokens',
+        args: [BigInt(item.tokenId)],
+      }),
+    ]));
+    return bscLiveState(String(owner), listing as BscMarketToken, Boolean(paused));
+  }
+  if (item.network !== 'TRON') throw new Error('INVALID_LEGACY_MARKETPLACE_NETWORK');
+  const tronWeb = new TronWeb({
+    fullHost: process.env.CUKIES_LEGACY_TRON_READ_RPC_URL?.trim()
+      || legacyMarketplaceContracts.tron.readRpcUrl,
+  });
+  tronWeb.setAddress(legacyMarketplaceContracts.tron.contracts.token);
+  const token = tronWeb.contract(
+    legacyMarketplaceTronAbis.token as unknown as Parameters<typeof tronWeb.contract>[0],
+    legacyMarketplaceContracts.tron.contracts.token,
+  );
+  const marketplace = tronWeb.contract(
+    legacyMarketplaceTronAbis.marketplace as unknown as Parameters<typeof tronWeb.contract>[0],
+    legacyMarketplaceContracts.tron.contracts.marketplace,
+  );
+  const [paused, owner, listing] = await withTimeout(Promise.all([
+    marketplace.paused().call(),
+    token.ownerOf(item.tokenId).call(),
+    marketplace.marketTokens(item.tokenId).call(),
+  ]));
+  return tronLiveState(item, owner, listing, paused);
 }
 
 async function verifyBscListings(items: LegacyMarketplaceCukiItem[]) {

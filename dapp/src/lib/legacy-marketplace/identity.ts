@@ -30,11 +30,12 @@ export function matchesLegacyMarketplaceIdentity(
   input: { network?: string; collection?: string },
 ) {
   if (input.network && input.network !== item.network) return false;
-  if (
-    input.collection &&
-    input.collection.toLowerCase() !== item.collectionAddress?.toLowerCase()
-  ) {
-    return false;
+  if (input.collection) {
+    if (!item.collectionAddress) return false;
+    const matchesCollection = item.network === 'BSC'
+      ? input.collection.toLowerCase() === item.collectionAddress.toLowerCase()
+      : input.collection === item.collectionAddress;
+    if (!matchesCollection) return false;
   }
   return true;
 }
