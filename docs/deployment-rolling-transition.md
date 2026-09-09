@@ -163,3 +163,14 @@ procedimiento de entrega por digest. La retención debe preservar las imágenes
 activas y las de recuperación; no ejecutar una limpieza global como parte del
 despliegue. La ausencia de cortes se declara únicamente sobre los flujos y el
 intervalo efectivamente medidos durante el ensayo.
+
+## Capacidad del builder
+
+VM1012 dispone de 12 GiB de RAM; BuildKit tiene un límite de 9 GiB y
+`max-parallelism=1`. El 2026-09-09, el límite anterior de 6 GiB agotó memoria
+al ejecutar `pnpm deploy` de schedulers y produjo exit 137/EOF antes de desplegar.
+La caché reside en el volumen persistente del builder. El descriptor de
+`docker buildx inspect` puede conservar una configuración antigua: contrastar
+los límites del contenedor y `/etc/buildkit/buildkitd.toml` del daemon activo.
+`prepare-buildx.sh` usa 9 GiB al crear un builder; los existentes se revisan antes
+de modificarlos, con el runner inactivo y conservando su volumen de caché.

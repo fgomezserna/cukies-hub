@@ -30,6 +30,7 @@ EOF
 docker buildx create \
   --name "$builder" \
   --driver docker-container \
+  --driver-opt "memory=${CUKIES_BUILDKIT_MEMORY:-9g}" \
   --buildkitd-config "$config" \
   --use
 docker buildx inspect --bootstrap
