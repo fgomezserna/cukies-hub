@@ -152,11 +152,87 @@ Protecciones recomendadas para `staging`:
 
 ## Configuracion Coolify
 
+### Despliegue de imagenes inmutables de staging
+
+El unico flujo CI de este carril es `.github/workflows/cukies-staging-images.yml`: acepta un
+`push` a `staging`, usa el GitHub Environment `cukies-staging` y el runner con las etiquetas
+`self-hosted`, `linux`, `x64` y `cukies-builder`. No se habilitan eventos de pull request,
+refs arbitrarios ni un disparador manual. El Environment contiene las credenciales del registry
+y Coolify; `CUKIES_STAGING_BUILD_ENV_JSON` es una variable publica validada por allowlist, no un
+almacen de secretos runtime.
+
+El pipeline usa Node 22, pnpm 10.19 y Nx 23.2. La primera ejecucion, un estado ausente o una
+base que no sea ancestro del SHA de GitHub construye los cinco targets CI (`dapp`,
+`chain-indexer`, `cuki-card-worker`, `schedulers` y `cukies-bridge-relayer`). En ejecuciones
+posteriores Nx affected y el diff de seguridad seleccionan los targets; los demas reutilizan el
+digest guardado. Cada imagen se publica con el tag inmutable `<sha>-<configHash>` y el compose
+usa una referencia `image` por componente que incluye digest obligatorio. `cuki-card-worker-legacy`
+comparte la imagen del card worker; los schedulers tienen una imagen propia.
+
+El builder BuildKit persistente se llama `cukies-ci`, usa el driver `docker-container`, una sola
+compilacion concurrente y caches de capas separados por componente y entorno en el registry.
+Nx conserva artefactos y base de datos bajo el mount `/app/.nx`, con
+`NX_CACHE_DIRECTORY` y `NX_WORKSPACE_DATA_DIRECTORY` explicitos; Next conserva su
+cache incremental por separado. El cache de registry no sustituye esos mounts. La
+creacion inicial fija la politica GC de 40 GB (`minFreeSpace=20 GB`, `reservedSpace=10 GB`);
+las ejecuciones posteriores solo inspeccionan y arrancan el builder existente. No se hace prune,
+SSH ni limpieza destructiva desde el workflow.
+
+El estado durable vive en `/srv/cukies-ci/state/staging/release.json` y contiene el ultimo SHA
+desplegado correctamente, el hash de configuracion y el digest de cada componente. Se escribe
+con rename atomico unicamente despues de que Coolify termine el deployment y la URL de health
+confirme el mismo SHA. El manifest JSON se adjunta como artefacto de cada ejecucion, tambien si
+un paso falla. Un fallo de deploy no adelanta la base de Nx ni modifica el estado durable.
+
+`docker-compose.images.yml` se genera de forma reproducible desde `docker-compose.coolify.yml`.
+Conserva perfiles, guards, comandos, variables, `label_file` si aparece en la fuente y la red
+externa `coolify`; elimina todos los `build`, `staging-mongo` y sus volumenes. Las BBDD y sus
+volumenes siguen fuera del Compose de la aplicacion. Las imagenes CI llevan
+`coolify.managed=true` para que la limpieza de Docker no las trate como imagenes huerfanas.
+
+Antes de iniciar Coolify, el flujo hace PATCH de `git_commit_sha`, `docker_compose_location` y
+`docker_compose_raw`, vuelve a leer la aplicacion para confirmar el SHA exacto, actualiza las
+referencias de imagen mediante `PATCH /applications/{uuid}/envs/bulk` y arranca el deployment
+por API. La API beta ejecuta `stop_running_container(force:true)` antes de arrancar el Compose:
+la seleccion de que construir permanece selectiva, pero los servicios del mismo Compose pueden
+reiniciarse juntos. El flujo no promete que los workers permanezcan levantados ni intenta cambiar
+esa politica.
+
+La activacion operativa queda para el coordinador despues de validar el parche: debe pasar el
+archivo Compose generado a la aplicacion y desactivar el webhook de build Git antes de aceptar
+el primer rollout. El estado actual de activacion es pendiente: root mantiene
+`CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=false`. Mientras siga ausente o en `false`, el workflow
+construye y adjunta el manifest, pero omite Coolify y no avanza el estado durable. Root puede
+ponerlo en `true` solo despues de verificar que la BBDD live funciona en el LXC independiente,
+que sus clientes usan el nuevo endpoint y que el autodeploy Git esta desactivado. Los volumenes
+originales se conservan para rollback; no forman parte del nuevo Compose. Health debe devolver
+`status=ok`, `environment=staging`, el SHA exacto y `coolify.resourceUuid` igual a
+`u4s804o4wwcckowgk0woo4wg`; el resultado conserva URL, timeouts, entorno y UUID verificados.
+El carril de produccion no cambia. Coolify conserva el despliegue de la aplicacion; este trabajo
+no incorpora autoescalado de servicios.
+
+El builder dedicado ya está instalado en VM1012 (`192.168.1.244`, 4 vCPU, 8 GiB RAM,
+120 GiB disco). El runner `cukies-builder-1012` está registrado. Mongo de staging
+funciona en LXC2007, `192.168.1.221:27018`; el Mongo compartido de `27017` se conserva
+sin cambios.
+
+El 2026-09-09 se sustituyó el cron de limpieza agresiva de VM1001 por
+`infrastructure/ci/docker-prune-safe.sh`: omite limpieza si Coolify tiene despliegues
+activos/en cola o no se puede consultar su estado; solo considera objetos antiguos
+y no limpia volúmenes ni caché de build. Se desactivó el modo forzado de limpieza
+interna de Coolify en los dos registros del mismo servidor.
+
+Durante el despliegue previo `1457` el host agotó `/srv`; se recuperó el servicio
+reduciendo del 5 % al 1 % los bloques reservados de esa partición de datos y
+retirando cuatro imágenes antiguas sin referencias. Los volúmenes se conservaron.
+El job quedó cancelado tras ENOSPC; no se presenta como despliegue exitoso. La
+aplicación con SHA `53088a3` se verificó tras recrear sus clientes hacia el LXC.
+
 El proveedor activo observado es Coolify. `cukieshub.eurekand.com` sigue `staging`; `cukies.world` sigue `main`.
 
 Trabajo pendiente en Coolify:
 
-- completar el cutover desde las bases logicas staging del host compartido a `cukies-staging-rs0`, sin leer ni escribir las bases live,
+- integrar y activar el CI de imagenes; la [migracion de Mongo al LXC](../infrastructure/ci/staging-data-handoff.md) ya esta verificada,
 - sustituir las integraciones externas deshabilitadas por credenciales realmente exclusivas cuando QA las necesite,
 - mantener los seis schedulers economicos y el publicador de batches desplegados con gates independientes,
 - documentar rollback por commit y por variables para cada promocion a `main`.
@@ -207,20 +283,12 @@ El schema de economia se inicializa de forma deliberada, no durante el arranque 
 
 Ambos comandos vuelven a ejecutar el guard staging-only antes de crear indices, escribir el sentinel o abrir la transaccion de prueba. Ademas, el arranque normal de `chain-indexer` ejecuta primero `setup:prod` y `setup:economy:prod`; asi cualquier coleccion o indice nuevo de Economy v2 queda instalado antes de iniciar el loop del indexer. Los wrappers manuales se conservan para diagnostico o reparacion controlada.
 
-### Mongo fisico exclusivo de staging
+### BBDD fuera del Compose de imagenes
 
-El servicio `staging-mongo` del compose crea un replica set de un solo nodo llamado `cukies-staging-rs0`, sin puerto publico y con volumenes exclusivos de la app Coolify `28`. Su entrypoint falla cerrado salvo que coincidan `APP_ENV=staging`, `STAGING_ONLY_GUARD=true` y el UUID `u4s804o4wwcckowgk0woo4wg`.
-
-El cutover se hace siempre en dos despliegues:
-
-1. desplegar `staging-mongo` manteniendo las cuatro URLs de aplicacion en el origen actual;
-2. el bootstrap valida que solo lee los tres namespaces `*-staging`, los copia a la replica exclusiva, conserva los cuatro usuarios limitados y escribe el marcador `logical-staging-v1`;
-3. verificar replica PRIMARY, conteos, indices, sentinel v2, usuarios/roles y transacciones;
-4. detener temporalmente solo los contenedores de la app `28` y ejecutar `cukies-staging-mongo-resync` dentro del nuevo Mongo para cerrar el delta con las tres fuentes staging ya quietas;
-5. cambiar solo las URLs de la app `28` al alias interno `cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg:27017`, con `replicaSet=cukies-staging-rs0`;
-6. redesplegar y repetir health, schema setup y comprobaciones de no escritura de los schedulers.
-
-No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap solo acepta como origen el host `192.168.1.221:27017`, los cuatro usuarios de staging conocidos y los tres nombres de base exactos; cualquier otra combinacion aborta el contenedor.
+El Compose de imagenes no crea `staging-mongo`, no declara sus volumenes y no contiene una ruta
+fallback a Mongo. La aplicacion conserva las URLs y credenciales de BBDD que ya administra el
+entorno de staging; este flujo no apaga, migra, resincroniza ni cambia datos. Cualquier cambio de
+topologia o migracion de BBDD requiere una operacion separada con su propio plan y validacion.
 
 ## Matriz de envs
 

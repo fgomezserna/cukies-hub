@@ -1,0 +1,11 @@
+/var/log/cukies-staging-mongodb/mongod.log {
+    daily
+    rotate 7
+    maxsize 20M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su cukies-mongo cukies-mongo
+}

@@ -1,0 +1,59 @@
+{
+  "version": "7.0.26",
+  "primary": true,
+  "databases": [
+    {
+      "database": "cukies-hub-staging",
+      "collections": 5,
+      "documents": 6444
+    },
+    {
+      "database": "cukies-legacy-staging",
+      "collections": 42,
+      "documents": 474385
+    },
+    {
+      "database": "cukieshub-new-staging",
+      "collections": 132,
+      "documents": 96605
+    }
+  ],
+  "mismatches": [],
+  "observedAt": "2026-09-09T12:05:40Z",
+  "source": {
+    "host": "VM1001",
+    "version": "4.4.29",
+    "snapshotAt": "2026-09-09T11:52:15.976253Z",
+    "backupSha256": "3b87434cbe5262f361b3629248e9aee86e23d09d5dde362486cbf5d45f745bce",
+    "containerState": "stopped",
+    "volumesPreserved": true,
+    "rollbackContainer": "cukies-mongo-rollback-20260909"
+  },
+  "destination": {
+    "lxc": 2007,
+    "node": "pve-04",
+    "endpoint": "192.168.1.221:27018",
+    "service": "mongod-cukies-staging",
+    "replicaSet": "cukies-staging-rs0",
+    "existing27017Unchanged": true,
+    "unauthenticatedAccessDenied": true,
+    "convertedDataSha256": "10d85435c72bd7a4204ba929a3d0909b1dc6f2d41a7e059e10527ddb9d8851c6"
+  },
+  "verification": {
+    "allScopedConnections": 5,
+    "prismaUserCount": 335,
+    "publicHealth": 200,
+    "servedSha": "53088a33fcdca428a2f6d11967b63c69d1e4fccb",
+    "indexerAdvancing": true,
+    "cardJobs": {
+      "economyGenerated": 19,
+      "legacyGenerated": 17465
+    },
+    "imageRegistryCiActivated": false
+  },
+  "rollout": {
+    "coolifyGitAutoDeploy": false,
+    "imageCiDeployGate": false,
+    "state": "Mongo migration live; CI code pending integration"
+  }
+}

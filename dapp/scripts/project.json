@@ -1,0 +1,18 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "schedulers",
+  "projectType": "application",
+  "sourceRoot": "dapp/scripts",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "inputs": ["production", "schedulerRuntimeManifest"],
+      "outputs": [],
+      "options": {
+        "command": "node -e \"const fs = require('node:fs'); for (const file of ['dapp/scripts/cukie-master-scheduler.mjs', 'dapp/scripts/competition-credit-scheduler.mjs', 'dapp/scripts/game-economy-scheduler.mjs', 'dapp/scripts/cukie-pool-scheduler.mjs', 'dapp/scripts/weekly-ranking-scheduler.mjs', 'dapp/scripts/reward-accounting-scheduler.mjs', 'dapp/scripts/reward-batch-publisher.mjs']) fs.accessSync(file)\"",
+        "cwd": "."
+      }
+    }
+  },
+  "tags": ["scope:schedulers"]
+}
