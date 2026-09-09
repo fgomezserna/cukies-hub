@@ -26,6 +26,12 @@ import { stableRewardHash } from "./rules";
 import type { RewardRule } from "./types";
 import type { RewardEmissionBudgetDay, RewardEmissionBudgetState } from "./types";
 import { DAILY_REWARD_EMISSION_RAW } from "./accounting-types";
+import { getAmbassadorEligibility } from "../ambassadors/eligibility";
+import {
+  materializeLockedPresaleAmbassadorAttributions,
+  resolveMongoAmbassadorAttribution,
+} from "../ambassadors/repository";
+import { getDefaultAmbassadorWallet } from "../ambassadors/rules";
 
 type SettledGameEvidence = {
   sessionId: string;
@@ -67,7 +73,8 @@ export interface RewardAccountingRepository {
     missingRewardSources: number;
     missingWeeklySources: number;
   }>;
-  listCreditContributors(startsAt: Date): Promise<RewardAccountingParticipant[]>;
+  listCreditContributors(startsAt: Date, observedAt?: Date): Promise<RewardAccountingParticipant[]>;
+  listDailyAmbassadorSourceSnapshots?(startsAt: Date, endsAt: Date): Promise<Record<string, string | null>>;
   listDailyAmbassadorSnapshots(
     startsAt: Date,
     endsAt: Date,
@@ -76,6 +83,7 @@ export interface RewardAccountingRepository {
     generation: "original" | "second_generation",
     startsAt: Date,
     endsAt: Date,
+    observedAt?: Date,
   ): Promise<CukieRewardAccountingParticipant[]>;
   findPriorWeeklyPoolTranche(scheduledAt: Date): Promise<PriorWeeklyPoolTranche | null>;
 }
@@ -83,6 +91,25 @@ export interface RewardAccountingRepository {
 export type RewardAccountingTransactionRunner = <T>(
   work: (repository: RewardAccountingRepository) => Promise<T>,
 ) => Promise<T>;
+
+export function resolveAmbassadorSnapshotWallet(snapshot: {
+  walletNormalized: string | null;
+  isCukieMaster?: boolean | null;
+  commissionEligible?: boolean;
+  eligibilityEvidenceHash?: string;
+  policyVersion?: "ambassador-lifecycle-v2";
+}): string | null {
+  if (snapshot.policyVersion !== "ambassador-lifecycle-v2") return snapshot.walletNormalized;
+  const eligible = (
+    snapshot.commissionEligible === true
+    && Boolean(snapshot.eligibilityEvidenceHash)
+  ) || (
+    snapshot.commissionEligible === undefined
+    && snapshot.isCukieMaster === true
+    && Boolean(snapshot.eligibilityEvidenceHash)
+  );
+  return eligible ? snapshot.walletNormalized : null;
+}
 
 export function createMongoRewardAccountingRepository(
   db: Db,
@@ -136,22 +163,66 @@ export function createMongoRewardAccountingRepository(
     amountRaw: string;
   }>("reward_pool_accruals");
   const options = { session };
-  const referralsFor = async (wallets: string[]) => {
-    if (wallets.length === 0) return new Map<string, string | null>();
-    const rows = await db.collection<{
-      normalizedWalletAddress: string;
-      lockedSponsorWalletAddress?: string | null;
-    }>("presale_participants").find({
-      normalizedWalletAddress: { $in: wallets },
-    }, options).project({
-      _id: 0,
-      normalizedWalletAddress: 1,
-      lockedSponsorWalletAddress: 1,
-    }).toArray();
-    return new Map(rows.map((row) => [
-      row.normalizedWalletAddress,
-      row.lockedSponsorWalletAddress ?? null,
-    ]));
+  const referralsFor = async (wallets: string[], observedAt: Date) => {
+    type ReferralSnapshot = {
+      ambassadorWalletNormalized: string | null;
+      commissionEligible: boolean;
+      capturedAt: Date;
+      evidenceHash: string | null;
+    };
+    if (wallets.length === 0) return new Map<string, ReferralSnapshot>();
+    const result = new Map<string, ReferralSnapshot>();
+    for (const wallet of wallets) {
+      let attribution = await resolveMongoAmbassadorAttribution(db, wallet, observedAt, session);
+      const defaultWallet = process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()
+        ? getDefaultAmbassadorWallet()
+        : null;
+      if (!attribution && defaultWallet && session) {
+        await materializeLockedPresaleAmbassadorAttributions(db, {
+          ambassadorWallet: defaultWallet,
+          referredWallet: wallet,
+          now: observedAt,
+          session,
+        });
+        attribution = await resolveMongoAmbassadorAttribution(db, wallet, observedAt, session);
+      }
+      if (!attribution) {
+        result.set(wallet, {
+          ambassadorWalletNormalized: null,
+          commissionEligible: false,
+          capturedAt: observedAt,
+          evidenceHash: null,
+        });
+        continue;
+      }
+      if (attribution.ambassadorWalletNormalized === defaultWallet) {
+        result.set(wallet, {
+          ambassadorWalletNormalized: defaultWallet,
+          commissionEligible: true,
+          capturedAt: observedAt,
+          evidenceHash: stableRewardHash({
+            kind: "ambassador-root-commission-eligibility-v1",
+            walletNormalized: defaultWallet,
+            capturedAt: observedAt,
+          }),
+        });
+        continue;
+      }
+      const eligibility = await getAmbassadorEligibility(attribution.ambassadorWalletNormalized, observedAt);
+      if (eligibility.isCukieMaster === null) {
+        throw new DomainConflictError(
+          "La elegibilidad del embajador no está disponible para cerrar el pool.",
+          { reason: "CUKIE_MASTER_SOURCE_UNKNOWN", retryable: true },
+        );
+      }
+      result.set(wallet, {
+        ambassadorWalletNormalized: eligibility.isCukieMaster ? attribution.ambassadorWalletNormalized : null,
+        commissionEligible: eligibility.isCukieMaster,
+        capturedAt: eligibility.observedAt,
+        evidenceHash: eligibility.sourceHash,
+      });
+    }
+    return result;
   };
   return {
     findRewardRule: (ruleVersion, at) => rewardRules.findOne({
@@ -435,7 +506,7 @@ export function createMongoRewardAccountingRepository(
         missingWeeklySources: missingWeekly[0]?.count ?? 0,
       };
     },
-    async listCreditContributors(startsAt) {
+    async listCreditContributors(startsAt, observedAt = new Date()) {
       const suffix = startsAt.toISOString().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const rows = await db.collection<{
         walletNormalized: string;
@@ -450,11 +521,14 @@ export function createMongoRewardAccountingRepository(
         { $group: { _id: "$walletNormalized", units: { $sum: "$credits" } } },
         { $sort: { _id: 1 } },
       ], options).toArray();
-      const referrals = await referralsFor(rows.map((row) => row._id));
+      const referrals = await referralsFor(rows.map((row) => row._id), observedAt);
       return rows.map((row) => ({
         walletNormalized: row._id,
         units: row.units,
-        ambassadorWalletNormalized: referrals.get(row._id) ?? null,
+        ambassadorWalletNormalized: referrals.get(row._id)?.ambassadorWalletNormalized ?? null,
+        ambassadorCommissionEligible: referrals.get(row._id)?.commissionEligible,
+        ambassadorCapturedAt: referrals.get(row._id)?.capturedAt,
+        ambassadorEvidenceHash: referrals.get(row._id)?.evidenceHash,
       }));
     },
     async listDailyAmbassadorSnapshots(startsAt, endsAt) {
@@ -465,19 +539,44 @@ export function createMongoRewardAccountingRepository(
         periodAnchorAt: { $gte: startsAt, $lt: endsAt },
       }, options).project<{
         wallet: string;
-        ambassadorSnapshot: { walletNormalized: string | null };
+        ambassadorSnapshot: {
+          walletNormalized: string | null;
+          isCukieMaster?: boolean | null;
+          commissionEligible?: boolean;
+          eligibilityEvidenceHash?: string;
+          policyVersion?: "ambassador-lifecycle-v2";
+        };
       }>({ _id: 0, wallet: 1, ambassadorSnapshot: 1 }).toArray();
       const snapshots: Record<string, string | null> = {};
       for (const row of rows) {
-        const value = row.ambassadorSnapshot.walletNormalized;
-        if (row.wallet in snapshots && snapshots[row.wallet] !== value) {
-          throw new DomainConflictError(`Snapshot ambassador contradictorio para ${row.wallet}.`);
-        }
+        const value = resolveAmbassadorSnapshotWallet(row.ambassadorSnapshot);
         snapshots[row.wallet] = value;
       }
       return snapshots;
     },
-    async listCukieParticipants(generation, startsAt, endsAt) {
+    async listDailyAmbassadorSourceSnapshots(startsAt, endsAt) {
+      const rows = await sources.find({
+        status: "settled",
+        outcome: "completed",
+        resultValid: true,
+        periodAnchorAt: { $gte: startsAt, $lt: endsAt },
+      }, options).project<{
+        sessionId: string;
+        ambassadorSnapshot: {
+          walletNormalized: string | null;
+          isCukieMaster?: boolean | null;
+          commissionEligible?: boolean;
+          eligibilityEvidenceHash?: string;
+          policyVersion?: "ambassador-lifecycle-v2";
+        };
+      }>({ _id: 0, sessionId: 1, ambassadorSnapshot: 1 }).toArray();
+      return Object.fromEntries(rows.map((row) => {
+        const snapshot = row.ambassadorSnapshot;
+        const eligible = resolveAmbassadorSnapshotWallet(snapshot) !== null;
+        return [`game-session:${row.sessionId}`, eligible ? snapshot.walletNormalized : null];
+      }));
+    },
+    async listCukieParticipants(generation, startsAt, endsAt, observedAt = new Date()) {
       const positions = await loadCukiePoolVaultRewardParticipants(
         db,
         requireCukiePoolVaultConfig(),
@@ -502,7 +601,7 @@ export function createMongoRewardAccountingRepository(
       const rows = [...grouped.values()].sort((left, right) => (
         left.wallet.localeCompare(right.wallet) || left.rarity.localeCompare(right.rarity)
       ));
-      const referrals = await referralsFor([...new Set(rows.map((row) => row.wallet))]);
+      const referrals = await referralsFor([...new Set(rows.map((row) => row.wallet))], observedAt);
       return rows.map((row) => {
         const rarity = rarityLevel.get(row.rarity);
         if (rarity === undefined) {
@@ -512,7 +611,10 @@ export function createMongoRewardAccountingRepository(
           walletNormalized: row.wallet,
           units: row.units,
           rarityLevel: rarity,
-          ambassadorWalletNormalized: referrals.get(row.wallet) ?? null,
+          ambassadorWalletNormalized: referrals.get(row.wallet)?.ambassadorWalletNormalized ?? null,
+          ambassadorCommissionEligible: referrals.get(row.wallet)?.commissionEligible,
+          ambassadorCapturedAt: referrals.get(row.wallet)?.capturedAt,
+          ambassadorEvidenceHash: referrals.get(row.wallet)?.evidenceHash,
         };
       });
     },
@@ -628,15 +730,16 @@ export class RewardAccountingService {
         original,
         second,
         priorWeekly,
-        ambassadorByWallet,
       ] = await Promise.all([
         repository.listDailyRewardSourceLines(dayId),
-        repository.listCreditContributors(startsAt),
-        repository.listCukieParticipants("original", startsAt, endsAt),
-        repository.listCukieParticipants("second_generation", startsAt, endsAt),
+        repository.listCreditContributors(startsAt, input.now),
+        repository.listCukieParticipants("original", startsAt, endsAt, input.now),
+        repository.listCukieParticipants("second_generation", startsAt, endsAt, input.now),
         repository.findPriorWeeklyPoolTranche(new Date(endsAt.getTime() + 2 * 60 * 60_000)),
-        repository.listDailyAmbassadorSnapshots(startsAt, endsAt),
       ]);
+      const ambassadorBySource = repository.listDailyAmbassadorSourceSnapshots
+        ? await repository.listDailyAmbassadorSourceSnapshots(startsAt, endsAt)
+        : {};
       const capacity = await repository.materializeDailyCapacity({
         dayId,
         startsAt,
@@ -656,7 +759,7 @@ export class RewardAccountingService {
         creditContributors,
         cukieOriginalParticipants: original,
         cukieSecondPlusParticipants: second,
-        ambassadorByWallet,
+        ambassadorBySource,
         priorWeekly: input.includePriorWeekly ? priorWeekly ?? undefined : undefined,
         destinations: {
           treasury: rule.destinations.treasury,

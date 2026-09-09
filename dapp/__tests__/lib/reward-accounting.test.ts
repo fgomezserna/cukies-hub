@@ -11,7 +11,10 @@ import {
   weeklySettlementSchedule,
 } from "@/lib/uki-economy/rewards/accounting";
 import { testRewardRule } from "@/lib/uki-economy/rewards/testing";
-import { RewardAccountingService } from "@/lib/uki-economy/rewards/accounting-repository";
+import {
+  RewardAccountingService,
+  resolveAmbassadorSnapshotWallet,
+} from "@/lib/uki-economy/rewards/accounting-repository";
 import {
   assertRewardAccountingActionEnabled,
   loadRewardAccountingRuntimeConfig,
@@ -243,6 +246,44 @@ describe("reward accounting invariants", () => {
     expect(result.priorReservedInflowRaw).toBe("210000000000000000");
     expect(result.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
   });
+
+  it("calcula la comisión del jugador por source y permite sponsors distintos el mismo día", () => {
+    const rule = testRewardRule({ version: "reward-v3" });
+    const sponsorA = wallet(401);
+    const sponsorB = wallet(402);
+    const result = calculateDailyRewardSettlement({
+      dayId: "2026-08-18",
+      rule,
+      sourceLines: [
+        {
+          sourceId: "game-session:a",
+          sourceTotalRaw: raw(10),
+          allocations: [{ allocationId: "player-a", walletNormalized: wallet(1), category: "player", amountRaw: raw(10) }],
+          accruals: [],
+        },
+        {
+          sourceId: "game-session:b",
+          sourceTotalRaw: raw(10),
+          allocations: [{ allocationId: "player-b", walletNormalized: wallet(1), category: "player", amountRaw: raw(10) }],
+          accruals: [],
+        },
+      ],
+      creditContributors: [],
+      cukieOriginalParticipants: [],
+      cukieSecondPlusParticipants: [],
+      ambassadorBySource: {
+        "game-session:a": sponsorA,
+        "game-session:b": null,
+      },
+      ambassadorByWallet: { [wallet(1)]: sponsorB },
+      destinations: DESTINATIONS,
+      sealedAt: new Date("2026-08-19T16:00:00.000Z"),
+    });
+    expect(result.allocations.filter((item) => item.category === "ambassador_ordinary").map((item) => item.walletNormalized))
+      .toEqual([sponsorA]);
+    expect(result.buckets.ambassadorOrdinaryRaw).toBe("500000000000000000");
+    expect(result.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
+  });
 });
 
 describe("weekly prize", () => {
@@ -362,6 +403,28 @@ describe("weekly prize", () => {
     });
   });
 
+  it("permite a la raíz institucional cobrar sin etiquetarla como Master", () => {
+    const source = settledResult({
+      wallet: wallet(1), gameId: "root-sponsor", scoreRaw: "200", playedAt: new Date("2026-08-20T10:00:00Z"),
+    });
+    source.ambassadorSnapshot = {
+      ...source.ambassadorSnapshot,
+      walletNormalized: wallet(9000),
+      policyVersion: "ambassador-lifecycle-v2",
+      isCukieMaster: null,
+      commissionEligible: true,
+      eligibilityCapturedAt: new Date("2026-08-20T09:59:59Z"),
+      eligibilityEvidenceHash: "6".repeat(64),
+    };
+    const result = calculateWeeklyPrize({
+      periodId: "2026-W34", ruleVersion: "reward-v3", potRaw: "10000", ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: ["reward-daily:2026-08-18"], results: [source],
+      lotteryEntropy: ENTROPY, destinations: DESTINATIONS, payoutAt: PAYOUT_AT, sealedAt: ENTROPY.confirmedAt,
+    });
+    expect(result.ambassadorPayouts).toHaveLength(1);
+    expect(result.ambassadorPayouts[0].ambassadorWallet).toBe(wallet(9000));
+  });
+
   it("no admite abandonos, fallos ni sesiones no settled y exige diez scores >100", () => {
     const base = Array.from({ length: 10 }, (_, index) => settledResult({
       wallet: wallet(1), gameId: `eligible-${index}`, scoreRaw: index === 9 ? "100" : "101",
@@ -395,6 +458,9 @@ describe("pool tranches and timing", () => {
   it("aplica max(ordinario + previo/7, 0.75) y 5% tambien al topup", () => {
     const tranche = calculatePoolTranche({
       periodId: "2026-W34", tranche: 0, participantWallet: wallet(1), ambassadorWallet: wallet(2),
+      ambassadorCommissionEligible: true,
+      ambassadorEligibilityCapturedAt: new Date("2026-08-18T15:59:00Z"),
+      ambassadorEligibilityEvidenceHash: "a".repeat(64),
       credits: 10, ordinaryRaw: "100000000000000000", priorPeriodRaw: "1400000000000000000",
       ordinarySourceId: "daily:2026-08-18", priorPeriodSourceId: "weekly:2026-W33",
       scheduledAt: new Date("2026-08-18T16:00:00Z"), sealedAt: new Date("2026-08-18T16:00:01Z"),
@@ -404,6 +470,10 @@ describe("pool tranches and timing", () => {
     expect(tranche.paymentRaw).toBe("750000000000000000");
     expect(tranche.topupRaw).toBe("450000000000000000");
     expect(tranche.ambassadorCommissionRaw).toBe("37500000000000000");
+    expect(tranche).toMatchObject({
+      ambassadorCommissionEligible: true,
+      ambassadorEligibilityEvidenceHash: "a".repeat(64),
+    });
     expect(tranche.fundingRaw).toBe("787500000000000000");
     expect(() => calculatePoolTranche({
       periodId: "2026-W34", tranche: 0, participantWallet: wallet(1), ambassadorWallet: wallet(1),
@@ -473,6 +543,22 @@ class MemoryAccountingRepository implements RewardAccountingRepository {
 }
 
 describe("accounting persistence and runtime gates", () => {
+  it("no reparte snapshots v2 elegibles sin evidencia y conserva legacy", () => {
+    const walletNormalized = wallet(403);
+    expect(resolveAmbassadorSnapshotWallet({
+      walletNormalized,
+      policyVersion: "ambassador-lifecycle-v2",
+      commissionEligible: true,
+    })).toBeNull();
+    expect(resolveAmbassadorSnapshotWallet({
+      walletNormalized,
+      policyVersion: "ambassador-lifecycle-v2",
+      commissionEligible: true,
+      eligibilityEvidenceHash: "b".repeat(64),
+    })).toBe(walletNormalized);
+    expect(resolveAmbassadorSnapshotWallet({ walletNormalized })).toBe(walletNormalized);
+  });
+
   it("hace replay idempotente y bloquea payload distinto", async () => {
     const repository = new MemoryAccountingRepository();
     const service = new RewardAccountingService(async (work) => work(repository));

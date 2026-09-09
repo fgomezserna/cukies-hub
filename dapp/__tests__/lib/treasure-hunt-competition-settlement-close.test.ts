@@ -1,5 +1,6 @@
 import {
   InMemoryCompetitionSettlementRepository,
+  CompetitionSettlementCloseError,
   closeTreasureHuntCompetition,
   type CompetitionSettlementCloseSource,
   type SettlementAttemptRecord,
@@ -71,7 +72,49 @@ class MutableSource implements CompetitionSettlementCloseSource {
   assertReady = jest.fn(async () => undefined);
   listAttempts = jest.fn(async () => this.attempts);
   listPurchases = jest.fn(async () => this.purchases);
-  listParticipants = jest.fn(async () => this.participants);
+  listParticipants = jest.fn(async (_input: { walletAddresses: readonly string[] }): Promise<SettlementParticipantRecord[]> => this.participants);
+  resolveAmbassadorSponsors = jest.fn(async (input: {
+    walletAddresses: readonly string[];
+    effectiveAt: string;
+  }): Promise<SettlementParticipantRecord[]> => {
+    const rows = await this.listParticipants({ walletAddresses: input.walletAddresses });
+    return rows.map((row) => ({
+      ...row,
+      effectiveSponsorWalletAddress: row.lockedSponsorWalletAddress ?? null,
+      sponsorCommissionEligible: Boolean(row.lockedSponsorWalletAddress),
+    }));
+  });
+}
+
+class AmbassadorLifecycleSource extends MutableSource {
+  resolvedParticipants: SettlementParticipantRecord[] = [];
+
+  resolveAmbassadorSponsors = jest.fn(async (_input: {
+    walletAddresses: readonly string[];
+    effectiveAt: string;
+  }): Promise<SettlementParticipantRecord[]> => this.resolvedParticipants);
+}
+
+function lifecycleParticipant(input: {
+  sponsor: string;
+  eligible: boolean;
+  walletAddress?: string;
+  reason?: string;
+}): SettlementParticipantRecord {
+  return {
+    walletAddress: input.walletAddress ?? PLAYER_A,
+    lockedSponsorWalletAddress: SPONSOR,
+    effectiveSponsorWalletAddress: input.sponsor,
+    sponsorAttributionSource: 'presale_locked',
+    sponsorAttributionSourceReferenceHash: 'a'.repeat(64),
+    sponsorAttributionAcceptedAt: '2026-02-01T00:00:00.000Z',
+    sponsorAttributionEvidenceHash: 'b'.repeat(64),
+    sponsorAttributionPolicyVersion: 'ambassador-direct-v1',
+    sponsorCommissionEligible: input.eligible,
+    sponsorEligibilityReason: input.reason ?? null,
+    sponsorEligibilitySourceHash: 'c'.repeat(64),
+    sponsorEligibilityObservedAt: '2026-04-01T00:00:00.000Z',
+  };
 }
 
 describe('Treasure Hunt competition settlement close', () => {
@@ -206,6 +249,99 @@ describe('Treasure Hunt competition settlement close', () => {
     });
     expect(result.snapshot.manifest.inputHash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(result.snapshot.manifest.outputHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+
+  it('does not create a new sponsor commission for a legacy sponsor without Cukie Master', async () => {
+    const source = new AmbassadorLifecycleSource();
+    source.attempts = [attempt('attempt-a')];
+    source.purchases = [{
+      eventId: 'purchase-a', walletAddress: PLAYER_A, ukiPurchasedRaw: '10000',
+      confirmedAt: '2026-02-01T00:00:00.000Z',
+    }];
+    source.resolvedParticipants = [lifecycleParticipant({
+      sponsor: SPONSOR, eligible: false, reason: 'CUKIE_MASTER_REQUIREMENT_NOT_MET',
+    })];
+
+    const result = await closeTreasureHuntCompetition({
+      runtime: runtime(), source, repository: new InMemoryCompetitionSettlementRepository(),
+      now: new Date('2026-04-01T00:00:00.000Z'),
+    });
+
+    expect(result.snapshot.settlement.sponsorRewardsUkiRaw).toBe('0');
+    expect(result.snapshot.settlement.awards[0].sponsorWalletAddress).toBeNull();
+    expect(result.snapshot.manifest).toEqual(expect.objectContaining({
+      ambassadorPolicyVersion: 'ambassador-direct-v1',
+      ambassadorResolutionAt: '2026-04-01T00:00:00.000Z',
+      ambassadorEvidenceHash: expect.stringMatching(/^sha256:/),
+    }));
+  });
+
+  it('creates a new sponsor commission only for a Master with confirmed sponsor', async () => {
+    const source = new AmbassadorLifecycleSource();
+    source.attempts = [attempt('attempt-a')];
+    source.purchases = [{
+      eventId: 'purchase-a', walletAddress: PLAYER_A, ukiPurchasedRaw: '10000',
+      confirmedAt: '2026-02-01T00:00:00.000Z',
+    }];
+    source.resolvedParticipants = [lifecycleParticipant({ sponsor: SPONSOR, eligible: true })];
+
+    const result = await closeTreasureHuntCompetition({
+      runtime: runtime(), source, repository: new InMemoryCompetitionSettlementRepository(),
+      now: new Date('2026-04-01T00:00:00.000Z'),
+    });
+
+    expect(result.snapshot.settlement.sponsorRewardsUkiRaw).toBe('250');
+    expect(result.snapshot.settlement.awards[0].sponsorWalletAddress).toBe(SPONSOR);
+  });
+
+  it('uses the current admin override sponsor while preserving the legacy locked sponsor as evidence', async () => {
+    const overrideSponsor = `0x${'4'.repeat(40)}`;
+    const source = new AmbassadorLifecycleSource();
+    source.attempts = [attempt('attempt-a')];
+    source.purchases = [{
+      eventId: 'purchase-a', walletAddress: PLAYER_A, ukiPurchasedRaw: '10000',
+      confirmedAt: '2026-02-01T00:00:00.000Z',
+    }];
+    source.resolvedParticipants = [lifecycleParticipant({ sponsor: overrideSponsor, eligible: true })];
+
+    const result = await closeTreasureHuntCompetition({
+      runtime: runtime(), source, repository: new InMemoryCompetitionSettlementRepository(),
+      now: new Date('2026-04-01T00:00:00.000Z'),
+    });
+
+    expect(result.snapshot.settlement.awards[0].sponsorWalletAddress).toBe(overrideSponsor);
+    expect(result.snapshot.allocations.map((allocation) => allocation.walletAddress)).toContain(overrideSponsor);
+  });
+
+  it('allows the institutional Cukies World root exemption and retries unknown Master evidence', async () => {
+    const source = new AmbassadorLifecycleSource();
+    source.attempts = [attempt('attempt-a')];
+    source.purchases = [{
+      eventId: 'purchase-a', walletAddress: PLAYER_A, ukiPurchasedRaw: '10000',
+      confirmedAt: '2026-02-01T00:00:00.000Z',
+    }];
+    source.resolvedParticipants = [lifecycleParticipant({ sponsor: SPONSOR, eligible: true, reason: 'CUKIES_WORLD_ROOT_EXEMPT' })];
+    const repository = new InMemoryCompetitionSettlementRepository();
+    source.resolveAmbassadorSponsors.mockRejectedValueOnce(new CompetitionSettlementCloseError(
+      'settlement_source_not_ready', 'Cukie Master eligibility is unknown',
+    ));
+    await expect(closeTreasureHuntCompetition({
+      runtime: runtime(), source, repository, now: new Date('2026-04-01T00:00:00.000Z'),
+    })).rejects.toMatchObject({ code: 'settlement_source_not_ready' });
+    const first = await closeTreasureHuntCompetition({
+      runtime: runtime(), source, repository, now: new Date('2026-04-01T00:00:00.000Z'),
+    });
+    source.resolveAmbassadorSponsors.mockRejectedValueOnce(new CompetitionSettlementCloseError(
+      'settlement_source_not_ready', 'Cukie Master eligibility is unknown',
+    ));
+
+    const replay = await closeTreasureHuntCompetition({
+      runtime: runtime(), source, repository, now: new Date('2026-04-02T00:00:00.000Z'),
+    });
+
+    expect(first.snapshot.settlement.sponsorRewardsUkiRaw).toBe('250');
+    expect(replay).toEqual({ created: false, snapshot: first.snapshot });
+    expect(source.resolveAmbassadorSponsors).toHaveBeenCalledTimes(2);
   });
 
   it('freezes the same threshold-adjusted indexed pool used by the provisional ranking', async () => {

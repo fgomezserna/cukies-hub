@@ -7,6 +7,7 @@ describe("ambassador economy index definitions", () => {
   it("mantiene una sola atribucion canonica por wallet referida", () => {
     expect(AMBASSADOR_ECONOMY_COLLECTIONS).toEqual([
       "ambassador_attributions",
+      "ambassador_attribution_overrides",
       "ambassador_graph_state",
       "ambassador_profiles",
     ]);
@@ -14,6 +15,11 @@ describe("ambassador economy index definitions", () => {
       collection: "ambassador_attributions",
       keys: { referredWalletNormalized: 1 },
       options: { unique: true, name: "ambassador_referred_wallet_unique" },
+    });
+    expect(AMBASSADOR_ECONOMY_INDEX_DEFINITIONS).toContainEqual({
+      collection: "ambassador_attribution_overrides",
+      keys: { referredWalletNormalized: 1, effectiveAt: -1, createdAt: -1, _id: 1 },
+      options: { name: "ambassador_override_effective_history" },
     });
   });
 

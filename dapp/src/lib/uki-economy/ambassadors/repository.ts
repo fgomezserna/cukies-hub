@@ -41,6 +41,21 @@ function duplicateKey(error: unknown) {
   );
 }
 
+async function findMongoAmbassadorOverride(
+  db: Db,
+  referredWalletNormalized: string,
+  effectiveAt: Date,
+  session?: ClientSession,
+) {
+  const { resolveMongoAmbassadorOverride } = await import("./admin");
+  return resolveMongoAmbassadorOverride(
+    db,
+    referredWalletNormalized,
+    effectiveAt,
+    session,
+  );
+}
+
 function lockedPresaleAmbassador(
   row: PresaleParticipant | null
 ): LockedPresaleAmbassador | null {
@@ -103,12 +118,19 @@ export function createMongoAmbassadorAttributionRepository(
         { session, upsert: true }
       );
     },
-    async findAttribution(referredWalletNormalized) {
+    async findAttribution(referredWalletNormalized, effectiveAt = new Date()) {
       const row = await attributions.findOne(
         { referredWalletNormalized },
         options
       );
-      return row ? assertAmbassadorAttribution(row) : null;
+      const base = row ? assertAmbassadorAttribution(row) : null;
+      const override = await findMongoAmbassadorOverride(
+        db,
+        referredWalletNormalized,
+        effectiveAt,
+        session,
+      );
+      return override ?? base;
     },
     async hasPresaleParticipation(referredWalletNormalized) {
       const row = await presale.findOne(
@@ -207,6 +229,11 @@ export async function resolveMongoAmbassadorAttributionsForWallets(
       )
       .toArray(),
   ]);
+  const overrides = await Promise.all(normalized.map(async (wallet) => [
+    wallet,
+    await findMongoAmbassadorOverride(db, wallet, effectiveAt, session),
+  ] as const));
+  const overrideByWallet = new Map(overrides);
   const existing = new Map(
     existingRows.map((row) => [
       row.referredWalletNormalized,
@@ -267,9 +294,11 @@ export async function resolveMongoAmbassadorAttributionsForWallets(
     }
   }
   for (const wallet of normalized) {
-    const attribution = existing.get(wallet) ?? null;
+    const override = overrideByWallet.get(wallet) ?? null;
+    const attribution = override ?? existing.get(wallet) ?? null;
     const presaleAttribution = locked.get(wallet);
     if (
+      !override &&
       presaleAttribution &&
       attribution?.ambassadorWalletNormalized !==
         presaleAttribution.ambassadorWalletNormalized
@@ -311,7 +340,7 @@ export async function getOrCreateMongoAmbassadorProfile(
   session?: ClientSession
 ) {
   const walletNormalized = validAmbassadorWallet(wallet);
-  const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, session);
+  const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, new Date(), session);
   if (!enrollment.canInvite) return null;
   const invitationCode = ambassadorInvitationCode(walletNormalized);
   const profile: AmbassadorProfile = {
@@ -359,7 +388,7 @@ export async function findMongoAmbassadorByInvitationCode(
   if (row.invitationCode !== ambassadorInvitationCode(walletNormalized)) {
     throw new DomainConflictError("El codigo de invitacion no coincide con su embajador.");
   }
-  const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, session);
+  const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, new Date(), session);
   if (!enrollment.canInvite) return null;
   return {
     ...row,
@@ -371,25 +400,43 @@ export async function findMongoAmbassadorByInvitationCode(
 export async function getMongoAmbassadorEnrollment(
   db: Db,
   wallet: string,
+  now = new Date(),
   session?: ClientSession
 ): Promise<AmbassadorEnrollment> {
   const walletNormalized = validAmbassadorWallet(wallet);
   const repository = createMongoAmbassadorAttributionRepository(db, session);
-  const isPresaleParticipant = await repository.hasPresaleParticipation(walletNormalized);
-  const attribution = await repository.findAttribution(walletNormalized);
+  const [isPresaleParticipant, attribution, locked] = await Promise.all([
+    repository.hasPresaleParticipation(walletNormalized),
+    repository.findAttribution(walletNormalized, now),
+    repository.findLockedPresaleAmbassador(walletNormalized),
+  ]);
+  const { getAmbassadorEligibility } = await import("./eligibility");
+  const eligibility = await getAmbassadorEligibility(walletNormalized, now);
   const isDefaultAmbassador =
     Boolean(process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()) &&
     walletNormalized === getDefaultAmbassadorWallet();
-  const canInvite = isPresaleParticipant || attribution !== null || isDefaultAmbassador;
-  return { isPresaleParticipant, canChooseSponsor: !canInvite, canInvite };
+  const hasConfirmedSponsor = isDefaultAmbassador || attribution !== null || locked !== null;
+  const canInvite = isDefaultAmbassador || (
+    eligibility.isCukieMaster === true && hasConfirmedSponsor
+  );
+  return {
+    isPresaleParticipant,
+    isCukieMaster: isDefaultAmbassador ? null : eligibility.isCukieMaster,
+    hasConfirmedSponsor,
+    canChooseSponsor: !isPresaleParticipant && !hasConfirmedSponsor && !isDefaultAmbassador,
+    canInvite,
+    eligibilityReason: isDefaultAmbassador ? "CUKIE_WORLD_ROOT_EXEMPT" : eligibility.reason,
+  };
 }
 
 export async function materializeLockedPresaleAmbassadorAttributions(
   db: Db,
   input: {
     ambassadorWallet?: string;
+    referredWallet?: string;
     now?: Date;
     session?: ClientSession;
+    dryRun?: boolean;
   } = {}
 ) {
   const now = input.now ?? new Date();
@@ -397,18 +444,14 @@ export async function materializeLockedPresaleAmbassadorAttributions(
     ? validAmbassadorWallet(input.ambassadorWallet)
     : null;
   const options = input.session ? { session: input.session } : {};
-  const query: Record<string, unknown> = {
-    lockedSponsorWalletAddress: { $type: "string" },
-  };
-  if (ambassadorWalletNormalized) {
-    query.lockedSponsorWalletAddress = {
-      $regex: `^${ambassadorWalletNormalized}$`,
-      $options: "i",
-    };
-  }
+  const defaultWallet = process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()
+    ? getDefaultAmbassadorWallet()
+    : null;
   const presaleRows = await db
     .collection<PresaleParticipant>("presale_participants")
-    .find(query, {
+    .find(input.referredWallet
+      ? { normalizedWalletAddress: validAmbassadorWallet(input.referredWallet) }
+      : {}, {
       ...options,
       projection: {
         _id: 0,
@@ -419,27 +462,119 @@ export async function materializeLockedPresaleAmbassadorAttributions(
       },
     })
     .toArray();
-  const candidates = presaleRows.map((row) => {
-    const locked = lockedPresaleAmbassador(row);
-    if (!locked)
-      throw new DomainConflictError(
-        "Un referido confirmado de preventa no pudo normalizarse."
-      );
-    return buildAmbassadorAttribution({
-      referredWallet: locked.referredWalletNormalized,
-      ambassadorWallet: locked.ambassadorWalletNormalized,
-      source: "presale_locked",
-      sourceReferenceHash: locked.sourceReferenceHash,
-      acceptedAt: locked.lockedAt,
+  const candidates = presaleRows.flatMap((row) => {
+    const locked = row.lockedSponsorWalletAddress
+      ? lockedPresaleAmbassador(row)
+      : null;
+    if (locked) {
+      if (ambassadorWalletNormalized && locked.ambassadorWalletNormalized !== ambassadorWalletNormalized) {
+        return [];
+      }
+      return [buildAmbassadorAttribution({
+        referredWallet: locked.referredWalletNormalized,
+        ambassadorWallet: locked.ambassadorWalletNormalized,
+        source: "presale_locked",
+        sourceReferenceHash: locked.sourceReferenceHash,
+        acceptedAt: locked.lockedAt,
+        now,
+      })];
+    }
+    if (!defaultWallet || (ambassadorWalletNormalized && defaultWallet !== ambassadorWalletNormalized)) {
+      return [];
+    }
+    // La autoatribucion CW es una escritura del grafo y solo se ejecuta en la
+    // transaccion de materializacion; el dashboard no abre una transaccion.
+    if (!input.session && !input.dryRun) return [];
+    if (!(row.firstPurchaseAt instanceof Date) || Number.isNaN(row.firstPurchaseAt.getTime())) {
+      return [];
+    }
+    const referredWalletNormalized = validAmbassadorWallet(
+      row.normalizedWalletAddress,
+      "presale.normalizedWalletAddress",
+    );
+    if (referredWalletNormalized === defaultWallet) return [];
+    return [buildAmbassadorAttribution({
+      referredWallet: referredWalletNormalized,
+      ambassadorWallet: defaultWallet,
+      source: "presale_default",
+      sourceReferenceHash: stableAmbassadorHash({
+        collection: "presale_participants",
+        kind: "presale-default-ambassador-v1",
+        referredWalletNormalized,
+        firstPurchaseAt: row.firstPurchaseAt,
+      }),
+      // El fallback CW empieza a generar comisiones desde la migracion; no
+      // reabre ni recalcula el sistema historico de referidos de preventa.
+      acceptedAt: now,
       now,
-    });
+    })];
   });
   if (candidates.length === 0) return { scanned: 0, materialized: 0 };
   const attributions = db.collection<AmbassadorAttribution>(
     "ambassador_attributions"
   );
+  const existing = await attributions.find({
+    referredWalletNormalized: {
+      $in: candidates.map((row) => row.referredWalletNormalized),
+    },
+  }, options).toArray();
+  const existingWallets = new Set(existing.map((row) => row.referredWalletNormalized));
+  const defaultCandidates = candidates.filter((candidate) => candidate.source === "presale_default");
+  const hasDefaultCandidates = defaultCandidates.length > 0;
+  const { resolveMongoAmbassadorOverride } = await import("./admin");
+  const overrides = await Promise.all(defaultCandidates.map(async (candidate) => ({
+    wallet: candidate.referredWalletNormalized,
+    attribution: await resolveMongoAmbassadorOverride(
+      db,
+      candidate.referredWalletNormalized,
+      now,
+      input.session,
+    ),
+  })));
+  const overriddenWallets = new Set(
+    overrides.filter((entry) => entry.attribution !== null).map((entry) => entry.wallet),
+  );
+  const preservedExisting = defaultCandidates.filter((candidate) =>
+    existingWallets.has(candidate.referredWalletNormalized) ||
+    overriddenWallets.has(candidate.referredWalletNormalized),
+  ).length;
+  const materializationCandidates = candidates.filter((candidate) =>
+    candidate.source !== "presale_default" || (
+      !existingWallets.has(candidate.referredWalletNormalized) &&
+      !overriddenWallets.has(candidate.referredWalletNormalized)
+    ),
+  );
+  const defaultMissing = materializationCandidates.filter(
+    (candidate) => candidate.source === "presale_default",
+  ).length;
+  if (defaultMissing > 0 && input.session) {
+    const graphRepository = createMongoAmbassadorAttributionRepository(db, input.session);
+    await graphRepository.acquireGraphWriteFence(now);
+    const { assertAttributionDoesNotCreateCycle } = await import("./service");
+    for (const candidate of materializationCandidates.filter((row) => row.source === "presale_default")) {
+      await assertAttributionDoesNotCreateCycle(
+        graphRepository,
+        candidate.referredWalletNormalized,
+        candidate.ambassadorWalletNormalized,
+        now,
+      );
+    }
+  }
+  if (input.dryRun) {
+    if (!hasDefaultCandidates) return { scanned: candidates.length, materialized: 0 };
+    return {
+      scanned: candidates.length,
+      preservedExisting,
+      defaultMissing,
+      materialized: defaultMissing,
+    };
+  }
+  if (materializationCandidates.length === 0) {
+    if (!hasDefaultCandidates) return { scanned: candidates.length, materialized: 0 };
+    return { scanned: candidates.length, preservedExisting, defaultMissing, materialized: 0 };
+  }
   const result = await attributions.bulkWrite(
-    candidates.map((attribution) => ({
+    materializationCandidates.map((attribution) => ({
       updateOne: {
         filter: {
           referredWalletNormalized: attribution.referredWalletNormalized,
@@ -454,14 +589,14 @@ export async function materializeLockedPresaleAmbassadorAttributions(
     .find(
       {
         referredWalletNormalized: {
-          $in: candidates.map((row) => row.referredWalletNormalized),
+          $in: materializationCandidates.map((row) => row.referredWalletNormalized),
         },
       },
       options
     )
     .toArray();
   const expectedByWallet = new Map(
-    candidates.map((row) => [row.referredWalletNormalized, row])
+    materializationCandidates.map((row) => [row.referredWalletNormalized, row])
   );
   for (const row of stored) {
     const expected = expectedByWallet.get(row.referredWalletNormalized);
@@ -474,5 +609,6 @@ export async function materializeLockedPresaleAmbassadorAttributions(
       );
     }
   }
-  return { scanned: candidates.length, materialized: result.upsertedCount };
+  if (!hasDefaultCandidates) return { scanned: candidates.length, materialized: result.upsertedCount };
+  return { scanned: candidates.length, preservedExisting, defaultMissing, materialized: result.upsertedCount };
 }

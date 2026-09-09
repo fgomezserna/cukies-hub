@@ -21,7 +21,9 @@ export const AMBASSADOR_ATTRIBUTION_POLICY =
 
 export type AmbassadorAttributionSource =
   | "presale_locked"
-  | "signed_wallet_session";
+  | "presale_default"
+  | "signed_wallet_session"
+  | "admin_override";
 
 export type AmbassadorAttribution = {
   _id: string;
@@ -56,15 +58,26 @@ export type AmbassadorProfile = {
 
 export type AmbassadorEnrollment = {
   isPresaleParticipant: boolean;
+  isCukieMaster?: boolean | null;
+  hasConfirmedSponsor?: boolean;
   canChooseSponsor: boolean;
   canInvite: boolean;
+  eligibilityReason?: string | null;
+};
+
+export type AmbassadorEligibility = {
+  isCukieMaster: boolean | null;
+  reason: string | null;
+  sourceHash: string | null;
+  observedAt: Date;
 };
 
 export interface AmbassadorAttributionRepository {
   acquireGraphWriteFence(now: Date): Promise<void>;
   hasPresaleParticipation(referredWalletNormalized: string): Promise<boolean>;
   findAttribution(
-    referredWalletNormalized: string
+    referredWalletNormalized: string,
+    effectiveAt?: Date,
   ): Promise<AmbassadorAttribution | null>;
   findLockedPresaleAmbassador(
     referredWalletNormalized: string
