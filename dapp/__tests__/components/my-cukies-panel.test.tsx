@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { MyCukiesPanel } from '@/components/cukies/my-cukies-panel';
 import { useAuth } from '@/providers/auth-provider';
@@ -140,5 +140,45 @@ describe('MyCukiesPanel', () => {
 
     expect(await screen.findByRole('heading', { name: 'Aún no hay Cukies en esta wallet' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Explorar marketplace/i })).toHaveAttribute('href', '/marketplace');
+  });
+
+  it('muestra acciones de estado y permite filtrar la colección', async () => {
+    fetchMock.mockResolvedValue(response([
+      item({ state: 'listed', saleKind: 'legacy', network: 'BSC', collectionAddress: '0x3333333333333333333333333333333333333333', availableActions: ['cancel_sale'] }),
+      item({ assetId: '97:0x3333333333333333333333333333333333333333:98000006', tokenId: '98000006', availableActions: ['deposit_pool', 'sell', 'stake_master'] }),
+    ]));
+
+    render(<MyCukiesPanel />);
+
+    expect(await screen.findByRole('link', { name: /Cancelar venta/i })).toHaveAttribute(
+      'href',
+      '/marketplace/98000005?source=legacy&network=BSC&collection=0x3333333333333333333333333333333333333333',
+    );
+    expect(screen.getByRole('link', { name: 'Hacer staking Master' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filtrar colección' }), { target: { value: 'listed' } });
+    expect(screen.getByRole('heading', { name: 'Cukie #98000005' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Cukie #98000006' })).not.toBeInTheDocument();
+  });
+
+  it('mantiene visible una custodia Pool histórica con acceso contextual', async () => {
+    fetchMock.mockResolvedValue(response([item({
+      tokenId: '98000001',
+      assetId: '97:0x3333333333333333333333333333333333333333:98000001',
+      state: 'in_pool',
+      custody: 'cukie_pool_recovery',
+      collectionAddress: '0x3333333333333333333333333333333333333333',
+      recoveryVaultAddress: '0x4444444444444444444444444444444444444444',
+      recoveryWithdrawableAt: String(Math.floor(Date.now() / 1_000) + 86_400),
+      availableActions: [],
+    })]));
+
+    render(<MyCukiesPanel />);
+
+    expect(await screen.findByRole('heading', { name: 'Cukie #98000001' })).toBeInTheDocument();
+    expect(screen.getAllByText('Vault anterior · salida pendiente')).not.toHaveLength(0);
+    expect(screen.getByRole('link', { name: /Gestionar recuperación/i })).toHaveAttribute(
+      'href',
+      '/cukie-hodler/recuperar?tokenId=98000001&recoveryVault=0x4444444444444444444444444444444444444444&collection=0x3333333333333333333333333333333333333333#pool-recovery',
+    );
   });
 });

@@ -113,6 +113,30 @@ function utcTimestampLabel(timestamp: bigint) {
   }).format(date);
 }
 
+function recoveryTransactionError(reason: unknown) {
+  const raw = reason instanceof Error ? reason.message : String(reason ?? '');
+  const message = raw.toLowerCase();
+  if (message.includes('pool_simulation_unavailable')) {
+    return 'No se pudo ejecutar la simulación previa. No se ha enviado ninguna transacción; actualiza la página o inténtalo cuando el RPC esté disponible.';
+  }
+  if (raw.startsWith('RECOVERY_OPERATION_')) {
+    return 'La wallet, la red o el vault cambiaron durante la comprobación. No se ha enviado ninguna transacción; vuelve a comprobar la posición antes de reintentarlo.';
+  }
+  if (message.includes('user rejected') || message.includes('user denied') || message.includes('rejected')) {
+    return 'La wallet canceló la firma. No se ha cambiado ninguna posición.';
+  }
+  if (message.includes('withdrawalnotready') || message.includes('exitnotrequested')) {
+    return 'La salida aún no está disponible según el calendario del vault anterior. Vuelve a comprobar la posición más adelante.';
+  }
+  if (message.includes('exitalreadyrequested')) {
+    return 'La salida ya estaba solicitada. Vuelve a comprobar la posición para ver su fecha de retirada.';
+  }
+  if (message.includes('revert')) {
+    return 'El contrato rechazó la operación. Revisa la fecha del calendario y vuelve a comprobar la posición.';
+  }
+  return 'No se pudo completar la recuperación. Vuelve a comprobar la posición antes de reintentarlo.';
+}
+
 export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const { address, chainId, isConnected } = useAccount();
   const runtime = useAppRuntime();
@@ -122,6 +146,11 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const operationGuardRef = useRef(operationGuard);
   operationGuardRef.current = operationGuard;
   const configuredCollections = ukiNftVaults.recoveryCollectionAddresses;
+  const previousPoolVaults = useMemo(
+    () => kind === 'cukie_pool' ? ukiNftVaults.poolRecoveryVaults ?? [] : [],
+    [kind],
+  );
+  const [recoveryVaultInput, setRecoveryVaultInput] = useState('active');
   const configuredCollectionKey = configuredCollections
     .map((collection) => collection.toLowerCase())
     .join(',');
@@ -135,17 +164,49 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const [chainTimeVerified, setChainTimeVerified] = useState(false);
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
   const operationLockRef = useRef(false);
+  const [requestedTokenId, setRequestedTokenId] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedTokenId = params.get('tokenId');
+    const requestedRecoveryVault = params.get('recoveryVault');
+    if (requestedTokenId && /^\d+$/.test(requestedTokenId)) {
+      setRequestedTokenId(requestedTokenId);
+      setTokenIdInput(requestedTokenId);
+    }
+    if (kind === 'cukie_pool' && requestedRecoveryVault && previousPoolVaults.some((vault) => (
+      sameAddress(vault.vaultAddress, requestedRecoveryVault)
+    ))) setRecoveryVaultInput(requestedRecoveryVault);
+  }, [kind, previousPoolVaults]);
 
-  const vaultAddress = kind === 'cukie_master'
+  const activeVaultAddress = kind === 'cukie_master'
     ? ukiNftVaults.cukieMasterNftVaultAddress
     : ukiNftVaults.cukiePoolNftVaultAddress;
+  const selectedPreviousVault = previousPoolVaults.find((vault) => (
+    sameAddress(vault.vaultAddress, recoveryVaultInput)
+  )) ?? null;
+  const vaultAddress = selectedPreviousVault?.vaultAddress ?? activeVaultAddress;
+  const writeContextRef = useRef({
+    wallet: address ?? null,
+    chainId: chainId ?? null,
+    vault: vaultAddress ?? null,
+  });
+  writeContextRef.current = {
+    wallet: address ?? null,
+    chainId: chainId ?? null,
+    vault: vaultAddress ?? null,
+  };
   const vaultAbi = kind === 'cukie_master'
     ? cukieMasterNftVaultAbi
     : cukiePoolNftVaultAbi;
-  const configuredMode = kind === 'cukie_master'
+  const configuredMode = selectedPreviousVault
+    ? 'custodial'
+    : kind === 'cukie_master'
     ? ukiNftVaults.mode.cukieMaster
     : ukiNftVaults.mode.cukiePool;
-  const configuredReady = kind === 'cukie_master'
+  const configuredReady = selectedPreviousVault
+    ? Boolean(ukiNftVaults.chainId && previousPoolVaults.length > 0)
+    : kind === 'cukie_master'
     ? ukiNftVaults.ready.cukieMaster
     : ukiNftVaults.ready.cukiePool;
   const pendingContext = useMemo<NftVaultPendingContext | null>(() => {
@@ -166,6 +227,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     && isAddress(vaultAddress)
     && ukiNftVaults.collectionConfigInvalid !== true
     && ukiNftVaults.recoveryCollectionConfigInvalid !== true
+    && (kind !== 'cukie_pool' || ukiNftVaults.poolRecoveryVaultConfigInvalid !== true)
     && configuredCollections.length > 0
     && configuredCollections.every((collection) => isAddress(collection)),
   );
@@ -199,6 +261,13 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     if (configuredCollections.some((collection) => sameAddress(collection, collectionInput))) return;
     setCollectionInput(configuredCollections[0] ?? '');
   }, [collectionInput, configuredCollectionKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (recoveryVaultInput === 'active' || previousPoolVaults.some((vault) => (
+      sameAddress(vault.vaultAddress, recoveryVaultInput)
+    ))) return;
+    setRecoveryVaultInput('active');
+  }, [previousPoolVaults, recoveryVaultInput]);
 
   useEffect(() => {
     operationLockRef.current = false;
@@ -456,13 +525,38 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       setPhase(operation === 'request_exit' ? 'requesting_exit' : 'withdrawing');
       setNotice(null);
       setLatestTxHash(null);
-      const hash = await writeContractAsync({
+      const simulateContract = (publicClient as unknown as {
+        simulateContract?: (request: Record<string, unknown>) => Promise<unknown>;
+      }).simulateContract;
+      if (typeof simulateContract !== 'function') {
+        throw new Error('POOL_SIMULATION_UNAVAILABLE');
+      }
+      if (!address || !ukiNftVaults.chainId || !vaultAddress) {
+        throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED');
+      }
+      const expectedContext = {
+        wallet: address,
+        chainId: ukiNftVaults.chainId,
+        vault: vaultAddress,
+      };
+      const request = {
         chainId: ukiNftVaults.chainId,
         address: vaultAddress,
         abi: vaultAbi,
         functionName: operation === 'request_exit' ? 'requestExit' : 'withdraw',
         args: [result.position.collection, result.position.tokenId],
-      });
+        account: expectedContext.wallet,
+      };
+      await simulateContract.call(publicClient, request);
+      const currentContext = writeContextRef.current;
+      const currentGuard = operationGuardRef.current;
+      if (
+        !currentGuard.ready
+        || !sameAddress(currentContext.wallet, expectedContext.wallet)
+        || currentContext.chainId !== expectedContext.chainId
+        || !sameAddress(currentContext.vault, expectedContext.vault)
+      ) throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED');
+      const hash = await writeContractAsync(request);
       submittedHash = hash;
       setLatestTxHash(hash);
       persistPending({
@@ -511,7 +605,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       } catch {
         setNotice('La transacción está confirmada, pero no pudimos releer el vault. Queda bloqueada hasta que vuelvas a comprobarla.');
       }
-    } catch {
+    } catch (reason) {
       if (submittedHash && !transactionReverted) {
         setNotice('La transacción ya fue enviada y sigue pendiente de comprobación. No la repitas.');
       } else {
@@ -519,7 +613,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
           kind: 'error',
           message: transactionReverted
             ? 'La transacción fue revertida por el contrato. Ya puedes volver a comprobar e intentarlo.'
-            : 'La wallet rechazó la operación antes de crear una transacción.',
+            : recoveryTransactionError(reason),
         });
       }
     } finally {
@@ -537,7 +631,15 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const explorerTxUrl = latestTxHash ? getNftVaultExplorerTxUrl(latestTxHash) : null;
 
   return (
-    <details className="group mt-6 rounded-[8px] border border-[var(--uki-lilac-border)] bg-black/25 p-5">
+    <details
+      id={kind === 'cukie_pool' ? 'pool-recovery' : 'master-recovery'}
+      open={Boolean(requestedTokenId) || manualOpen}
+      onToggle={(event) => {
+        setManualOpen(event.currentTarget.open);
+        if (!event.currentTarget.open) setRequestedTokenId(null);
+      }}
+      className="group mt-6 rounded-[8px] border border-[var(--uki-lilac-border)] bg-black/25 p-5"
+    >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
         <span>
           <span className="uki-label">Recuperación de emergencia</span>
@@ -555,6 +657,31 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
           Usa esta opción solo si un Cukie que ya depositaste no aparece en tu cuenta.
           Te permite comprobar la posición y recuperar el Cukie, pero no realizar nuevos depósitos.
         </p>
+
+      {kind === 'cukie_pool' && previousPoolVaults.length > 0 ? (
+        <label className="mt-4 grid max-w-xl gap-1.5 text-xs font-black uppercase text-[var(--uki-muted)]">
+          Vault Pool
+          <select
+            aria-label="Vault Pool"
+            value={recoveryVaultInput}
+            disabled={phase !== 'idle'}
+            onChange={(event) => setRecoveryVaultInput(event.target.value)}
+            className="h-11 rounded-[7px] border border-white/15 bg-black/40 px-3 text-sm font-semibold normal-case text-[var(--uki-text)] disabled:opacity-50"
+          >
+            <option value="active">Pool actual</option>
+            {previousPoolVaults.map((vault) => (
+              <option key={vault.vaultAddress.toLowerCase()} value={vault.vaultAddress}>
+                Pool anterior · {shortAddress(vault.vaultAddress)}
+              </option>
+            ))}
+          </select>
+          {selectedPreviousVault ? (
+            <span className="mt-1 normal-case text-amber-300">
+              Esta lectura usa el vault anterior configurado y conserva el calendario de salida de esa custodia.
+            </span>
+          ) : null}
+        </label>
+      ) : null}
 
       {!publicConfigReady ? (
         <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">

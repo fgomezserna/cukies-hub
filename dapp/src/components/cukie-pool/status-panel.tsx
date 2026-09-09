@@ -171,6 +171,72 @@ function statusLabel(value: PoolPositionStatus) {
   return 'Retirado';
 }
 
+function poolGuardLabel(input: {
+  identityReady: boolean;
+  depositsReady: boolean;
+  pendingHydrated: boolean;
+  pending?: NftVaultPendingOperation;
+  correctChain: boolean;
+  walletMatches: boolean;
+  canonical: boolean;
+  busy?: boolean;
+}) {
+  if (input.busy) return 'Ya hay otra operación en curso; espera a que termine antes de repetirla.';
+  if (!input.canonical) return 'El inventario de este Cukie está pendiente de sincronizar; actualiza el estado antes de aportar.';
+  if (!input.walletMatches) return 'Conecta la misma wallet con la que has iniciado sesión para aportar este Cukie.';
+  if (!input.correctChain) return 'Cambia tu wallet a la red configurada para este Pool antes de aportar.';
+  if (!input.identityReady) return 'No podemos verificar la configuración y la custodia del Pool; la operación permanece bloqueada.';
+  if (!input.depositsReady) return 'El indexador está actualizando el inventario; el depósito se habilitará cuando el estado sea verificable.';
+  if (!input.pendingHydrated) return 'Estamos recuperando el estado de operaciones anteriores; espera un momento.';
+  if (input.pending && input.pending.phase !== 'approval_confirmed') return 'Este Cukie ya tiene una operación pendiente; espera a que se confirme antes de repetirla.';
+  return null;
+}
+
+function poolTransactionError(reason: unknown) {
+  const raw = reason instanceof Error ? reason.message : String(reason ?? '');
+  const message = raw.toLowerCase();
+  if (message.includes('pool_simulation_unavailable')) {
+    return 'No se pudo ejecutar la simulación previa del Pool. No se ha enviado ninguna transacción; actualiza la página o inténtalo cuando el RPC esté disponible.';
+  }
+  if (message.includes('user rejected') || message.includes('user denied') || message.includes('rejected')) {
+    return 'La wallet canceló la firma. No se ha cambiado ninguna posición.';
+  }
+  if (raw.startsWith('POOL_OPERATION_')) {
+    const code = raw.slice('POOL_OPERATION_'.length);
+    return ({
+      WRONG_CHAIN: 'Cambia tu wallet a la red configurada para este Pool.',
+      WALLET_MISMATCH: 'Conecta la misma wallet con la que has iniciado sesión.',
+      PUBLIC_CLIENT_UNAVAILABLE: 'No podemos comprobar la red ahora. Actualiza el estado y vuelve a intentarlo.',
+      CONTEXT_CHANGED: 'La wallet, la red o el vault cambiaron durante la comprobación. No se ha enviado ninguna transacción; actualiza el estado antes de reintentarlo.',
+    } as Record<string, string>)[code] ?? 'La operación permanece bloqueada porque no se puede verificar su contexto.';
+  }
+  if (message.includes('wallet_is_not_owner') || message.includes('not token owner')) {
+    return 'Este Cukie ya no está en tu wallet. El inventario puede estar desactualizado; actualiza el estado antes de volver a intentarlo.';
+  }
+  if (message.includes('collectionnotallowed') || message.includes('invalidcollection')) {
+    return 'El contrato no permite esta colección en el Pool configurado. No se ha movido ningún NFT.';
+  }
+  if (message.includes('positionalreadyexists') || message.includes('registeredposition')) {
+    return 'Este Cukie ya tiene una posición registrada en el Pool. Actualiza el estado para verla.';
+  }
+  if (message.includes('withdrawalnotready') || message.includes('exitnotrequested')) {
+    return 'La salida todavía no está disponible para esta posición. Revisa la fecha indicada y actualiza el estado.';
+  }
+  if (message.includes('exitalreadyrequested')) {
+    return 'La salida de este Cukie ya está solicitada. Actualiza el estado para ver cuándo puedes retirarlo.';
+  }
+  if (message.includes('enforcedpause')) {
+    return 'El Pool está pausado temporalmente. No se ha cambiado ninguna posición; vuelve a intentarlo cuando se habilite.';
+  }
+  if (message.includes('transaction_reverted') || message.includes('reverted')) {
+    return 'El contrato ha rechazado la operación (revert). Revisa la red, la colección y el estado del Cukie antes de reintentarlo.';
+  }
+  if (message.includes('simulation')) {
+    return 'La simulación del contrato ha rechazado la operación. Revisa la red, la colección y el estado del Cukie antes de firmar.';
+  }
+  return 'No se pudo completar la operación del Pool. Actualiza el estado y vuelve a intentarlo.';
+}
+
 function pendingLabel(operation: NftVaultPendingOperation) {
   if (operation.phase === 'approval_confirmed') return 'Continuar depósito';
   if (operation.phase === 'syncing_projection') {
@@ -278,6 +344,16 @@ export function CukiePoolStatusPanel() {
   const operationGuard = useGuardedOperation('pool-write');
   const operationGuardRef = useRef(operationGuard);
   operationGuardRef.current = operationGuard;
+  const writeContextRef = useRef({
+    wallet: address ?? null,
+    chainId: chainId ?? null,
+    vault: ukiNftVaults.cukiePoolNftVaultAddress ?? null,
+  });
+  writeContextRef.current = {
+    wallet: address ?? null,
+    chainId: chainId ?? null,
+    vault: ukiNftVaults.cukiePoolNftVaultAddress ?? null,
+  };
   const [mutatingAssetId, setMutatingAssetId] = useState<string | null>(null);
   const [phase, setPhase] = useState<MutationPhase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -478,7 +554,31 @@ export function CukiePoolStatusPanel() {
       throw new Error(`POOL_OPERATION_${currentGuard.reason.toUpperCase()}`);
     }
     if (!publicClient) throw new Error('PUBLIC_CLIENT_UNAVAILABLE');
-    const hash = await writeContractAsync(input);
+    if (!address || !ukiNftVaults.chainId || !ukiNftVaults.cukiePoolNftVaultAddress) {
+      throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
+    }
+    const expectedContext = {
+      wallet: address,
+      chainId: ukiNftVaults.chainId,
+      vault: ukiNftVaults.cukiePoolNftVaultAddress,
+    };
+    const simulateContract = (publicClient as unknown as {
+      simulateContract?: (request: Record<string, unknown>) => Promise<unknown>;
+    }).simulateContract;
+    if (typeof simulateContract !== 'function') {
+      throw new Error('POOL_SIMULATION_UNAVAILABLE');
+    }
+    const request = { ...input, account: expectedContext.wallet };
+    await simulateContract.call(publicClient, request);
+    const currentContext = writeContextRef.current;
+    const currentGuardAfterSimulation = operationGuardRef.current;
+    if (
+      !currentGuardAfterSimulation.ready
+      || !sameAddress(currentContext.wallet, expectedContext.wallet)
+      || currentContext.chainId !== expectedContext.chainId
+      || !sameAddress(currentContext.vault, expectedContext.vault)
+    ) throw new Error('POOL_OPERATION_CONTEXT_CHANGED');
+    const hash = await writeContractAsync(request);
     setLatestTxHash(hash);
     persistPending({ asset, action, phase: 'awaiting_receipt', txHash: hash });
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -527,7 +627,19 @@ export function CukiePoolStatusPanel() {
       || !vaultAddress
       || !ukiNftVaults.chainId
       || !publicClient
-    ) return;
+    ) {
+      setError(poolGuardLabel({
+        identityReady,
+        depositsReady,
+        pendingHydrated,
+        pending: pendingByAsset[asset.assetId],
+        correctChain,
+        walletMatches,
+        canonical: Boolean(identity),
+        busy: Boolean(mutatingAssetId || walletOperationLockRef.current || operationLocksRef.current.has(asset.assetId)),
+      }));
+      return;
+    }
     walletOperationLockRef.current = true;
     operationLocksRef.current.add(asset.assetId);
     setMutatingAssetId(asset.assetId);
@@ -577,7 +689,7 @@ export function CukiePoolStatusPanel() {
       setPhase('syncing');
       await runtime.refreshAfterTransaction('pool');
       setNotice('Depósito confirmado en BSC. Este Cukie seguirá bloqueado mientras actualizamos el inventario; ya puedes operar con otro.');
-    } catch {
+    } catch (reason) {
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
           .find((item) => item.assetId === asset.assetId)
@@ -587,7 +699,10 @@ export function CukiePoolStatusPanel() {
           ? 'La aprobación quedó confirmada. Pulsa «Continuar depósito» cuando quieras reanudar.'
           : 'La operación ya tiene transacción. Seguiremos comprobándola automáticamente; no la repitas.');
       } else {
-        setError('La wallet rechazó la operación antes de crear una transacción, o la transacción fue revertida.');
+        setError(poolTransactionError(reason));
+        if (reason instanceof Error && reason.message.includes('WALLET_IS_NOT_OWNER')) {
+          void refreshStatusQuery();
+        }
       }
     } finally {
       setPhase('idle');
@@ -614,7 +729,19 @@ export function CukiePoolStatusPanel() {
       || !identity
       || !vaultAddress
       || !ukiNftVaults.chainId
-    ) return;
+    ) {
+      setError(poolGuardLabel({
+        identityReady,
+        depositsReady: true,
+        pendingHydrated,
+        pending: pendingByAsset[position.assetId],
+        correctChain,
+        walletMatches,
+        canonical: Boolean(identity),
+        busy: Boolean(mutatingAssetId || walletOperationLockRef.current || operationLocksRef.current.has(position.assetId)),
+      }));
+      return;
+    }
     walletOperationLockRef.current = true;
     operationLocksRef.current.add(position.assetId);
     setExitConfirmationId(null);
@@ -636,7 +763,7 @@ export function CukiePoolStatusPanel() {
       setNotice(operation === 'request_exit'
         ? 'Salida confirmada en BSC. Este Cukie ya no participa en el reparto y seguirá bloqueado mientras actualizamos su estado.'
         : 'Retirada confirmada en BSC. Estamos actualizando el inventario; ya puedes operar con otro Cukie.');
-    } catch {
+    } catch (reason) {
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
           .find((item) => item.assetId === position.assetId)
@@ -644,7 +771,7 @@ export function CukiePoolStatusPanel() {
       if (persisted) {
         setNotice('La operación ya tiene transacción. Seguiremos comprobándola automáticamente; no la repitas.');
       } else {
-        setError('La wallet rechazó la operación o el contrato no permitió completarla.');
+        setError(poolTransactionError(reason));
       }
     } finally {
       setPhase('idle');
@@ -882,8 +1009,18 @@ export function CukiePoolStatusPanel() {
                     const pending = pendingByAsset[asset.assetId];
                     const pendingLocked = Boolean(pending && pending.phase !== 'approval_confirmed');
                     const gamesPerDay = dailyGamesCapacity(asset.generation, asset.rarity);
+                    const guardMessage = poolGuardLabel({
+                      identityReady,
+                      depositsReady,
+                      pendingHydrated,
+                      pending,
+                      correctChain,
+                      walletMatches,
+                      canonical: Boolean(canonicalIdentity(asset)),
+                      busy: Boolean(mutatingAssetId && mutatingAssetId !== asset.assetId),
+                    });
                     return (
-                    <article key={asset.assetId} className="min-w-0 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914] transition-transform duration-200 active:scale-[0.99] sm:grid sm:grid-cols-[11rem_minmax(0,1fr)]">
+                    <article id={`pool-available-${asset.tokenId}`} key={asset.assetId} className="min-w-0 scroll-mt-24 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914] transition-transform duration-200 active:scale-[0.99] sm:grid sm:grid-cols-[11rem_minmax(0,1fr)]">
                       <div className="relative aspect-[4/3] min-w-0 overflow-hidden border-b border-white/10 bg-[#160d21] sm:aspect-auto sm:min-h-[13.5rem] sm:border-b-0 sm:border-r">
                         <CukiImage
                           src={asset.imageUrl}
@@ -926,6 +1063,9 @@ export function CukiePoolStatusPanel() {
                                 ? pendingLabel(pending)
                                 : 'Aportar este Cukie'}
                         </button>
+                        {guardMessage && !working && !pendingLocked ? (
+                          <p className="mt-2 text-center text-[11px] font-semibold leading-relaxed text-amber-200">{guardMessage}</p>
+                        ) : null}
                         {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (
                           <a
                             href={`${ukiNftVaults.explorerBaseUrl}/tx/${pending.txHash}`}
@@ -968,7 +1108,7 @@ export function CukiePoolStatusPanel() {
                     const pending = pendingByAsset[position.assetId];
                     const confirmingExit = exitConfirmationId === position.positionId;
                     return (
-                    <article key={position.positionId} className="min-w-0 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914]">
+                    <article id={`pool-cukie-${position.tokenId}`} key={position.positionId} className="min-w-0 scroll-mt-24 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914]">
                       <div className="grid min-w-0 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
                         <div className="relative aspect-[4/3] min-w-0 overflow-hidden border-b border-white/10 bg-[#160d21] sm:aspect-auto sm:min-h-[15.5rem] sm:border-b-0 sm:border-r">
                           <CukiImage
@@ -1080,12 +1220,19 @@ export function CukiePoolStatusPanel() {
               )}
             </div>
 
-            <div className="border-t border-white/10 pt-5 text-sm font-semibold text-[var(--uki-muted)]">
-              ¿Depositaste un Cukie y no aparece aquí?{' '}
-              <Link href="/cukie-hodler/recuperar" className="font-black text-[var(--uki-lilac)] hover:underline">
-                Abrir la herramienta de recuperación
-              </Link>
-            </div>
+            {(ukiNftVaults.poolRecoveryVaults?.length ?? 0) > 0 ? (
+              <div className="border-t border-white/10 pt-5 text-sm font-semibold text-[var(--uki-muted)]">
+                Los Cukies que siguen en un vault Pool anterior no se cuentan como disponibles.{' '}
+                <Link href="/cukies" className="font-black text-[var(--uki-lilac)] hover:underline">
+                  Verlos en Mis Cukies
+                </Link>{' '}
+                o{' '}
+                <Link href="/cukie-hodler/recuperar#pool-recovery" className="font-black text-[var(--uki-lilac)] hover:underline">
+                  abrir la herramienta de recuperación
+                </Link>
+                {' '}para consultar sus fechas de salida.
+              </div>
+            ) : null}
 
           </div>
         ) : null}

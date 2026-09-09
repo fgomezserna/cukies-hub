@@ -10,6 +10,7 @@ import type {
   MyCukieCollectionData,
   MyCukieCollectionItem,
   MyCukieCollectionResponse,
+  MyCukieAction,
 } from '@/lib/cukies-data/my-collection-types';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -34,6 +35,19 @@ function rarityLabel(cukie: MyCukieCollectionItem) {
 }
 
 function stateLabel(cukie: MyCukieCollectionItem) {
+  if (cukie.custody === 'cukie_pool_recovery') {
+    if (cukie.recoveryWithdrawableAt) {
+      try {
+        const withdrawableAt = BigInt(cukie.recoveryWithdrawableAt);
+        const nowSeconds = BigInt(Math.floor(Date.now() / 1_000));
+        if (withdrawableAt <= nowSeconds) return 'Vault anterior · listo según calendario';
+      } catch {
+        // An invalid timestamp stays pending; it must never look withdrawable.
+      }
+    }
+    if (cukie.recoveryExitRequestedAt) return 'Vault anterior · salida solicitada';
+    return 'Vault anterior · salida pendiente';
+  }
   if (cukie.state === 'cukie_master') return 'En Cukie Master';
   if (cukie.state === 'in_pool') {
     if (cukie.poolStatus === 'pending') return 'Activándose en el pool';
@@ -53,6 +67,12 @@ function stateLabel(cukie: MyCukieCollectionItem) {
 }
 
 function itemAction(cukie: MyCukieCollectionItem) {
+  if (cukie.custody === 'cukie_pool_recovery') {
+    const query = new URLSearchParams({ tokenId: cukie.tokenId });
+    if (cukie.recoveryVaultAddress) query.set('recoveryVault', cukie.recoveryVaultAddress);
+    if (cukie.collectionAddress) query.set('collection', cukie.collectionAddress);
+    return { href: `/cukie-hodler/recuperar?${query.toString()}#pool-recovery`, label: 'Gestionar recuperación' };
+  }
   if (cukie.custody === 'cukie_pool') {
     return { href: '/cukie-hodler#mis-cukies-aportados', label: 'Gestionar en el pool' };
   }
@@ -66,10 +86,73 @@ function itemAction(cukie: MyCukieCollectionItem) {
 }
 
 function itemActionDescription(cukie: MyCukieCollectionItem) {
+  if (cukie.custody === 'cukie_pool_recovery') return 'Está en un vault Pool anterior. Comprueba la posición para solicitar la salida según su calendario.';
   if (cukie.custody === 'cukie_pool') return 'Consulta o retira la aportación al pool.';
   if (cukie.custody === 'cukie_master') return 'Gestiona la posición depositada en Cukie Master.';
   if (cukie.state === 'available') return 'Puedes aportarlo al pool cuando quieras.';
   return 'Revisa identidad, estado y actividad del Cukie.';
+}
+
+type CollectionFilter = 'all' | 'listed' | 'pool' | 'master' | 'available';
+
+function actionsFor(cukie: MyCukieCollectionItem) {
+  if (Object.prototype.hasOwnProperty.call(cukie, 'availableActions')) {
+    return Array.isArray(cukie.availableActions) ? cukie.availableActions : [];
+  }
+  return [];
+}
+
+function hasActionsField(cukie: MyCukieCollectionItem) {
+  return Object.prototype.hasOwnProperty.call(cukie, 'availableActions');
+}
+
+function actionLabel(action: MyCukieAction) {
+  return ({
+    cancel_sale: 'Cancelar venta',
+    request_pool_exit: 'Solicitar devolución',
+    withdraw_pool: 'Retirar del Pool',
+    withdraw_master: 'Retirar staking',
+    deposit_pool: 'Aportar al Pool',
+    sell: 'Vender',
+    stake_master: 'Hacer staking Master',
+  } as const)[action];
+}
+
+function actionHref(cukie: MyCukieCollectionItem, action: MyCukieAction) {
+  if (action === 'cancel_sale') {
+    return cukie.saleKind === 'uki'
+      ? `/marketplace?tokenId=${encodeURIComponent(cukie.tokenId)}#mis-anuncios`
+      : `/marketplace/${encodeURIComponent(cukie.tokenId)}?source=legacy${cukie.network ? `&network=${encodeURIComponent(cukie.network)}` : ''}${cukie.collectionAddress ? `&collection=${encodeURIComponent(cukie.collectionAddress)}` : ''}`;
+  }
+  if (action === 'request_pool_exit' || action === 'withdraw_pool') {
+    return `/cukie-hodler?tokenId=${encodeURIComponent(cukie.tokenId)}#pool-cukie-${encodeURIComponent(cukie.tokenId)}`;
+  }
+  if (action === 'withdraw_master' || action === 'stake_master') {
+    return `/cukie-master?tokenId=${encodeURIComponent(cukie.tokenId)}#cukie-master-cukie-${encodeURIComponent(cukie.tokenId)}`;
+  }
+  if (action === 'deposit_pool') {
+    return `/cukie-hodler?tokenId=${encodeURIComponent(cukie.tokenId)}#pool-available-${encodeURIComponent(cukie.tokenId)}`;
+  }
+  if (cukie.network?.toUpperCase() === 'TRON') {
+    return `/marketplace/${encodeURIComponent(cukie.tokenId)}?source=legacy&network=TRON`;
+  }
+  return `/marketplace?tokenId=${encodeURIComponent(cukie.tokenId)}#mis-anuncios`;
+}
+
+function filterMatches(cukie: MyCukieCollectionItem, filter: CollectionFilter) {
+  if (filter === 'all') return true;
+  if (filter === 'listed') return cukie.state === 'listed';
+  if (filter === 'pool') return cukie.custody === 'cukie_pool' || cukie.custody === 'cukie_pool_recovery';
+  if (filter === 'master') return cukie.custody === 'cukie_master';
+  return cukie.custody === 'wallet' && cukie.state === 'available';
+}
+
+function collectionOrder(cukie: MyCukieCollectionItem) {
+  if (cukie.state === 'listed') return 0;
+  if (cukie.custody === 'cukie_pool' || cukie.custody === 'cukie_pool_recovery') return 1;
+  if (cukie.custody === 'cukie_master') return 2;
+  if (cukie.state === 'available') return 3;
+  return 4;
 }
 
 export function MyCukiesPanel() {
@@ -77,8 +160,12 @@ export function MyCukiesPanel() {
   const walletAddress = user?.walletAddress ?? null;
   const [state, setState] = useState<LoadState>('idle');
   const [collection, setCollection] = useState<MyCukieCollectionData | null>(null);
+  const [filter, setFilter] = useState<CollectionFilter>('all');
   const requestIdRef = useRef(0);
   const items = useMemo(() => collection?.items ?? [], [collection]);
+  const visibleItems = useMemo(() => items
+    .filter((item) => filterMatches(item, filter))
+    .sort((left, right) => collectionOrder(left) - collectionOrder(right) || (BigInt(left.tokenId) < BigInt(right.tokenId) ? -1 : 1)), [filter, items]);
 
   const load = useCallback(async (
     signal?: AbortSignal,
@@ -218,10 +305,24 @@ export function MyCukiesPanel() {
         <section aria-labelledby="collection-list-title" className="pt-8">
           <div className="flex items-end justify-between gap-3">
             <div><p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">Inventario</p><h2 id="collection-list-title" className="mt-2 font-headline text-2xl font-black text-[var(--uki-cream)] sm:text-3xl">Tus Cukies</h2></div>
-            <p className="text-sm font-semibold text-[var(--uki-muted)]">{items.length} en total</p>
+            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+              <span className="sr-only">Filtrar colección</span>
+              <select aria-label="Filtrar colección" value={filter} onChange={(event) => setFilter(event.target.value as CollectionFilter)} className="min-h-10 rounded-[8px] border border-white/10 bg-black/30 px-3 text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-text)] outline-none focus:border-[var(--uki-lilac)]/50">
+                <option value="all">Todos ({items.length})</option>
+                <option value="listed">En venta ({items.filter((item) => item.state === 'listed').length})</option>
+                <option value="pool">Pool ({items.filter((item) => item.custody === 'cukie_pool' || item.custody === 'cukie_pool_recovery').length})</option>
+                <option value="master">Staking Master ({items.filter((item) => item.custody === 'cukie_master').length})</option>
+                <option value="available">Disponibles ({items.filter((item) => item.custody === 'wallet' && item.state === 'available').length})</option>
+              </select>
+            </label>
           </div>
+          {visibleItems.length === 0 ? (
+            <p className="mt-5 rounded-[12px] border border-white/10 bg-black/25 p-5 text-sm font-semibold text-[var(--uki-muted)]">
+              No hay Cukies en este filtro.
+            </p>
+          ) : (
           <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {items.map((cukie) => (
+            {visibleItems.map((cukie) => (
               <article key={cukie.assetId} className="group overflow-hidden rounded-[16px] border border-white/10 bg-black/25">
                 <div className="relative aspect-[4/5] bg-[#0d0914]">
                   <CukiImage src={cukie.imageUrl} alt={`Cukie #${cukie.tokenId}`} sizes="(min-width: 1280px) 30vw, (min-width: 640px) 50vw, 100vw" className="object-contain p-3 transition-transform duration-300 group-hover:scale-[1.015]" />
@@ -240,14 +341,29 @@ export function MyCukiesPanel() {
                     <Link href={`/marketplace/${cukie.tokenId}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-white/15 bg-white/[0.04] px-3 text-sm font-black text-[var(--uki-cream)] transition hover:border-[var(--uki-lilac)]/45">
                       Ver ficha <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
                     </Link>
-                    <Link href={itemAction(cukie).href} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
-                      {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
-                    </Link>
+                    {actionsFor(cukie).length > 0 ? actionsFor(cukie).map((action) => (
+                      <Link key={action} href={actionHref(cukie, action)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                        {actionLabel(action)} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                      </Link>
+                    )) : cukie.custody === 'cukie_pool_recovery' ? (
+                      <Link href={itemAction(cukie).href} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                        {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                      </Link>
+                    ) : hasActionsField(cukie) ? (
+                      <span className="inline-flex min-h-11 items-center justify-center rounded-[9px] border border-white/10 px-3 text-center text-xs font-black uppercase text-[var(--uki-muted)]">
+                        Sin acción disponible
+                      </span>
+                    ) : (
+                      <Link href={itemAction(cukie).href} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                        {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               </article>
             ))}
           </div>
+          )}
         </section>
       ) : state === 'ready' ? (
         <div className="mt-6 rounded-[16px] border border-white/10 bg-black/25 p-8 text-center">

@@ -91,11 +91,17 @@ function statusResponse() {
           route: 'uki',
           ordinal: 1,
           status: 'active',
+          creditEligibleFrom: '2026-07-10T11:00:00.000Z',
+          firstEligibleCutoff: '2026-07-10T12:00:00.000Z',
           poolCreditsPerSlot: 20,
           effectiveCutoff: '2026-07-11T12:00:00.000Z',
         }],
         activeReservations: 1,
         grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
+        currentRun: {
+          periodCutoff: '2026-07-10T12:00:00.000Z',
+          routes: [{ route: 'uki', status: 'open' }, { route: 'nft', status: 'open' }],
+        },
         history: {
           available: true,
           page: 0,
@@ -160,7 +166,7 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
 
-    await waitFor(() => expect(screen.getByText('Lo que ya tienes hoy')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Confirmado en este periodo')).toBeInTheDocument());
     expect(screen.getAllByText('80').length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: 'Historial de créditos' })).toBeInTheDocument();
     expect(screen.getByText('Créditos recibidos')).toBeInTheDocument();
@@ -188,6 +194,84 @@ describe('CompetitionCreditPanel', () => {
     expect(await screen.findByText(/Reparto guardado\. Se aplicará/i)).toBeInTheDocument();
   });
 
+  it('shows the exact first eligible cutoff and lets qualifying slots be configured in advance', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.configurations[0].status = 'qualifying';
+    body.data.configurations[0].creditEligibleFrom = '2026-07-10T12:35:00.000Z';
+    body.data.configurations[0].firstEligibleCutoff = '2026-07-10T13:00:00.000Z';
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/Primer corte elegible para recibir créditos: 10 jul 2026, 13:00 UTC/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/Configuración futura/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', {
+      name: 'Aumentar aportación al pool de UKI, cupo 1',
+    })).toBeEnabled();
+  });
+
+  it('groups qualifying slots by their own first eligible cutoff', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.configurations.push({
+      slotId: 'slot-2',
+      route: 'uki',
+      ordinal: 2,
+      status: 'qualifying',
+      creditEligibleFrom: '2026-07-11T12:35:00.000Z',
+      firstEligibleCutoff: '2026-07-12T12:00:00.000Z',
+      poolCreditsPerSlot: 40,
+      effectiveCutoff: '2026-07-12T12:00:00.000Z',
+    });
+    body.data.configurations[0].status = 'qualifying';
+    body.data.configurations[0].firstEligibleCutoff = '2026-07-11T12:00:00.000Z';
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/Primer corte elegible: 11 jul 2026, 12:00 UTC/i)).toBeInTheDocument();
+    expect(screen.getByText(/Primer corte elegible: 12 jul 2026, 12:00 UTC/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/100 créditos preparados/i)).toHaveLength(2);
+  });
+
+  it('keeps an open current-period run as final even when the confirmed balance is zero', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.balance.availableCredits = 0;
+    body.data.balance.reservedCredits = 0;
+    body.data.balance.spentCredits = 0;
+    body.data.balance.poolDepositedCredits = 0;
+    (body.data as { currentRun?: unknown }).currentRun = {
+      periodCutoff: '2026-07-10T12:00:00.000Z',
+      routes: [{ route: 'uki', status: 'open' }, { route: 'nft', status: 'open' }],
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText('Confirmado en este periodo')).toBeInTheDocument();
+    expect(screen.queryByText(/sigue en proceso/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0);
+  });
+
+  it('shows the current period as pending before either route has a run', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.balance.availableCredits = 0;
+    (body.data as { currentRun?: unknown }).currentRun = {
+      periodCutoff: '2026-07-10T12:00:00.000Z',
+      routes: [{ route: 'uki', status: 'missing' }, { route: 'nft', status: 'missing' }],
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/sigue en proceso/i)).toBeInTheDocument();
+    expect(screen.getByText(/último saldo confirmado/i)).toBeInTheDocument();
+  });
+
   it('fails closed without balances or controls when the ledger is unavailable', async () => {
     fetchMock.mockResolvedValue({
       ok: false,
@@ -213,6 +297,8 @@ describe('CompetitionCreditPanel', () => {
       route: 'nft',
       ordinal: 1,
       status: 'active',
+      creditEligibleFrom: '2026-07-10T11:00:00.000Z',
+      firstEligibleCutoff: '2026-07-10T12:00:00.000Z',
       poolCreditsPerSlot: 0,
       effectiveCutoff: '2026-07-11T12:00:00.000Z',
     });
@@ -395,7 +481,7 @@ describe('CompetitionCreditPanel', () => {
     view.rerender(<CompetitionCreditPanel />);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    await screen.findByText('Lo que ya tienes hoy');
+    await screen.findByText('Confirmado en este periodo');
     resolveFirst?.(statusResponse());
     await act(async () => {
       await Promise.resolve();
@@ -414,6 +500,8 @@ describe('CompetitionCreditPanel', () => {
       route: 'nft',
       ordinal: 1,
       status: 'active',
+      creditEligibleFrom: '2026-07-10T11:00:00.000Z',
+      firstEligibleCutoff: '2026-07-10T12:00:00.000Z',
       poolCreditsPerSlot: 0,
       effectiveCutoff: '2026-07-11T12:00:00.000Z',
     });

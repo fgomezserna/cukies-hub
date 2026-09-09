@@ -50,6 +50,21 @@ export type AppRuntimeReadiness = {
   service: AppRuntimeServiceStatus | null;
 };
 
+export type AppRuntimeStakingExpectation = {
+  wallet: string;
+  chainId: number;
+  stakedUkiRaw: string;
+};
+
+export type AppRuntimeProjectionSync = {
+  state: 'idle' | 'syncing' | 'delayed';
+  wallet: string | null;
+  chainId: number | null;
+  expectedStakedUkiRaw: string | null;
+  attempt: number;
+  error: 'offline' | 'request_failed' | 'not_converged' | null;
+};
+
 type RuntimeContextValue = {
   address: string | null;
   walletType: 'evm' | 'tron' | null;
@@ -63,6 +78,8 @@ type RuntimeContextValue = {
   status: AppRuntimeStatus | null;
   statusState: 'idle' | 'loading' | 'ready' | 'stale' | 'syncing' | 'unavailable';
   isRefreshing: boolean;
+  projectionSync: AppRuntimeProjectionSync;
+  registerStakingExpectation: (expectation: AppRuntimeStakingExpectation) => void;
   refresh: () => Promise<unknown>;
   refreshAfterTransaction: (resource?: AppRuntimeResource) => Promise<void>;
   invalidate: (resource?: AppRuntimeResource) => Promise<void>;
@@ -122,6 +139,86 @@ function statusStateFor(status: AppRuntimeStatus | null): 'ready' | 'syncing' | 
   if (services.some((service) => service.status === 'unavailable' || service.status === 'disabled')) return 'unavailable';
   if (services.some((service) => service.status === 'syncing')) return 'syncing';
   return 'ready';
+}
+
+// The indexer and economy scheduler run asynchronously. Keep retries sparse and
+// bounded so a receipt never turns into a burst of requests or a false success.
+const PROJECTION_SYNC_BACKOFF_MS = [2_000, 5_000, 10_000, 15_000, 30_000, 50_000] as const;
+const PROJECTION_SYNC_DEADLINE_MS = 120_000;
+
+function waitForProjectionRetry(delayMs: number, signal: AbortSignal) {
+  if (signal.aborted) return Promise.resolve(false);
+  return new Promise<boolean>((resolve) => {
+    const timer = window.setTimeout(() => resolve(true), delayMs);
+    signal.addEventListener('abort', () => {
+      window.clearTimeout(timer);
+      resolve(false);
+    }, { once: true });
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function canonicalRaw(value: unknown): value is string {
+  return typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value);
+}
+
+function payloadMatchesIdentity(resource: string, payload: unknown, wallet: string, chainId: number) {
+  if (!isRecord(payload)) return false;
+  if (resource === 'dashboard') {
+    const identity = isRecord(payload.identity) ? payload.identity : null;
+    const network = isRecord(payload.network) ? payload.network : null;
+    return typeof identity?.walletNormalized === 'string'
+      && identity.walletNormalized.toLowerCase() === wallet
+      && network?.chainId === chainId;
+  }
+  if (typeof payload.walletNormalized !== 'string' || payload.walletNormalized.toLowerCase() !== wallet) return false;
+  return payload.chainId === undefined || payload.chainId === chainId;
+}
+
+function projectionMatches(
+  master: unknown,
+  credits: unknown,
+  expectedStakedUkiRaw: string,
+) {
+  if (!isRecord(master) || !isRecord(credits)) return false;
+  const routes = master.routes;
+  if (!isRecord(routes) || !isRecord(routes.uki) || !isRecord(routes.nft)) return false;
+  const uki = routes.uki;
+  const ukiSource = isRecord(uki.source) ? uki.source : null;
+  if (!ukiSource || ukiSource.complete !== true || ukiSource.stakedUkiRaw !== expectedStakedUkiRaw) return false;
+  const masterRouteEntries = [routes.uki, routes.nft];
+  if (!masterRouteEntries.every((route) => isRecord(route)
+    && isRecord(route.source)
+    && route.source.complete === true
+    && route.projectionFresh === true
+    && Array.isArray(route.slots))) return false;
+  const masterSlots = masterRouteEntries.flatMap((route) => route.slots);
+
+  const expectedSlots = masterSlots
+    .filter(isRecord)
+    .filter((slot) => ['qualifying', 'active', 'grace'].includes(String(slot.status)))
+    .map((slot) => `${String(slot.route ?? 'uki')}:${String(slot.ordinal)}:${String(slot.eligibilityEpoch)}:${String(slot.status)}`)
+    .sort();
+  const configurations = credits.configurations;
+  if (!Array.isArray(configurations)) return false;
+  const actualSlots = configurations
+    .filter(isRecord)
+    .filter((configuration) => ['qualifying', 'active', 'grace'].includes(String(configuration.status)))
+    .map((configuration) => `${String(configuration.route)}:${String(configuration.ordinal)}:${String(configuration.eligibilityEpoch)}:${String(configuration.status)}`)
+    .sort();
+  return expectedSlots.length === actualSlots.length
+    && expectedSlots.every((slot, index) => slot === actualSlots[index]);
+}
+
+export function appRuntimeProjectionMatches(
+  master: unknown,
+  credits: unknown,
+  expectedStakedUkiRaw: string,
+) {
+  return canonicalRaw(expectedStakedUkiRaw) && projectionMatches(master, credits, expectedStakedUkiRaw);
 }
 
 export function appRuntimeEndpoint(resource: AppRuntimeResource, wallet: string | null) {
@@ -194,6 +291,26 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     || pathname.startsWith('/cukie-hodler')
     || pathname.startsWith('/cukies');
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
+  const projectionExpectationRef = useRef<AppRuntimeStakingExpectation | null>(null);
+  const projectionAbortRef = useRef<AbortController | null>(null);
+  const projectionRunRef = useRef<Promise<void> | null>(null);
+  const projectionIdentityRef = useRef<string | null>(null);
+  const currentAddressRef = useRef(address);
+  const currentConnectedAddressRef = useRef(connectedAddressNormalized);
+  const currentChainIdRef = useRef(chainId);
+  const currentSessionReadyRef = useRef(sessionReady);
+  currentAddressRef.current = address;
+  currentConnectedAddressRef.current = connectedAddressNormalized;
+  currentChainIdRef.current = chainId;
+  currentSessionReadyRef.current = sessionReady;
+  const [projectionSync, setProjectionSync] = useState<AppRuntimeProjectionSync>({
+    state: 'idle',
+    wallet: null,
+    chainId: null,
+    expectedStakedUkiRaw: null,
+    attempt: 0,
+    error: null,
+  });
 
   useEffect(() => {
     const onlineHandler = () => setOnline(true);
@@ -205,6 +322,36 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       window.removeEventListener('offline', offlineHandler);
     };
   }, []);
+
+  useEffect(() => {
+    if (online || !projectionExpectationRef.current) return;
+    projectionAbortRef.current?.abort();
+    setProjectionSync((current) => current.state === 'idle'
+      ? current
+      : { ...current, state: 'delayed', error: 'offline' });
+  }, [online]);
+
+  const projectionIdentity = `${address ?? ''}:${connectedAddressNormalized ?? ''}:${chainId ?? ''}:${sessionReady ? 'ready' : 'unready'}`;
+
+  useEffect(() => {
+    if (projectionIdentityRef.current === null) {
+      projectionIdentityRef.current = projectionIdentity;
+      return;
+    }
+    if (projectionIdentityRef.current === projectionIdentity) return;
+    projectionIdentityRef.current = projectionIdentity;
+    projectionAbortRef.current?.abort();
+    projectionAbortRef.current = null;
+    projectionExpectationRef.current = null;
+    setProjectionSync({
+      state: 'idle',
+      wallet: null,
+      chainId: null,
+      expectedStakedUkiRaw: null,
+      attempt: 0,
+      error: null,
+    });
+  }, [chainId, connectedAddressNormalized, projectionIdentity, queryClient, sessionReady]);
 
   const runtimeQuery = useQuery({
     queryKey: appRuntimeQueryKey('runtime-status', address, configuredBscChain()),
@@ -296,15 +443,175 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     await queryClient.refetchQueries({ predicate }, { cancelRefetch: false });
   }, [address, queryClient, runtimeRouteActive, sessionReady]);
 
+  const fetchCanonicalResource = useCallback(async (
+    resource: AppRuntimeResource,
+    wallet: string,
+    targetChainId: number | null,
+    syncSignal: AbortSignal,
+    payloadChainId = targetChainId ?? configuredBscChain() ?? 0,
+  ) => {
+    const canonical = canonicalResource(resource);
+    const endpoint = appRuntimeEndpoint(canonical, wallet);
+    const queryKey = [...appRuntimeQueryKey(canonical, wallet, targetChainId), endpoint, ''] as const;
+    return queryClient.fetchQuery({
+      queryKey,
+      queryFn: async ({ signal }) => {
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        signal.addEventListener('abort', abort, { once: true });
+        syncSignal.addEventListener('abort', abort, { once: true });
+        try {
+          const { response, body } = await fetchRuntime<{ status?: string; data?: unknown }>(endpoint, controller.signal);
+          if (!response.ok || (body.status !== undefined && body.status !== 'ok') || body.data === undefined || !payloadMatchesIdentity(canonical, body.data, wallet, payloadChainId)) {
+            throw new Error(`${canonical.toUpperCase()}_UNAVAILABLE`);
+          }
+          return body.data;
+        } finally {
+          signal.removeEventListener('abort', abort);
+          syncSignal.removeEventListener('abort', abort);
+        }
+      },
+      staleTime: 0,
+      retry: false,
+    });
+  }, [queryClient]);
+
+  const coordinateProjectionSync = useCallback(async () => {
+    if (projectionRunRef.current) return projectionRunRef.current;
+    const expectation = projectionExpectationRef.current;
+    if (!expectation || !address || !sessionReady || address !== expectation.wallet || !runtimeRouteActive) return;
+    const controller = new AbortController();
+    projectionAbortRef.current?.abort();
+    projectionAbortRef.current = controller;
+    const run = (async () => {
+      let lastError: AppRuntimeProjectionSync['error'] = null;
+      const startedAt = Date.now();
+      let deadlineReached = false;
+      const deadlineTimer = window.setTimeout(() => {
+        deadlineReached = true;
+        controller.abort();
+      }, PROJECTION_SYNC_DEADLINE_MS);
+      try {
+        for (let attempt = 1; attempt <= PROJECTION_SYNC_BACKOFF_MS.length + 1; attempt += 1) {
+          if (projectionExpectationRef.current !== expectation) return;
+          if (controller.signal.aborted && !deadlineReached) return;
+          if (Date.now() - startedAt >= PROJECTION_SYNC_DEADLINE_MS) {
+            deadlineReached = true;
+            lastError = 'not_converged';
+            break;
+          }
+          if (!online) {
+            lastError = 'offline';
+            break;
+          }
+          setProjectionSync((current) => current.wallet === expectation.wallet
+            ? { ...current, state: 'syncing', attempt, error: null }
+            : current);
+          try {
+            const [masterResult, creditsResult] = await Promise.allSettled([
+              fetchCanonicalResource('master', expectation.wallet, expectation.chainId, controller.signal),
+              fetchCanonicalResource('credits', expectation.wallet, expectation.chainId, controller.signal),
+              // Dashboard is refreshed with the group, but an unavailable or
+              // partial module must not mask fundamental Master+Credits proof.
+              fetchCanonicalResource('dashboard', expectation.wallet, null, controller.signal, expectation.chainId),
+            ]).then(([master, credits]) => [master, credits] as const);
+            if (projectionExpectationRef.current !== expectation || (controller.signal.aborted && !deadlineReached)) return;
+            if (masterResult.status !== 'fulfilled' || creditsResult.status !== 'fulfilled') {
+              throw new Error('PROJECTION_RESOURCE_UNAVAILABLE');
+            }
+            if (appRuntimeProjectionMatches(masterResult.value, creditsResult.value, expectation.stakedUkiRaw)) {
+              projectionExpectationRef.current = null;
+              setProjectionSync({
+                state: 'idle',
+                wallet: null,
+                chainId: null,
+                expectedStakedUkiRaw: null,
+                attempt,
+                error: null,
+              });
+              return;
+            }
+            lastError = 'not_converged';
+          } catch {
+            if (controller.signal.aborted && !deadlineReached || projectionExpectationRef.current !== expectation) return;
+            lastError = 'request_failed';
+          }
+          if (deadlineReached) break;
+          if (attempt <= PROJECTION_SYNC_BACKOFF_MS.length) {
+            const shouldContinue = await waitForProjectionRetry(PROJECTION_SYNC_BACKOFF_MS[attempt - 1], controller.signal);
+            if (!shouldContinue && !deadlineReached) return;
+          }
+        }
+      } finally {
+        window.clearTimeout(deadlineTimer);
+      }
+      if (projectionExpectationRef.current !== expectation || (controller.signal.aborted && !deadlineReached)) return;
+      setProjectionSync((current) => current.wallet === expectation.wallet
+        ? { ...current, state: 'delayed', attempt: PROJECTION_SYNC_BACKOFF_MS.length + 1, error: lastError ?? 'not_converged' }
+        : current);
+    })();
+    const runPromise = run.finally(() => {
+      if (projectionRunRef.current === runPromise) projectionRunRef.current = null;
+      if (projectionAbortRef.current === controller) projectionAbortRef.current = null;
+    });
+    projectionRunRef.current = runPromise;
+    return runPromise;
+  }, [address, fetchCanonicalResource, online, runtimeRouteActive, sessionReady]);
+
+  const registerStakingExpectation = useCallback((expectation: AppRuntimeStakingExpectation) => {
+    const currentAddress = currentAddressRef.current;
+    const currentConnectedAddress = currentConnectedAddressRef.current;
+    const currentChainId = currentChainIdRef.current;
+    if (!currentAddress
+      || !currentSessionReadyRef.current
+      || !currentConnectedAddress
+      || currentConnectedAddress !== currentAddress
+      || expectation.wallet.toLowerCase() !== currentAddress
+      || currentChainId !== expectation.chainId
+      || !canonicalRaw(expectation.stakedUkiRaw)) return;
+    projectionAbortRef.current?.abort();
+    projectionRunRef.current = null;
+    const nextExpectation = {
+      wallet: currentAddress,
+      chainId: expectation.chainId,
+      stakedUkiRaw: expectation.stakedUkiRaw,
+    } satisfies AppRuntimeStakingExpectation;
+    projectionExpectationRef.current = nextExpectation;
+    setProjectionSync({
+      state: 'syncing',
+      wallet: nextExpectation.wallet,
+      chainId: nextExpectation.chainId,
+      expectedStakedUkiRaw: nextExpectation.stakedUkiRaw,
+      attempt: 0,
+      error: null,
+    });
+  }, []);
+
   const refresh = useCallback(() => runRefresh(), [runRefresh]);
   const invalidate = useCallback((resource?: AppRuntimeResource) => {
     const resources = resource ? new Set([canonicalResource(resource)]) : undefined;
     return runRefresh(resources, true);
   }, [runRefresh]);
 
-  const refreshAfterTransaction = useCallback((resource?: AppRuntimeResource) => {
-    return runRefresh(transactionResources(resource), true, true);
-  }, [runRefresh]);
+  const refreshAfterTransaction = useCallback(async (resource?: AppRuntimeResource) => {
+    const resourceRefresh = runRefresh(transactionResources(resource), true, true);
+    if (projectionExpectationRef.current) {
+      await Promise.allSettled([coordinateProjectionSync(), resourceRefresh]);
+      return;
+    }
+    await resourceRefresh;
+  }, [coordinateProjectionSync, runRefresh]);
+
+  useEffect(() => {
+    if (!projectionExpectationRef.current || projectionSync.state === 'idle' || !runtimeRouteActive) return;
+    const timer = window.setInterval(() => { void coordinateProjectionSync(); }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [coordinateProjectionSync, projectionSync.state, runtimeRouteActive]);
+
+  useEffect(() => {
+    if (runtimeRouteActive) return;
+    projectionAbortRef.current?.abort();
+  }, [runtimeRouteActive]);
 
   useEffect(() => {
     const refreshMaster = () => { void refreshAfterTransaction('master'); };
@@ -331,6 +638,8 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
           ? runtimeQuery.data ? 'stale' : 'unavailable'
           : statusStateFor(runtimeQuery.data ?? null),
     isRefreshing: runtimeQuery.isFetching,
+    projectionSync,
+    registerStakingExpectation,
     refresh,
     refreshAfterTransaction,
     invalidate,
@@ -338,7 +647,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     readiness,
     switchTo,
     queryKey: (resource, wallet = address, targetChainId = expectedChainId('dashboard')) => appRuntimeQueryKey(resource, wallet?.toLowerCase() ?? null, targetChainId ?? null),
-  }), [address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, online, readiness, refresh, refreshAfterTransaction, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
+  }), [address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, online, projectionSync, readiness, refresh, refreshAfterTransaction, registerStakingExpectation, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
 
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
 }

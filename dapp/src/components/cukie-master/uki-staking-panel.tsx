@@ -293,9 +293,24 @@ export function UkiStakingPanel({
 
     void refetchAllowance();
     void refetchLiquidBalance();
-    void refetchStakedBalance();
     void refetchPaused();
     void refetchStakingToken();
+
+    const refreshProjection = async () => {
+      if (lastAction === 'stake' || lastAction === 'unstake') {
+        const refreshedStakedBalance = await Promise.resolve(refetchStakedBalance()).catch(() => null);
+        if (refreshedStakedBalance?.data !== undefined && address) {
+          runtime.registerStakingExpectation({
+            wallet: address.toLowerCase(),
+            chainId: UKI_PRESALE_CHAIN_ID,
+            stakedUkiRaw: refreshedStakedBalance.data.toString(),
+          });
+        }
+      } else {
+        void refetchStakedBalance();
+      }
+      await refreshAfterTransaction('master');
+    };
 
     if (lastAction === 'approve' && parsedAmount) {
       setApprovedAmount(parsedAmount);
@@ -311,7 +326,7 @@ export function UkiStakingPanel({
       setAmount(DEFAULT_AMOUNT);
       setApprovedAmount(null);
       setLastCompletedAction('stake');
-      void refreshAfterTransaction('master');
+      void refreshProjection();
       window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Staking confirmado',
@@ -320,7 +335,7 @@ export function UkiStakingPanel({
     } else if (lastAction === 'unstake') {
       setAmount(DEFAULT_AMOUNT);
       setLastCompletedAction('unstake');
-      void refreshAfterTransaction('master');
+      void refreshProjection();
       window.dispatchEvent(new Event('cukies:treasure-hunt:competition:refresh'));
       toast({
         title: 'Retirada confirmada',
@@ -338,6 +353,7 @@ export function UkiStakingPanel({
     refetchPaused,
     refetchStakedBalance,
     refetchStakingToken,
+    runtime,
     refreshAfterTransaction,
     stakingAddress,
     toast,

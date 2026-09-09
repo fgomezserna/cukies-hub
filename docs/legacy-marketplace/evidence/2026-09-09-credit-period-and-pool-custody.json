@@ -1,0 +1,601 @@
+{
+  "observedStageSha": "43d8a2ffa318478d74d2289f741309f3ade2e2ea",
+  "chainId": 97,
+  "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+  "observedAt": "2026-09-09T09:49:10.800Z",
+  "currentSlots": [
+    {
+      "route": "nft",
+      "ordinal": 1,
+      "status": "active",
+      "eligibilityEpoch": 5,
+      "creditEligibleFrom": "2026-09-09T08:16:20.155Z"
+    },
+    {
+      "route": "nft",
+      "ordinal": 2,
+      "status": "active",
+      "eligibilityEpoch": 5,
+      "creditEligibleFrom": "2026-09-09T08:16:20.155Z"
+    },
+    {
+      "route": "nft",
+      "ordinal": 3,
+      "status": "active",
+      "eligibilityEpoch": 5,
+      "creditEligibleFrom": "2026-09-09T08:16:20.155Z"
+    },
+    {
+      "route": "nft",
+      "ordinal": 4,
+      "status": "inactive",
+      "eligibilityEpoch": 4,
+      "creditEligibleFrom": "2026-09-07T18:58:31.111Z"
+    },
+    {
+      "route": "nft",
+      "ordinal": 5,
+      "status": "inactive",
+      "eligibilityEpoch": 4,
+      "creditEligibleFrom": "2026-09-07T19:34:38.617Z"
+    },
+    {
+      "route": "uki",
+      "ordinal": 1,
+      "status": "inactive",
+      "eligibilityEpoch": 4,
+      "creditEligibleFrom": "2026-09-07T19:23:36.425Z"
+    }
+  ],
+  "creditPeriod": {
+    "calendar": {
+      "version": "cycle-v1",
+      "chainId": 97,
+      "cycleSeconds": 1800,
+      "anchorAt": "2026-09-07T11:30:00.000Z"
+    },
+    "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T09:30:00.000Z",
+    "cutoff": "2026-09-09T09:30:00.000Z",
+    "nextCutoff": "2026-09-09T10:00:00.000Z",
+    "settlementTarget": "2026-09-09T09:30:00.000Z",
+    "ruleVersion": "credits-staging-cycle-v1",
+    "ruleConfigHash": "810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de"
+  },
+  "balance": {
+    "grantedCredits": 300,
+    "poolDepositedCredits": 0,
+    "availableCredits": 300,
+    "reservedCredits": 0,
+    "spentCredits": 0,
+    "expiredCredits": 0,
+    "blocked": false
+  },
+  "previousPoolCustody": [
+    {
+      "tokenId": "98000001",
+      "previousPosition": {
+        "beneficialOwner": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+        "depositEpoch": "1",
+        "depositedAt": "1786890275",
+        "activationAt": "1786975200",
+        "exitRequestedAt": "0",
+        "withdrawableAt": "0",
+        "exitPeriodId": "0",
+        "depositCalendarVersion": 1,
+        "exitCalendarVersion": 0
+      }
+    },
+    {
+      "tokenId": "98000003",
+      "previousPosition": {
+        "beneficialOwner": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+        "depositEpoch": "1",
+        "depositedAt": "1786890390",
+        "activationAt": "1786975200",
+        "exitRequestedAt": "0",
+        "withdrawableAt": "0",
+        "exitPeriodId": "0",
+        "depositCalendarVersion": 1,
+        "exitCalendarVersion": 0
+      }
+    },
+    {
+      "tokenId": "98000004",
+      "previousPosition": {
+        "beneficialOwner": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+        "depositEpoch": "1",
+        "depositedAt": "1786984403",
+        "activationAt": "1787061600",
+        "exitRequestedAt": "0",
+        "withdrawableAt": "0",
+        "exitPeriodId": "0",
+        "depositCalendarVersion": 1,
+        "exitCalendarVersion": 0
+      }
+    },
+    {
+      "tokenId": "98000007",
+      "previousPosition": {
+        "beneficialOwner": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+        "depositEpoch": "1",
+        "depositedAt": "1786984626",
+        "activationAt": "1787061600",
+        "exitRequestedAt": "0",
+        "withdrawableAt": "0",
+        "exitPeriodId": "0",
+        "depositCalendarVersion": 1,
+        "exitCalendarVersion": 0
+      }
+    }
+  ],
+  "poolAvailableAdvertised": 11,
+  "poolAvailableOwned": 7,
+  "cutoffTimeline": [
+    {
+      "at": "2026-09-09T10:00:06.901Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T09:59:26.899Z",
+          "healthObserved": "2026-09-09T09:59:54.701Z",
+          "warnings": [],
+          "block": null,
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T09:59:31.685Z",
+          "healthObserved": "2026-09-09T09:59:48.262Z",
+          "warnings": [],
+          "block": null,
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T09:59:52.432Z",
+          "endedAt": "2026-09-09T09:59:52.637Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "waiting"
+        },
+        {
+          "startedAt": "2026-09-09T09:59:22.138Z",
+          "endedAt": "2026-09-09T09:59:22.396Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "waiting"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-09T10:00:18.164Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T09:59:26.899Z",
+          "healthObserved": "2026-09-09T09:59:54.701Z",
+          "warnings": [],
+          "block": null,
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T09:59:31.685Z",
+          "healthObserved": "2026-09-09T09:59:48.262Z",
+          "warnings": [],
+          "block": null,
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T09:59:52.432Z",
+          "endedAt": "2026-09-09T09:59:52.637Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "waiting"
+        },
+        {
+          "startedAt": "2026-09-09T09:59:22.138Z",
+          "endedAt": "2026-09-09T09:59:22.396Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "waiting"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-09T10:00:29.482Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T09:59:54.701Z",
+          "healthObserved": "2026-09-09T09:59:56.061Z",
+          "warnings": [
+            "CHAIN_EVENTS_NOT_PROJECTED"
+          ],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T09:59:59.569Z",
+          "healthObserved": "2026-09-09T09:59:59.569Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T10:00:22.659Z",
+          "endedAt": "2026-09-09T10:00:23.936Z",
+          "status": "error",
+          "errorCode": "DOMAIN_CONFLICT",
+          "result": null
+        },
+        {
+          "startedAt": "2026-09-09T09:59:52.432Z",
+          "endedAt": "2026-09-09T09:59:52.637Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "waiting"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-09T10:00:40.556Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T09:59:54.701Z",
+          "healthObserved": "2026-09-09T10:00:28.654Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T09:59:59.569Z",
+          "healthObserved": "2026-09-09T10:00:22.010Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T10:00:22.659Z",
+          "endedAt": "2026-09-09T10:00:23.936Z",
+          "status": "error",
+          "errorCode": "DOMAIN_CONFLICT",
+          "result": null
+        },
+        {
+          "startedAt": "2026-09-09T09:59:52.432Z",
+          "endedAt": "2026-09-09T09:59:52.637Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "waiting"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-09T10:00:51.546Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T09:59:54.701Z",
+          "healthObserved": "2026-09-09T10:00:28.654Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T09:59:59.569Z",
+          "healthObserved": "2026-09-09T10:00:33.509Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T10:00:22.659Z",
+          "endedAt": "2026-09-09T10:00:23.936Z",
+          "status": "error",
+          "errorCode": "DOMAIN_CONFLICT",
+          "result": null
+        },
+        {
+          "startedAt": "2026-09-09T09:59:52.432Z",
+          "endedAt": "2026-09-09T09:59:52.637Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "waiting"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-09T10:01:02.729Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T10:00:28.654Z",
+          "healthObserved": "2026-09-09T10:00:37.387Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T10:00:33.509Z",
+          "healthObserved": "2026-09-09T10:00:37.387Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T10:00:53.976Z",
+          "endedAt": "2026-09-09T10:00:54.994Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "open"
+        },
+        {
+          "startedAt": "2026-09-09T10:00:22.659Z",
+          "endedAt": "2026-09-09T10:00:23.936Z",
+          "status": "error",
+          "errorCode": "DOMAIN_CONFLICT",
+          "result": null
+        }
+      ]
+    },
+    {
+      "at": "2026-09-09T10:01:13.861Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T10:00:28.654Z",
+          "healthObserved": "2026-09-09T10:00:56.500Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T10:00:33.509Z",
+          "healthObserved": "2026-09-09T10:00:50.061Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T10:00:53.976Z",
+          "endedAt": "2026-09-09T10:00:54.994Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "open"
+        },
+        {
+          "startedAt": "2026-09-09T10:00:22.659Z",
+          "endedAt": "2026-09-09T10:00:23.936Z",
+          "status": "error",
+          "errorCode": "DOMAIN_CONFLICT",
+          "result": null
+        }
+      ]
+    },
+    {
+      "at": "2026-09-09T10:01:24.913Z",
+      "periodCutoff": "2026-09-09T10:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "wmObserved": "2026-09-09T10:00:28.654Z",
+          "healthObserved": "2026-09-09T10:00:57.902Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        },
+        {
+          "route": "nft",
+          "wmObserved": "2026-09-09T10:00:33.509Z",
+          "healthObserved": "2026-09-09T10:01:01.413Z",
+          "warnings": [],
+          "block": {
+            "blockNumber": 130003282,
+            "blockHash": "0x57a3bb89c6c99ec3522f5c4cc13f788194e1cc93ecaba7811e69a5bdfd98c483",
+            "blockTimestamp": "2026-09-09T09:59:59.000Z"
+          },
+          "gateMatured": 0
+        }
+      ],
+      "runs": [
+        {
+          "startedAt": "2026-09-09T10:00:53.976Z",
+          "endedAt": "2026-09-09T10:00:54.994Z",
+          "status": "success",
+          "errorCode": null,
+          "result": "open"
+        },
+        {
+          "startedAt": "2026-09-09T10:00:22.659Z",
+          "endedAt": "2026-09-09T10:00:23.936Z",
+          "status": "error",
+          "errorCode": "DOMAIN_CONFLICT",
+          "result": null
+        }
+      ]
+    }
+  ],
+  "candidateRecoveryRead": {
+    "observedAt": "2026-09-09T10:24:15.233Z",
+    "chainId": 97,
+    "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+    "indexer": {
+      "status": "ready"
+    },
+    "positions": 0,
+    "collectionSummary": {
+      "total": 12,
+      "inWallet": 8,
+      "available": 8,
+      "onSale": 0,
+      "inPool": 4,
+      "inCukieMaster": 0,
+      "otherInUse": 0
+    },
+    "bundleSha256": "fe7e35eabfc0be18d1368b430cdd6f4a989cc91f3bb4a8e137d58c2d28533935",
+    "custody": [
+      {
+        "tokenId": "98000001",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      },
+      {
+        "tokenId": "98000003",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      },
+      {
+        "tokenId": "98000004",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      },
+      {
+        "tokenId": "98000007",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      }
+    ],
+    "availableIds": [
+      "98000002",
+      "98000005",
+      "98000006",
+      "98000008",
+      "98000009",
+      "98000010",
+      "98000011",
+      "98000012"
+    ],
+    "allAvailableOwnedByWallet": true,
+    "requiresApprovalBeforePoolDeposit": true,
+    "readOnly": true
+  },
+  "finalCandidateRecoveryRead": {
+    "observedAt": "2026-09-09T10:35:50.676Z",
+    "chainId": 97,
+    "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+    "indexer": {
+      "status": "ready"
+    },
+    "positions": 0,
+    "collectionSummary": {
+      "total": 12,
+      "inWallet": 7,
+      "available": 7,
+      "onSale": 0,
+      "inPool": 4,
+      "inCukieMaster": 1,
+      "otherInUse": 0
+    },
+    "bundleSha256": "5d5ff1df5021f811152423bc57edc4499aa289038a06d2011812ff352452b594",
+    "custody": [
+      {
+        "tokenId": "98000001",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      },
+      {
+        "tokenId": "98000002",
+        "custody": "cukie_master",
+        "state": "cukie_master"
+      },
+      {
+        "tokenId": "98000003",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      },
+      {
+        "tokenId": "98000004",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      },
+      {
+        "tokenId": "98000007",
+        "custody": "cukie_pool_recovery",
+        "state": "in_pool"
+      }
+    ],
+    "availableIds": [
+      "98000005",
+      "98000006",
+      "98000008",
+      "98000009",
+      "98000010",
+      "98000011",
+      "98000012"
+    ],
+    "allAvailableOwnedByWallet": true,
+    "requiresApprovalBeforePoolDeposit": true,
+    "readOnly": true
+  }
+}

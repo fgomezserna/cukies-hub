@@ -6,7 +6,7 @@ import { CompetitionCreditPanel } from '@/components/cukie-master/credit-panel';
 
 export const metadata: Metadata = {
   title: 'Mis créditos | Cukies World',
-  description: 'Consulta tus créditos diarios y decide cuánto usar para jugar y cuánto aportar al pool.',
+  description: 'Consulta tus créditos por periodo y decide cuánto usar para jugar y cuánto aportar al pool.',
 };
 
 export default function CreditsPage() {
@@ -21,10 +21,10 @@ export default function CreditsPage() {
               Tus créditos
             </p>
             <h1 className="mt-2 text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">
-              Elige cómo aprovecharlos cada día
+              Elige cómo aprovecharlos en cada periodo
             </h1>
             <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-              Tus cupos activos generan créditos. Puedes reservarlos para jugar o aportar una parte al pool; la decisión se aplica en el siguiente reparto diario.
+              Tus cupos activos generan créditos. Puedes reservarlos para jugar o aportar una parte al pool; la decisión se aplica en el siguiente corte.
             </p>
           </div>
 

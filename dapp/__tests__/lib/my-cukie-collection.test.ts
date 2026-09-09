@@ -109,4 +109,68 @@ describe('my canonical Cukie collection', () => {
       state: 'cukie_master',
     });
   });
+
+  it('expone capacidades contextualizadas para venta, Pool y staking Master', async () => {
+    const docs = ['1', '2', '3', '4'].map((tokenId) => inventory(tokenId));
+    const poolPosition = position('2', 'active');
+    const masterPosition = position('3', 'custodied');
+    const ukiOrder = {
+      chainId: 97,
+      collectionAddressNormalized: collection,
+      tokenId: '1',
+      sellerNormalized: wallet,
+      status: 'active',
+    };
+    const db = {
+      collection: (name: string) => ({
+        find: () => {
+          if (name === 'cukie_pool_nft_vault_positions') return cursor([poolPosition]);
+          if (name === 'cukie_master_nft_positions') return cursor([masterPosition]);
+          if (name === 'uki_marketplace_orders') return cursor([ukiOrder]);
+          if (name === 'nft_asset_locks') return cursor([]);
+          return cursor(docs);
+        },
+      }),
+    } as unknown as Db;
+
+    const result = await listMyCukieCollectionFromDb({ db, walletAddress: wallet, config });
+
+    expect(result.items.find((item) => item.tokenId === '1')).toMatchObject({
+      state: 'listed',
+      saleKind: 'uki',
+      availableActions: ['cancel_sale'],
+    });
+    expect(result.items.find((item) => item.tokenId === '2')).toMatchObject({
+      custody: 'cukie_pool',
+      availableActions: ['request_pool_exit'],
+    });
+    expect(result.items.find((item) => item.tokenId === '3')).toMatchObject({
+      custody: 'cukie_master',
+      availableActions: ['withdraw_master'],
+    });
+    expect(result.items.find((item) => item.tokenId === '4')).toMatchObject({
+      availableActions: ['deposit_pool', 'stake_master'],
+    });
+  });
+
+  it('no vuelve a solicitar salida cuando el Pool ya está en exit_requested', async () => {
+    const poolPosition = position('9', 'exit_requested');
+    const db = {
+      collection: (name: string) => ({
+        find: () => {
+          if (name === 'cukie_pool_nft_vault_positions') return cursor([poolPosition]);
+          if (name === 'cukie_master_nft_positions') return cursor([]);
+          if (name === 'uki_marketplace_orders') return cursor([]);
+          if (name === 'nft_asset_locks') return cursor([]);
+          return cursor([inventory('9')]);
+        },
+      }),
+    } as unknown as Db;
+    const result = await listMyCukieCollectionFromDb({ db, walletAddress: wallet, config });
+    expect(result.items[0]).toMatchObject({
+      custody: 'cukie_pool',
+      poolStatus: 'exit_requested',
+      availableActions: [],
+    });
+  });
 });

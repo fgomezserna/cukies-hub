@@ -507,6 +507,27 @@ export function computePoolConfigEffectiveCutoff(
     : new Date(today.getTime() + economyCycleDurationMs(rule.calendar));
 }
 
+/**
+ * Returns the first scheduled cutoff that can include a slot once its
+ * maturity delay has elapsed. Cutoffs are inclusive for eligibility.
+ */
+export function firstEligibleCreditCutoff(
+  creditEligibleFromInput: Date,
+  rule: CompetitionCreditRule,
+) {
+  const creditEligibleFrom = validCreditDate(
+    creditEligibleFromInput,
+    "creditEligibleFrom",
+  );
+  const period = currentCompetitionCreditPeriod(creditEligibleFrom, rule);
+  return new Date(
+    (period.cutoff.getTime() >= creditEligibleFrom.getTime()
+      ? period.cutoff
+      : period.nextCutoff
+    ).getTime(),
+  );
+}
+
 export function validPoolCreditsPerSlot(value: number) {
   const credits = assertCreditAmount(value);
   if (credits > CREDITS_PER_MATURE_SLOT || credits % 10 !== 0) {

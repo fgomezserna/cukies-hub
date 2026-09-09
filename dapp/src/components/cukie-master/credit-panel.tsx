@@ -28,6 +28,8 @@ type CreditConfiguration = {
   route: 'uki' | 'nft';
   ordinal: number;
   status: 'qualifying' | 'active' | 'grace';
+  creditEligibleFrom: string;
+  firstEligibleCutoff: string;
   poolCreditsPerSlot: number;
   effectiveCutoff: string | null;
 };
@@ -60,6 +62,13 @@ type CreditStatus = {
   configurations: CreditConfiguration[];
   activeReservations: number;
   grants: { healthy: boolean; sourceObservedThrough: string | null; openIncidents: number };
+  currentRun: {
+    periodCutoff: string;
+    routes: Array<{
+      route: 'uki' | 'nft';
+      status: 'missing' | 'snapshotted' | 'processing' | 'open' | 'open_with_holds' | 'blocked';
+    }>;
+  };
   history: CreditHistoryData;
 };
 
@@ -72,6 +81,7 @@ function utcLabel(value: string | null) {
   return new Intl.DateTimeFormat('es-ES', {
     day: 'numeric',
     month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'UTC',
@@ -91,6 +101,13 @@ function slotStatusLabel(status: CreditConfiguration['status']) {
   if (status === 'qualifying') return 'Activándose';
   if (status === 'grace') return 'En periodo de gracia';
   return 'Activo';
+}
+
+function isEligibleForCutoff(configuration: CreditConfiguration, cutoff: string) {
+  if (configuration.status !== 'qualifying') return true;
+  const eligibleAt = Date.parse(configuration.firstEligibleCutoff);
+  const cutoffAt = Date.parse(cutoff);
+  return Number.isFinite(eligibleAt) && Number.isFinite(cutoffAt) && eligibleAt <= cutoffAt;
 }
 
 export function CompetitionCreditPanel() {
@@ -285,7 +302,9 @@ export function CompetitionCreditPanel() {
 
   const creditableConfigurations = useMemo(() => (
     status?.configurations.filter((configuration) => (
-      routeAvailability[configuration.route] && configuration.status !== 'qualifying'
+      routeAvailability[configuration.route]
+      && status
+      && isEligibleForCutoff(configuration, status.period.nextCutoff)
     )) ?? []
   ), [routeAvailability, status]);
 
@@ -312,12 +331,39 @@ export function CompetitionCreditPanel() {
     && unavailableRoutes.length > 0,
   );
 
+  const futureConfigurations = useMemo(() => (
+    status?.configurations.filter((configuration) => configuration.status === 'qualifying') ?? []
+  ), [status]);
+  const futureAllocationGroups = useMemo(() => {
+    const groups = new Map<string, { cutoff: string; generated: number; forPlaying: number; forPool: number }>();
+    futureConfigurations.forEach((configuration) => {
+      const cutoff = configuration.firstEligibleCutoff;
+      const current = groups.get(cutoff) ?? { cutoff, generated: 0, forPlaying: 0, forPool: 0 };
+      const forPool = drafts[configuration.slotId] ?? configuration.poolCreditsPerSlot;
+      const creditsPerSlot = status?.rule.creditsPerSlot ?? 0;
+      groups.set(cutoff, {
+        cutoff,
+        generated: current.generated + creditsPerSlot,
+        forPlaying: current.forPlaying + creditsPerSlot - forPool,
+        forPool: current.forPool + forPool,
+      });
+    });
+    return [...groups.values()].sort((left, right) => Date.parse(left.cutoff) - Date.parse(right.cutoff));
+  }, [drafts, futureConfigurations, status]);
+
   const allocationSourceMessage = useMemo(() => {
     if (!status || status.configurations.length === 0 || unavailableRoutes.length === 0) return null;
     const labels = unavailableRoutes.map((route) => route === 'uki' ? 'UKI' : 'Cukies');
     const stateLabel = unknownRoutes.length > 0 ? 'sin confirmar' : 'bloqueada';
     return `${labels.join(' y ')} ${stateLabel}; mostramos solo la parte confirmada.`;
   }, [status, unavailableRoutes, unknownRoutes]);
+
+  const currentRunStatuses = status?.currentRun?.routes.map(({ status: runStatus }) => runStatus) ?? [];
+  const currentRunPending = currentRunStatuses.some((runStatus) => (
+    ['missing', 'snapshotted', 'processing'].includes(runStatus)
+  ));
+  const currentRunBlocked = currentRunStatuses.some((runStatus) => runStatus === 'blocked');
+  const currentRunHeld = currentRunStatuses.some((runStatus) => runStatus === 'open_with_holds');
 
   function updateDraft(slotId: string, value: number) {
     if (!status || isSaving) return;
@@ -447,7 +493,7 @@ export function CompetitionCreditPanel() {
         <Panel innerClassName="p-5 sm:p-7 lg:p-8">
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="max-w-2xl">
-              <p className="uki-label">Tu reparto diario</p>
+              <p className="uki-label">Tu reparto por periodo</p>
               <h2 className="mt-2 font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
                 Conecta o firma tu wallet para ver tus créditos
               </h2>
@@ -473,22 +519,22 @@ export function CompetitionCreditPanel() {
       <Panel innerClassName="p-5 sm:p-7 lg:p-8">
         <div className="flex flex-col gap-4 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="uki-label">Tus créditos diarios</p>
+            <p className="uki-label">Tus créditos por periodo</p>
             <h2 className="mt-2 max-w-2xl font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
               Decide cómo quieres usarlos
             </h2>
             <p className="mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-              Cada cupo activo genera {status?.rule.creditsPerSlot ?? 100} créditos al día.
+              Cada cupo activo genera {status?.rule.creditsPerSlot ?? 100} créditos por periodo.
               Conserva los que quieras para jugar y aporta el resto al pool de créditos.
             </p>
           </div>
           {status ? (
             <div className="shrink-0 rounded-[8px] border border-white/10 bg-black/20 px-4 py-3 lg:text-right">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--uki-muted)]">
-                Próxima aplicación
+                Próximo corte
               </p>
               <p className="mt-1 text-sm font-black text-[var(--uki-cream)]">
-                {utcLabel(status.period.nextCutoff) ?? 'Próximo reparto diario'}
+                {utcLabel(status.period.nextCutoff) ?? 'Próximo corte'}
               </p>
             </div>
           ) : null}
@@ -518,7 +564,7 @@ export function CompetitionCreditPanel() {
             <div className="mt-6 flex items-end justify-between gap-4">
               <div>
                 <p className="uki-label">Saldo actual</p>
-                <h3 className="mt-1 text-lg font-black text-[var(--uki-cream)]">Lo que ya tienes hoy</h3>
+                <h3 className="mt-1 text-lg font-black text-[var(--uki-cream)]">Confirmado en este periodo</h3>
               </div>
             </div>
             <div className="mt-3 grid overflow-hidden rounded-[8px] border border-white/10 bg-black/20 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-white/10">
@@ -528,6 +574,29 @@ export function CompetitionCreditPanel() {
               <CurrentBalance label="Aportados al pool" value={status.balance.poolDepositedCredits} />
               <CurrentBalance label="Caducados" value={status.balance.expiredCredits} />
             </div>
+
+            {currentRunPending ? (
+              <div className="mt-5 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
+                <Warning className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" weight="bold" />
+                <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                  El reparto del periodo con corte {utcLabel(status.currentRun?.periodCutoff ?? null) ?? 'pendiente'} sigue en proceso. El saldo mostrado es el último saldo confirmado; todavía no damos este reparto por liquidado.
+                </p>
+              </div>
+            ) : currentRunBlocked ? (
+              <div className="mt-5 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
+                <Warning className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" weight="bold" />
+                <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                  El reparto del periodo con corte {utcLabel(status.currentRun?.periodCutoff ?? null) ?? 'pendiente'} está bloqueado y requiere una comprobación adicional. No hemos modificado tu saldo confirmado.
+                </p>
+              </div>
+            ) : currentRunHeld ? (
+              <div className="mt-5 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
+                <Warning className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" weight="bold" />
+                <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                  El reparto del periodo ya está disponible para las rutas confirmadas; una parte sigue retenida para revisión. Mostramos por separado lo que está confirmado.
+                </p>
+              </div>
+            ) : null}
 
             {unavailableRoutes.length > 0 ? (
               <div className="mt-5 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
@@ -553,7 +622,7 @@ export function CompetitionCreditPanel() {
                   <>
                     <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no tienes cupos configurables</p>
                     <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
-                      Cuando actives tu primer cupo podrás decidir aquí cómo usar sus créditos diarios.
+                      Cuando actives tu primer cupo podrás decidir aquí cómo usar sus créditos en cada periodo.
                     </p>
                   </>
                 )}
@@ -561,7 +630,7 @@ export function CompetitionCreditPanel() {
             ) : (
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.6fr)]">
                 <aside className="self-start rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-5 lg:sticky lg:top-24">
-                  <p className="uki-label text-[var(--uki-lilac)]">Próximo reparto diario</p>
+                  <p className="uki-label text-[var(--uki-lilac)]">Reparto del próximo corte</p>
                   <div className="mt-5 space-y-4">
                     <AllocationSummary
                       icon={<GameController className="h-6 w-6" weight="fill" />}
@@ -579,8 +648,30 @@ export function CompetitionCreditPanel() {
                       ? 'La próxima asignación queda pendiente de confirmar la fuente de cupos.'
                       : nextAllocationPartial
                         ? `Asignación parcial: ${allocationSourceMessage}`
-                      : `Repartes ${nextAllocation.generated} créditos entre tus cupos activos.`}
+                      : nextAllocation.generated === 0
+                        ? 'No hay cupos activos para el próximo corte.'
+                        : `Repartes ${nextAllocation.generated} créditos entre tus cupos activos en el próximo corte.`}
                   </p>
+
+                  {futureAllocationGroups.length > 0 ? (
+                    <div className="mt-5 border-t border-white/10 pt-5">
+                      <p className="uki-label text-[var(--uki-muted)]">Configuración futura</p>
+                      <div className="mt-3 space-y-4">
+                        {futureAllocationGroups.map((allocation) => (
+                          <div key={allocation.cutoff} className="rounded-[7px] border border-white/10 bg-black/15 p-3">
+                            <p className="text-xs font-black text-[var(--uki-cream)]">
+                              Primer corte elegible: {utcLabel(allocation.cutoff) ?? 'pendiente de fecha'}
+                            </p>
+                            <div className="mt-2 grid gap-1 text-xs font-black text-[var(--uki-cream)]">
+                              <span>{allocation.generated} créditos preparados</span>
+                              <span>Para jugar: {allocation.forPlaying}</span>
+                              <span>Al pool: {allocation.forPool}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="mt-5 grid gap-2" aria-label="Aplicar un reparto a todos los cupos disponibles">
                     <PresetButton
@@ -691,7 +782,7 @@ export function CompetitionCreditPanel() {
                             </div>
                             {configuration.status === 'qualifying' ? (
                               <p className="mt-2 text-right text-[11px] font-semibold text-[var(--uki-muted)]">
-                                Este reparto empezará cuando el cupo se active.
+                                Primer corte elegible para recibir créditos: {utcLabel(configuration.firstEligibleCutoff) ?? 'pendiente de fecha'}. Puedes dejar preparado el reparto desde ahora; no se adelanta la entrega.
                               </p>
                             ) : null}
                           </div>
@@ -705,7 +796,7 @@ export function CompetitionCreditPanel() {
                       {saveResult === 'saved' ? (
                         <p className="flex items-center gap-2 text-xs font-black text-[var(--uki-lilac)]">
                           <CheckCircle className="h-4 w-4" weight="fill" />
-                          Reparto guardado. Se aplicará en el próximo corte.
+                          Reparto guardado. Se aplicará en el corte indicado para cada cupo.
                         </p>
                       ) : saveResult === 'error' ? (
                         <p className="flex items-center gap-2 text-xs font-black text-amber-300">

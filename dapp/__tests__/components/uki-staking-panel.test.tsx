@@ -87,6 +87,7 @@ const switchChain = jest.fn();
 const reset = jest.fn();
 const toast = jest.fn();
 const refreshAfterTransaction = jest.fn().mockResolvedValue(undefined);
+const registerStakingExpectation = jest.fn();
 const routePreview = {
   currentRequirementRaw: parseUnits('20000', 18).toString(),
   presaleLockedRaw: parseUnits('40000', 18).toString(),
@@ -143,6 +144,7 @@ describe('UkiStakingPanel', () => {
     mockUseAppRuntime.mockReturnValue({
       address: walletAddress,
       sessionReady: true,
+      registerStakingExpectation,
       refreshAfterTransaction,
     } as never);
     mockUseGuardedOperation.mockReturnValue({ ready: true } as never);

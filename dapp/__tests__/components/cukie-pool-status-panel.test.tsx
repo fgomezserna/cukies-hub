@@ -240,6 +240,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -273,6 +274,7 @@ describe('CukiePoolStatusPanel', () => {
     } as unknown as ReturnType<typeof useAccount>);
     const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn()
         .mockResolvedValueOnce(walletAddress)
         .mockResolvedValueOnce('0x0000000000000000000000000000000000000000')
@@ -305,6 +307,123 @@ describe('CukiePoolStatusPanel', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it('simula el depósito antes de pedir cualquier firma', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const simulateContract = jest.fn().mockResolvedValue({ request: {} });
+    const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn()
+        .mockResolvedValueOnce(walletAddress)
+        .mockResolvedValueOnce(vaultAddress)
+        .mockResolvedValueOnce(true),
+      simulateContract,
+      waitForTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    writeContractAsync.mockResolvedValueOnce(depositHash);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    render(<CukiePoolStatusPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(1));
+    expect(simulateContract).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'deposit',
+      account: walletAddress,
+    }));
+    expect(simulateContract.mock.invocationCallOrder[0]).toBeLessThan(
+      writeContractAsync.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('vuelve a bloquear el depósito si la wallet cambia durante la simulación', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    let accountState = {
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    };
+    mockUseAccount.mockImplementation(() => accountState as unknown as ReturnType<typeof useAccount>);
+    let rerenderPanel: ((ui: React.ReactElement) => void) | undefined;
+    const simulateContract = jest.fn().mockImplementation(async () => {
+      accountState = { address: walletAddress, chainId: 56, isConnected: true };
+      rerenderPanel?.(<CukiePoolStatusPanel />);
+    });
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn()
+        .mockResolvedValueOnce(walletAddress)
+        .mockResolvedValueOnce(vaultAddress)
+        .mockResolvedValueOnce(true),
+      simulateContract,
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    const view = render(<CukiePoolStatusPanel />);
+    rerenderPanel = view.rerender;
+    fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
+
+    await waitFor(() => expect(screen.getAllByRole('alert').some((alert) => (
+      /wallet.*red.*vault cambiaron/i.test(alert.textContent ?? '')
+    ))).toBe(true));
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('explica un inventario stale cuando ownerOf ya no pertenece a la wallet', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn().mockResolvedValue(otherVaultAddress),
+      simulateContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    render(<CukiePoolStatusPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/ya no está en tu wallet/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/inventario puede estar desactualizado/i);
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('distingue un revert de simulación y evita pedir la firma', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const simulateContract = jest.fn().mockRejectedValue(new Error('ContractFunctionRevertedError: CollectionNotAllowed'));
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn()
+        .mockResolvedValueOnce(walletAddress)
+        .mockResolvedValueOnce(vaultAddress)
+        .mockResolvedValueOnce(true),
+      simulateContract,
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    render(<CukiePoolStatusPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no permite esta colección/i);
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
   it('unlocks other NFTs after the first deposit receipt while keeping that asset pending', async () => {
     configureVault();
     mockUseAuth.mockReturnValue(authValue(user, 'evm'));
@@ -315,6 +434,7 @@ describe('CukiePoolStatusPanel', () => {
     } as unknown as ReturnType<typeof useAccount>);
     const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn()
         .mockResolvedValueOnce(walletAddress)
         .mockResolvedValueOnce(vaultAddress)
@@ -357,6 +477,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -384,6 +505,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -407,6 +529,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -440,6 +563,7 @@ describe('CukiePoolStatusPanel', () => {
         isConnected: true,
       } as unknown as ReturnType<typeof useAccount>);
       mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
         readContract: jest.fn(),
         waitForTransactionReceipt: jest.fn(),
       } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -477,6 +601,7 @@ describe('CukiePoolStatusPanel', () => {
         isConnected: true,
       } as unknown as ReturnType<typeof useAccount>);
       mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
         readContract: jest.fn(),
         waitForTransactionReceipt: jest.fn(),
       } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -525,6 +650,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -552,6 +678,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
@@ -582,6 +709,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);

@@ -7,6 +7,7 @@ import { assertCreditAmount } from '../money';
 import {
   assertCompetitionCreditRule,
   currentCompetitionCreditPeriod,
+  firstEligibleCreditCutoff,
   validCreditWallet,
 } from './rules';
 import { isBlockingCreditIncident } from './integrity';
@@ -19,6 +20,7 @@ import type {
   CreditSnapshotSlot,
   CreditSourceWatermark,
   CreditRoute,
+  CompetitionCreditRun,
 } from './types';
 
 function exactCredits(value: unknown, label: string) {
@@ -123,6 +125,12 @@ export async function getCompetitionCreditWalletStatus(
       expiresAt: { $gt: now },
     }, { limit: 1_001 }),
   ]);
+  const currentRuns = await db.collection<CompetitionCreditRun>('competition_credit_runs').find({
+    'period.periodId': period.periodId,
+    route: { $in: routes },
+  }, {
+    projection: { _id: 0, route: 1, status: 1, 'period.cutoff': 1 },
+  }).limit(3).toArray();
   if (slots.length > 10) {
     throw new DomainConflictError('La wallet excede el maximo canonico de 10 slots.');
   }
@@ -133,6 +141,7 @@ export async function getCompetitionCreditWalletStatus(
   }
 
   const configurations = await Promise.all(slots.map(async (slot) => {
+    const creditEligibleFrom = exactDate(slot.creditEligibleFrom, 'creditEligibleFrom');
     const config = await db.collection<CreditPoolConfiguration>('competition_credit_pool_configs')
       .findOne({
         walletNormalized,
@@ -147,6 +156,8 @@ export async function getCompetitionCreditWalletStatus(
       ordinal: slot.ordinal,
       eligibilityEpoch: slot.eligibilityEpoch,
       status: slot.status,
+      creditEligibleFrom,
+      firstEligibleCutoff: firstEligibleCreditCutoff(creditEligibleFrom, rule),
       poolCreditsPerSlot: config ? exactCredits(config.poolCreditsPerSlot, 'poolCreditsPerSlot') : 0,
       effectiveCutoff: config ? exactDate(config.effectiveCutoff, 'effectiveCutoff') : null,
     };
@@ -243,6 +254,13 @@ export async function getCompetitionCreditWalletStatus(
       healthy: routes.every((route) => routeStatus[route].grants.healthy),
       sourceObservedThrough,
       openIncidents,
+    },
+    currentRun: {
+      periodCutoff: period.cutoff,
+      routes: routes.map((route) => ({
+        route,
+        status: currentRuns.find((run) => run.route === route)?.status ?? 'missing',
+      })),
     },
   };
 }

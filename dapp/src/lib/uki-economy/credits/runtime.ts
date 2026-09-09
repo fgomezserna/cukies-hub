@@ -265,6 +265,15 @@ function runtimeReasonCodes(error: unknown) {
   ))].slice(0, 20);
 }
 
+function canRetryCreditSnapshot(error: unknown) {
+  if (!(error instanceof DomainConflictError)) return false;
+  const reasonCode = error.details?.reasonCode;
+  return reasonCode === 'CREDIT_WATERMARK_UNHEALTHY_OR_STALE'
+    || reasonCode === 'CREDIT_SOURCE_CHANGED_AFTER_WATERMARK'
+    || reasonCode === 'CREDIT_MATURED_QUALIFYING_SLOTS'
+    || reasonCode === 'CREDIT_CUTOFF_BLOCK_MISSING';
+}
+
 export function createMongoCompetitionCreditRuntimeCoordinator(
   db: Db,
 ): CompetitionCreditRuntimeCoordinator {
@@ -457,15 +466,15 @@ export async function runCompetitionCreditRuntimeTick(input: {
     let firstRouteError: unknown = null;
     for (const route of ['uki', 'nft'] as const) {
       try {
-        const snapshotNow = validClockDate(clock);
-        lease = await coordinator.renew(lease, snapshotNow, config.leaseMs);
+        const periodNow = validClockDate(clock);
+        lease = await coordinator.renew(lease, periodNow, config.leaseMs);
         const period = await services.findOldestPendingRoutePeriod({
           route,
           rule,
-          now: snapshotNow,
+          now: periodNow,
         });
         if (!period) {
-          const waitingPeriod = currentCompetitionCreditPeriod(snapshotNow, rule);
+          const waitingPeriod = currentCompetitionCreditPeriod(periodNow, rule);
           const watermarkNow = validClockDate(clock);
           lease = await coordinator.renew(lease, watermarkNow, config.leaseMs);
           await services.refreshSourceWatermark({
@@ -493,12 +502,37 @@ export async function runCompetitionCreditRuntimeTick(input: {
           ruleAt: period.cutoff,
           now: watermarkNow,
         });
-        let run: CompetitionCreditRun = await services.createDailyRun({
-          route,
-          cutoff: period.cutoff,
-          expectedRuleVersion: period.ruleVersion,
-          now: snapshotNow,
-        });
+        let run: CompetitionCreditRun;
+        let snapshotNow = watermarkNow;
+        for (let attempt = 0; ; attempt += 1) {
+          // Refreshing the source may take the clock past the initial lookup.
+          // The run must be created with a time at or after the watermark
+          // refresh, otherwise a freshly published watermark can look newer
+          // than the snapshot's `now` and produce a false DOMAIN_CONFLICT.
+          snapshotNow = validClockDate(clock);
+          try {
+            run = await services.createDailyRun({
+              route,
+              cutoff: period.cutoff,
+              expectedRuleVersion: period.ruleVersion,
+              now: snapshotNow,
+            });
+            break;
+          } catch (error) {
+            if (attempt > 0 || !canRetryCreditSnapshot(error)) throw error;
+            // Master/indexer projections can change between the watermark
+            // refresh and the strict snapshot. Re-read both sides once and
+            // keep the conflict visible if they do not converge.
+            const retryNow = validClockDate(clock);
+            lease = await coordinator.renew(lease, retryNow, config.leaseMs);
+            await services.refreshSourceWatermark({
+              route,
+              expectedRuleVersion: period.ruleVersion,
+              ruleAt: period.cutoff,
+              now: retryNow,
+            });
+          }
+        }
         let batchesProcessed = 0;
         let itemsApplied = 0;
     let pendingItems = run.status === 'open' || run.status === 'open_with_holds'

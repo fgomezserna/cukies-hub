@@ -3,6 +3,7 @@ import {
   buildCompetitionCreditRuleConfigHash,
   buildCompetitionCreditPeriod,
   computePoolConfigEffectiveCutoff,
+  firstEligibleCreditCutoff,
   stableCreditHash,
   validPoolCreditsPerSlot,
 } from "@/lib/uki-economy/credits/rules";
@@ -43,6 +44,26 @@ describe("competition credit rules", () => {
         rule
       )
     ).toEqual(new Date("2026-07-11T12:00:00.000Z"));
+  });
+
+  it("computes the first inclusive eligible cutoff after the scaled maturity delay", () => {
+    const cutoff = new Date("2026-07-10T12:00:00.000Z");
+    const rule = testCompetitionCreditRule({
+      calendar: {
+        version: "cycle-v1",
+        chainId: 97,
+        cycleSeconds: 1_800,
+        anchorAt: cutoff.toISOString(),
+      },
+      expectedBscChainId: 97,
+      activeFrom: cutoff,
+    });
+
+    expect(firstEligibleCreditCutoff(new Date("2026-07-10T12:05:00.000Z"), rule))
+      .toEqual(new Date("2026-07-10T12:30:00.000Z"));
+    expect(firstEligibleCreditCutoff(new Date("2026-07-10T11:50:00.000Z"), rule))
+      .toEqual(cutoff);
+    expect(firstEligibleCreditCutoff(cutoff, rule)).toEqual(cutoff);
   });
 
   it("only accepts 0..100 pool credits in multiples of ten", () => {
