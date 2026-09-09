@@ -13,6 +13,7 @@ import { SchemaNotReadyError } from '../errors';
 import { economyCycleDurationMs, loadEconomyCycleCalendar } from '../cycle-calendar';
 import { gamesQuota, poolPriority } from './rules';
 import type { CukiePoolGeneration, CukiePoolRarity } from './types';
+import { readPoolRecoveryPositions } from './recovery-read';
 
 export const CUKIE_POOL_NFT_VAULT_POSITIONS = 'cukie_pool_nft_vault_positions';
 export const CUKIE_POOL_CALENDAR_VERSIONS = 'cukie_pool_calendar_versions';
@@ -922,9 +923,33 @@ export async function listAvailableCukiePoolVaultAssets(
     assetIds,
   }))) return sourceError('la proyeccion abierta de Cukie Master no es canonica.');
 
+  // Resolve current Pool/Master custody before probing former vaults. The
+  // active vaults are authoritative for these assets; querying an old vault
+  // first could turn a valid current position into an inconclusive read.
+  const currentCustody = new Set([
+    ...poolRows.map((row) => String(row.assetId)),
+    ...masterRows.map((row) => String(row.assetId)),
+  ]);
+  const recovery = await readPoolRecoveryPositions({
+    walletNormalized,
+    assets: preliminary
+      .filter((item) => !currentCustody.has(item.assetId))
+      .map((item) => ({
+        chainId: config.chainId,
+        collectionAddress: item.collection,
+        tokenId: item.normalized.tokenId!,
+      })),
+  });
+  if (recovery.some((item) => item.status === 'unknown')) {
+    return sourceError('no se puede confirmar si un NFT disponible sigue en custodia de un vault Pool anterior.');
+  }
+
   const unavailable = new Set([
     ...poolRows.map((row) => String(row.assetId)),
     ...masterRows.map((row) => String(row.assetId)),
+    ...recovery
+      .filter((item) => item.status === 'custodied')
+      .map((item) => item.assetId),
   ]);
   return preliminary
     .filter((item) => !unavailable.has(item.assetId) && !lockedLegacyAssets.has(item.legacyAssetId))

@@ -6,6 +6,11 @@ import cukiePoolNftVaultAbiJson from './abis/CukiePoolNftVault.json';
 export type UkiNftVaultChainId = 56 | 97;
 export type UkiNftVaultMode = 'legacy' | 'custodial' | 'invalid';
 
+export type UkiPoolRecoveryVault = {
+  chainId: UkiNftVaultChainId;
+  vaultAddress: Address;
+};
+
 export type UkiNftVaultPublicConfig = {
   chainId: UkiNftVaultChainId | null;
   cukieMasterNftVaultAddress: Address | null;
@@ -14,6 +19,8 @@ export type UkiNftVaultPublicConfig = {
   collectionConfigInvalid: boolean;
   recoveryCollectionAddresses: Address[];
   recoveryCollectionConfigInvalid: boolean;
+  poolRecoveryVaults?: UkiPoolRecoveryVault[];
+  poolRecoveryVaultConfigInvalid?: boolean;
   explorerBaseUrl: string | null;
   ready: {
     cukieMaster: boolean;
@@ -63,6 +70,7 @@ export function parseUkiNftVaultPublicConfig(input: {
   collectionAddress?: string;
   collectionAddresses?: string;
   recoveryCollectionAddresses?: string;
+  poolRecoveryVaultAddresses?: string;
   explorerBaseUrl?: string;
 }): UkiNftVaultPublicConfig {
   const chainId = configuredChainId(input.chainId);
@@ -83,6 +91,15 @@ export function parseUkiNftVaultPublicConfig(input: {
         .map((address) => [address.toLowerCase(), address]),
     ).values(),
   ];
+  const poolRecoveryRaw = input.poolRecoveryVaultAddresses?.trim();
+  const poolRecoveryCandidates = poolRecoveryRaw ? poolRecoveryRaw.split(',') : [];
+  const poolRecoveryAddresses = poolRecoveryCandidates.map((item) => configuredAddress(item));
+  const poolRecoveryVaults = poolRecoveryAddresses
+    .filter((address): address is Address => Boolean(address))
+    .filter((address, index, values) => values.findIndex((candidate) => (
+      candidate.toLowerCase() === address.toLowerCase()
+    )) === index)
+    .map((vaultAddress) => ({ chainId: chainId ?? 97, vaultAddress }));
   const explorerBaseUrl = input.explorerBaseUrl?.trim().replace(/\/$/, '')
     || (chainId === 97
       ? 'https://testnet.bscscan.com'
@@ -105,6 +122,9 @@ export function parseUkiNftVaultPublicConfig(input: {
     collectionConfigInvalid: collections.invalid,
     recoveryCollectionAddresses,
     recoveryCollectionConfigInvalid: recoveryCollections.invalid,
+    poolRecoveryVaults,
+    poolRecoveryVaultConfigInvalid: poolRecoveryAddresses.some((item) => item === null)
+      || (poolRecoveryAddresses.length > 0 && chainId === null),
     explorerBaseUrl,
     ready: {
       cukieMaster: cukieMasterReady,
@@ -132,6 +152,7 @@ export const ukiNftVaults = parseUkiNftVaultPublicConfig({
   collectionAddress: process.env.NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS,
   collectionAddresses: process.env.NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESSES,
   recoveryCollectionAddresses: process.env.NEXT_PUBLIC_CUKIES_NFT_RECOVERY_COLLECTION_ADDRESSES,
+  poolRecoveryVaultAddresses: process.env.NEXT_PUBLIC_CUKIE_POOL_RECOVERY_VAULT_ADDRESSES,
   explorerBaseUrl: process.env.NEXT_PUBLIC_BSCSCAN_BASE_URL,
 });
 

@@ -4,7 +4,18 @@ import type {
   NftCanonicalState,
 } from '@/lib/nft-inventory';
 
-export type MyCukieCustody = 'wallet' | 'cukie_pool' | 'cukie_master';
+export type MyCukieCustody = 'wallet' | 'cukie_pool' | 'cukie_pool_recovery' | 'cukie_master';
+
+export type MyCukieAction =
+  | 'cancel_sale'
+  | 'request_pool_exit'
+  | 'withdraw_pool'
+  | 'withdraw_master'
+  | 'deposit_pool'
+  | 'sell'
+  | 'stake_master';
+
+export type MyCukieSaleKind = 'legacy' | 'uki' | null;
 
 export type MyCukieCollectionItem = {
   assetId: string;
@@ -17,6 +28,13 @@ export type MyCukieCollectionItem = {
   state: NftCanonicalState | 'cukie_master';
   custody: MyCukieCustody;
   poolStatus: 'pending' | 'active' | 'exit_requested' | 'withdrawable' | null;
+  chainId: 56 | 97;
+  collectionAddress: string;
+  saleKind: MyCukieSaleKind;
+  availableActions: MyCukieAction[];
+  recoveryVaultAddress?: string | null;
+  recoveryExitRequestedAt?: string | null;
+  recoveryWithdrawableAt?: string | null;
 };
 
 export type MyCukieCollectionSummary = {

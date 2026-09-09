@@ -55,6 +55,7 @@ function mockCollections(rows: Record<string, unknown[]>) {
   const collections: Record<string, {
     find: jest.Mock;
     countDocuments: jest.Mock;
+    findOne: jest.Mock;
   }> = {};
   const db = {
     collection: jest.fn((name: string) => {
@@ -67,6 +68,7 @@ function mockCollections(rows: Record<string, unknown[]>) {
       collections[name] = {
         find: jest.fn().mockReturnValue(cursor),
         countDocuments: jest.fn().mockResolvedValue(0),
+        findOne: jest.fn().mockResolvedValue(null),
       };
       return collections[name];
     }),
@@ -122,6 +124,43 @@ describe('competition credit public status conflicts', () => {
     expect(status.routes.uki.grants).toMatchObject({ healthy: false, openIncidents: 0 });
     expect(status.routes.nft.grants).toMatchObject({ healthy: false, openIncidents: 0 });
     expect(status.grants.healthy).toBe(false);
+  });
+
+  it('exposes the maturity timestamp and first eligible cutoff for qualifying slots', async () => {
+    const eligibleFrom = new Date('2026-09-07T09:00:00.000Z');
+    mockCollections({
+      economy_rule_versions: [testCompetitionCreditRule()],
+      cukie_master_slots: [{
+        _id: 'uki-slot-1',
+        walletNormalized: wallet,
+        route: 'uki',
+        ordinal: 1,
+        eligibilityEpoch: 1,
+        status: 'qualifying',
+        qualifiedSince: new Date('2026-09-07T08:00:00.000Z'),
+        creditEligibleFrom: eligibleFrom,
+        roundId: 'uki-round-v1',
+        ruleVersion: 'cukie-master-v1',
+        sourceHash: 'c'.repeat(64),
+        sourceBlockNumber: 100,
+        sourceBlockHash: `0x${'f'.repeat(64)}`,
+        sourceBlockTimestamp: new Date('2026-09-07T08:00:00.000Z'),
+        revision: 1,
+        createdAt: new Date('2026-09-07T08:00:00.000Z'),
+        updatedAt: new Date('2026-09-07T08:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.configurations).toEqual([
+      expect.objectContaining({
+        slotId: 'uki-slot-1',
+        status: 'qualifying',
+        creditEligibleFrom: eligibleFrom,
+        firstEligibleCutoff: new Date('2026-09-07T12:00:00.000Z'),
+      }),
+    ]);
   });
 
   it('contains a valid historical incident when both source watermarks are fresh', async () => {

@@ -1119,13 +1119,17 @@ export function createCompetitionCreditService(
         const rule = await repository.findRuleAt(cutoff, expectedRuleVersion);
         if (!rule)
           throw new DomainConflictError(
-            "La regla esperada no esta activa en el corte."
+            "La regla esperada no esta activa en el corte.",
+            { reasonCode: "CREDIT_RULE_NOT_ACTIVE_AT_CUTOFF" },
           );
         assertRuleActiveAt(rule, cutoff);
         const period = buildCompetitionCreditPeriod(cutoff, rule);
         const activeSettlementRule = await repository.findRuleAt(now);
         if (!activeSettlementRule) {
-          throw new DomainConflictError("No existe una regla activa para liquidar compensaciones.");
+          throw new DomainConflictError(
+            "No existe una regla activa para liquidar compensaciones.",
+            { reasonCode: "CREDIT_SETTLEMENT_RULE_MISSING" },
+          );
         }
         const settlementPeriod =
           now.getTime() >= period.nextCutoff.getTime()
@@ -1138,7 +1142,10 @@ export function createCompetitionCreditService(
             existing.settlementPeriod.ruleVersion
           );
           if (!existingSettlementRule) {
-            throw new DomainConflictError("La regla de liquidacion del run no existe.");
+            throw new DomainConflictError(
+              "La regla de liquidacion del run no existe.",
+              { reasonCode: "CREDIT_SETTLEMENT_RULE_MISSING" },
+            );
           }
           return validateExistingCreditRun(
             existing,
@@ -1151,19 +1158,24 @@ export function createCompetitionCreditService(
         }
         const gate = await repository.readSnapshotGate(rule, cutoff, route);
         if (!gate.schemaReady)
-          throw new DomainConflictError("El schema de economia no esta listo.");
+          throw new DomainConflictError("El schema de economia no esta listo.", {
+            reasonCode: "CREDIT_SCHEMA_NOT_READY",
+          });
         if (!gate.activeRuleMatches)
           throw new DomainConflictError(
-            "La regla activa cambio durante el snapshot."
+            "La regla activa cambio durante el snapshot.",
+            { reasonCode: "CREDIT_RULE_CHANGED_DURING_SNAPSHOT" },
           );
         if (gate.openIntegrityIncidents > 0) {
           throw new DomainConflictError(
-            "Hay incidentes de integridad abiertos."
+            "Hay incidentes de integridad abiertos.",
+            { reasonCode: "CREDIT_INTEGRITY_INCIDENT_OPEN" },
           );
         }
         if (gate.maturedQualifyingSlots > 0) {
           throw new DomainConflictError(
-            "Hay slots qualifying ya maduros; debe cerrarse su transicion antes del snapshot."
+            "Hay slots qualifying ya maduros; debe cerrarse su transicion antes del snapshot.",
+            { reasonCode: "CREDIT_MATURED_QUALIFYING_SLOTS" },
           );
         }
         const watermark = gate.sourceWatermark;
@@ -1209,7 +1221,8 @@ export function createCompetitionCreditService(
           !/^[0-9a-f]{64}$/.test(watermark.healthEvidenceHash)
         )
           throw new DomainConflictError(
-            "El watermark de Cukie Master no es saludable o no cubre el corte."
+            "El watermark de Cukie Master no es saludable o no cubre el corte.",
+            { reasonCode: "CREDIT_WATERMARK_UNHEALTHY_OR_STALE" },
           );
         if (
           validCreditText(
@@ -1222,7 +1235,8 @@ export function createCompetitionCreditService(
           ) !== watermark.sourceRuleVersions.nft
         ) {
           throw new DomainConflictError(
-            "Las versiones del watermark no son canonicas."
+            "Las versiones del watermark no son canonicas.",
+            { reasonCode: "CREDIT_WATERMARK_RULE_MISMATCH" },
           );
         }
 
@@ -1241,17 +1255,20 @@ export function createCompetitionCreditService(
           buildCreditSourceSlotsHash(currentSourceSlots) !== watermark.sourceHash
         )
           throw new DomainConflictError(
-            "Los slots cambiaron despues de publicar el watermark."
+            "Los slots cambiaron despues de publicar el watermark.",
+            { reasonCode: "CREDIT_SOURCE_CHANGED_AFTER_WATERMARK" },
           );
         const cutoffBlock = await repository.findCanonicalCutoffBlock(cutoff);
         if (!cutoffBlock) {
           throw new DomainConflictError(
-            `No existe evidencia de bloque canonico anterior a ${cutoff.toISOString()}.`
+            `No existe evidencia de bloque canonico anterior a ${cutoff.toISOString()}.`,
+            { reasonCode: "CREDIT_CUTOFF_BLOCK_MISSING" },
           );
         }
         if (cutoffBlock.blockNumber > watermark.canonicalSafeBlock) {
           throw new DomainConflictError(
-            "El bloque efectivo del cutoff excede el checkpoint canonico saludable."
+            "El bloque efectivo del cutoff excede el checkpoint canonico saludable.",
+            { reasonCode: "CREDIT_CUTOFF_BLOCK_AHEAD_OF_SAFE_CHECKPOINT" },
           );
         }
         const sourceSlots = await repository.listSourceSlotsAtCutoff(

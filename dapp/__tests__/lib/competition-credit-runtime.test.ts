@@ -276,6 +276,72 @@ describe('competition credit runtime', () => {
     expect(coordinator.finished).toHaveLength(1);
   });
 
+  it('uses a clock reading after watermark refresh before creating a run', async () => {
+    let observedNow = now;
+    const runtimeServices = services({
+      refreshSourceWatermark: jest.fn().mockImplementation(async ({ route }) => {
+        observedNow = new Date(observedNow.getTime() + 1_000);
+        return testCreditSourceWatermark({
+          route,
+          _id: `cukie-master-slots:${route}`,
+          observedThrough: observedNow,
+          updatedAt: observedNow,
+        });
+      }),
+    });
+
+    await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => observedNow,
+      coordinator: new MemoryCoordinator(),
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(runtimeServices.createDailyRun).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      now: new Date(now.getTime() + 1_000),
+    }));
+  });
+
+  it('rechecks a transient watermark race once and keeps a persistent conflict blocked', async () => {
+    const transientConflict = new DomainConflictError('source changed during snapshot', {
+      reasonCode: 'CREDIT_SOURCE_CHANGED_AFTER_WATERMARK',
+    });
+    const runtimeServices = services({
+      createDailyRun: jest.fn()
+        .mockRejectedValueOnce(transientConflict)
+        .mockResolvedValueOnce(creditRun())
+        .mockRejectedValue(new DomainConflictError('source still changing', {
+          reasonCode: 'CREDIT_SOURCE_CHANGED_AFTER_WATERMARK',
+        })),
+    });
+    const coordinator = new MemoryCoordinator();
+
+    const result = await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(runtimeServices.createDailyRun).toHaveBeenCalledTimes(4);
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenCalledTimes(4);
+    expect(result.routeResults).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'open' }),
+      expect.objectContaining({
+        route: 'nft',
+        status: 'blocked',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['CREDIT_SOURCE_CHANGED_AFTER_WATERMARK'],
+      }),
+    ]);
+    expect(coordinator.finished).toHaveLength(1);
+  });
+
   it('blocks unhealthy waiting sources while still expiring reservations and lots', async () => {
     const coordinator = new MemoryCoordinator();
     const repository = new MemoryCompetitionCreditRepository({ rule });

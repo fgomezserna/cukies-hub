@@ -168,6 +168,7 @@ describe('NftVaultRecoveryPanel', () => {
 
   it('permanece colapsado por defecto y muestra una única colección sin selector', () => {
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn(),
       getBlock: jest.fn(),
       waitForTransactionReceipt: jest.fn(),
@@ -193,6 +194,7 @@ describe('NftVaultRecoveryPanel', () => {
       .mockResolvedValueOnce(emptyMasterPosition());
     const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract,
       getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
       waitForTransactionReceipt,
@@ -228,6 +230,7 @@ describe('NftVaultRecoveryPanel', () => {
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(masterPosition());
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract,
       getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
       waitForTransactionReceipt: jest.fn(),
@@ -262,6 +265,7 @@ describe('NftVaultRecoveryPanel', () => {
       .mockResolvedValueOnce(poolPosition({ withdrawableAt: cutoff }));
     const getBlock = jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) });
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract,
       getBlock,
       waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
@@ -295,6 +299,7 @@ describe('NftVaultRecoveryPanel', () => {
     const getBlock = jest.fn().mockResolvedValue({ timestamp: BigInt(blockAfterCutoff) });
     const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract,
       getBlock,
       waitForTransactionReceipt,
@@ -321,6 +326,7 @@ describe('NftVaultRecoveryPanel', () => {
     const cutoff = 1_775_086_400;
     jest.spyOn(Date, 'now').mockReturnValue((cutoff + 3_600) * 1_000);
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn()
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(poolPosition({ withdrawableAt: cutoff })),
@@ -340,6 +346,7 @@ describe('NftVaultRecoveryPanel', () => {
 
   it('bloquea firmas si beneficialOwner no coincide con la wallet conectada', async () => {
     mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract: jest.fn()
         .mockResolvedValueOnce(true)
         .mockResolvedValueOnce(masterPosition(otherWallet)),

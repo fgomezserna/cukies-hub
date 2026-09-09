@@ -105,6 +105,9 @@ export type CukiesInventoryDocument = {
   updatedAt?: unknown;
   /** Ultimo evento que cambio la tenencia, no el ultimo cambio de estado/listing. */
   ownershipEventId?: unknown;
+  marketplaceListingStatus?: unknown;
+  marketplaceListingChain?: unknown;
+  marketplaceListingOwnerNormalized?: unknown;
 };
 
 export type NftAssetLockDocument = {

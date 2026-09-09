@@ -5,6 +5,7 @@ import { useAccount, useSwitchChain } from 'wagmi';
 import { usePathname } from 'next/navigation';
 import {
   appRuntimeEndpoint,
+  appRuntimeProjectionMatches,
   appRuntimeQueryKey,
   AppRuntimeProvider,
   useAppRuntime,
@@ -67,6 +68,51 @@ function RuntimeRefreshProbe() {
   return <><span data-testid="master-resource">{master.data?.value ?? master.state}</span><span data-testid="pool-resource">{pool.data?.value ?? pool.state}</span><button onClick={() => { void runtime.refreshAfterTransaction('pool'); void runtime.refreshAfterTransaction('master'); }}>refresh dependencies</button></>;
 }
 
+function ProjectionSyncProbe() {
+  const runtime = useAppRuntime();
+  const registered = React.useRef(false);
+  React.useEffect(() => {
+    if (registered.current) return;
+    registered.current = true;
+    runtime.registerStakingExpectation({ wallet: '0xaaa', chainId: 97, stakedUkiRaw: '20000' });
+    void runtime.refreshAfterTransaction('master');
+  }, [runtime]);
+  return <span data-testid="projection-state">{runtime.projectionSync.state}</span>;
+}
+
+function ProjectionControlProbe({ includePool = false }: { includePool?: boolean }) {
+  const runtime = useAppRuntime();
+  const pool = useAppRuntimeResource<{ value: string }>('pool', { enabled: includePool });
+  const registered = React.useRef(false);
+  React.useEffect(() => {
+    if (registered.current) return;
+    registered.current = true;
+    runtime.registerStakingExpectation({ wallet: '0xaaa', chainId: 97, stakedUkiRaw: '20000' });
+    void runtime.refreshAfterTransaction('master');
+  }, [runtime]);
+  return <><span data-testid="projection-state">{runtime.projectionSync.state}</span><span data-testid="pool-state">{pool.state}</span><button onClick={() => void runtime.refreshAfterTransaction('pool')}>refresh pool</button><button onClick={() => void runtime.refreshAfterTransaction('master')}>retry projection</button></>;
+}
+
+function projectionPayloads(stakedUkiRaw: string, slotStatus: 'qualifying' | 'active' = 'active') {
+  return {
+    master: {
+      walletNormalized: '0xaaa',
+      routes: {
+        uki: { source: { complete: true, stakedUkiRaw }, projectionFresh: true, slots: [{ route: 'uki', ordinal: 1, eligibilityEpoch: 2, status: slotStatus }] },
+        nft: { source: { complete: true }, projectionFresh: true, slots: [] },
+      },
+    },
+    credits: {
+      walletNormalized: '0xaaa',
+      configurations: [{ route: 'uki', ordinal: 1, eligibilityEpoch: 2, status: slotStatus }],
+    },
+    dashboard: {
+      identity: { walletNormalized: '0xaaa' },
+      network: { chainId: 97 },
+    },
+  };
+}
+
 function TransactionRefreshProbe() {
   const runtime = useAppRuntime();
   const query = useAppRuntimeResource<{ value: string }>('master');
@@ -111,6 +157,96 @@ describe('AppRuntimeProvider shared resource contract', () => {
   it('isolates each wallet and target chain in the cache key', () => {
     expect(appRuntimeQueryKey('credits', '0xabc', null)).not.toEqual(appRuntimeQueryKey('credits', '0xdef', null));
     expect(appRuntimeQueryKey('credits', '0xabc', 56)).not.toEqual(appRuntimeQueryKey('credits', '0xabc', 97));
+  });
+
+  it('only accepts a projection when Master and Credits have converged', () => {
+    const old = projectionPayloads('10000', 'qualifying');
+    const next = projectionPayloads('20000', 'active');
+    expect(appRuntimeProjectionMatches(old.master, next.credits, '20000')).toBe(false);
+    expect(appRuntimeProjectionMatches(next.master, next.credits, '20000')).toBe(true);
+  });
+
+  it('coordinates canonical Master, Credits and Dashboard reads through convergence', async () => {
+    const old = projectionPayloads('10000', 'qualifying');
+    const next = projectionPayloads('20000', 'active');
+    const calls = { master: 0, credits: 0 };
+    mockFetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return response(runtimeStatus);
+      if (url.includes('cukie-master')) return response({ status: 'ok', data: calls.master++ === 0 ? old.master : next.master });
+      if (url.includes('/credits')) return response({ status: 'ok', data: calls.credits++ === 0 ? old.credits : next.credits });
+      return response({ status: 'ok', data: next.dashboard });
+    });
+    render(<Shell><ProjectionSyncProbe /></Shell>);
+    await waitFor(() => expect(calls.master).toBe(2), { timeout: 5_000 });
+    await waitFor(() => expect(screen.getByTestId('projection-state')).toHaveTextContent('idle'));
+    expect(calls.master).toBe(2);
+    expect(calls.credits).toBe(2);
+  });
+
+  it('pauses an in-flight projection when the browser goes offline', async () => {
+    let masterSignal: AbortSignal | undefined;
+    mockFetch.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      if (url.includes('cukie-master')) {
+        masterSignal = init?.signal ?? undefined;
+        return new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+      }
+      return Promise.resolve(response({ status: 'ok', data: projectionPayloads('20000').credits }));
+    });
+    render(<Shell><ProjectionControlProbe /></Shell>);
+    await waitFor(() => expect(masterSignal).toBeDefined());
+    act(() => window.dispatchEvent(new Event('offline')));
+    await waitFor(() => expect(masterSignal?.aborted).toBe(true));
+    expect(screen.getByTestId('projection-state')).toHaveTextContent('delayed');
+    act(() => window.dispatchEvent(new Event('online')));
+  });
+
+  it('pauses projection reads on the public landing and resumes after returning', async () => {
+    let masterCalls = 0;
+    let masterSignal: AbortSignal | undefined;
+    mockFetch.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      if (url.includes('cukie-master')) {
+        masterCalls += 1;
+        if (masterCalls === 1) {
+          masterSignal = init?.signal ?? undefined;
+          return new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }));
+        }
+        return Promise.resolve(response({ status: 'ok', data: projectionPayloads('20000').master }));
+      }
+      if (url.includes('/credits')) return Promise.resolve(response({ status: 'ok', data: projectionPayloads('20000').credits }));
+      return Promise.resolve(response({ status: 'ok', data: projectionPayloads('20000').dashboard }));
+    });
+    const view = render(<Shell><ProjectionControlProbe /></Shell>);
+    await waitFor(() => expect(masterSignal).toBeDefined());
+    configureWallet('0xaaa', '/');
+    view.rerender(<Shell><ProjectionControlProbe /></Shell>);
+    await waitFor(() => expect(masterSignal?.aborted).toBe(true));
+    configureWallet('0xaaa', '/dashboard');
+    view.rerender(<Shell><ProjectionControlProbe /></Shell>);
+    fireEvent.click(screen.getByText('retry projection'));
+    await waitFor(() => expect(masterCalls).toBe(2));
+  });
+
+  it('keeps the requested Pool refresh while UKI projection sync is pending', async () => {
+    const payloads = projectionPayloads('10000');
+    mockFetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return response(runtimeStatus);
+      if (url.includes('cukie-master')) return response({ status: 'ok', data: payloads.master });
+      if (url.includes('/credits')) return response({ status: 'ok', data: payloads.credits });
+      if (url.includes('dashboard')) return response({ status: 'ok', data: payloads.dashboard });
+      if (url.includes('cukie-pool')) return response({ status: 'ok', data: { value: 'pool' } });
+      return response({ status: 'ok', data: { value: 'other' } });
+    });
+    render(<Shell><ProjectionControlProbe includePool /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('pool-state')).toHaveTextContent('ready'));
+    mockFetch.mockClear();
+    fireEvent.click(screen.getByText('refresh pool'));
+    await waitFor(() => expect(mockFetch.mock.calls.some(([input]) => String(input).includes('cukie-pool'))).toBe(true));
   });
 
   it('keeps wallet query parameters explicit and leaves dashboard aggregated', () => {

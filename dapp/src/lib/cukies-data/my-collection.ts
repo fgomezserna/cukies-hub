@@ -11,8 +11,11 @@ import {
   type CukiesInventoryDocument,
   type NftAssetLockDocument,
 } from '@/lib/nft-inventory';
+import type { IndexedUkiMarketplaceOrder } from '@/lib/uki-marketplace/types';
+import { ukiMarketplacePublicConfig } from '@/lib/uki-marketplace/public-config';
 import { DomainValidationError, SchemaNotReadyError } from '@/lib/uki-economy/errors';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
+import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
 
 import type {
   MyCukieCollectionData,
@@ -26,6 +29,53 @@ type CanonicalCukieDocument = CukiesInventoryDocument & {
   chainId?: unknown;
   collectionAddressNormalized?: unknown;
 };
+
+type CollectionAction = MyCukieCollectionItem['availableActions'][number];
+
+function legacySaleKind(document: CanonicalCukieDocument, walletNormalized: string, state: string) {
+  if (
+    state !== 'listed'
+    && document.marketplaceListingStatus !== 'active'
+  ) return null;
+  if (
+    typeof document.marketplaceListingOwnerNormalized === 'string'
+    && document.marketplaceListingOwnerNormalized.toLowerCase() !== walletNormalized
+  ) return null;
+  const network = typeof document.network === 'string' ? document.network.toUpperCase() : '';
+  if (document.marketplaceListingStatus !== 'active' && !['BSC', 'TRON'].includes(network)) return null;
+  return 'legacy' as const;
+}
+
+function actionsForItem(input: {
+  custody: MyCukieCollectionItem['custody'];
+  state: MyCukieCollectionItem['state'];
+  poolStatus: MyCukieCollectionItem['poolStatus'];
+  generation: MyCukieCollectionItem['generation'];
+  saleKind: MyCukieCollectionItem['saleKind'];
+  canDepositPool: boolean;
+  canStakeMaster: boolean;
+  canSell: boolean;
+}) {
+  const actions: CollectionAction[] = [];
+  if (input.custody === 'cukie_pool') {
+    if (input.poolStatus === 'withdrawable') actions.push('withdraw_pool');
+    else if (input.poolStatus === 'pending' || input.poolStatus === 'active') {
+      actions.push('request_pool_exit');
+    }
+    return actions;
+  }
+  if (input.custody === 'cukie_master') return ['withdraw_master'] satisfies CollectionAction[];
+  if (input.state === 'listed') {
+    if (input.saleKind) actions.push('cancel_sale');
+    return actions;
+  }
+  if (input.state === 'available') {
+    if (input.canDepositPool) actions.push('deposit_pool');
+    if (input.canSell) actions.push('sell');
+    if (input.generation === 'original' && input.canStakeMaster) actions.push('stake_master');
+  }
+  return actions;
+}
 
 type OpenVaultPosition = {
   assetId?: unknown;
@@ -50,6 +100,8 @@ function requiredConfig(config: UkiNftVaultPublicConfig) {
   return {
     chainId: config.chainId,
     collections: config.collectionAddresses.map((address) => address.toLowerCase()),
+    poolReady: config.ready.cukiePool && config.mode.cukiePool === 'custodial',
+    masterReady: config.ready.cukieMaster && config.mode.cukieMaster === 'custodial',
   };
 }
 
@@ -121,7 +173,37 @@ export async function listMyCukieCollectionFromDb(input: {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new DomainValidationError('now no es una fecha válida.');
   }
-  const { chainId, collections } = requiredConfig(input.config ?? ukiNftVaults);
+  const { chainId, collections, poolReady, masterReady } = requiredConfig(input.config ?? ukiNftVaults);
+  const activeUkiOrders = await input.db.collection<IndexedUkiMarketplaceOrder>('uki_marketplace_orders')
+    .find({
+      chainId,
+      collectionAddressNormalized: { $in: collections as `0x${string}`[] },
+      sellerNormalized: walletNormalized as `0x${string}`,
+      status: 'active',
+    })
+    .limit(MAX_COLLECTION_ROWS + 1)
+    .toArray();
+  if (activeUkiOrders.length > MAX_COLLECTION_ROWS) {
+    throw new SchemaNotReadyError('La colección supera el límite seguro de anuncios activos.');
+  }
+  const ukiSaleByAsset = new Map<string, true>();
+  for (const order of activeUkiOrders) {
+    const id = tokenId(order.tokenId);
+    const collection = typeof order.collectionAddressNormalized === 'string'
+      ? order.collectionAddressNormalized.toLowerCase()
+      : null;
+    if (
+      order.status !== 'active'
+      ||
+      order.chainId !== chainId
+      || !collection
+      || !collections.includes(collection)
+      || !id
+    ) continue;
+    const assetId = `${chainId}:${collection}:${id}`;
+    if (ukiSaleByAsset.has(assetId)) throw new SchemaNotReadyError('Un Cukie tiene más de un anuncio UKI activo.');
+    ukiSaleByAsset.set(assetId, true);
+  }
   const positionFilter = {
     chainId,
     collectionAddressNormalized: { $in: collections },
@@ -192,6 +274,18 @@ export async function listMyCukieCollectionFromDb(input: {
     throw new SchemaNotReadyError('Falta la metadata de un Cukie depositado.');
   }
 
+  const recovery = await readPoolRecoveryPositions({
+    walletNormalized,
+    assets: canonical
+      .filter(({ assetId }) => !positionAssetIds.has(assetId))
+      .map(({ collection, tokenId: id }) => ({
+      chainId,
+      collectionAddress: collection,
+      tokenId: id,
+      })),
+  });
+  const recoveryByAsset = new Map(recovery.map((item) => [item.assetId, item]));
+
   const legacyAssetIds = canonical.map(({ document }) => buildCukiesAssetId(document));
   const locks = legacyAssetIds.length === 0 ? [] : await input.db
     .collection<NftAssetLockDocument>('nft_asset_locks')
@@ -218,6 +312,29 @@ export async function listMyCukieCollectionFromDb(input: {
     );
     const pool = poolByAsset.get(assetId);
     const master = masterByAsset.get(assetId);
+    const recoveryPosition = recoveryByAsset.get(assetId);
+    const legacySale = legacySaleKind(document, walletNormalized, normalized.canonicalState);
+    const ukiSale = ukiSaleByAsset.has(assetId);
+    const saleKind = master || pool || recoveryPosition?.status === 'custodied'
+      ? null
+      : ukiSale
+        ? 'uki' as const
+        : legacySale;
+    const state = recoveryPosition?.status === 'unknown'
+      ? 'unknown' as const
+      : recoveryPosition?.status === 'custodied'
+        ? 'in_pool' as const
+        : master
+      ? 'cukie_master'
+      : pool
+        ? 'in_pool'
+        : saleKind
+          ? 'listed'
+          : normalized.canonicalState;
+    const custody = recoveryPosition?.status === 'custodied'
+      ? 'cukie_pool_recovery'
+      : master ? 'cukie_master' : pool ? 'cukie_pool' : 'wallet';
+    const poolState = pool ? poolStatus(pool, now) : null;
     return {
       assetId,
       tokenId: id,
@@ -226,9 +343,33 @@ export async function listMyCukieCollectionFromDb(input: {
       origin: typeof document.origin === 'string' ? document.origin : null,
       generation: normalized.generation,
       rarity: normalized.rarity,
-      state: master ? 'cukie_master' : pool ? 'in_pool' : normalized.canonicalState,
-      custody: master ? 'cukie_master' : pool ? 'cukie_pool' : 'wallet',
-      poolStatus: pool ? poolStatus(pool, now) : null,
+      state,
+      custody,
+      poolStatus: poolState,
+      chainId,
+      collectionAddress: String(document.collectionAddressNormalized).toLowerCase(),
+      saleKind,
+      availableActions: actionsForItem({
+        custody,
+        state,
+        poolStatus: poolState,
+        generation: normalized.generation,
+        saleKind,
+        canDepositPool: poolReady,
+        canStakeMaster: masterReady,
+        canSell: typeof document.network === 'string'
+          && document.network.toUpperCase() === 'TRON'
+          || (chainId === 56 && ukiMarketplacePublicConfig.ready),
+      }),
+      recoveryVaultAddress: recoveryPosition?.status === 'custodied'
+        ? recoveryPosition.vaultAddress
+        : null,
+      recoveryExitRequestedAt: recoveryPosition?.status === 'custodied'
+        ? recoveryPosition.exitRequestedAt
+        : null,
+      recoveryWithdrawableAt: recoveryPosition?.status === 'custodied'
+        ? recoveryPosition.withdrawableAt
+        : null,
     } satisfies MyCukieCollectionItem;
   }).sort((left, right) => compareTokenIds(left.tokenId, right.tokenId));
 
@@ -237,7 +378,7 @@ export async function listMyCukieCollectionFromDb(input: {
     inWallet: items.filter((item) => item.custody === 'wallet').length,
     available: items.filter((item) => item.custody === 'wallet' && item.state === 'available').length,
     onSale: items.filter((item) => item.custody === 'wallet' && item.state === 'listed').length,
-    inPool: items.filter((item) => item.custody === 'cukie_pool').length,
+    inPool: items.filter((item) => item.custody === 'cukie_pool' || item.custody === 'cukie_pool_recovery').length,
     inCukieMaster: items.filter((item) => item.custody === 'cukie_master').length,
     otherInUse: items.filter((item) => (
       item.custody === 'wallet' && !['available', 'listed'].includes(item.state)

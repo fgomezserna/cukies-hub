@@ -535,7 +535,7 @@ export function CukieMasterNftVaultPanel() {
             const pending = pendingByAsset[asset.assetId];
             const pendingLocked = Boolean(pending && pending.phase !== 'approval_confirmed');
             return (
-              <article key={asset.assetId} className="overflow-hidden rounded-[10px] border border-white/10 bg-[#07131d]">
+              <article id={`cukie-master-cukie-${asset.tokenId ?? ''}`} key={asset.assetId} className="scroll-mt-24 overflow-hidden rounded-[10px] border border-white/10 bg-[#07131d]">
                 <div className="relative aspect-[4/3] bg-black/25">
                   <CukiImage src={asset.imageUrl} alt={`Cukie #${asset.tokenId ?? ''}`} sizes="(min-width: 1280px) 24vw, 90vw" className="object-contain p-3" />
                   <span className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/70 px-2.5 py-1 text-xs font-black uppercase text-[var(--uki-text)]">

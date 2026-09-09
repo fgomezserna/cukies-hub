@@ -47,8 +47,12 @@ export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: bo
 
   useEffect(() => {
     const selectRouteFromHash = () => {
+      const tokenId = new URLSearchParams(window.location.search).get('tokenId');
+      const hashTarget = window.location.hash.slice(1);
       const route = window.location.hash === '#cukie-master-nft-staking'
         ? 'nft'
+        : hashTarget.startsWith('cukie-master-cukie-') || tokenId
+          ? 'nft'
         : window.location.hash === '#uki-staking'
           ? 'uki'
           : null;
@@ -56,7 +60,8 @@ export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: bo
       if (!route) return;
       setActiveRoute(route);
       window.setTimeout(() => {
-        document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+        const targetId = hashTarget || (tokenId ? `cukie-master-cukie-${tokenId}` : '');
+        document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
       }, 0);
     };
 

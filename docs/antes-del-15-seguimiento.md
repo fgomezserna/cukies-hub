@@ -845,6 +845,47 @@ normal permanecen deshabilitados. [Evidencia](legacy-marketplace/evidence/2026-0
 Este alcance no modifica saldos, contratos, reglas economicas, procesos de
 reparacion remotos ni produccion.
 
+### Creditos por periodo y custodia de la coleccion — 2026-09-09
+
+La prueba de las 09:49 UTC de la wallet `0x26789b…0c13` confirma tres cupos NFT
+activos, cero UKI y 300 creditos del periodo 09:30–10:00 UTC. La captura anterior
+de cinco cupos no representa su estado actual. En staging la validacion de 24 h
+se escala a 30 minutos y despues aplica el primer corte elegible: un deposito
+reconocido a las 12:05 madura a las 12:35 y entra como pronto en el corte 13:00.
+Configurar el reparto de un cupo en validacion no adelanta esa elegibilidad.
+
+Seguimiento de este lote en `codex/credit-cycle-and-cukie-actions`:
+
+| Punto | Evidencia y estado | Criterio de cierre |
+| --- | --- | --- |
+| Corte de creditos | Observado en Stage servido `43d8a2f`: a las 10:00:06 todavia no existe evidencia del bloque del corte; primer tick 10:00:22 falla y el siguiente abre ambas rutas a las 10:00:54.994. La UI cambia a cero mientras el reparto esta pendiente. | Distinguir reparto pendiente de saldo final cero, conservar motivos de bloqueo y verificar otro corte despues de desplegar. |
+| Configuracion de cupos pendientes | API admite configurar slots materializados `qualifying`; el resumen solo cuenta activos y no informa el primer corte por cupo. | Configuracion anticipada visible por fecha elegible, sin grants anticipados; proximo corte separado de fechas posteriores. |
+| Pool anterior | Contraste `ownerOf` + `positionOf` en BSC 97 a las 09:56: los IDs `98000001`, `98000003`, `98000004`, `98000007` siguen en `0xd405acff1bba872be893e796c39f3eacbde2872b`, con la wallet como beneficiaria y sin salida solicitada. El vault actual es `0x359b8fc829eb6d320df6301c8f323af9ae773b41`. Los 11 disponibles de la observacion anterior eran un resultado de UI; siete estan realmente en la wallet y cuatro en el Pool sustituido. | Excluir la custodia anterior de disponibles y ofrecer recuperacion con allowlist, prueba de beneficiario y calendario del contrato anterior. Sin reset, backfill ni transaccion automatica. |
+| Actualizacion y acciones | El recibo on-chain y las proyecciones Master/Creditos se refrescan en momentos distintos. Coleccion necesita filtros y acciones por custodia/red. | Seguimiento compartido de convergencia y acciones que lleven al control correcto; verificar errores, cambio de wallet y navegacion. |
+
+El candidato de recuperacion se contrasto a las 10:24 UTC contra Mongo y
+`ownerOf`/`positionOf` de BSC 97, sin escrituras: reconoce los cuatro NFTs del
+Pool anterior y ocho disponibles. El `98000005` ya habia vuelto a la wallet
+desde la observacion de las 09:49; ambos estados quedan fechados, no se fuerza
+un saldo historico como expectativa actual. Los ocho disponibles no ofrecen
+venta UKI porque ese contrato no esta configurado en staging.
+
+La configuracion publica `NEXT_PUBLIC_CUKIE_POOL_RECOVERY_VAULT_ADDRESSES`
+admite solo vaults anteriores declarados para la red configurada. En app 28
+se incorpora `0xd405acff1bba872be893e796c39f3eacbde2872b`; conserva su
+calendario diario y requiere solicitud de salida/retirada firmada por el
+beneficiario. La lista queda vacia por defecto. El despliegue actual del Pool
+sigue siendo `0x359b8fc829eb6d320df6301c8f323af9ae773b41`.
+
+A las 10:35 UTC el candidato final confirma una coleccion mixta: siete
+disponibles, cuatro en el Pool anterior y uno en Master. La recuperacion
+excluye correctamente las posiciones actuales de sus consultas historicas.
+[Evidencia de ambos contrastes y del corte](legacy-marketplace/evidence/2026-09-09-credit-period-and-pool-custody.json).
+
+Base integrada `32b27fc` (PR #342). Lint, typecheck, build y 222 suites / 1.810
+tests correctos; despliegue de este lote en curso. Main/app 12 queda
+fuera del alcance.
+
 ### Auditoria del 2026-09-08
 
 Observado en `https://cukieshub.eurekand.com`, app 28, SHA

@@ -68,6 +68,8 @@ function formatDate(value: string) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
   }).format(date);
 }
 
@@ -112,7 +114,7 @@ function presentation(entry: CreditHistoryEntry) {
     case 'pool_deposit':
       return {
         title: 'Aportación al pool',
-        detail: 'Esta parte de tu reparto diario se destinó a partidas de competición.',
+        detail: 'Esta parte de tu reparto por periodo se destinó a partidas de competición.',
         amount: `${entry.amountCredits} al pool`,
         amountClass: 'text-[var(--uki-cream)]',
         icon: <Trophy className="h-5 w-5" weight="fill" />,
