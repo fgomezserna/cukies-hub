@@ -313,7 +313,6 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
         _id: documentId,
         ...(!isMint ? { origin: 'transfer' } : {}),
         birthNetwork: event.chain,
-        price: 0,
         children: [],
         parents: [null, null],
         history: [],

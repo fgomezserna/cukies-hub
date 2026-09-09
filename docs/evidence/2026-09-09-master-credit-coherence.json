@@ -1,0 +1,671 @@
+{
+  "observedAt": "2026-09-09T20:42:30.561Z",
+  "environment": "staging",
+  "appResourceWorkers": "u4s804o4wwcckowgk0woo4wg",
+  "servedWorkerCommit": "16466025030bfb9a0a3c784431988c5840430f93",
+  "readOnly": true,
+  "database": "cukieshub-new-staging",
+  "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+  "historicalCorrespondence": {
+    "scope": "Known wallet and observed settlement period. DOCX P02 does not identify wallet/time; correspondence is not definitive attribution.",
+    "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T16:30:00.000Z",
+    "items": [
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T14:30:00.000Z",
+          "route": "nft",
+          "status": "applied"
+        },
+        "count": 5,
+        "base": 500,
+        "compensation": 500,
+        "own": 1000,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T14:30:00.000Z",
+          "route": "uki",
+          "status": "applied"
+        },
+        "count": 1,
+        "base": 100,
+        "compensation": 100,
+        "own": 200,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T15:00:00.000Z",
+          "route": "nft",
+          "status": "applied"
+        },
+        "count": 5,
+        "base": 500,
+        "compensation": 500,
+        "own": 1000,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T15:00:00.000Z",
+          "route": "uki",
+          "status": "applied"
+        },
+        "count": 1,
+        "base": 100,
+        "compensation": 100,
+        "own": 200,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T15:30:00.000Z",
+          "route": "nft",
+          "status": "applied"
+        },
+        "count": 5,
+        "base": 500,
+        "compensation": 500,
+        "own": 1000,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T15:30:00.000Z",
+          "route": "uki",
+          "status": "applied"
+        },
+        "count": 1,
+        "base": 100,
+        "compensation": 100,
+        "own": 200,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T16:00:00.000Z",
+          "route": "nft",
+          "status": "applied"
+        },
+        "count": 5,
+        "base": 500,
+        "compensation": 500,
+        "own": 1000,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T16:00:00.000Z",
+          "route": "uki",
+          "status": "applied"
+        },
+        "count": 1,
+        "base": 100,
+        "compensation": 100,
+        "own": 200,
+        "pool": 0,
+        "reasons": [
+          "late_gt_24h"
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T16:30:00.000Z",
+          "route": "nft",
+          "status": "applied"
+        },
+        "count": 5,
+        "base": 500,
+        "compensation": 0,
+        "own": 500,
+        "pool": 0,
+        "reasons": [
+          null
+        ]
+      },
+      {
+        "_id": {
+          "earned": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-07T16:30:00.000Z",
+          "route": "uki",
+          "status": "applied"
+        },
+        "count": 1,
+        "base": 100,
+        "compensation": 0,
+        "own": 100,
+        "pool": 0,
+        "reasons": [
+          null
+        ]
+      }
+    ],
+    "duplicateItems": [],
+    "ledger": [
+      {
+        "_id": {
+          "operation": "grant",
+          "bucket": "own"
+        },
+        "count": 30,
+        "amount": 3000,
+        "first": "2026-09-07T16:49:07.666Z",
+        "last": "2026-09-07T16:51:10.508Z"
+      },
+      {
+        "_id": {
+          "operation": "late_compensation",
+          "bucket": "own"
+        },
+        "count": 24,
+        "amount": 2400,
+        "first": "2026-09-07T16:49:07.666Z",
+        "last": "2026-09-07T16:50:39.896Z"
+      },
+      {
+        "_id": {
+          "operation": "expire",
+          "bucket": "own"
+        },
+        "count": 30,
+        "amount": 5400,
+        "first": "2026-09-07T17:00:12.312Z",
+        "last": "2026-09-07T17:00:12.312Z"
+      }
+    ],
+    "duplicateLedger": [],
+    "rule": {
+      "_id": "competition_credits:credits-staging-cycle-v1",
+      "calendar": {
+        "version": "cycle-v1",
+        "chainId": 97,
+        "cycleSeconds": 1800,
+        "anchorAt": "2026-09-07T11:30:00.000Z"
+      },
+      "activeFrom": "2026-09-07T11:30:00.000Z",
+      "maxSnapshotLatenessMs": 1800000,
+      "sourceFreshnessMs": 900000,
+      "creditsPerSlot": 100,
+      "reservationTtlMs": 600000
+    }
+  },
+  "currentSources": {
+    "watermarks": [
+      {
+        "_id": "cukie-master-slots:nft",
+        "status": "healthy",
+        "observedThrough": "2026-09-09T16:52:46.401Z",
+        "updatedAt": "2026-09-09T16:53:09.529Z"
+      },
+      {
+        "_id": "cukie-master-slots:uki",
+        "status": "healthy",
+        "observedThrough": "2026-09-09T20:40:06.440Z",
+        "updatedAt": "2026-09-09T20:40:35.622Z"
+      }
+    ],
+    "recentRuns": [
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T20:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T20:30:58.291Z",
+        "updatedAt": "2026-09-09T20:30:58.471Z",
+        "openedAt": "2026-09-09T20:30:58.471Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T20:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T20:01:03.810Z",
+        "updatedAt": "2026-09-09T20:01:03.945Z",
+        "openedAt": "2026-09-09T20:01:03.945Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T19:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T19:30:48.516Z",
+        "updatedAt": "2026-09-09T19:30:48.653Z",
+        "openedAt": "2026-09-09T19:30:48.653Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T19:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T19:01:04.693Z",
+        "updatedAt": "2026-09-09T19:01:04.814Z",
+        "openedAt": "2026-09-09T19:01:04.814Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T18:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T18:30:50.317Z",
+        "updatedAt": "2026-09-09T18:30:50.441Z",
+        "openedAt": "2026-09-09T18:30:50.441Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T18:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T18:01:05.822Z",
+        "updatedAt": "2026-09-09T18:01:06.019Z",
+        "openedAt": "2026-09-09T18:01:06.019Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T17:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T17:30:51.195Z",
+        "updatedAt": "2026-09-09T17:30:51.339Z",
+        "openedAt": "2026-09-09T17:30:51.339Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T17:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T17:01:11.134Z",
+        "updatedAt": "2026-09-09T17:01:11.269Z",
+        "openedAt": "2026-09-09T17:01:11.269Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T16:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T16:30:58.753Z",
+        "updatedAt": "2026-09-09T16:30:58.959Z",
+        "openedAt": "2026-09-09T16:30:58.959Z"
+      },
+      {
+        "route": "nft",
+        "period": {
+          "cutoff": "2026-09-09T16:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 3,
+        "createdAt": "2026-09-09T16:30:59.090Z",
+        "updatedAt": "2026-09-09T16:30:59.243Z",
+        "openedAt": "2026-09-09T16:30:59.243Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T16:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T16:00:44.453Z",
+        "updatedAt": "2026-09-09T16:00:44.584Z",
+        "openedAt": "2026-09-09T16:00:44.584Z"
+      },
+      {
+        "route": "nft",
+        "period": {
+          "cutoff": "2026-09-09T16:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 3,
+        "createdAt": "2026-09-09T16:00:44.684Z",
+        "updatedAt": "2026-09-09T16:00:44.813Z",
+        "openedAt": "2026-09-09T16:00:44.813Z"
+      },
+      {
+        "route": "nft",
+        "period": {
+          "cutoff": "2026-09-09T15:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 3,
+        "createdAt": "2026-09-09T15:31:00.305Z",
+        "updatedAt": "2026-09-09T15:31:00.529Z",
+        "openedAt": "2026-09-09T15:31:00.529Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T15:30:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T15:31:00.034Z",
+        "updatedAt": "2026-09-09T15:31:00.173Z",
+        "openedAt": "2026-09-09T15:31:00.173Z"
+      },
+      {
+        "route": "uki",
+        "period": {
+          "cutoff": "2026-09-09T15:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 2,
+        "createdAt": "2026-09-09T15:01:15.581Z",
+        "updatedAt": "2026-09-09T15:01:15.721Z",
+        "openedAt": "2026-09-09T15:01:15.721Z"
+      },
+      {
+        "route": "nft",
+        "period": {
+          "cutoff": "2026-09-09T15:00:00.000Z"
+        },
+        "status": "open",
+        "expectedItemCount": 3,
+        "createdAt": "2026-09-09T15:01:15.840Z",
+        "updatedAt": "2026-09-09T15:01:16.012Z",
+        "openedAt": "2026-09-09T15:01:16.012Z"
+      }
+    ],
+    "masterRuns": [
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T20:42:26.094Z",
+        "endedAt": "2026-09-09T20:42:26.282Z",
+        "result": {
+          "legacyQueueRepair": {
+            "repaired": 0
+          },
+          "queue": {
+            "completed": 0,
+            "failed": 0
+          },
+          "activation": {
+            "jobRunId": "cukie-master:2026-09-09T20:42:26.094Z:9a0c9a91-7bc8-49ec-ae93-6a810b771c5a",
+            "scanned": 0,
+            "activated": 0,
+            "done": true,
+            "nextCursor": null
+          },
+          "grace": {
+            "rounds": 0,
+            "recalculated": 0
+          },
+          "waitlist": {
+            "promoted": 0
+          },
+          "poolExpiry": {
+            "scanned": 0,
+            "expired": 0,
+            "skipped": 0
+          },
+          "expiry": {
+            "scanned": 0,
+            "expired": 0,
+            "skipped": 0
+          },
+          "ownership": {
+            "scanned": 0,
+            "invalidated": 0,
+            "incidents": 0,
+            "deferred": true
+          },
+          "poolReconciliation": {
+            "scanned": 0,
+            "invalidated": 0,
+            "skipped": 0,
+            "nextCursor": null
+          },
+          "reconciliation": {
+            "enqueued": 0,
+            "done": true,
+            "source": null
+          }
+        }
+      },
+      {
+        "status": "success",
+        "startedAt": "2026-09-09T20:41:25.775Z",
+        "endedAt": "2026-09-09T20:41:25.953Z",
+        "result": {
+          "legacyQueueRepair": {
+            "repaired": 0
+          },
+          "queue": {
+            "completed": 0,
+            "failed": 0
+          },
+          "activation": {
+            "jobRunId": "cukie-master:2026-09-09T20:41:25.775Z:0a2735ce-163d-4707-8c40-137bf454f637",
+            "scanned": 0,
+            "activated": 0,
+            "done": true,
+            "nextCursor": null
+          },
+          "grace": {
+            "rounds": 0,
+            "recalculated": 0
+          },
+          "waitlist": {
+            "promoted": 0
+          },
+          "poolExpiry": {
+            "scanned": 0,
+            "expired": 0,
+            "skipped": 0
+          },
+          "expiry": {
+            "scanned": 0,
+            "expired": 0,
+            "skipped": 0
+          },
+          "ownership": {
+            "scanned": 0,
+            "invalidated": 0,
+            "incidents": 0,
+            "deferred": true
+          },
+          "poolReconciliation": {
+            "scanned": 0,
+            "invalidated": 0,
+            "skipped": 0,
+            "nextCursor": null
+          },
+          "reconciliation": {
+            "enqueued": 0,
+            "done": true,
+            "source": null
+          }
+        }
+      }
+    ]
+  },
+  "limits": [
+    "No balance mutation, replay, backfill, runtime flag update or watermark advance was performed.",
+    "This record does not certify original slot eligibility against historical chain state.",
+    "Transfer projection fix validated locally; deployment, targeted event recovery and frontend continuity verification remain pending."
+  ],
+  "projectionBlocker": {
+    "observedAt": "2026-09-09T20:51:29.634Z",
+    "events": [
+      {
+        "_id": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+        "attempts": 5,
+        "blockNumber": 130058335,
+        "contractAlias": "TOKEN_V2",
+        "eventName": "Transfer",
+        "logIndex": 0,
+        "status": "failed",
+        "txHash": "0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587",
+        "updatedAt": "2026-09-09T16:53:30.676Z",
+        "lastError": "Updating the path 'price' would create a conflict at 'price'"
+      }
+    ],
+    "deadLetters": [
+      {
+        "eventId": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+        "contractAlias": "TOKEN_V2",
+        "createdAt": "2026-09-09T16:53:30.664Z",
+        "error": "Updating the path 'price' would create a conflict at 'price'",
+        "eventName": "Transfer",
+        "updatedAt": "2026-09-09T16:53:30.680Z"
+      }
+    ],
+    "runtime": {
+      "observedAt": "2026-09-09T20:50:58.236Z",
+      "firstBlockedAt": "2026-09-09T16:53:39.642Z",
+      "latestBlockedAt": "2026-09-09T20:50:43.863Z",
+      "outerStatus": "success",
+      "resultStatus": "blocked",
+      "nftReasonCodes": [
+        "SOURCE_UNHEALTHY",
+        "CHAIN_DEAD_LETTERS_OPEN",
+        "CHAIN_EVENTS_NOT_PROJECTED"
+      ]
+    },
+    "codeCause": {
+      "path": "packages/chain-indexer/src/projectors/index.ts",
+      "function": "projectTransfer",
+      "duplicateUpdatePath": "price",
+      "operators": [
+        "$set",
+        "$setOnInsert"
+      ],
+      "retryLimit": 5,
+      "automaticReplayAfterLimit": false,
+      "markProjectedClearsDeadLetter": false
+    }
+  },
+  "recoveryBaseline": {
+    "observedAt": "2026-09-09T20:54:58.710Z",
+    "event": {
+      "_id": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+      "args": {
+        "from": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b",
+        "to": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+        "tokenId": "98000007"
+      },
+      "attempts": 5,
+      "blockHash": "0x11fa437af60742bb71f1e363ba39b23a3eca4a9bd8dd1ef24065fac8a6cfd5c4",
+      "blockNumber": 130058335,
+      "chain": "BSC",
+      "chainId": 97,
+      "contractAddress": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+      "contractAlias": "TOKEN_V2",
+      "eventName": "Transfer",
+      "logIndex": 0,
+      "normalized": {
+        "tokenId": "98000007",
+        "from": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b",
+        "to": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+        "isMint": false
+      },
+      "status": "failed",
+      "timestampMs": 1788972773000,
+      "txHash": "0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587"
+    },
+    "nft": {
+      "_id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000007",
+      "chainId": 97,
+      "collectionAddressNormalized": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+      "lastEventId": "BSC:TOKEN_V2:Transfer:0x213347554c7127ce0ed83f53525fa1147479e975dd662f892ce37ba0f83360ad:0",
+      "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "ownerNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+      "price": 0,
+      "state": "available",
+      "tokenId": "98000007"
+    },
+    "listings": [],
+    "txCount": 0,
+    "laterEvents": [
+      {
+        "_id": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+        "blockNumber": 130058335,
+        "eventName": "Transfer",
+        "logIndex": 0,
+        "status": "failed"
+      }
+    ]
+  },
+  "recoveryPlan": {
+    "status": "Prepared for coordinator/INFRA review; not executed",
+    "targetEventId": "BSC:TOKEN_V2:Transfer:0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587:0",
+    "preconditions": [
+      "Coordinator approves deployment/recovery window. Verify indexer SOURCE_COMMIT equals exact merged fix SHA (not only web health) and compiled projectTransfer has no price overlap.",
+      "Guard staging worker resource and database cukieshub-new-staging. Read event and dead-letter again; require exact BSC/97/TOKEN_V2/collection/tx/log/block identity from recoveryBaseline, status failed, attempts 5 and exact price conflict.",
+      "Read ownerOf(98000007) via verified BSC97 RPC at a recorded current block for collection 0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8; require target wallet ownership. Verify TOKEN_V2 cursor identity and continuous coverage through the required safe block are current. Also require no later token event/materialization superseding this transfer. Mongo absence alone does not exclude un-ingested changes. Abort/replan on ownership discrepancy, cursor gap, changed error, ignored state or unexpected listings.",
+      "Capture allowlisted before-state for event, single dead-letter, NFT document, tx_nfts(eventId), matching listings and NFT route runtime/watermark."
+    ],
+    "retry": [
+      "Use a single compare-and-set update on the exact event identity, failed status, attempts 5 and original lastError: set status ingested, update updatedAt. Preserve attempts 5 and immutable event payload. matchedCount must equal 1.",
+      "Let the already deployed indexer claim the event normally; next claim increments attempts to 6. Do not call projectOnce for an unfenced global batch and do not reset other events.",
+      "Repeated invocation: if ingested/projecting, observe; if projected, proceed to verification only; if failed with attempts 6 or a changed error, stop without requeue. Preserve before/after evidence."
+    ],
+    "resolve": [
+      "Require exact event status projected, same identity, NFT owner destination and lastEventId target (or verified later canonical state), tx_nfts target count exactly 1, and no unexpected active listing changes.",
+      "Resolve only this dead-letter after successful projection: transactionally re-read projected event and deleteOne matching exact eventId, contractAlias and captured price error. If already absent and event/projections verified, treat as completed. Never delete broadly or before success.",
+      "Leave ledger, balances, positions, slots, cursor and watermark to normal verified runtime processing; never force health or source timestamp."
+    ],
+    "postconditions": [
+      "Observe successive ticks with NFT observedThrough advancing, NFT route unblocked and ownership.deferred false when health is ready.",
+      "Verify same-wallet authenticated Master/NFT/Credits readings and next eligible-period settlement from ledger, keeping entitlement, allocated slots and already-earned credits distinct.",
+      "Global health or outer runtime success alone is insufficient; record actual worker SHA and timestamp with scoped evidence."
+    ]
+  },
+  "localValidation": {
+    "branch": "codex/master-credit-coherence-20260910",
+    "runtimeChange": "Remove only duplicate price from projectTransfer $setOnInsert; preserve $set.price.",
+    "regressionRedBeforeFix": "Mongo update path conflict: $setOnInsert.price overlaps $set.price",
+    "focal": {
+      "passed": 11,
+      "failed": 0
+    },
+    "packageTests": {
+      "passed": 86,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "Mongo integration opt-in"
+    },
+    "typecheck": "pass",
+    "build": "pass",
+    "diffCheck": "pass",
+    "contractsArtifactSetup": "Compiled locally to satisfy event-coverage artifact prerequisite; generated artifacts are not committed.",
+    "liveRecoveryExecuted": false
+  }
+}
