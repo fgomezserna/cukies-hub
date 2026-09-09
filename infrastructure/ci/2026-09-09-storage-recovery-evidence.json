@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "scope": "Historical storage recovery snapshot; Coolify VM1001 and staging app28 only",
+  "observedAt": "2026-09-09T16:50:23.362655+00:00",
+  "host": "VM1001:/srv",
+  "initialFreeBytes": 3684106240,
+  "afterCachePruneFreeBytes": 22697611264,
+  "finalVerifiedFreeBytes": 22697099264,
+  "cachePruneMeasuredReclaimedBytes": 19013685248,
+  "dockerReportedCacheReclaimed": "16.42GB",
+  "measurementNote": "Filesystem deltas and Docker logical cache sizes are different measurements; services remained running.",
+  "removedImages": [
+    {
+      "id": "sha256:2077d4d37fb3b51287829d9c1821b1c38908382d48ac48ee04f11fb0d795702f",
+      "references": []
+    },
+    {
+      "id": "sha256:b0948e2fa1df97fb2073b8efe580d006c8b6723b4efd408abad507bd052104dc",
+      "references": []
+    },
+    {
+      "id": "sha256:426732de1816b37fd50efdcf21d2faba756a75c4a7b65fa15c0cba2a2567a8f8",
+      "references": [
+        "cukies-hub-dapp-runtime-u4s804o4wwcckowgk0woo4wg:latest"
+      ]
+    },
+    {
+      "id": "sha256:cd811a993d3c73e21d7b9b54d61cb591da2bf80504c3c8b75022414321b4aef9",
+      "references": [
+        "u4s804o4wwcckowgk0woo4wg-chain-indexer:latest"
+      ]
+    },
+    {
+      "id": "sha256:b2867a2bd884db4f1688ad3c57610ca538948564193bc50da57acae499b594dd",
+      "references": [
+        "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-legacy:latest",
+        "u4s804o4wwcckowgk0woo4wg-cuki-card-worker:latest"
+      ]
+    }
+  ],
+  "removedCache": {
+    "builder": "default on VM1001",
+    "count": 54,
+    "ids": [
+      "molbyapkw36ak9r09n96udnyw",
+      "wcb6b5nqtwj6i2h431uhb43w5",
+      "ebkf2t83p2qy8qrwd7tg2pt3j",
+      "nqkj2rugkrlk9lyzc9ned0ymt",
+      "1f74qohg0pvj25lgdtnnp6ssw",
+      "5h0g6b22239wrbkn69rhmtlci",
+      "o4kpna8oqy7jv7ywebwvi4j45",
+      "z3ifjrzj0c0pra4yfgvatr82y",
+      "xnokyhj28ox2wctefb2hg7j5h",
+      "vz0d1m790ly3wg4uerpoiappl",
+      "mumzmsjaavpu0i6q8t9xguxk2",
+      "3pfzg0nkzrv1xgt3osmzcrooe",
+      "jpasujd6jgwe2mtxrll7oz860",
+      "ukn3ow39vva305w7sum5xmjvf",
+      "8874wddbsau48co52bbkvf3hw",
+      "m5dvyorsuu2b5dhk14qw4inlc",
+      "p8o65uabtwswe55bwxec96463",
+      "qam1f9eoh7k3t6hc4poupvoqv",
+      "ut83yb74ipyv1nmuxjmwz3nva",
+      "548zcxthix2bqwvvv3brh6umo",
+      "kvc38e7kobfig2iyho4no2eqa",
+      "sm46ij9mz5d572ja9lsq3evl7",
+      "o9qy0471xme8o19eehq0j53hf",
+      "npbo9nhswc2pke6thuzj9ljgt",
+      "ca4hieisybepvoxsj7gddv549",
+      "qwb0ssnrpqtku12yeeebfe3hc",
+      "u6e6gn9e4pz7knbl7ku2604oh",
+      "igupl3wdwf0h6w5aq2p4uium1",
+      "8v9fdudib5pqqzjfqacsyowns",
+      "qzba0z489td6s0h95a7x3q8dv",
+      "fewh7i4vu307lah54ymqxfnpj",
+      "nghwvdfw71jxp0yq4lr3rgsz4",
+      "o6oy32qu0f0mr2cj8t6kz4d7z",
+      "dzo88ndzk677wb2ftqtj5hmwd",
+      "p84bmj5wxpgcum0tldqjjic7r",
+      "nxvl0cubf8qsmok8qbc8t38dn",
+      "igqp73vqtuxwqqbpmeg1pujbg",
+      "bvlkzs3r1dqrslhye11aarj2o",
+      "yyc94mkmmkehowf6w79z8pu09",
+      "1h9q23k6heslvhpz3uh7sqgtl",
+      "l8vyrl0d85vvua3uqfco5thr2",
+      "wm2088tbpsmapgyb3129ek1el",
+      "wcq4g3nisdjz9yg2uai4yp2g9",
+      "mt1mps3arlewq8fa3r1re77vd",
+      "9qb43bvip9nplw14173da8xps",
+      "4o80w3nz5hf0sxz8yxrqtopa2",
+      "xtkxh6leqrksmoq1vitjpddke",
+      "fa5k9l5nikb5cbiqwjzu3hjt9",
+      "pt8y9cjpbc2vkma535ozo3of8",
+      "tco0fbf90lxdfng91cg7q6md3",
+      "86pwny9y6oj72bh27yltj9ir7",
+      "x30nj2qt8rd91zc04hzaa4xot",
+      "yhgc1m8xlqif5lrjq3pht9fph",
+      "ox93h50t2384lilgrkacjp6wn"
+    ],
+    "selection": "obsolete stage builds; exact 54 IDs; all verified private unused immutable regular records; no cache mounts",
+    "allSelectedAbsentAfter": true
+  },
+  "preserved": {
+    "containerCount": 93,
+    "stagingServices": 11,
+    "containerImagesUnchanged": true,
+    "previousStageAndMainImagesPresent": true,
+    "mongoRollback": {
+      "state": "created",
+      "restart": "no",
+      "volumes": [
+        "u4s804o4wwcckowgk0woo4wg_staging-mongo-data",
+        "u4s804o4wwcckowgk0woo4wg_staging-mongo-config"
+      ]
+    },
+    "volumesDeleted": false,
+    "builderVm1012CacheTouched": false,
+    "cacheMountsPruned": false,
+    "registryTouched": false
+  },
+  "postflight": {
+    "stageReleaseSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e",
+    "productionReleaseSha": "4475baaa9a9d560711b8b9e14a38055aecb79c1f",
+    "stageAndProductionHealthHttp": 200,
+    "workers": [
+      {
+        "service": "cuki-card-worker-legacy",
+        "containerId": "825c01f64fe8",
+        "status": "running",
+        "guard": "pass",
+        "checkedAt": 1788972607.5723782,
+        "ageSeconds": 13.47262191772461,
+        "freeBytes": 12921602048,
+        "sourceFreeBytes": 22697148416,
+        "floorErrorsSince164830": 0,
+        "missingModuleErrors": 0,
+        "authErrors": 0
+      },
+      {
+        "service": "cuki-card-worker",
+        "containerId": "b1c37213f77e",
+        "status": "running",
+        "guard": "pass",
+        "checkedAt": 1788972607.5723782,
+        "ageSeconds": 14.063621759414673,
+        "freeBytes": 12921602048,
+        "sourceFreeBytes": 22697148416,
+        "floorErrorsSince164830": 0,
+        "missingModuleErrors": 0,
+        "authErrors": 0
+      }
+    ],
+    "cardsSnapshot": {
+      "checkedAt": "2026-09-09T16:48:50.053Z",
+      "databases": [
+        {
+          "database": "cukieshub-new-staging",
+          "statuses": [
+            {
+              "_id": "generated",
+              "count": 18
+            }
+          ],
+          "latest": [
+            {
+              "cardImageStatus": "generated",
+              "cardGeneratedAt": "2026-09-09T04:43:14.755Z"
+            }
+          ],
+          "generatedSince1647": 0
+        },
+        {
+          "database": "cukies-legacy-staging",
+          "statuses": [
+            {
+              "_id": "generated",
+              "count": 17464
+            }
+          ],
+          "latest": [
+            {
+              "cardImageStatus": "generated",
+              "cardGeneratedAt": "2026-09-09T04:43:17.906Z"
+            }
+          ],
+          "generatedSince1647": 0
+        }
+      ]
+    },
+    "cardsNote": "Existing records were all generated; no new card jobs or database writes were forced to demonstrate recovery. Actual runtime storage guards passed and no new floor errors appeared after 16:48:30 UTC."
+  }
+}

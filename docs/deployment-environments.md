@@ -1,50 +1,74 @@
 # UKI deployment environments
 
-Estado: topologia activa y checklist operativo.
+Estado: topología activa y checklist operativo.
 Issue: #166 `UKI-090.4`.
-Fecha de ultima comprobacion: 2026-08-05.
+Última comprobación documental: 2026-09-09.
 
-## Decision
+## Decisión y alcance
 
-Usamos dos carriles separados:
+`staging` sigue siendo el carril de integración y `main` el carril live. La
+promoción a `main` continúa siendo controlada y no arrastra variables,
+contratos ni datos de testnet. Treasure Hunt tiene un recurso Coolify separado.
 
-- `staging` -> staging/integracion sobre BSC Testnet y bases staging.
-- `main` -> live actual sobre `cukies.world`.
+La política de referencias permite `staging-YYYYMMDD.N` para candidatos
+validados en staging y `prod-YYYYMMDD.N` para producción. Las ramas
+`release/staging-YYYY-MM-DD` son opcionales cuando `staging` sigue avanzando
+mientras se estabiliza una release.
 
-Los cambios se validan primero en `staging`. El paso a `main` requiere una promocion controlada y no debe arrastrar variables, contratos ni datos de testnet.
+| Scope | Recurso y rama | Ruta de despliegue | Datos y dominio |
+| --- | --- | --- | --- |
+| Stage / Hub | App 28 `game-hub-staging`, `staging`, UUID `u4s804o4wwcckowgk0woo4wg` | Push `staging` -> GitHub Actions `.github/workflows/cukies-staging-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201` usando `docker-compose.images.yml`. Autodeploy Git de app 28: **OFF**. `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
+| Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`. Este carril no consume el pipeline de imágenes de app 28. | BSC mainnet y datos de producción; `https://cukies.world`. |
+| Treasure Hunt | App 31 `game-treasurehunt-staging`, `staging`, UUID `lc04cw8gs4koo4swwws0c4ss` | Recurso independiente con Nixpacks (`build_pack=nixpacks`); no aplica `docker-compose.coolify.yml` ni `docker-compose.images.yml`. | Staging; `https://cukieshub.eurekand.com/treasurehunt-game`, con `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y origen dapp de staging. |
 
-La estrategia de tags recomendada es:
+En los hubs app 28 y app 12, solo `dapp` publica dominio mediante Traefik.
+Workers y schedulers son internos; app 31 es un recurso independiente.
+Las tres bases de Stage (`cukies-hub-staging`, `cukies-legacy-staging` y
+`cukieshub-new-staging`) están fuera del Compose operativo y viven en el Mongo
+dedicado de LXC2007, servicio `mongod-cukies-staging`, `192.168.1.221:27018`,
+verificado como `PRIMARY`. El Mongo existente de `27017` permanece sin cambios.
 
-- `staging-YYYYMMDD.N` para candidatos validados en staging si hace falta fijar un punto.
-- `prod-YYYYMMDD.N` para lo que se publica en produccion.
+## Topología local y de preview
 
-Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `staging` sigue avanzando mientras una release se estabiliza.
+| Entorno | Rama/ref | Hosting | Datos | Uso |
+| --- | --- | --- | --- | --- |
+| Local | Cualquier rama local | Máquina local | Dev/local o mocks | Implementación y pruebas focales. |
+| Preview PR | Branch del PR | Coolify preview si se habilita | Datos aislados o mocks | Revisión visual/técnica. |
 
-## Estado actual observado
+La fuente de topología para generar el Compose de imágenes es
+[`docker-compose.coolify.yml`](../docker-compose.coolify.yml). No se trata como
+el Compose operativo actual de Stage. Tras cambiar la fuente:
 
-- Staging/integracion: Coolify app `game-hub-staging`, application ID `28`, UUID `u4s804o4wwcckowgk0woo4wg`, rama `staging`, URL `https://cukieshub.eurekand.com`.
-- El iframe Treasure Hunt de staging se despliega como recurso Coolify independiente `game-treasurehunt-staging` (application ID `31`, UUID `lc04cw8gs4koo4swwws0c4ss`) desde la misma rama y se publica bajo `https://cukieshub.eurekand.com/treasurehunt-game`, con `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y `NEXT_PUBLIC_DAPP_ORIGIN=https://cukieshub.eurekand.com`.
-- Live actual: Coolify app `game-hub`, application ID `12`, UUID `jookw8ow8woks088s44404ok`, rama `main`, URL `https://cukies.world`.
-- Ambos recursos usan `docker-compose.coolify.yml`; solo `dapp` se publica mediante Traefik.
-- Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
-- Staging usa `UKIStaking` `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` (bloque `123359165`, tx `0xc09b84077e97fe32b198ed99f1a56829ccc60c1dbe401e7bb20b66983ddc670e`) y `RewardsDistributor` `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` (bloque `123359171`, tx `0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639`). Ambos apuntan al UKI testnet existente y tienen source publico con coincidencia exacta en Sourcify y BscScan Testnet.
-- Verificacion publica: [UKIStaking en Sourcify](https://repo.sourcify.dev/97/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205), [RewardsDistributor en Sourcify](https://repo.sourcify.dev/97/0xc2252D797Da294D16b84282d213604b4Bcf6EE09), [UKIStaking en BscScan Testnet](https://testnet.bscscan.com/address/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205#code) y [RewardsDistributor en BscScan Testnet](https://testnet.bscscan.com/address/0xc2252D797Da294D16b84282d213604b4Bcf6EE09#code). BscScan muestra `Source Code Verified`, `Exact Match`, Solidity `v0.8.28+commit.7893614a` y optimizacion de 200 runs para ambos contratos (comprobado el 6 de agosto de 2026).
-- El smoke `STAGING_SMOKE_C31176A_2026_08_05` movio temporalmente `1 UKI` por contrato y termino con staking, reservas y balance del distribuidor a cero. No representa una cifra de producto.
-- Staging usa las bases logicas `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging`. El cutover a la instancia fisica exclusiva `cukies-staging-rs0` se prepara en dos despliegues para no apuntar la aplicacion a una replica a medio inicializar.
-- Produccion conserva BSC mainnet y sus bases de produccion; no se han reapuntado durante esta separacion.
-- La VM Coolify/Traefik observada es `1001` (`192.168.1.201`) y publica Traefik en `80/443`.
-- Cloudflare Tunnel ya tiene ruta para `cukieshub.eurekand.com` hacia `https://192.168.1.201:443`.
+```bash
+node scripts/ci/generate-images-compose.mjs --write
+node scripts/ci/generate-images-compose.mjs --check
+```
 
-## Topologia objetivo
+El segundo comando debe quedar limpio antes de integrar el cambio.
 
-| Entorno | Rama/ref | Hosting | Chain | Datos | Uso |
-| --- | --- | --- | --- | --- | --- |
-| Local | Cualquier rama local | Maquina local | Hardhat/local o testnet puntual | Dev/local | Implementacion rapida. |
-| Preview PR | Branch del PR | Coolify preview si se habilita | Sin valor real | Datos aislados o mocks | Revision visual/tecnica. |
-| Staging | `staging` | Coolify `game-hub-staging` | BSC testnet | DB staging | QA integrada. |
-| Production | `main` + tag `prod-*` | Coolify `game-hub` | BSC mainnet | DB production | Usuarios reales. |
+## Histórico: comprobaciones de agosto
 
-### Validacion local antes de desplegar
+Estas comprobaciones históricas de contratos y smoke se conservan como
+referencia. No forman parte de esta reconciliación documental ni sustituyen
+los gates actuales.
+
+- Staging usa BSC Testnet (`97`) y la preventa
+  `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
+- `UKIStaking` es `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205`, desplegado en
+  el bloque `123359165`, tx
+  `0xc09b84077e97fe32b198ed99f1a56829ccc60c1dbe401e7bb20b66983ddc670e`.
+- `RewardsDistributor` es `0xc2252D797Da294D16b84282d213604b4Bcf6EE09`,
+  desplegado en el bloque `123359171`, tx
+  `0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639`.
+- La verificación pública conservada está en [UKIStaking en Sourcify](https://repo.sourcify.dev/97/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205),
+  [RewardsDistributor en Sourcify](https://repo.sourcify.dev/97/0xc2252D797Da294D16b84282d213604b4Bcf6EE09),
+  [UKIStaking en BscScan Testnet](https://testnet.bscscan.com/address/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205#code) y
+  [RewardsDistributor en BscScan Testnet](https://testnet.bscscan.com/address/0xc2252D797Da294D16b84282d213604b4Bcf6EE09#code).
+- El smoke `STAGING_SMOKE_C31176A_2026_08_05` movió temporalmente `1 UKI` por
+  contrato y terminó con staking, reservas y balance del distribuidor a cero;
+  no representa una cifra de producto.
+
+## Validacion local antes de desplegar
 
 El trabajo de una rama se prueba localmente por bloques y no provoca un despliegue de Coolify por cada cambio. Para contratos, el comando reproducible es:
 
@@ -102,7 +126,7 @@ Solo cuando varios bloques formen un candidato coherente se integra en `staging`
 - Objetivo: ciclos de 1.800 segundos y semanas de siete ciclos (3 h 30 min), con siete entregas posteriores separadas por un ciclo. Se mantiene el reloj real de BSC Testnet.
 - La configuracion incluye un ancla UTC explicita e inmutable por escenario. Las reglas y snapshots conservan su calendario y hashes; sin configuracion se mantienen las duraciones originales de produccion.
 - No escalar expiracion de sesiones de autenticacion, HMAC, leases, tiempo de partida, confirmaciones ni freshness de RPC.
-- Orden: probar localmente y desplegar pool en chain 97; preparar variables con gates economicos deshabilitados; integrar codigo en staging (autodeploy); detener workers durante el reset; ejecutar plan/apply y bootstrap; habilitar gates y verificar autodeploy final. No lanzar redeploy manual ni tocar main.
+- Orden: probar localmente y desplegar pool en chain 97; preparar variables con gates economicos deshabilitados; integrar codigo en staging y dejar que el workflow de imagenes haga la entrega; detener workers durante el reset; ejecutar plan/apply y bootstrap; habilitar gates y verificar el postflight de CI. No lanzar redeploy manual ni tocar main.
 - Antes del reset, validar recurso `u4s804o4wwcckowgk0woo4wg`, chain 97 y base `cukieshub-new-staging`. No borrar bases completas ni colecciones de usuarios, embajadores, preventa o assets no necesarias. No tocar main, produccion ni servicios externos.
 - Descartar el historial off-chain no mueve activos entre contratos. Las posiciones del vault anterior no aparecen en el nuevo; se usan NFTs de prueba disponibles para el nuevo escenario.
 - Variables exclusivas de app28: `ECONOMY_CYCLE_SECONDS=1800`, `ECONOMY_CYCLE_ANCHOR_AT=<ISO UTC alineado futuro>`, `COMPETITION_CREDITS_RULE_VERSION=credits-staging-cycle-v1`, `REWARD_ACCOUNTING_RULE_VERSION=rewards-staging-cycle-v1`, `WEEKLY_RANKING_SCHEDULER_INTERVAL_MS=60000`. El bootstrap mantiene game version `staging-test-v4`, cuyo hash incluye el nuevo calendario; ranking version `weekly-ranking-staging-cycle-v1`.
@@ -158,25 +182,33 @@ El unico flujo CI de este carril es `.github/workflows/cukies-staging-images.yml
 `push` a `staging`, usa el GitHub Environment `cukies-staging` y el runner con las etiquetas
 `self-hosted`, `linux`, `x64` y `cukies-builder`. No se habilitan eventos de pull request,
 refs arbitrarios ni un disparador manual. El Environment contiene las credenciales del registry
-y Coolify; `CUKIES_STAGING_BUILD_ENV_JSON` es una variable publica validada por allowlist, no un
-almacen de secretos runtime.
+y Coolify para CI; `CUKIES_STAGING_BUILD_ENV_JSON` es una variable pública validada por
+allowlist, no un almacén de secretos runtime. Los secretos runtime de Mongo, OAuth, HMAC, RPC
+y S3/MinIO se configuran en Coolify.
 
-El pipeline usa Node 22, pnpm 10.19 y Nx 23.2. La primera ejecucion, un estado ausente o una
+El pipeline usa Node 22, pnpm 10.19 y Nx 23.2. La primera ejecución, un estado ausente o una
 base que no sea ancestro del SHA de GitHub construye los cinco targets CI (`dapp`,
 `chain-indexer`, `cuki-card-worker`, `schedulers` y `cukies-bridge-relayer`). En ejecuciones
-posteriores Nx affected y el diff de seguridad seleccionan los targets; los demas reutilizan el
-digest guardado. Cada imagen se publica con el tag inmutable `<sha>-<configHash>` y el compose
-usa una referencia `image` por componente que incluye digest obligatorio. `cuki-card-worker-legacy`
-comparte la imagen del card worker; los schedulers tienen una imagen propia.
+posteriores Nx affected y el diff de seguridad seleccionan los targets; los demás reutilizan el
+digest guardado. Cada imagen se publica con el tag inmutable `<sha>-<configHash>` y el Compose
+usa una referencia `image` por componente con digest obligatorio. `cuki-card-worker-legacy`
+comparte la imagen del card worker; los schedulers tienen una imagen propia. El manifest del
+workflow es la fuente primaria para saber si una release construyó o reutilizó cada imagen.
 
 El builder BuildKit persistente se llama `cukies-ci`, usa el driver `docker-container`, una sola
-compilacion concurrente y caches de capas separados por componente y entorno en el registry.
-Nx conserva artefactos y base de datos bajo el mount `/app/.nx`, con
-`NX_CACHE_DIRECTORY` y `NX_WORKSPACE_DATA_DIRECTORY` explicitos; Next conserva su
-cache incremental por separado. El cache de registry no sustituye esos mounts. La
-creacion inicial fija la politica GC de 40 GB (`minFreeSpace=20 GB`, `reservedSpace=10 GB`);
-las ejecuciones posteriores solo inspeccionan y arrancan el builder existente. No se hace prune,
-SSH ni limpieza destructiva desde el workflow.
+compilación concurrente (`max-parallelism=1`) y caches de capas separados por componente y
+entorno en el registry. El perfil live del 2026-09-09 es host de 8 GiB y contenedor de 6 GiB.
+`scripts/ci/prepare-buildx.sh` reutiliza el builder existente y **no reconcilia** sus límites ni
+su configuración; solo crea el builder cuando falta. Nx conserva artefactos y base de datos
+juntos bajo el mount `/app/.nx`, con `NX_CACHE_DIRECTORY` y `NX_WORKSPACE_DATA_DIRECTORY`
+explícitos; Next conserva su cache incremental por separado. El cache del registry no sustituye
+esos mounts.
+
+La creación inicial fija la política GC de BuildKit en `minFreeSpace=20GB`,
+`reservedSpace=10GB` y `maxUsedSpace=40GB`. El límite de 40 GB es del builder,
+no una política de retención del registry. Las ejecuciones posteriores solo
+inspeccionan y arrancan el builder existente. No se hace prune, SSH ni limpieza
+destructiva desde el workflow.
 
 El estado durable vive en `/srv/cukies-ci/state/staging/release.json` y contiene el ultimo SHA
 desplegado correctamente, el hash de configuracion y el digest de cada componente. Se escribe
@@ -191,12 +223,13 @@ volumenes siguen fuera del Compose de la aplicacion. Las imagenes CI llevan
 `coolify.managed=true` para que la limpieza de Docker no las trate como imagenes huerfanas.
 
 Antes de iniciar Coolify, el flujo hace PATCH de `git_commit_sha`, `docker_compose_location` y
-`docker_compose_raw`, vuelve a leer la aplicacion para confirmar el SHA exacto, actualiza las
+`docker_compose_raw`, vuelve a leer la aplicación para confirmar el SHA exacto, actualiza las
 referencias de imagen mediante `PATCH /applications/{uuid}/envs/bulk` y arranca el deployment
-por API. La API beta ejecuta `stop_running_container(force:true)` antes de arrancar el Compose:
-la seleccion de que construir permanece selectiva, pero los servicios del mismo Compose pueden
-reiniciarse juntos. El flujo no promete que los workers permanezcan levantados ni intenta cambiar
-esa politica.
+por API. Coolify descarga y guarda el runtime local y reinicia el Compose aunque las imágenes
+se reutilicen. La API beta ejecuta `stop_running_container(force:true)` antes de arrancar el
+Compose: la selección de qué construir permanece selectiva, pero los servicios del mismo Compose
+pueden reiniciarse juntos. El flujo no promete que los workers permanezcan levantados ni intenta
+cambiar esa política.
 
 El pipeline de staging se activa con `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true` en el
 Environment `cukies-staging`; el autodeploy Git de app 28 permanece desactivado para evitar
@@ -216,30 +249,61 @@ documentación/orquestación, puede reconstruir únicamente dapp. La comparació
 prefijo y sufijo idénticos fuera de ese stage; cualquier otro cambio conserva la
 selección conservadora. El manifest registra esta selección por componente.
 
-La primera publicación completa fue el run `34352921601`: construyó y publicó las cinco
-imágenes de `0896fbd`, pero quedó `failure` por el HEAD transitorio y la interpolación de
-las referencias marcadas solo runtime. Se conserva ese resultado. La recuperación
-Coolify `1462` (`a76af1841ccb57fbdc12d071`) terminó el 2026-09-09 a las 13:16:47 UTC con
-los mismos digests, sin reconstruir. Se adoptó el estado inicial solo después de verificar
-health, los once contenedores contra el manifest, Prisma y avance del indexador en LXC.
-[La evidencia de esta primera entrega](../infrastructure/ci/2026-09-09-image-deployment-evidence.json)
-distingue la recuperación del resultado de GitHub; cada release posterior publica su
-manifest y postflight en [el workflow](https://github.com/fgomezserna/cukies-hub/actions/workflows/cukies-staging-images.yml).
+La prueba vigente de reutilización es el [run `34379350360`](https://github.com/fgomezserna/cukies-hub/actions/runs/34379350360): terminó `SUCCESS`,
+con `build=[]` y reutilización de las cinco imágenes. El release commit fue
+`7f56123`; las cinco imágenes conservaron `sourceSha=e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e` y health devolvió
+HTTP 200 con el SHA exacto. El deployment Coolify `1466`
+(`vwc0soksswksoc8kw88okc8c`) terminó a las 16:56:39 UTC. Esta evidencia prueba
+reuse de imágenes y runtime identificado; la comprobación visual de la UI queda
+fuera de este runbook. El manifest del workflow es la fuente final y no se
+duplican aquí cronologías de ejecuciones.
 
 El carril de producción no cambia. Coolify conserva el despliegue de la aplicación;
 este trabajo no incorpora autoescalado. La retención y GC de versiones del registry
 requieren su propia política; el límite de 40 GB corresponde a la caché del builder.
 
-El builder dedicado ya está instalado en VM1012 (`192.168.1.244`, 4 vCPU, 8 GiB RAM,
-120 GiB disco). El runner `cukies-builder-1012` está registrado. Mongo de staging
-funciona en LXC2007, `192.168.1.221:27018`; el Mongo compartido de `27017` se conserva
-sin cambios.
+El builder dedicado está instalado en VM1012 (`192.168.1.244`, 4 vCPU, 8 GiB RAM,
+120 GiB disco). El runner `cukies-builder-1012` está registrado. Mongo de staging funciona
+en LXC2007, `192.168.1.221:27018`, mediante `mongod-cukies-staging`; el Mongo compartido de
+`27017` se conserva sin cambios.
 
 El 2026-09-09 se sustituyó el cron de limpieza agresiva de VM1001 por
 `infrastructure/ci/docker-prune-safe.sh`: omite limpieza si Coolify tiene despliegues
 activos/en cola o no se puede consultar su estado; solo considera objetos antiguos
 y no limpia volúmenes ni caché de build. Se desactivó el modo forzado de limpieza
 interna de Coolify en los dos registros del mismo servidor.
+
+### Espacio y recuperación de card workers
+
+El guard de tarjetas mantiene un suelo independiente de 10 GiB tanto en Coolify
+como en MinIO. Su heartbeat debe ser menor de 45 s; ante una pausa se esperan
+30 s y se reanuda automáticamente sin bajar el guard. Esta política es distinta
+de la GC del builder descrita arriba. La recuperación de storage autorizada el
+2026-09-09 retiró 5 imágenes antiguas de Stage y 54 IDs exactos de caché regular
+privada e inmutable: el espacio pasó de 3.684.106.240 a 22.697.099.264 bytes.
+Los guards de ambos card workers pasaron; no hubo reinicios, borrado de
+volúmenes ni limpieza de caché Nx en VM1012. La evidencia está en
+[`2026-09-09-storage-recovery-evidence.json`](../infrastructure/ci/2026-09-09-storage-recovery-evidence.json).
+La retención del registry no está automatizada.
+
+Para recuperar capacidad, coordinar una ventana sin builds ni deployments activos
+o en cola. Inventariar imágenes y referencias de todos los contenedores, incluidos
+los detenidos, y conservar los digests del manifest anterior y los volúmenes de
+rollback. Retirar únicamente referencias obsoletas verificadas, sin forzar la
+eliminación. No imprimir historiales Docker ni entornos completos: pueden contener
+credenciales.
+
+Si el disco no se libera, comprobar qué registros de BuildKit siguen reteniendo
+esas capas. La limpieza debe limitarse a identificadores comprobados como privados,
+sin uso e inmutables; no usar una limpieza global ni borrar mounts de caché. Los
+IDs de la evidencia anterior son históricos y no constituyen una lista reutilizable
+de borrado. Medir el espacio real del sistema de archivos después de la operación.
+
+El postflight exige un heartbeat fresco en
+`/run/cukies-card-capacity/capacity.json`, ambos valores de capacidad por encima
+del mínimo y el guard real de cada worker correcto. Confirmar que no aparecen nuevos
+errores de capacidad. Si no hay trabajos pendientes, los workers quedan esperando;
+no crear ni regenerar tarjetas solo para probar la recuperación.
 
 Durante el despliegue previo `1457` el host agotó `/srv`; se recuperó el servicio
 reduciendo del 5 % al 1 % los bloques reservados de esa partición de datos y
@@ -249,14 +313,34 @@ aplicación con SHA `53088a3` se verificó tras recrear sus clientes hacia el LX
 
 El proveedor activo observado es Coolify. `cukieshub.eurekand.com` sigue `staging`; `cukies.world` sigue `main`.
 
-Trabajo pendiente en Coolify:
+La migración de Mongo al LXC está completada y su procedimiento queda como histórico o
+repetición controlada en [`staging-data-handoff.md`](../infrastructure/ci/staging-data-handoff.md).
+Las integraciones externas, schedulers y gates económicos mantienen sus perfiles y credenciales
+separadas; nada de esto debe usar secrets en el repo.
 
-- integrar y activar el CI de imagenes; la [migracion de Mongo al LXC](../infrastructure/ci/staging-data-handoff.md) ya esta verificada,
-- sustituir las integraciones externas deshabilitadas por credenciales realmente exclusivas cuando QA las necesite,
-- mantener los seis schedulers economicos y el publicador de batches desplegados con gates independientes,
-- documentar rollback por commit y por variables para cada promocion a `main`.
+### Diagnóstico de Nx después de OOM
 
-Nada de esto debe usar secrets en el repo.
+En Nx 23.2, `task_invocations` persiste una fila identificada por `root_pid` y
+`task_id`; el cleanup solo elimina filas con más de 24 horas. Después de un OOM,
+la reutilización de un PID puede chocar con una fila pendiente. En el incidente
+no se verificó una fila huérfana ni se borró ninguna; el mecanismo queda como
+hipótesis hasta correlacionar logs y estado del contenedor. La inspección SQL se
+limita a metadata; nunca se hace un reset global ni se atribuye la causa como
+confirmada sin evidencia. La fuente primaria es
+[`task_invocation_tracker.rs`](https://github.com/nrwl/nx/blob/23.2.0/packages/nx/src/native/tasks/task_invocation_tracker.rs).
+
+Tras un OOM se confirman primero logs y estado del contenedor. No se reintenta a ciegas.
+
+### Rollback de imágenes
+
+La vía ordinaria es revertir el cambio mediante un PR hacia `staging` y dejar
+que una nueva ejecución de CI publique y despliegue las imágenes resultantes.
+Para un incidente operativo, un operador puede restaurar el manifest previo y
+su configuración pública por digest durante una ventana confirmada. En ambos
+casos se comprueban health con el commit esperado y los digests del manifest
+servido. No se vuelve al `docker-compose.coolify.yml` legacy ni se cambia Mongo.
+Si ya hubo escrituras, cualquier rollback de datos exige reconciliar el delta y
+seguir el procedimiento separado del handoff de Mongo.
 
 ### Configuracion Coolify objetivo
 
