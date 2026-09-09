@@ -32,6 +32,9 @@ import {
   type CukiesBridgeRuntimeConfig,
 } from '@/lib/legacy-marketplace/bridge-runtime';
 import {
+  getLegacyTronWeb,
+  getLegacyTronWalletRpcOrigin,
+  isLegacyTronWalletOnRpc,
   readTronContractAt,
   sendTronContractAt,
 } from '@/lib/legacy-marketplace/tron';
@@ -97,21 +100,6 @@ function enabledBridgeRuntime(
     operationsEnabled: config.operationsEnabled,
     readOnly: !config.operationsEnabled,
   };
-}
-
-function tronWalletRpcOrigin() {
-  if (typeof window === 'undefined') return null;
-  const configuredHost =
-    window.tronWeb?.fullNode?.host ??
-    window.tronLink?.tronWeb?.fullNode?.host ??
-    window.tron?.tronWeb?.fullNode?.host;
-  if (typeof configuredHost !== 'string') return null;
-
-  try {
-    return new URL(configuredHost).origin;
-  } catch {
-    return null;
-  }
 }
 
 function getErrorMessage(error: unknown) {
@@ -322,12 +310,14 @@ function BridgeOperationsClient({
 
   const destinationNetwork = getDestinationNetwork(sourceNetwork);
   const sourceOwner = sourceNetwork === 'BSC' ? address : tronAddress;
+  const tronWeb = getLegacyTronWeb();
+  const tronWalletRpcOrigin = getLegacyTronWalletRpcOrigin(tronWeb);
   const bscReady =
     sourceNetwork === 'BSC' && isConnected && chainId === bscChainId;
   const tronReady =
     sourceNetwork === 'TRON' &&
     isTronConnected &&
-    tronWalletRpcOrigin() === tronRpcUrl;
+    isLegacyTronWalletOnRpc(tronWeb, tronRpcUrl);
   const ready = sourceNetwork === 'BSC' ? bscReady : tronReady;
   const disabled = isWriting || isSwitchingChain;
 
@@ -453,38 +443,56 @@ function BridgeOperationsClient({
   }, [address, tronAddress]);
 
   const refreshTronSnapshot = useCallback(async () => {
-    if (!tronAddress || !window.tronWeb) {
+    const currentTronWeb = getLegacyTronWeb();
+    if (
+      !tronAddress
+      || !currentTronWeb
+      || !isLegacyTronWalletOnRpc(currentTronWeb, tronRpcUrl)
+    ) {
       setTronSnapshot({
         price: null,
         rawPrice: null,
         paused: null,
         approved: null,
       });
+      if (tronAddress && currentTronWeb && tronWalletRpcOrigin !== tronRpcUrl) {
+        setStatus(`Cambia TronLink a ${tronNetworkLabel} para consultar el bridge.`);
+      }
       return;
     }
 
     try {
       const [price, paused, approval] = await Promise.all([
         readTronContractAt<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           cukiesBridgeEndpointAbi,
           tronBridgeAddress,
           'bridgePrice',
         ),
         readTronContractAt<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           cukiesBridgeEndpointAbi,
           tronBridgeAddress,
           'paused',
         ),
         readTronContractAt<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           legacyMarketplaceTronAbis.token,
           tronTokenAddress,
           'isApprovedForAll',
           [tronAddress, tronBridgeAddress],
         ),
       ]);
+      if (!isLegacyTronWalletOnRpc(getLegacyTronWeb(), tronRpcUrl)) {
+        setTronSnapshot({
+          price: null,
+          rawPrice: null,
+          paused: null,
+          approved: null,
+        });
+        setStatus(`Cambia TronLink a ${tronNetworkLabel} para consultar el bridge.`);
+        return;
+      }
       setTronSnapshot({
         price: formatTronBridgePrice(price),
         rawPrice: String(price),
@@ -494,7 +502,14 @@ function BridgeOperationsClient({
     } catch (error) {
       setStatus(getErrorMessage(error));
     }
-  }, [tronAddress, tronBridgeAddress, tronTokenAddress]);
+  }, [
+    tronAddress,
+    tronBridgeAddress,
+    tronTokenAddress,
+    tronNetworkLabel,
+    tronRpcUrl,
+    tronWalletRpcOrigin,
+  ]);
 
   useEffect(() => {
     void refreshCandidates();
@@ -531,11 +546,12 @@ function BridgeOperationsClient({
       await connectTron();
       return false;
     }
-    if (!window.tronWeb) {
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) {
       setStatus('TronLink no ha expuesto tronWeb todavia.');
       return false;
     }
-    if (tronWalletRpcOrigin() !== tronRpcUrl) {
+    if (!isLegacyTronWalletOnRpc(currentTronWeb, tronRpcUrl)) {
       setStatus(`Cambia TronLink a ${tronNetworkLabel} antes de continuar.`);
       return false;
     }
@@ -747,9 +763,8 @@ function BridgeOperationsClient({
           className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
         >
           Contratos Legacy identificados en sus redes existentes. Esta vista
-          permite consultar wallet, estado y movimientos desde este entorno; approvals,
-          transferencias y relayer permanecen bloqueados hasta una activación
-          operativa revisada.
+          permite consultar wallet, estado y movimientos. Las transferencias
+          estarán disponibles cuando finalice la revisión.
         </div>
       )}
 

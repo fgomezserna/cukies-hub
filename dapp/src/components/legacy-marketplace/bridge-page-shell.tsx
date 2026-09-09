@@ -25,7 +25,7 @@ export function BridgePageShell() {
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
               Consulta el estado de tus Cukies y la disponibilidad de un movimiento
-              entre TRON y BSC. Las operaciones requieren un gate operativo activo.
+              entre TRON y BSC. Las operaciones estarán disponibles cuando finalice la revisión.
             </p>
             <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
               {[

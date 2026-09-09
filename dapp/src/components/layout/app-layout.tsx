@@ -21,8 +21,6 @@ import {
   Cookie,
   Layers3,
   Store,
-  ArrowRightLeft,
-  Dna,
   LockKeyhole,
   Crown,
   Coins,
@@ -120,8 +118,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     {
       label: 'Legacy',
       items: [
-        { href: '/bridge', label: 'Bridge', Icon: ArrowRightLeft, active: pathname.startsWith('/bridge') || pathname.startsWith('/bridges') },
-        { href: '/breeding', label: 'Crías', Icon: Dna, active: pathname.startsWith('/breeding') },
+        { href: '/bridge', label: 'Bridge', Icon: Layers3, active: pathname.startsWith('/bridge') || pathname.startsWith('/bridges') },
+        { href: '/breeding', label: 'Crías', Icon: Cookie, active: pathname.startsWith('/breeding') },
         { href: '/cukiepoints', label: 'Cukie Points', Icon: Coins, active: pathname.startsWith('/cukiepoints') },
       ],
     },

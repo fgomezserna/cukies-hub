@@ -19,7 +19,13 @@ import { useTronLink } from '@/hooks/use-tronlink';
 import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
-import { readLegacyTronContract } from '@/lib/legacy-marketplace/tron';
+import {
+  LEGACY_TRON_MAINNET_RPC_URL,
+  getLegacyTronWeb,
+  getLegacyTronWalletRpcOrigin,
+  isLegacyTronWalletOnRpc,
+  readLegacyTronContract,
+} from '@/lib/legacy-marketplace/tron';
 import type {
   LegacyCukiePointsResponse,
   LegacyCukiePointsTransaction,
@@ -153,6 +159,8 @@ export function CukiePointsClient() {
       ),
     [address, tronAddress],
   );
+  const tronWeb = getLegacyTronWeb();
+  const tronWalletRpcOrigin = getLegacyTronWalletRpcOrigin(tronWeb);
   const effectiveScope: PointsScope =
     connectedWallets.length > 0 ? scope : 'global';
 
@@ -198,10 +206,12 @@ export function CukiePointsClient() {
   const refreshTronSnapshot = useCallback(async () => {
     const requestId = tronRequestRef.current + 1;
     tronRequestRef.current = requestId;
+    const currentTronWeb = getLegacyTronWeb();
     if (
       !legacyMarketplaceRuntime.legacyMainnetReadEnabled ||
       !tronAddress ||
-      !window.tronWeb
+      !currentTronWeb ||
+      !isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
     ) {
       setTronSnapshot({
         balance: null,
@@ -209,31 +219,44 @@ export function CukiePointsClient() {
         emitted: null,
         burned: null,
       });
+      if (
+        tronAddress
+        && currentTronWeb
+        && tronWalletRpcOrigin !== LEGACY_TRON_MAINNET_RPC_URL
+      ) {
+        setStatus('Cambia TronLink a TRON Mainnet para consultar tus puntos.');
+      }
       return;
     }
 
     try {
       const [balance, total, emitted, burned] = await Promise.all([
-        readLegacyTronContract<unknown>(window.tronWeb, 'points', 'getPoints', [
+        readLegacyTronContract<unknown>(currentTronWeb, 'points', 'getPoints', [
           tronAddress,
         ]),
         readLegacyTronContract<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           'points',
           'getTotalPoints',
         ),
         readLegacyTronContract<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           'points',
           'getTotalPointsEmited',
         ),
         readLegacyTronContract<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           'points',
           'getTotalPointsBurned',
         ),
       ]);
-      if (requestId !== tronRequestRef.current) return;
+      if (
+        requestId !== tronRequestRef.current
+        || !isLegacyTronWalletOnRpc(
+          getLegacyTronWeb(),
+          LEGACY_TRON_MAINNET_RPC_URL,
+        )
+      ) return;
       setTronSnapshot({
         balance: formatPointValue(String(balance)),
         total: formatPointValue(String(total)),
@@ -244,7 +267,7 @@ export function CukiePointsClient() {
       if (requestId !== tronRequestRef.current) return;
       setStatus(getErrorMessage(error));
     }
-  }, [tronAddress]);
+  }, [tronAddress, tronWalletRpcOrigin]);
 
   const buildPointsQuery = useCallback(
     (offset: number) => {
@@ -395,8 +418,8 @@ export function CukiePointsClient() {
       )}
       {legacyMarketplaceRuntime.legacyMainnetReadEnabled && (
         <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-4 text-sm text-lilac-100">
-          Lectura de CukiePoints desde los contratos Legacy existentes. Este
-          entorno mantiene sus datos indexados y no habilita escrituras ni firmas.
+          Puedes consultar tus Cukie Points Legacy. Las acciones de escritura y
+          firma estarán disponibles cuando finalice la revisión.
         </div>
       )}
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">

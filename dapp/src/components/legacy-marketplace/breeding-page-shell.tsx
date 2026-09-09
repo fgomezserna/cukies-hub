@@ -25,7 +25,7 @@ export function BreedingPageShell({
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
               Consulta padres compatibles, coste y crías activas o terminadas.
-              Las acciones requieren un gate operativo activo.
+              Las acciones estarán disponibles cuando finalice la revisión.
             </p>
             <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
               {[

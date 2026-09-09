@@ -212,6 +212,11 @@ export function buildCukiesBridgeRuntimeConfig(
     if (tronNetwork !== 'mainnet') {
       issues.push('legacy-readonly requiere TRON mainnet');
     }
+    if (!tronRpcUrl) {
+      issues.push(
+        `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL debe ser ${expectedTronOrigin}`,
+      );
+    }
     if (collectionAddress?.toLowerCase() !== BSC_MAINNET_COLLECTION) {
       issues.push('legacy-readonly requiere la coleccion Legacy BSC mainnet');
     }

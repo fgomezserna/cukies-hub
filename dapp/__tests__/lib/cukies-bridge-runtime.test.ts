@@ -89,6 +89,19 @@ describe('Cukies bridge runtime safety', () => {
     expect(config.issues).toEqual([]);
   });
 
+  it('falla cerrado si legacy-readonly recibe un RPC TRON distinto', () => {
+    const config = buildCukiesBridgeRuntimeConfig({
+      APP_ENV: 'staging',
+      NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL: 'https://nile.trongrid.io',
+    });
+
+    expect(config.enabled).toBe(false);
+    expect(config.tron.rpcUrl).toBeNull();
+    expect(config.issues).toContain(
+      'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL debe ser https://api.trongrid.io',
+    );
+  });
+
   it('falla cerrado si Stage intenta apuntar a mainnet', () => {
     const config = buildCukiesBridgeRuntimeConfig({
       ...validStageEnvironment(),

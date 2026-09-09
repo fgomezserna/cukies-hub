@@ -29,10 +29,12 @@ de Coolify.
 ## Verificación local
 
 - `pnpm --dir dapp test -- --runInBand __tests__/lib/legacy-marketplace-runtime.test.ts __tests__/lib/cukies-bridge-runtime.test.ts __tests__/components/cukiepoints-client.test.tsx` — 3 suites, 15 tests OK.
+- `pnpm --dir dapp exec jest --runInBand` — suite completa: 234 suites, 1.887 tests OK.
 - Compilación focal de `runtime.ts` y `bridge-runtime.ts` con TypeScript — OK.
 - `pnpm --dir dapp lint` — OK, sin warnings ni errores.
 - `pnpm --dir dapp typecheck` — OK después de ejecutar `pnpm --dir dapp exec prisma generate` (necesario porque la instalación inicial usó `--ignore-scripts`).
 - `pnpm --dir dapp build` — OK: compilación, 92 páginas estáticas y trazas finalizadas.
+- Guard TRON: helper de origen RPC y regresiones mainnet/Nile; las lecturas limpian el snapshot y muestran cambio de red cuando TronLink no está en la red Legacy esperada.
 
 La presencia de un endpoint HTTP, una ruta o un contrato con bytecode no acredita
 que el worker avance, que el relayer custodie activos o que una operación sea
