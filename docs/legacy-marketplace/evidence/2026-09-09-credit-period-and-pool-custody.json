@@ -597,5 +597,219 @@
     "allAvailableOwnedByWallet": true,
     "requiresApprovalBeforePoolDeposit": true,
     "readOnly": true
+  },
+  "rollout": {
+    "pr": 343,
+    "sha": "bae6f3b022297ac431aa417ac8e8127d82d1913c",
+    "guard": {
+      "pass": true,
+      "expectedCommit": "bae6f3b022297ac431aa417ac8e8127d82d1913c",
+      "deploymentUuid": "mk0wos4gs4wwkosg0gkg8w4c",
+      "status": "finished",
+      "cancelCount": 0,
+      "minimumFreeBytes": "11446267904",
+      "error": null,
+      "finishedAt": "2026-09-09T10:53:24.340Z"
+    },
+    "checks": {
+      "lint": "pass",
+      "typecheck": "pass",
+      "build": "pass",
+      "suites": 222,
+      "tests": 1810,
+      "composeConfig": "pass"
+    },
+    "services": {
+      "running": 12,
+      "total": 12,
+      "restarts": 0,
+      "runtimeGatesUnchanged": true
+    },
+    "runtime": {
+      "checkedAt": "2026-09-09T10:54:39.853Z",
+      "services": {
+        "indexer": {
+          "status": "ready",
+          "checkedAt": "2026-09-09T10:54:39.853Z",
+          "lastSuccessAt": "2026-09-09T10:54:34.109Z",
+          "code": "indexer_ready"
+        },
+        "master": {
+          "status": "ready",
+          "checkedAt": "2026-09-09T10:54:39.853Z",
+          "lastSuccessAt": "2026-09-09T10:54:19.500Z",
+          "code": "master_ready"
+        },
+        "credits": {
+          "status": "ready",
+          "checkedAt": "2026-09-09T10:54:39.853Z",
+          "lastSuccessAt": "2026-09-09T10:54:20.109Z",
+          "code": "credits_ready"
+        }
+      }
+    },
+    "pool": {
+      "observedAt": "2026-09-09T10:54:44.179Z",
+      "summary": {
+        "total": 12,
+        "inWallet": 7,
+        "available": 7,
+        "onSale": 0,
+        "inPool": 4,
+        "inCukieMaster": 1,
+        "otherInUse": 0
+      },
+      "indexer": {
+        "status": "ready"
+      },
+      "approvalSimulations": [
+        {
+          "tokenId": "98000002",
+          "simulation": "approval_success",
+          "errorName": null
+        },
+        {
+          "tokenId": "98000006",
+          "simulation": "approval_success",
+          "errorName": null
+        },
+        {
+          "tokenId": "98000008",
+          "simulation": "approval_success",
+          "errorName": null
+        },
+        {
+          "tokenId": "98000009",
+          "simulation": "approval_success",
+          "errorName": null
+        },
+        {
+          "tokenId": "98000010",
+          "simulation": "approval_success",
+          "errorName": null
+        },
+        {
+          "tokenId": "98000011",
+          "simulation": "approval_success",
+          "errorName": null
+        },
+        {
+          "tokenId": "98000012",
+          "simulation": "approval_success",
+          "errorName": null
+        }
+      ],
+      "recoverySimulations": [
+        {
+          "tokenId": "98000001",
+          "status": "request_exit_success"
+        },
+        {
+          "tokenId": "98000003",
+          "status": "request_exit_success"
+        },
+        {
+          "tokenId": "98000004",
+          "status": "request_exit_success"
+        },
+        {
+          "tokenId": "98000007",
+          "status": "request_exit_success"
+        }
+      ],
+      "transactionsSent": 0
+    },
+    "postDeployCutoff": {
+      "cutoff": "2026-09-09T11:00:00.000Z",
+      "runs": [
+        {
+          "status": "error",
+          "startedAt": "2026-09-09T11:00:23.260Z",
+          "endedAt": "2026-09-09T11:00:24.091Z",
+          "errorCode": "DOMAIN_CONFLICT",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "blocked",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T11:00:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "errorCode": "DOMAIN_CONFLICT",
+              "reasonCodes": [
+                "CREDIT_CUTOFF_BLOCK_MISSING"
+              ]
+            },
+            {
+              "route": "nft",
+              "status": "blocked",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T11:00:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "errorCode": "DOMAIN_CONFLICT",
+              "reasonCodes": [
+                "CREDIT_WATERMARK_UNHEALTHY_OR_STALE"
+              ]
+            }
+          ]
+        },
+        {
+          "status": "success",
+          "startedAt": "2026-09-09T11:00:54.117Z",
+          "endedAt": "2026-09-09T11:00:54.863Z",
+          "result": {
+            "status": "open",
+            "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T11:00:00.000Z",
+            "creditRunId": "49d57bd986219a17ce95207172b7de4eec97ee251464c468883bea167ecaa041",
+            "batchesProcessed": 2,
+            "itemsApplied": 2,
+            "pendingItems": 0,
+            "expiredReservations": 0,
+            "expiredLots": 0,
+            "routeResults": [
+              {
+                "route": "uki",
+                "status": "open",
+                "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T11:00:00.000Z",
+                "creditRunId": "49d57bd986219a17ce95207172b7de4eec97ee251464c468883bea167ecaa041",
+                "batchesProcessed": 1,
+                "itemsApplied": 2,
+                "pendingItems": 0
+              },
+              {
+                "route": "nft",
+                "status": "open",
+                "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-09T11:00:00.000Z",
+                "creditRunId": "8064059bb1bfa063415fdfdfe0fd9748e2f58306bf5ff4921ffbedff48c7c0d8",
+                "batchesProcessed": 1,
+                "itemsApplied": 0,
+                "pendingItems": 0
+              }
+            ],
+            "completedAt": "2026-09-09T11:00:54.863Z"
+          }
+        }
+      ],
+      "uiPendingObserved": true,
+      "uiPendingAutomaticallyCleared": true
+    },
+    "ui": {
+      "desktopWidth": 1792,
+      "mobileWidth": 391,
+      "horizontalOverflow": false,
+      "poolFilterCount": 4,
+      "recoveryTokenId": "98000001",
+      "recoveryOwnerVerified": true,
+      "recoveryRequestExitEnabled": true,
+      "draftAdjustmentDiscardedWithoutSaving": true,
+      "consoleObservation": {
+        "at": "2026-09-09T10:59:44.143Z",
+        "code": "ProviderNotFoundError",
+        "context": "Wagmi durante recarga; sesion recuperada y pantallas operativas. Causa del aviso sin aislar."
+      }
+    }
   }
 }

@@ -858,10 +858,10 @@ Seguimiento de este lote en `codex/credit-cycle-and-cukie-actions`:
 
 | Punto | Evidencia y estado | Criterio de cierre |
 | --- | --- | --- |
-| Corte de creditos | Observado en Stage servido `43d8a2f`: a las 10:00:06 todavia no existe evidencia del bloque del corte; primer tick 10:00:22 falla y el siguiente abre ambas rutas a las 10:00:54.994. La UI cambia a cero mientras el reparto esta pendiente. | Distinguir reparto pendiente de saldo final cero, conservar motivos de bloqueo y verificar otro corte despues de desplegar. |
-| Configuracion de cupos pendientes | API admite configurar slots materializados `qualifying`; el resumen solo cuenta activos y no informa el primer corte por cupo. | Configuracion anticipada visible por fecha elegible, sin grants anticipados; proximo corte separado de fechas posteriores. |
+| Corte de creditos | Desplegado en Stage `bae6f3b`: el corte 11:00 abre ambas rutas a las 11:00:54.863. El primer intento registra `CREDIT_CUTOFF_BLOCK_MISSING` y `CREDIT_WATERMARK_UNHEALTHY_OR_STALE`. La UI informa reparto en proceso y retira el aviso automaticamente al terminar. | Verificado un corte posterior al deploy; conserva la espera del indexador y no promete liquidacion instantanea. |
+| Configuracion de cupos pendientes | Stage `bae6f3b`: fecha elegible por cupo, configuracion futura agrupada por corte y controles habilitados durante `qualifying`. La UI real muestra tres NFT elegibles desde el corte 11:30 y reparto preparado 200 jugar / 100 pool. | Configuracion anticipada comprobada sin adelantar grants ni guardar cambios de reparto en QA. |
 | Pool anterior | Contraste `ownerOf` + `positionOf` en BSC 97 a las 09:56: los IDs `98000001`, `98000003`, `98000004`, `98000007` siguen en `0xd405acff1bba872be893e796c39f3eacbde2872b`, con la wallet como beneficiaria y sin salida solicitada. El vault actual es `0x359b8fc829eb6d320df6301c8f323af9ae773b41`. Los 11 disponibles de la observacion anterior eran un resultado de UI; siete estan realmente en la wallet y cuatro en el Pool sustituido. | Excluir la custodia anterior de disponibles y ofrecer recuperacion con allowlist, prueba de beneficiario y calendario del contrato anterior. Sin reset, backfill ni transaccion automatica. |
-| Actualizacion y acciones | El recibo on-chain y las proyecciones Master/Creditos se refrescan en momentos distintos. Coleccion necesita filtros y acciones por custodia/red. | Seguimiento compartido de convergencia y acciones que lleven al control correcto; verificar errores, cambio de wallet y navegacion. |
+| Actualizacion y acciones | Stage `bae6f3b`: coordinacion compartida tras recibo UKI, reintentos con plazo y cancelacion por wallet/red/offline/landing. Coleccion ordenada y filtrable por custodia con acciones segun contratos configurados. | Regresiones de sincronizacion y guardas verificadas; navegacion real a recovery con beneficiario confirmado. No se ejecutaron firmas ni transacciones durante QA. |
 
 El candidato de recuperacion se contrasto a las 10:24 UTC contra Mongo y
 `ownerOf`/`positionOf` de BSC 97, sin escrituras: reconoce los cuatro NFTs del
@@ -882,9 +882,28 @@ disponibles, cuatro en el Pool anterior y uno en Master. La recuperacion
 excluye correctamente las posiciones actuales de sus consultas historicas.
 [Evidencia de ambos contrastes y del corte](legacy-marketplace/evidence/2026-09-09-credit-period-and-pool-custody.json).
 
-Base integrada `32b27fc` (PR #342). Lint, typecheck, build y 222 suites / 1.810
-tests correctos; despliegue de este lote en curso. Main/app 12 queda
-fuera del alcance.
+PR [#343](https://github.com/fgomezserna/cukies-hub/pull/343), integrada sobre
+`32b27fc` (PR #342), desplegada como `bae6f3b022297ac431aa417ac8e8127d82d1913c`.
+Coolify `mk0wos4gs4wwkosg0gkg8w4c` termino a las 10:53:22 UTC; `/api/health`
+confirma el SHA. Lint, typecheck, build, compose config y 222 suites / 1.810
+tests correctos. Doce servicios running, cero reinicios y gates previos
+conservados; indexer, Master y Creditos con estado `ready` a las 10:54 UTC.
+El guard mantuvo un minimo de 11.446.267.904 bytes libres, sobre el suelo de
+10 GiB. Main/app 12 queda fuera del alcance.
+
+QA con sesion real: Creditos en escritorio y movil; filtros de Mis Cukies;
+recuperacion de `98000001` con el vault anterior seleccionado y propietario
+verificado; siete aprobaciones y cuatro solicitudes de salida simuladas
+correctamente contra los contratos, sin enviar transacciones. Sin overflow
+horizontal en Creditos, Mis Cukies y recovery a 391 px. Pool actual contrastado
+en escritorio. El corte 11:00 confirma una espera de unos 55 s, similar a la
+observacion previa: mejora la coherencia y el diagnostico, no elimina la espera
+por evidencia de cadena. Un corte observado no constituye una garantia de latencia.
+
+Observacion residual: Wagmi registro `ProviderNotFoundError` durante una
+recarga a las 10:59:44; la sesion se recupero y las pantallas quedaron operativas.
+La causa concreta de ese aviso transitorio no se ha aislado; no se presenta
+esta verificacion como ausencia total de errores de conectores.
 
 ### Auditoria del 2026-09-08
 
