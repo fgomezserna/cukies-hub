@@ -20,6 +20,9 @@ jest.mock('@/components/uki-marketplace/seller-panel', () => ({
 jest.mock('@/components/legacy-marketplace/marketplace-client', () => ({
   MarketplaceClient: () => <div data-testid="legacy-marketplace" />,
 }));
+jest.mock('@/components/legacy-marketplace/seller-panel', () => ({
+  LegacyMarketplaceSellerPanel: () => <div data-testid="legacy-marketplace-seller" />,
+}));
 
 describe('marketplace orientado al cliente', () => {
   const mockMarketplacePublicConfig = ukiMarketplacePublicConfig as { ready: boolean };
@@ -28,14 +31,16 @@ describe('marketplace orientado al cliente', () => {
     mockMarketplacePublicConfig.ready = false;
   });
 
-  it('muestra el mercado disponible y oculta módulos que todavía no están listos', () => {
+  it('muestra compra y venta Legacy y explica que V2 no está configurado', () => {
     render(<MarketplacePage />);
 
     expect(screen.getByTestId('legacy-marketplace')).toBeInTheDocument();
     expect(screen.queryByTestId('uki-marketplace')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('uki-marketplace-seller')).not.toBeInTheDocument();
+    expect(screen.getByTestId('legacy-marketplace-seller')).toBeInTheDocument();
+    expect(screen.getByTestId('uki-marketplace-seller')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Comprar Cukies' })).toHaveAttribute('href', '#cukies-disponibles');
-    expect(screen.queryByText(/staging|testnet|contrato/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Vender / mis anuncios' })).toHaveAttribute('href', '#mis-anuncios');
+    expect(screen.getByText(/contrato Marketplace V2\/UKI no está configurado/i)).toBeInTheDocument();
   });
 
   it('activa compra y anuncios únicamente mediante configuración de entorno', () => {
@@ -44,6 +49,6 @@ describe('marketplace orientado al cliente', () => {
 
     expect(screen.getByTestId('uki-marketplace')).toBeInTheDocument();
     expect(screen.getByTestId('uki-marketplace-seller')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Mis anuncios' })).toHaveAttribute('href', '#mis-anuncios');
+    expect(screen.getByRole('link', { name: 'Vender / mis anuncios' })).toHaveAttribute('href', '#mis-anuncios');
   });
 });

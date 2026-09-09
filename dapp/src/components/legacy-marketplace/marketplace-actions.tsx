@@ -1,10 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatEther, isAddress, parseEther } from 'viem';
 import {
   useAccount,
   useConnect,
+  usePublicClient,
   useReadContract,
   useSwitchChain,
   useWriteContract,
@@ -36,16 +38,52 @@ const bscTokenAddress = legacyMarketplaceContracts.bsc.contracts.token;
 const tronMarketplaceAddress =
   legacyMarketplaceContracts.tron.contracts.marketplace;
 
-function getErrorMessage(_error: unknown) {
-  return 'La wallet ha rechazado o no ha podido completar la operación.';
+function getErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  if (message.includes('reject') || message.includes('denied') || message.includes('4001')) {
+    return 'Operación rechazada en la wallet. No se ha enviado ninguna transacción.';
+  }
+  if (message.includes('invalid_price')) return 'Introduce un precio válido mayor que cero.';
+  if (message.includes('approval_required')) return 'Debes conceder permiso al contrato antes de publicar el Cukie.';
+  if (message.includes('not_owner') || message.includes('not_owned')) return 'La wallet conectada ya no es la propietaria válida para esta acción.';
+  if (message.includes('not_active') || message.includes('not_sellable')) return 'El estado del Cukie cambió. Actualiza la ficha antes de continuar.';
+  if (message.includes('owner_cannot_buy')) return 'La wallet propietaria no puede comprar su propio anuncio.';
+  if (message.includes('already_approved')) return 'El contrato ya tiene permiso para operar con tus Cukies.';
+  return 'La operación no se pudo completar. Vuelve a validar la red, el saldo y el estado del anuncio.';
 }
 
 function isSameWallet(left?: string | null, right?: string | null) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
 
+function contractField(value: unknown, name: string, index: number) {
+  if (Array.isArray(value)) return value[index];
+  if (value && typeof value === 'object') {
+    return (value as Record<string, unknown>)[name]
+      ?? (value as Record<string, unknown>)[String(index)];
+  }
+  return undefined;
+}
+
+function contractInteger(value: unknown) {
+  const normalized = value && typeof value === 'object' && 'toString' in value
+    ? String(value)
+    : typeof value === 'bigint' || typeof value === 'number' || typeof value === 'string'
+      ? String(value)
+      : '';
+  if (!/^\d+$/.test(normalized)) throw new Error('INVALID_CONTRACT_VALUE');
+  return BigInt(normalized);
+}
+
+function contractBoolean(value: unknown) {
+  if (typeof value === 'boolean') return value;
+  if (value === 1 || value === '1') return true;
+  if (value === 0 || value === '0') return false;
+  throw new Error('INVALID_CONTRACT_VALUE');
+}
+
 export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
-  if (!legacyMarketplaceRuntime.legacyMainnetEnabled) {
+  if (!legacyMarketplaceRuntime.legacyMarketplaceActionsEnabled) {
     return (
       <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-5 text-amber-50">
         <h2 className="font-headline text-xl font-bold">Marketplace en modo seguro</h2>
@@ -61,10 +99,12 @@ export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
 }
 
 function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
+  const router = useRouter();
   const { address, chainId, isConnected } = useAccount();
   const { connectAsync, connectors, isPending: isConnectingWallet } = useConnect();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
-  const { writeContract, isPending: isWriting } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: 56 });
+  const { writeContractAsync, isPending: isWriting } = useWriteContract();
   const {
     address: tronAddress,
     connect: connectTron,
@@ -88,6 +128,29 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     () => (hasMounted ? getPreferredWalletConnector(connectors) : undefined),
     [connectors, hasMounted],
   );
+
+  function parsedBscPrice() {
+    const value = sellPrice.trim();
+    if (!/^\d+(?:\.\d{1,18})?$/.test(value)) {
+      throw new Error('INVALID_PRICE');
+    }
+    const price = parseEther(value);
+    if (price <= BigInt(0)) throw new Error('INVALID_PRICE');
+    return price;
+  }
+
+  function parsedTronPrice() {
+    const value = sellPrice.trim();
+    if (!/^\d+(?:\.\d{1,6})?$/.test(value)) {
+      throw new Error('INVALID_PRICE');
+    }
+    const [whole, fraction = ''] = value.split('.');
+    const price = BigInt(whole) * BigInt(1_000_000) + BigInt(fraction.padEnd(6, '0'));
+    if (price <= BigInt(0) || price > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error('INVALID_PRICE');
+    }
+    return Number(price);
+  }
 
   const { data: isApprovedForAll } = useReadContract({
     address: bscTokenAddress,
@@ -154,62 +217,151 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     return true;
   }
 
-  function approveBsc() {
-    if (!ensureBsc()) return;
-    setStatus('Solicitando permiso para gestionar este Cukie...');
-    writeContract({
-      address: bscTokenAddress,
-      abi: legacyMarketplaceBscAbis.token,
-      functionName: 'setApprovalForAll',
-      args: [bscMarketplaceAddress, true],
+  async function inspectBsc() {
+    if (!publicClient || !address) throw new Error('BSC_NOT_READY');
+    const [paused, owner, listing, approved, liveFeeCancelPrice, liveFeeChangePrice] = await Promise.all([
+      publicClient.readContract({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'paused',
+      }),
+      publicClient.readContract({
+        address: bscTokenAddress,
+        abi: legacyMarketplaceBscAbis.token,
+        functionName: 'ownerOf',
+        args: [tokenId],
+      }),
+      publicClient.readContract({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'marketTokens',
+        args: [tokenId],
+      }),
+      publicClient.readContract({
+        address: bscTokenAddress,
+        abi: legacyMarketplaceBscAbis.token,
+        functionName: 'isApprovedForAll',
+        args: [address, bscMarketplaceAddress],
+      }),
+      publicClient.readContract({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'feeCancelPrice',
+      }),
+      publicClient.readContract({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'feeChangePrice',
+      }),
+    ]);
+    const marketToken = listing as readonly [string, bigint, bigint, boolean, bigint, bigint];
+    return {
+      paused: paused as boolean,
+      owner: String(owner),
+      approved: approved as boolean,
+      listingOwner: marketToken[0],
+      price: marketToken[1],
+      isOnSale: marketToken[3],
+      feeCancelPrice: liveFeeCancelPrice as bigint,
+      feeChangePrice: liveFeeChangePrice as bigint,
+    };
+  }
+
+  async function runBscAction(
+    label: string,
+    request: () => Promise<`0x${string}`>,
+  ) {
+    if (!ensureBsc() || !publicClient) return;
+    setStatus(label);
+    try {
+      const hash = await request();
+      setStatus('Transacción enviada. Esperando confirmación en BNB Smart Chain…');
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+      setStatus(`Confirmada en BNB Smart Chain · ${hash.slice(0, 10)}…${hash.slice(-6)}. Actualizando la ficha…`);
+      router.refresh();
+    } catch (error) {
+      setStatus(getErrorMessage(error));
+    }
+  }
+
+  async function approveBsc() {
+    await runBscAction('Validando propiedad y permiso en el contrato…', async () => {
+      const live = await inspectBsc();
+      if (!isSameWallet(live.owner, address)) throw new Error('NOT_OWNER');
+      if (live.approved) throw new Error('ALREADY_APPROVED');
+      return writeContractAsync({
+        address: bscTokenAddress,
+        abi: legacyMarketplaceBscAbis.token,
+        functionName: 'setApprovalForAll',
+        args: [bscMarketplaceAddress, true],
+      });
     });
   }
 
-  function buyBsc() {
-    if (!ensureBsc() || !cuki.priceOriginal) return;
-    setStatus('Confirma la compra en tu wallet...');
-    writeContract({
-      address: bscMarketplaceAddress,
-      abi: legacyMarketplaceBscAbis.marketplace,
-      functionName: 'buyToken',
-      args: [tokenId],
-      value: BigInt(cuki.priceOriginal),
+  async function buyBsc() {
+    await runBscAction('Validando anuncio, propietario y precio en el contrato…', async () => {
+      const live = await inspectBsc();
+      if (live.paused || !live.isOnSale || live.price <= BigInt(0)) {
+        throw new Error('LISTING_NOT_ACTIVE');
+      }
+      if (isSameWallet(live.listingOwner, address)) throw new Error('OWNER_CANNOT_BUY');
+      return writeContractAsync({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'buyToken',
+        args: [tokenId],
+        value: live.price,
+      });
     });
   }
 
-  function sellBsc() {
-    if (!ensureBsc() || !sellPrice) return;
-    setStatus('Publicando tu Cukie...');
-    writeContract({
-      address: bscMarketplaceAddress,
-      abi: legacyMarketplaceBscAbis.marketplace,
-      functionName: 'putTokenOnSale',
-      args: [tokenId, parseEther(sellPrice)],
-      value: BigInt(0),
+  async function sellBsc() {
+    await runBscAction('Validando propiedad, permiso y estado en el contrato…', async () => {
+      const live = await inspectBsc();
+      if (live.paused || live.isOnSale || !isSameWallet(live.owner, address)) {
+        throw new Error('TOKEN_NOT_SELLABLE');
+      }
+      if (!live.approved) throw new Error('APPROVAL_REQUIRED');
+      return writeContractAsync({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'putTokenOnSale',
+        args: [tokenId, parsedBscPrice()],
+        value: BigInt(0),
+      });
     });
   }
 
-  function cancelBscSale() {
-    if (!ensureBsc()) return;
-    setStatus('Retirando el anuncio...');
-    writeContract({
-      address: bscMarketplaceAddress,
-      abi: legacyMarketplaceBscAbis.marketplace,
-      functionName: 'cancelTokenSale',
-      args: [tokenId],
-      value: (feeCancelPrice as bigint | undefined) ?? BigInt(0),
+  async function cancelBscSale() {
+    await runBscAction('Validando el anuncio antes de retirarlo…', async () => {
+      const live = await inspectBsc();
+      if (live.paused || !live.isOnSale || !isSameWallet(live.listingOwner, address)) {
+        throw new Error('LISTING_NOT_OWNED');
+      }
+      return writeContractAsync({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'cancelTokenSale',
+        args: [tokenId],
+        value: live.feeCancelPrice,
+      });
     });
   }
 
-  function changeBscPrice() {
-    if (!ensureBsc() || !sellPrice) return;
-    setStatus('Actualizando el precio...');
-    writeContract({
-      address: bscMarketplaceAddress,
-      abi: legacyMarketplaceBscAbis.marketplace,
-      functionName: 'changeMarketTokenPrice',
-      args: [tokenId, parseEther(sellPrice)],
-      value: (feeChangePrice as bigint | undefined) ?? BigInt(0),
+  async function changeBscPrice() {
+    await runBscAction('Validando el anuncio antes de cambiar el precio…', async () => {
+      const live = await inspectBsc();
+      if (live.paused || !live.isOnSale || !isSameWallet(live.listingOwner, address)) {
+        throw new Error('LISTING_NOT_OWNED');
+      }
+      return writeContractAsync({
+        address: bscMarketplaceAddress,
+        abi: legacyMarketplaceBscAbis.marketplace,
+        functionName: 'changeMarketTokenPrice',
+        args: [tokenId, parsedBscPrice()],
+        value: live.feeChangePrice,
+      });
     });
   }
 
@@ -230,12 +382,43 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     return true;
   }
 
+  async function inspectTron() {
+    if (!window.tronWeb || !tronAddress) throw new Error('TRON_NOT_READY');
+    const [paused, owner, listing, approved] = await Promise.all([
+      readLegacyTronContract(window.tronWeb, 'marketplace', 'paused'),
+      readLegacyTronContract(window.tronWeb, 'token', 'ownerOf', [cuki.tokenId]),
+      readLegacyTronContract(window.tronWeb, 'marketplace', 'marketTokens', [cuki.tokenId]),
+      readLegacyTronContract(window.tronWeb, 'token', 'isApprovedForAll', [
+        tronAddress,
+        tronMarketplaceAddress,
+      ]),
+    ]);
+    const normalizeAddress = (value: unknown) => {
+      const addressValue = String(value);
+      try {
+        return window.tronWeb?.address?.toHex?.(addressValue) ?? addressValue;
+      } catch {
+        return addressValue;
+      }
+    };
+    return {
+      paused: contractBoolean(paused),
+      owner: normalizeAddress(owner),
+      approved: contractBoolean(approved),
+      listingOwner: normalizeAddress(contractField(listing, 'owner', 0) ?? ''),
+      connectedOwner: normalizeAddress(tronAddress),
+      price: contractInteger(contractField(listing, 'price', 1)),
+      isOnSale: contractBoolean(contractField(listing, 'isOnSale', 3)),
+    };
+  }
+
   async function runTronAction(action: () => Promise<unknown>, label: string) {
     setIsTronPending(true);
     setStatus(label);
     try {
       const tx = await action();
-      setStatus(`Operación enviada: ${String(tx).slice(0, 18)}...`);
+      setStatus(`Operación confirmada en TRON · ${String(tx).slice(0, 18)}… Actualizando la ficha…`);
+      router.refresh();
     } catch (error) {
       setStatus(getErrorMessage(error));
     } finally {
@@ -246,55 +429,75 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   async function approveTron() {
     if (!(await ensureTron()) || !window.tronWeb) return;
     await runTronAction(
-      () =>
-        sendLegacyTronContract(
+      async () => {
+        const live = await inspectTron();
+        if (!isSameWallet(live.owner, live.connectedOwner)) throw new Error('NOT_OWNER');
+        if (live.approved) throw new Error('ALREADY_APPROVED');
+        return sendLegacyTronContract(
           window.tronWeb,
           'token',
           'setApprovalForAll',
           [tronMarketplaceAddress, true],
-          { feeLimit: 800_000_000, shouldPollResponse: false },
-        ),
-      'Solicitando permiso para gestionar este Cukie...',
+          { feeLimit: 800_000_000, shouldPollResponse: true },
+        );
+      },
+      'Validando propiedad y permiso en TRON Mainnet…',
     );
   }
 
   async function buyTron() {
     if (!(await ensureTron()) || !window.tronWeb || !cuki.priceOriginal) return;
     await runTronAction(
-      () =>
-        sendLegacyTronContract(
+      async () => {
+        const live = await inspectTron();
+        if (live.paused || !live.isOnSale || live.price <= BigInt(0)) {
+          throw new Error('LISTING_NOT_ACTIVE');
+        }
+        if (isSameWallet(live.listingOwner, live.connectedOwner)) throw new Error('OWNER_CANNOT_BUY');
+        return sendLegacyTronContract(
           window.tronWeb,
           'marketplace',
           'buyToken',
           [cuki.tokenId],
           {
-            callValue: Number(cuki.priceOriginal),
+            callValue: Number(live.price),
             feeLimit: 800_000_000,
-            shouldPollResponse: false,
+            shouldPollResponse: true,
           },
-        ),
-      'Confirma la compra en tu wallet...',
+        );
+      },
+      'Validando anuncio, propietario y precio en TRON Mainnet…',
     );
   }
 
   async function sellTron() {
     if (!(await ensureTron()) || !window.tronWeb || !sellPrice) return;
     await runTronAction(
-      () =>
-        sendLegacyTronContract(
+      async () => {
+        const live = await inspectTron();
+        if (live.paused || live.isOnSale || !isSameWallet(live.owner, live.connectedOwner)) {
+          throw new Error('TOKEN_NOT_SELLABLE');
+        }
+        if (!live.approved) throw new Error('APPROVAL_REQUIRED');
+        return sendLegacyTronContract(
           window.tronWeb,
           'marketplace',
           'putTokenOnSale',
-          [cuki.tokenId, Math.round(Number(sellPrice) * 1_000_000)],
-          { feeLimit: 800_000_000, shouldPollResponse: false },
-        ),
-      'Publicando tu Cukie...',
+          [cuki.tokenId, parsedTronPrice()],
+          { feeLimit: 800_000_000, shouldPollResponse: true },
+        );
+      },
+      'Validando propiedad, permiso y estado en TRON Mainnet…',
     );
   }
 
   async function cancelTronSale() {
     if (!(await ensureTron()) || !window.tronWeb) return;
     await runTronAction(async () => {
+      const live = await inspectTron();
+      if (live.paused || !live.isOnSale || !isSameWallet(live.listingOwner, live.connectedOwner)) {
+        throw new Error('LISTING_NOT_OWNED');
+      }
       const fee = await readLegacyTronContract<unknown>(
         window.tronWeb,
         'marketplace',
@@ -306,12 +509,38 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         'cancelTokenSale',
         [cuki.tokenId],
         {
-          callValue: Number(fee),
+          callValue: Number(contractInteger(fee)),
           feeLimit: 800_000_000,
-          shouldPollResponse: false,
+          shouldPollResponse: true,
         },
       );
     }, 'Retirando el anuncio...');
+  }
+
+  async function changeTronPrice() {
+    if (!(await ensureTron()) || !window.tronWeb) return;
+    await runTronAction(async () => {
+      const live = await inspectTron();
+      if (live.paused || !live.isOnSale || !isSameWallet(live.listingOwner, live.connectedOwner)) {
+        throw new Error('LISTING_NOT_OWNED');
+      }
+      const fee = await readLegacyTronContract<unknown>(
+        window.tronWeb,
+        'marketplace',
+        'feeChangePrice',
+      );
+      return sendLegacyTronContract(
+        window.tronWeb,
+        'marketplace',
+        'changeMarketTokenPrice',
+        [cuki.tokenId, parsedTronPrice()],
+        {
+          callValue: Number(contractInteger(fee)),
+          feeLimit: 800_000_000,
+          shouldPollResponse: true,
+        },
+      );
+    }, 'Validando el anuncio antes de cambiar el precio…');
   }
 
   const disabled = isWriting || isSwitchingChain || isTronPending || isConnectingWallet;
@@ -336,6 +565,11 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           <p className="text-xs text-slate-500">
             Retirar el anuncio cuesta {formatEther(feeCancelPrice as bigint)} BNB · Cambiar el precio cuesta{' '}
             {formatEther((feeChangePrice as bigint | undefined) ?? BigInt(0))} BNB
+          </p>
+        )}
+        {legacyMarketplaceRuntime.appEnv === 'staging' && (
+          <p className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-xs font-semibold text-amber-100">
+            Stage usa los contratos Legacy reales de BSC/TRON Mainnet. La wallet volverá a validar red, propietario, anuncio, precio y permisos antes de firmar.
           </p>
         )}
       </div>
@@ -376,8 +610,8 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
         {isOwner && (
           <Button
-            onClick={isBsc ? approveBsc : () => void approveTron()}
-            disabled={disabled}
+            onClick={isBsc ? () => void approveBsc() : () => void approveTron()}
+            disabled={disabled || (isBsc && Boolean(isApprovedForAll))}
             variant="outline"
             className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
           >
@@ -388,7 +622,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
         {cuki.state === 'onSale' && !isOwner && (
           <Button
-            onClick={isBsc ? buyBsc : () => void buyTron()}
+            onClick={isBsc ? () => void buyBsc() : () => void buyTron()}
             disabled={disabled || !cuki.priceOriginal}
             className="bg-[var(--uki-lilac)] text-[#100516] hover:bg-[#f19bff]"
           >
@@ -409,7 +643,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
               {cuki.state === 'onSale' ? (
                 <>
                   <Button
-                    onClick={isBsc ? changeBscPrice : () => void sellTron()}
+                    onClick={isBsc ? () => void changeBscPrice() : () => void changeTronPrice()}
                     disabled={disabled || !sellPrice}
                     className="bg-white text-slate-950 hover:bg-slate-200"
                   >
@@ -417,7 +651,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
                     Actualizar precio
                   </Button>
                   <Button
-                    onClick={isBsc ? cancelBscSale : () => void cancelTronSale()}
+                    onClick={isBsc ? () => void cancelBscSale() : () => void cancelTronSale()}
                     disabled={disabled}
                     variant="outline"
                     className="border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"
@@ -428,7 +662,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
                 </>
               ) : (
                 <Button
-                  onClick={isBsc ? sellBsc : () => void sellTron()}
+                  onClick={isBsc ? () => void sellBsc() : () => void sellTron()}
                   disabled={disabled || !sellPrice}
                   className="bg-white text-slate-950 hover:bg-slate-200 sm:col-span-2"
                 >

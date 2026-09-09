@@ -34,6 +34,8 @@ import {
 type CukiDocument = {
   _id: string;
   tokenId?: unknown;
+  chainId?: unknown;
+  collectionAddressNormalized?: unknown;
   user?: unknown;
   owner?: unknown;
   ownerNormalized?: unknown;
@@ -272,6 +274,8 @@ function normalizeRelation(value: unknown): LegacyMarketplaceCukiReference | nul
   return {
     id,
     tokenId: id,
+    chainId: toNumberOrNull(document.chainId),
+    collectionAddress: toStringOrNull(document.collectionAddressNormalized),
     cukiNumber: toNumberOrNull(document.cukiNumber),
     network: toStringOrNull(document.network),
     birthNetwork: toStringOrNull(document.birthNetwork),
@@ -348,6 +352,8 @@ function normalizeCuki(document: CukiDocument): LegacyMarketplaceCukiItem {
   return {
     id,
     tokenId: id,
+    chainId: toNumberOrNull(document.chainId),
+    collectionAddress: toStringOrNull(document.collectionAddressNormalized),
     cukiNumber: toNumberOrNull(document.cukiNumber),
     owner,
     network: toStringOrNull(document.network) ?? 'TRON',

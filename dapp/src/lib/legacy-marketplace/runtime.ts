@@ -6,6 +6,7 @@ export type LegacyMarketplaceEnvironment = Partial<Record<
 export type LegacyMarketplaceRuntime = Readonly<{
   appEnv: 'staging' | 'production' | 'unknown';
   legacyMainnetEnabled: boolean;
+  legacyMarketplaceActionsEnabled: boolean;
   bscChainId: 56 | null;
   bscExplorerBaseUrl: string | null;
   tronExplorerBaseUrl: string | null;
@@ -28,18 +29,18 @@ export function buildLegacyMarketplaceRuntime(
     ? rawAppEnv
     : 'unknown';
   const legacyMainnetEnabled = appEnv === 'production';
+  const legacyMarketplaceActionsEnabled = appEnv === 'staging' || appEnv === 'production';
 
   return Object.freeze({
     appEnv,
     legacyMainnetEnabled,
-    bscChainId: legacyMainnetEnabled ? 56 : null,
-    bscExplorerBaseUrl: legacyMainnetEnabled ? 'https://bscscan.com' : null,
-    tronExplorerBaseUrl: legacyMainnetEnabled ? 'https://tronscan.org' : null,
-    reason: legacyMainnetEnabled
+    legacyMarketplaceActionsEnabled,
+    bscChainId: legacyMarketplaceActionsEnabled ? 56 : null,
+    bscExplorerBaseUrl: legacyMarketplaceActionsEnabled ? 'https://bscscan.com' : null,
+    tronExplorerBaseUrl: legacyMarketplaceActionsEnabled ? 'https://tronscan.org' : null,
+    reason: legacyMarketplaceActionsEnabled
       ? null
-      : appEnv === 'staging'
-        ? 'El marketplace legacy de mainnet esta desactivado en Stage/Testnet.'
-        : 'El marketplace legacy permanece desactivado hasta identificar el entorno.',
+      : 'El marketplace legacy permanece desactivado hasta identificar el entorno.',
   });
 }
 

@@ -36,6 +36,7 @@ type CatalogResponse = {
       generations: { value: string; count: number }[];
     };
     sources: { legacy: 'ready' | 'unavailable'; uki: 'ready' | 'unavailable' };
+    legacyNetworks: { BSC: 'ready' | 'unavailable'; TRON: 'ready' | 'unavailable' };
   };
   code?: string;
 };
@@ -71,7 +72,7 @@ function UkiMarketplaceCard({
       <div className="relative grid aspect-[4/5] min-h-[22rem] place-items-center bg-[radial-gradient(circle_at_center,rgba(228,92,255,0.2),transparent_65%)]">
         <ShieldCheck aria-hidden className="h-14 w-14 text-lilac-100/70" />
         <div className="absolute left-3 top-3 rounded-full border border-lilac-200/30 bg-lilac-200/15 px-2.5 py-1 text-xs font-bold text-lilac-100 backdrop-blur">
-          UKI · BSC
+          V2 · UKI · BSC {order.chainId === 97 ? 'Testnet' : 'Mainnet'}
         </div>
         <div className="absolute right-3 top-3 rounded-full border border-emerald-200/30 bg-emerald-200/15 px-2.5 py-1 text-xs font-bold text-emerald-100 backdrop-blur">
           Anuncio validado
@@ -415,6 +416,22 @@ export function MarketplaceClient({
           que sí respondieron.
         </div>
       )}
+      {catalog?.sources.legacy === 'ready' &&
+        catalog.legacyNetworks?.BSC === 'unavailable' &&
+        scope !== 'uki' &&
+        network !== 'TRON' && (
+          <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+            BSC no ha podido verificarse ahora. Se conservan únicamente los anuncios TRON comprobados; no se interpreta como cero anuncios BSC.
+          </div>
+        )}
+      {catalog?.sources.legacy === 'ready' &&
+        catalog.legacyNetworks?.TRON === 'unavailable' &&
+        scope !== 'uki' &&
+        network !== 'BSC' && (
+          <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+            TRON no ha podido verificarse ahora. Se conservan únicamente los anuncios BSC comprobados; no se interpreta como cero anuncios TRON.
+          </div>
+        )}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (

@@ -4,15 +4,24 @@ jest.mock('@/lib/legacy-marketplace/data', () => ({
 jest.mock('@/lib/uki-marketplace', () => ({
   listPublicUkiMarketplacePage: jest.fn(),
 }));
+jest.mock('@/lib/legacy-marketplace/live-marketplace', () => ({
+  verifyLegacyMarketplaceListings: jest.fn(async (items: unknown[]) => items),
+  verifyLegacyMarketplaceListingsByNetwork: jest.fn(async (items: unknown[]) => ({
+    items,
+    unavailableNetworks: [],
+  })),
+}));
 
 import { NextRequest } from 'next/server';
 
 import { GET } from '@/app/api/marketplace/v1/catalog/route';
 import { listLegacyMarketplaceCukies } from '@/lib/legacy-marketplace/data';
+import { verifyLegacyMarketplaceListingsByNetwork } from '@/lib/legacy-marketplace/live-marketplace';
 import { listPublicUkiMarketplacePage } from '@/lib/uki-marketplace';
 
 const legacyList = listLegacyMarketplaceCukies as jest.Mock;
 const ukiList = listPublicUkiMarketplacePage as jest.Mock;
+const verifyLegacy = verifyLegacyMarketplaceListingsByNetwork as jest.Mock;
 
 const facets = {
   states: [],
@@ -68,6 +77,10 @@ describe('/api/marketplace/v1/catalog', () => {
       facets,
     });
     ukiList.mockResolvedValue({ orders: [], nextCursor: null, hasMore: false });
+    verifyLegacy.mockImplementation(async (items: unknown[]) => ({
+      items,
+      unavailableNetworks: [],
+    }));
   });
 
   it('avanza por páginas reales sin duplicar ni omitir más de cien resultados', async () => {
@@ -162,5 +175,57 @@ describe('/api/marketplace/v1/catalog', () => {
       marketplaceOnly: true,
     }));
     expect(ukiList).not.toHaveBeenCalled();
+  });
+
+  it('descarta anuncios Legacy obsoletos y avanza por los candidatos ya verificados', async () => {
+    const candidates = Array.from({ length: 48 }, (_, index) =>
+      legacyItem(String(index + 1), 2_000_000_000 - index),
+    );
+    legacyList.mockImplementation(async ({ offset, limit }: { offset: number; limit: number }) => ({
+      source: 'mongo',
+      items: candidates.slice(offset, offset + limit),
+      total: candidates.length,
+      offset,
+      limit,
+      facets,
+    }));
+    verifyLegacy
+      .mockResolvedValueOnce({ items: [], unavailableNetworks: [] })
+      .mockImplementation(async (items: unknown[]) => ({
+        items,
+        unavailableNetworks: [],
+      }));
+
+    const response = await GET(request('scope=legacy&limit=24'));
+    const body = await response.json();
+
+    expect(body.data.items).toHaveLength(24);
+    expect(body.data.items[0].item.tokenId).toBe('25');
+    expect(body.data.cursors.legacyOffset).toBe(48);
+    expect(legacyList).toHaveBeenNthCalledWith(2, expect.objectContaining({ offset: 24 }));
+  });
+
+  it('conserva BSC verificable cuando TRON no responde y declara la degradación', async () => {
+    const bsc = legacyItem('1', 2_000_000_000, 'BSC');
+    const tron = legacyItem('2', 1_999_999_999, 'TRON');
+    legacyList.mockResolvedValue({
+      source: 'mongo',
+      items: [bsc, tron],
+      total: 2,
+      offset: 0,
+      limit: 24,
+      facets,
+    });
+    verifyLegacy.mockResolvedValue({
+      items: [bsc],
+      unavailableNetworks: ['TRON'],
+    });
+
+    const response = await GET(request('scope=legacy&limit=24'));
+    const body = await response.json();
+
+    expect(body.data.items.map((entry: { item: { tokenId: string } }) => entry.item.tokenId)).toEqual(['1']);
+    expect(body.data.sources.legacy).toBe('ready');
+    expect(body.data.legacyNetworks).toEqual({ BSC: 'ready', TRON: 'unavailable' });
   });
 });

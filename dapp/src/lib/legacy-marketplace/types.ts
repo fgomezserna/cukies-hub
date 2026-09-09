@@ -26,6 +26,8 @@ export type LegacyCukiSkills = {
 export type LegacyMarketplaceCukiReference = {
   id: string;
   tokenId: string;
+  chainId?: number | null;
+  collectionAddress?: string | null;
   cukiNumber: number | null;
   network: LegacyCukiNetwork | string | null;
   birthNetwork: string | null;
@@ -50,6 +52,8 @@ export type LegacyMarketplaceCukiHistoryEntry = {
 export type LegacyMarketplaceCukiItem = {
   id: string;
   tokenId: string;
+  chainId: number | null;
+  collectionAddress: string | null;
   cukiNumber: number | null;
   owner: string | null;
   network: LegacyCukiNetwork | string;
@@ -68,6 +72,7 @@ export type LegacyMarketplaceCukiItem = {
   children: LegacyMarketplaceCukiReference[];
   history: LegacyMarketplaceCukiHistoryEntry[];
   timestamp: number | null;
+  catalogOffset?: number;
 };
 
 export type LegacyMarketplaceFacet = {
@@ -101,6 +106,8 @@ export type LegacyMarketplaceListParams = {
   owner?: string;
   sort?: string;
   marketplaceOnly?: boolean;
+  includeFacets?: boolean;
+  hydrateRelations?: boolean;
 };
 
 export type LegacyBreedingCandidatesParams = {

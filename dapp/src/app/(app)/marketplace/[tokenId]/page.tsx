@@ -29,16 +29,26 @@ import {
   legacyMarketplaceContracts,
 } from '@/lib/legacy-marketplace/config';
 import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
-import { getCuki } from '@/lib/cukies-data/data';
 import type {
   LegacyMarketplaceCukiHistoryEntry,
   LegacyMarketplaceCukiItem,
   LegacyMarketplaceCukiReference,
 } from '@/lib/legacy-marketplace/types';
+import { getLegacyMarketplaceCuki } from '@/lib/legacy-marketplace/data';
+import {
+  getLegacyMarketplaceDetailHref,
+  matchesLegacyMarketplaceIdentity,
+} from '@/lib/legacy-marketplace/identity';
+import { verifyLegacyMarketplaceListings } from '@/lib/legacy-marketplace/live-marketplace';
 
 type MarketplaceDetailPageProps = {
   params: Promise<{
     tokenId: string;
+  }>;
+  searchParams: Promise<{
+    source?: string;
+    network?: string;
+    collection?: string;
   }>;
 };
 
@@ -57,7 +67,7 @@ const vitalLabels = [
 ] as const;
 
 function getExplorerUrl(network: string, tokenId: string) {
-  if (!legacyMarketplaceRuntime.legacyMainnetEnabled) return null;
+  if (!legacyMarketplaceRuntime.legacyMarketplaceActionsEnabled) return null;
 
   if (network === 'BSC') {
     return `${getLegacyBscExplorerAddressUrl(
@@ -122,7 +132,7 @@ function getHistoryLabel(entry: LegacyMarketplaceCukiHistoryEntry) {
 }
 
 function getHistoryTransactionUrl(entry: LegacyMarketplaceCukiHistoryEntry) {
-  if (!legacyMarketplaceRuntime.legacyMainnetEnabled || !entry.transactionId) return null;
+  if (!legacyMarketplaceRuntime.legacyMarketplaceActionsEnabled || !entry.transactionId) return null;
   if (entry.network === 'BSC') return `https://bscscan.com/tx/${entry.transactionId}`;
   if (entry.network === 'TRON') {
     return `https://tronscan.org/#/transaction/${entry.transactionId}`;
@@ -235,7 +245,7 @@ function RelationCard({
 
   return (
     <Link
-      href={`/marketplace/${relation.tokenId}`}
+      href={getLegacyMarketplaceDetailHref(relation)}
       className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-lilac-300/35 hover:bg-lilac-300/10"
     >
       <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
@@ -264,13 +274,33 @@ function RelationCard({
 
 export default async function MarketplaceDetailPage({
   params,
+  searchParams,
 }: MarketplaceDetailPageProps) {
   const { tokenId } = await params;
-  const cuki = await getCuki(tokenId);
+  const identity = await searchParams;
+  if (identity.source && identity.source !== 'legacy') notFound();
+  const indexedCuki = await getLegacyMarketplaceCuki(tokenId);
 
-  if (!cuki) {
+  if (
+    !indexedCuki ||
+    !matchesLegacyMarketplaceIdentity(indexedCuki, {
+      network: identity.network,
+      collection: identity.collection,
+    })
+  ) {
     notFound();
   }
+  const [verifiedListing] = indexedCuki.state === 'onSale'
+    ? await verifyLegacyMarketplaceListings([indexedCuki])
+    : [];
+  const cuki = indexedCuki.state === 'onSale' && !verifiedListing
+    ? {
+        ...indexedCuki,
+        state: 'unknown',
+        price: null,
+        priceOriginal: null,
+      }
+    : verifiedListing ?? indexedCuki;
 
   const originAction = getOriginAction(cuki);
   const originDate = getOriginDate(cuki);
@@ -335,6 +365,11 @@ export default async function MarketplaceDetailPage({
             </h1>
             <p className="mt-2 break-all font-mono text-sm text-slate-400">
               Cukie {cuki.tokenId}
+            </p>
+            <p className="mt-2 break-all font-mono text-xs text-slate-500">
+              Legacy · {cuki.network}
+              {cuki.chainId ? ` · chain ${cuki.chainId}` : ''} · colección{' '}
+              {cuki.collectionAddress ?? 'no identificada'}
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">

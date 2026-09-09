@@ -17,7 +17,7 @@ export const legacyMarketplaceContracts = {
   bsc: {
     chainId: 56,
     chainName: 'BNB Smart Chain',
-    rpcUrl: 'https://bsc-dataseed.binance.org',
+    rpcUrl: 'https://bsc-rpc.publicnode.com',
     blockExplorerBaseUrl: 'https://bscscan.com',
     contracts: {
       token: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
@@ -31,6 +31,7 @@ export const legacyMarketplaceContracts = {
   tron: {
     chainName: 'TRON mainnet',
     rpcUrl: 'https://api.trongrid.io',
+    readRpcUrl: 'https://tron-rpc.publicnode.com',
     contracts: {
       mint: 'TUrjiyFSa1pq8TGZJnsTAHcgyxnnRmZjN7',
       token: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
