@@ -813,7 +813,7 @@
     }
   },
   "nftOperationRecurrence": {
-    "status": "verified_recurrence_fix_in_progress",
+    "status": "validated_local_deploy_blocked_capacity",
     "observedAt": "2026-09-09T11:23:34.575Z",
     "servedCommit": "bae6f3b022297ac431aa417ac8e8127d82d1913c",
     "chainId": 97,
@@ -930,6 +930,25 @@
         "otherInUse": 0
       },
       "limitation": "Uncommitted candidate run against Stage data; not proof of code deployed or wallet transaction completion."
+    },
+    "codeCommit": "50d27f5",
+    "baseCommit": "53088a33fcdca428a2f6d11967b63c69d1e4fccb",
+    "validation": {
+      "jestSuites": 227,
+      "jestTests": 1841,
+      "jestPassed": true,
+      "buildPassed": true,
+      "typecheckPassed": true,
+      "lintPassed": true,
+      "gitDiffCheckPassed": true,
+      "liveWalletTransactionsSent": 0
+    },
+    "deploymentBlocker": {
+      "reportedBy": "Marketplace deployment operator",
+      "applicationId": 28,
+      "reason": "srv filesystem exhausted during Marketplace deployment; no new deployment window authorized by the operator while capacity remains below guard floor",
+      "marketplaceDeploymentUuid": "dc0s484w4gg0o0oos4o0c0o4",
+      "newDeployTriggered": false
     }
   }
 }
