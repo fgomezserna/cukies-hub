@@ -17,7 +17,7 @@ mientras se estabiliza una release.
 
 | Scope | Recurso y rama | Ruta de despliegue | Datos y dominio |
 | --- | --- | --- | --- |
-| Stage / Hub | App 28 `game-hub-staging`, `staging`, UUID `u4s804o4wwcckowgk0woo4wg` | Push `staging` -> GitHub Actions `.github/workflows/cukies-staging-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201` usando `docker-compose.images.yml`. Autodeploy Git de app 28: **OFF**. `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
+| Stage / Hub | App 28 `game-hub-staging`, `staging`, UUID `u4s804o4wwcckowgk0woo4wg` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201` usando `docker-compose.images.yml`. Autodeploy Git de app 28: **OFF**. `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
 | Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`. Este carril no consume el pipeline de imágenes de app 28. | BSC mainnet y datos de producción; `https://cukies.world`. |
 | Treasure Hunt | App 31 `game-treasurehunt-staging`, `staging`, UUID `lc04cw8gs4koo4swwws0c4ss` | Recurso independiente con Nixpacks (`build_pack=nixpacks`); no aplica `docker-compose.coolify.yml` ni `docker-compose.images.yml`. | Staging; `https://cukieshub.eurekand.com/treasurehunt-game`, con `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y origen dapp de staging. |
 
@@ -178,7 +178,11 @@ Protecciones recomendadas para `staging`:
 
 ### Despliegue de imagenes inmutables de staging
 
-El unico flujo CI de este carril es `.github/workflows/cukies-staging-images.yml`: acepta un
+El reemplazo gradual está en validación; recursos, bootstrap y pruebas en
+[`deployment-rolling-transition.md`](deployment-rolling-transition.md). Hasta
+completar el ensayo, el modo efectivo del Environment determina el destino.
+
+El unico flujo CI de este carril es `.github/workflows/cukies-images.yml`: acepta un
 `push` a `staging`, usa el GitHub Environment `cukies-staging` y el runner con las etiquetas
 `self-hosted`, `linux`, `x64` y `cukies-builder`. No se habilitan eventos de pull request,
 refs arbitrarios ni un disparador manual. El Environment contiene las credenciales del registry

@@ -10,7 +10,7 @@ datos de staging está en
 
 | Recurso | Ruta activa | Compose | Alcance |
 | --- | --- | --- | --- |
-| Coolify app 28, `game-hub-staging` | `staging` -> workflow `.github/workflows/cukies-staging-images.yml` | `docker-compose.images.yml` generado | Hub de integración; CI publica imágenes inmutables y llama a Coolify. El autodeploy Git de app 28 está desactivado y `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. |
+| Coolify app 28, `game-hub-staging` | `staging` -> workflow `.github/workflows/cukies-images.yml` | `docker-compose.images.yml` generado | Hub de integración; CI publica imágenes inmutables y llama a Coolify. El autodeploy Git de app 28 está desactivado y `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. |
 | Coolify app 12, `game-hub` | `main` -> build/deploy existente | `docker-compose.coolify.yml` | Producción live; conserva la ruta legacy de Coolify. |
 | Coolify app 31, `game-treasurehunt-staging` | `staging` -> recurso independiente | No aplica; Nixpacks (`build_pack=nixpacks`, rama `staging`) | Treasure Hunt se mantiene separado del hub y sigue su build/deploy independiente. |
 
@@ -60,5 +60,5 @@ Para comprobar un despliegue de staging hay que validar el manifest, el digest
 que corre en cada servicio, `/api/health`, el endpoint Mongo de staging y los
 logs de los workers. Un build verde o un job terminado no demuestra por sí solo
 que el runtime servido sea el esperado. La última fuente de releases es el
-[workflow de imágenes de staging](https://github.com/fgomezserna/cukies-hub/actions/workflows/cukies-staging-images.yml);
+[workflow de imágenes de staging](https://github.com/fgomezserna/cukies-hub/actions/workflows/cukies-images.yml);
 no se duplican aquí cronologías de runs.

@@ -3,6 +3,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { requireValue } from './cli-args.mjs';
+import { assertEnvironmentMetadata, resolveDeploymentEnvironment } from './deployment-environment.mjs';
 import { assertImmutableImageEntry, CI_COMPONENTS } from './image-ref.mjs';
 
 export async function readReleaseState(path) {
@@ -12,27 +13,37 @@ export async function readReleaseState(path) {
   });
 }
 
-export function createSuccessfulState({ previous = null, head, configHash, components, deploymentUuid, healthSha }) {
+export function createSuccessfulState({ previous = null, head, configHash, components, deploymentUuid, healthSha, environment, chainId, deliveryMode, workersComposeHash, webResourceUuid, workersResourceUuid }) {
+  const deployment = resolveDeploymentEnvironment(environment);
+  if (chainId !== undefined && String(chainId) !== deployment.chainId) {
+    throw new Error(`release state no corresponde al entorno ${deployment.environment}/${deployment.chainId}.`);
+  }
+  if (previous) assertEnvironmentMetadata(previous, deployment, { allowLegacy: deployment.environment === 'staging', context: 'previous release state' });
   if (healthSha !== head) throw new Error('no se puede persistir release: health no confirma el SHA de CI.');
   if (!/^[0-9a-f]{40}$/i.test(head)) throw new Error('SHA desplegado inválido.');
   if (!/^[0-9a-f]{64}$/i.test(configHash ?? '')) throw new Error('config hash inválido.');
   const normalizedComponents = Object.fromEntries(CI_COMPONENTS.map((component) => {
-    const value = assertImmutableImageEntry(component, components?.[component]);
+    const entry = components?.[component];
+    assertEnvironmentMetadata(entry, deployment, { allowLegacy: deployment.environment === 'staging', context: `imagen de ${component}` });
+    const value = assertImmutableImageEntry(component, entry);
     return [component, {
       image: value.image,
       digest: value.digest,
       tag: value.tag,
       configHash: value.configHash,
       sourceSha: value.sourceSha,
+      environment: deployment.environment,
+      chainId: deployment.chainId,
     }];
   }));
   return {
     schemaVersion: 1,
-    environment: 'staging',
-    chainId: '97',
+    environment: deployment.environment,
+    chainId: deployment.chainId,
     commit: head,
     configHash,
     deploymentUuid: deploymentUuid ?? null,
+    ...(deliveryMode === 'rolling' ? { deliveryMode, workersComposeHash, webResourceUuid, workersResourceUuid } : {}),
     components: normalizedComponents,
     previousCommit: previous?.commit ?? null,
     updatedAt: new Date().toISOString(),
@@ -52,8 +63,13 @@ async function main() {
   const manifestPath = requireValue(process.argv, '--manifest');
   const healthSha = requireValue(process.argv, '--health-sha');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  const environmentName = requireValue(process.argv, '--environment', {
+    fallback: process.env.CUKIES_DEPLOY_ENVIRONMENT ?? manifest.environment ?? 'staging',
+  });
+  const deployment = resolveDeploymentEnvironment(environmentName);
+  assertEnvironmentMetadata(manifest, deployment, { allowLegacy: deployment.environment === 'staging', context: 'release manifest' });
   const previous = await readReleaseState(statePath);
-  const state = createSuccessfulState({ previous, ...manifest, head: manifest.commit, healthSha });
+  const state = createSuccessfulState({ previous, ...manifest, environment: deployment.environment, head: manifest.commit, healthSha });
   await writeReleaseStateAtomic(statePath, state);
 }
 

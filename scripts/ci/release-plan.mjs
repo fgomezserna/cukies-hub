@@ -3,6 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { requireValue } from './cli-args.mjs';
+import { assertEnvironmentMetadata, resolveDeploymentEnvironment } from './deployment-environment.mjs';
 import { assertImmutableImageEntry, CI_COMPONENTS } from './image-ref.mjs';
 
 export const COMPONENTS = CI_COMPONENTS;
@@ -32,6 +33,14 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/release-state.mjs',
   'scripts/ci/ci.test.mjs',
   'scripts/ci/standalone-assets.test.mjs',
+  'scripts/ci/coolify-rolling-web.mjs',
+  'scripts/ci/coolify-targets.mjs',
+  'scripts/ci/deliver-release.mjs',
+  'scripts/ci/release-delivery-plan.mjs',
+  'scripts/ci/release-delivery.test.mjs',
+  'scripts/ci/rolling-web.test.mjs',
+  'scripts/ci/env-ci.test.mjs',
+  'scripts/ci/worker-compose.test.mjs',
 ]);
 
 const DAPP_DOCKERFILE_REFINEMENT_REASON = 'dockerfile-ci-final-dapp-stage-only';
@@ -99,7 +108,9 @@ function canRefineDappOnly({ changedFiles, dockerfileBefore, dockerfileAfter }) 
     && isDappFinalStageOnlyChange(dockerfileBefore, dockerfileAfter);
 }
 
-export function chooseReleasePlan({ state, head, configHash, changedFiles = [], nxProjects = [], nxAvailable = true, baseAncestor = true, dockerfileBefore = null, dockerfileAfter = null }) {
+export function chooseReleasePlan({ state, head, configHash, environment, changedFiles = [], nxProjects = [], nxAvailable = true, baseAncestor = true, dockerfileBefore = null, dockerfileAfter = null }) {
+  const deployment = resolveDeploymentEnvironment(environment);
+  if (state) assertEnvironmentMetadata(state, deployment, { allowLegacy: deployment.environment === 'staging', context: 'release state' });
   const previousCommit = state?.commit ?? state?.deployedSha ?? null;
   const hasUsableBase = validSha(previousCommit) && validSha(head) && baseAncestor;
   const nxAffected = mapNxProjects(nxProjects);
@@ -116,7 +127,9 @@ export function chooseReleasePlan({ state, head, configHash, changedFiles = [], 
   if (!firstOrInvalid) {
     for (const component of COMPONENTS.filter((value) => !build.includes(value))) {
       try {
-        reuse.push({ component, ...assertImmutableImageEntry(component, state?.components?.[component]) });
+        const entry = state?.components?.[component];
+        assertEnvironmentMetadata(entry, deployment, { allowLegacy: deployment.environment === 'staging', context: `reutilización de ${component}` });
+        reuse.push({ component, ...assertImmutableImageEntry(component, entry) });
       } catch {
         build.push(component);
       }
@@ -132,6 +145,9 @@ export function chooseReleasePlan({ state, head, configHash, changedFiles = [], 
         : 'component-changes';
 
   return {
+    environment: deployment.environment,
+    chainId: deployment.chainId,
+    cacheNamespace: deployment.cacheNamespace,
     head,
     base: hasUsableBase ? previousCommit : null,
     baseReason: firstOrInvalid ? ALL_REASON : configChanged ? 'build-config-changed' : 'last-successful-deploy',
@@ -144,7 +160,16 @@ export function chooseReleasePlan({ state, head, configHash, changedFiles = [], 
     nx: { available: nxAvailable, projects: nxProjects, affected: effectiveNxAffected },
     changedFiles,
     build: unique(build),
-    reuse: reuse.map((entry) => ({ component: entry.component, image: entry.image, digest: entry.digest, tag: entry.tag, configHash: entry.configHash, sourceSha: entry.sourceSha })),
+    reuse: reuse.map((entry) => ({
+      component: entry.component,
+      image: entry.image,
+      digest: entry.digest,
+      tag: entry.tag,
+      configHash: entry.configHash,
+      sourceSha: entry.sourceSha,
+      environment: deployment.environment,
+      chainId: deployment.chainId,
+    })),
     imageEnv: IMAGE_ENV,
   };
 }
@@ -204,8 +229,14 @@ async function main() {
   const outputPath = requireValue(process.argv, '--output');
   const head = requireValue(process.argv, '--head', { fallback: process.env.GITHUB_SHA });
   const configHash = requireValue(process.argv, '--config-hash', { fallback: process.env.CUKIES_BUILD_ENV_HASH });
+  const environmentName = requireValue(process.argv, '--environment', { fallback: process.env.CUKIES_DEPLOY_ENVIRONMENT ?? 'staging' });
+  const deployment = resolveDeploymentEnvironment(environmentName);
   if (!validSha(head) || !/^[0-9a-f]{64}$/i.test(configHash)) throw new Error('release-plan requiere SHA completo y config hash SHA-256.');
-  const state = await readFile(statePath, 'utf8').then(JSON.parse).catch(() => null);
+  const state = await readFile(statePath, 'utf8').catch((error) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }).then((source) => source === null ? null : JSON.parse(source));
+  if (state) assertEnvironmentMetadata(state, deployment, { allowLegacy: deployment.environment === 'staging', context: 'release state' });
   const previousCommit = state?.commit ?? null;
   const ancestor = await isAncestor(previousCommit, head);
   const baseForDiff = previousCommit && ancestor ? previousCommit : null;
@@ -215,7 +246,7 @@ async function main() {
     ? await gitShowFile(baseForDiff, 'Dockerfile.ci')
     : null;
   const dockerfileAfter = dockerfileBefore === null ? null : await gitShowFile(head, 'Dockerfile.ci');
-  const plan = chooseReleasePlan({ state, head, configHash, changedFiles: files, nxProjects: nx.projects, nxAvailable: nx.available, baseAncestor: ancestor, dockerfileBefore, dockerfileAfter });
+  const plan = chooseReleasePlan({ state, head, configHash, environment: deployment.environment, changedFiles: files, nxProjects: nx.projects, nxAvailable: nx.available, baseAncestor: ancestor, dockerfileBefore, dockerfileAfter });
   plan.nx.stderr = nx.stderr ?? null;
   await writeFile(outputPath, `${JSON.stringify(plan, null, 2)}\n`);
   console.log(JSON.stringify({ base: plan.base, baseReason: plan.baseReason, build: plan.build, reuse: plan.reuse.map((entry) => entry.component) }));

@@ -37,6 +37,8 @@ RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
 FROM deps AS dapp-build
 
 ARG CUKIES_BUILD_ENV_HASH
+ARG IMAGE_REVISION
+ENV CUKIES_DEPLOYMENT_ID=$IMAGE_REVISION
 ARG NEXT_PUBLIC_APP_ENV
 ARG NEXT_PUBLIC_UKI_CHAIN_ID
 ARG NEXT_PUBLIC_ASM_TOKEN_ADDRESS
@@ -201,6 +203,11 @@ ARG IMAGE_REVISION
 
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
+
+# Coolify's Docker Image rolling health check runs curl inside the container.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=dapp-build /app/dapp/.next/standalone /app
 COPY --from=dapp-build /app/dapp/.next/static /tmp/cukies-next-static/

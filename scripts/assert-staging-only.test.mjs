@@ -47,6 +47,33 @@ test('accepts only the exact staging application, chain and database perimeter',
   assert.equal(result.indexerMongoDatabaseName, 'cukieshub-new-staging');
 });
 
+test('accepts the dedicated web staging resource only for the dapp scope', () => {
+  const result = validateStagingEnvironment(stagingEnvironment({
+    COOLIFY_RESOURCE_UUID: 'rwwsc4kkwc0ck84cgk40s8kk',
+  }), 'dapp');
+
+  assert.equal(result.ok, true);
+  assert.equal(result.scope, 'dapp');
+  assert.equal(result.coolifyApplicationId, '32');
+  assert.equal(result.coolifyResourceUuid, 'rwwsc4kkwc0ck84cgk40s8kk');
+  assert.equal(result.publicChainId, '97');
+  assert.equal(result.databaseName, 'cukies-hub-staging');
+  assert.equal(result.legacyDatabaseName, 'cukies-legacy-staging');
+  assert.equal(result.authHost, 'cukieshub.eurekand.com');
+});
+
+test('rejects the dedicated web staging resource for workers and full scope', () => {
+  for (const scope of ['cuki-card-worker', 'full']) {
+    assert.throws(
+      () => validateStagingEnvironment(stagingEnvironment({
+        COOLIFY_RESOURCE_UUID: 'rwwsc4kkwc0ck84cgk40s8kk',
+      }), scope),
+      (error) => error instanceof StagingGuardError
+        && error.message.includes('COOLIFY_RESOURCE_UUID must equal u4s804o4wwcckowgk0woo4wg'),
+    );
+  }
+});
+
 for (const [name, override, expectedMessage] of [
   ['production app env', { APP_ENV: 'production' }, 'APP_ENV must equal staging'],
   ['disabled staging guard', { STAGING_ONLY_GUARD: 'false' }, 'STAGING_ONLY_GUARD must equal true'],

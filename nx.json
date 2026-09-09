@@ -27,6 +27,7 @@
       "!{projectRoot}/**/coverage/**"
     ],
     "dappBuildEnv": [
+      { "env": "CUKIES_DEPLOYMENT_ID" },
       { "env": "CUKIES_BUILD_ENV_HASH" },
       { "env": "CUKIES_STANDALONE" },
       { "env": "NEXT_PUBLIC_APP_ENV" },
