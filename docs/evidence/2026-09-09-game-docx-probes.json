@@ -1,0 +1,51 @@
+{
+  "observedAt": "2026-09-09T17:20:18Z",
+  "readOnly": true,
+  "scope": "GET only; no auth, no game start, no transaction",
+  "config": {
+    "stage": {
+      "url": "https://cukieshub.eurekand.com/api/games/config?gameId=sybil-slayer",
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "gameUrl": "https://cukieshub.eurekand.com/treasurehunt-game",
+      "name": "Treasure Hunt",
+      "port": 9002,
+      "isActive": true,
+      "updatedAt": "2026-09-09T17:16:36.388Z"
+    },
+    "production": {
+      "url": "https://cukies.world/api/games/config?gameId=sybil-slayer",
+      "httpStatus": 200,
+      "contentType": "application/json",
+      "gameUrl": "https://treasurehunt.cukies.world/",
+      "name": "Treasure Hunt",
+      "port": 9002,
+      "isActive": true,
+      "updatedAt": "2026-09-09T14:09:27.891Z"
+    }
+  },
+  "assets": [
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/totem/totemlateral.png","httpStatus":200,"contentType":"image/png","bytes":197881,"sha256":"9a6235b61f141611a11cc5cdca09d7a866a3763089bf40703da39a7920676bd2"},
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/totem/miner_totem.png","httpStatus":200,"contentType":"image/png","bytes":5498,"sha256":"2b5de63d92494dd2687e81822f419aa282909527dbaf7c414ead658b0537ea38"},
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/totem/engineer_totem.png","httpStatus":200,"contentType":"image/png","bytes":5839,"sha256":"286e4c82111e07ed11d98429d1ade298c581c29a80d98e6281c2b1e7fbdc3177"},
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/totem/farmer_totem.png","httpStatus":200,"contentType":"image/png","bytes":5351,"sha256":"f89aa43a0d92cf63c26c5fce291b3c4ec72961006ab52d2e05131e9f4fefccce"},
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/totem/gatherer_totem.png","httpStatus":200,"contentType":"image/png","bytes":5270,"sha256":"6f47908547b108f31f6151b43c7548775cb1525d7b5beabd6ac719c48ed98e46"},
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/totem/chef_totem.png","httpStatus":200,"contentType":"image/png","bytes":5317,"sha256":"bb32d55a6bdd18fed88c05a2d1451ae270004079357739dcea3dd5f3307e0ed3"},
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/characters/1p.png","httpStatus":200,"contentType":"image/png","bytes":369488,"sha256":"4ac883d395cf4fca2c21da7d30ca8653e8be94e2adfdb87e47d18267c0cd9234"},
+    {"environment":"stage-proxy","url":"https://cukieshub.eurekand.com/treasurehunt-game/assets/characters/vs.png","httpStatus":200,"contentType":"image/png","bytes":184483,"sha256":"3a666c96c097f3b15812ed97ab3287c848ab9b709983937eaa3f7685c127e0db"},
+    {"environment":"stage-root-rewrite","url":"https://cukieshub.eurekand.com/assets/totem/totemlateral.png","httpStatus":200,"contentType":"image/png","bytes":197881,"sha256":"9a6235b61f141611a11cc5cdca09d7a866a3763089bf40703da39a7920676bd2"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/totem/totemlateral.png","httpStatus":200,"contentType":"image/png","bytes":197881,"sha256":"9a6235b61f141611a11cc5cdca09d7a866a3763089bf40703da39a7920676bd2"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/totem/miner_totem.png","httpStatus":200,"contentType":"image/png","bytes":5498,"sha256":"2b5de63d92494dd2687e81822f419aa282909527dbaf7c414ead658b0537ea38"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/totem/engineer_totem.png","httpStatus":200,"contentType":"image/png","bytes":5839,"sha256":"286e4c82111e07ed11d98429d1ade298c581c29a80d98e6281c2b1e7fbdc3177"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/totem/farmer_totem.png","httpStatus":200,"contentType":"image/png","bytes":5351,"sha256":"f89aa43a0d92cf63c26c5fce291b3c4ec72961006ab52d2e05131e9f4fefccce"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/totem/gatherer_totem.png","httpStatus":200,"contentType":"image/png","bytes":5270,"sha256":"6f47908547b108f31f6151b43c7548775cb1525d7b5beabd6ac719c48ed98e46"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/totem/chef_totem.png","httpStatus":200,"contentType":"image/png","bytes":5317,"sha256":"bb32d55a6bdd18fed88c05a2d1451ae270004079357739dcea3dd5f3307e0ed3"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/characters/1p.png","httpStatus":200,"contentType":"image/png","bytes":369488,"sha256":"4ac883d395cf4fca2c21da7d30ca8653e8be94e2adfdb87e47d18267c0cd9234"},
+    {"environment":"production-root","url":"https://treasurehunt.cukies.world/assets/characters/vs.png","httpStatus":200,"contentType":"image/png","bytes":184483,"sha256":"3a666c96c097f3b15812ed97ab3287c848ab9b709983937eaa3f7685c127e0db"}
+  ],
+  "source": {
+    "stageProxy": "dapp next.config rewrites /assets/:path* to GAME_SYBILSLASH/assets/:path*; Stage gameUrl is /treasurehunt-game",
+    "production": "config gameUrl is separate root https://treasurehunt.cukies.world/",
+    "codePaths": ["games/sybil-slayer/src/components/game-container.tsx:158-175", "games/sybil-slayer/src/components/mode-select-modal.tsx:370-383,506-518", "dapp/next.config.ts:3-19,62-73"]
+  }
+}

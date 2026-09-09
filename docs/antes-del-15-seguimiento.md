@@ -81,6 +81,44 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 | post1-2 | **ANTES DEL 15 · MIGRACION LEGACY**: Cukie Points y crias siguen ligados al bloque de migracion; no son activos POST-15. | Decision de producto; 2026-09-07. | Inventario y migracion validada; no ejecutar pausa/corte en este seguimiento. |
 | post3-9 | Alcance conservado como inventario posterior, sin afirmar codigo definitivo ni cierre. | Registro historico; 2026-09-07. | Mantener scope y esperar decision/evidencia especifica. |
 
+## Cobertura de cambios actualizado y requisitos adicionales
+
+El [apéndice de cobertura del 9 de septiembre](antes-del-15-cobertura-cambios-20260909.md)
+reconcilia las cinco páginas, 23 párrafos y cinco capturas de `cambios actualizado.docx`
+y los requisitos adicionales de venta, contratos Legacy y Marketplace V2:
+16 puntos originales, tres adicionales y 94 comprobaciones atómicas. Los IDs del
+apéndice son localizadores de evidencia; las filas anteriores conservan el estado
+canónico y los responsables. No constituye otro backlog ni reabre cierres de
+alcance limitado por falta de una prueba adicional.
+
+- Filas **3 y 5**: quedan por reconciliar los 5.400 créditos reportados y el intento
+  de juego de la captura, la continuidad de staking tras aprobación y la secuencia
+  UKI → cupo → créditos. La custodia de los NFTs 98000001/003/004 ya está acreditada;
+  su retirada y experiencia de Pool se siguen en el bloque de PR355 existente.
+  El resumen de Mis Cukies aún usa ceros mientras su fuente es desconocida.
+- Filas **2A-C y 5**: el CTA `Vender` existe, pero su predicado excluye BSC97 y liga
+  la venta BSC56 a la disponibilidad de V2. El contrato V2 cubre precio/cobro UKI,
+  conversión de la parte del vendedor y fee en moneda de entrada; su UI solo
+  contempla UKI/BNB/USDT y Stage responde `UKI_MARKETPLACE_UNAVAILABLE`. No se
+  certifica operación V2 en Stage ni producción. La fee BNB queda acreditada
+  hasta su retirada; no equivale a cobro inmediato.
+- Filas **D, 1, post1, post2 y 5**: faltan Bridge/Crías/Points en la navegación
+  común. El modo Bridge BSC97/Nile no cubre el requisito Legacy MAINNET desde
+  Stage; el worker de eventos Legacy y el relayer no están activos. La paridad de
+  Points/Breeding y la identidad contractual Bread siguen pendientes. El objetivo
+  conserva los mismos contratos Legacy mainnet en Stage y producción, con datos
+  y cursores separados; no autoriza redespliegues Legacy ni activación de relayers.
+- Fila **C/5**: la captura del tótem corresponde a Treasure Hunt/Sybil Slayer, de
+  este monorepo. Los assets actuales responden correctamente; falta reproducir
+  el render móvil y el recorrido del selector antiguo. No se atribuye a Unreal.
+- Fila **4**: conservar PR351/352, la migración y la herramienta administrativa.
+  La publicación y las pruebas económicas tienen su propio cierre. Los ejemplos
+  5%/2% y segundo nivel al 3% son únicamente viabilidad futura.
+
+Evidencia: [inventario, referencias Git y sondas de esta auditoría](evidence/2026-09-09-cambios-docx-audit.json)
+y [assets del juego](evidence/2026-09-09-game-docx-probes.json). No se ejecutaron
+transacciones, escrituras de datos, despliegues ni cierres de issues durante la auditoría.
+
 ## Definicion de cerrado por punto
 
 Un punto solo pasa a cerrado cuando constan las cuatro evidencias que le
@@ -895,7 +933,7 @@ Seguimiento de este lote en `codex/credit-cycle-and-cukie-actions`:
 | --- | --- | --- |
 | Corte de creditos | Desplegado en Stage `bae6f3b`: el corte 11:00 abre ambas rutas a las 11:00:54.863. El primer intento registra `CREDIT_CUTOFF_BLOCK_MISSING` y `CREDIT_WATERMARK_UNHEALTHY_OR_STALE`. La UI informa reparto en proceso y retira el aviso automaticamente al terminar. | Verificado un corte posterior al deploy; conserva la espera del indexador y no promete liquidacion instantanea. |
 | Configuracion de cupos pendientes | Stage `bae6f3b`: fecha elegible por cupo, configuracion futura agrupada por corte y controles habilitados durante `qualifying`. La UI real muestra tres NFT elegibles desde el corte 11:30 y reparto preparado 200 jugar / 100 pool. | Configuracion anticipada comprobada sin adelantar grants ni guardar cambios de reparto en QA. |
-| Retiradas de prueba del Pool sustituido | **BSC Testnet verificado el 2026-09-09 a las 17:05 UTC**, bloque `130059996`: `98000007` vuelve a la wallet `0x26789b…0c13`; `98000001`, `98000003` y `98000004` tienen salida solicitada y siguen depositados hasta **2026-09-10 14:00 UTC / 16:00 Andorra**. Cuatro recibos correctos y lectura conjunta de propietario/posicion. [Evidencia RPC](evidence/2026-09-09-pool-test-retirements.json). La UI de retirada especifica esta en revision en `codex/pool-single-experience`, aun sin desplegar. | Mostrar un unico Pool con estado y fecha de retirada; conservar validacion de red, coleccion, contrato y beneficiario. Pendiente retirar los tres NFT tras el plazo y verificar cadena/indexacion. No se declara vacio el contrato ni terminada una migracion global: el censo se limita a estos cuatro NFT. |
+| Retiradas de prueba del Pool sustituido | **BSC Testnet verificado el 2026-09-09 a las 17:05 UTC**, bloque `130059996`: `98000007` vuelve a la wallet `0x26789b…0c13`; `98000001`, `98000003` y `98000004` tienen salida solicitada y siguen depositados hasta **2026-09-10 14:00 UTC / 16:00 Andorra**. Cuatro recibos correctos y lectura conjunta de propietario/posicion. [Evidencia RPC](evidence/2026-09-09-pool-test-retirements.json). **Experiencia publicada y verificada en Stage** con [PR #355](https://github.com/fgomezserna/cukies-hub/pull/355), SHA `6803252`, QA del coordinador 17:29–17:33 UTC: Mis Cukies conserva 12 = 2 wallet + 9 Pool + 1 Master; los tres pendientes muestran Salida solicitada, fecha y Ver retirada; #7 figura Disponible. El enlace de #3 valida token, coleccion, vault y beneficiario, sin permitir retirada anticipada. La pantalla Pool muestra seis posiciones actuales (cinco disponibles para partidas y #8 retirable), dos en wallet y ningun banner de vault anterior. CI [34382259657](https://github.com/fgomezserna/cukies-hub/actions/runs/34382259657) SUCCESS; Coolify `q8cgs8c0sgc8osko8w084sos` finished; DApp reconstruida y cuatro imagenes reutilizadas. [Informe UI del coordinador](evidence/2026-09-09-pool-ui-qa.md) y [handoff con artefactos de runtime](evidence/2026-09-09-cambios-docx-audit.json). Runtime atribuido al verificador Luna, sin archivo raw propio; capturas inline en la tarea del coordinador. | Cambio de experiencia/custodia verificado; quedan las tres retiradas fisicas tras el plazo y su contraste de cadena/indexacion. Los nueve NFT de Pool en la coleccion incluyen tres posiciones antiguas pendientes; los seis de la pantalla Pool son actuales. No se declara custodia unica, contrato anterior vacio ni migracion global terminada. QA desktop y responsive sin overflow (viewport efectivo 521 CSS px a zoom 75%). Runtime: 11 servicios running, reinicios 0; DApp/indexer/schedulers healthy; dos guards PASS, heartbeat de capacidad 26 s, imagesMissing 0 e indexer sin errores hasta 130063570. Mongo: solo TCP 221:27018 comprobado en este cierre; PRIMARY corresponde a la observacion INFRA de 17:18. Persiste el banner global de recuperacion previo al deploy y la repeticion visual de titulo/token en la retirada: siguen en UX, fuera del cierre textual. Ventana devuelta a INFRA; sin deploy documental. |
 | Actualizacion y acciones | **Desplegado y contrastado en Stage, 2026-09-09 13:21 UTC.** PR [#347](https://github.com/fgomezserna/cukies-hub/pull/347), merge `8d89676`, servido dentro de `0896fbd` (PR #349). El despliegue `a76af1841ccb57fbdc12d071` termino a las 13:16:47 UTC usando las imagenes publicadas; el primer workflow CI quedo fallido y se recupero el despliegue explicitamente. Custodia y ciclo transaccional compartidos; inventario y pendientes conservados por identidad. QA autenticada Master/Pool/Mis Cukies y sonda RO Mongo+BSC 97 coherentes: 12 Cukies = 2 wallet + 9 Pool (5 actuales y 4 anteriores) + 1 Master; indexador `ready`, sin errores de consola. Master ya bloquea `98000001`, `03`, `04` por estar en Pool. Lint, tipos, build y 228 suites / 1.844 tests correctos. [Evidencia](legacy-marketplace/evidence/2026-09-09-credit-period-and-pool-custody.json). | Codigo publicado y lecturas verificadas. La conservacion durante refresh/transaccion queda cubierta por regresion; no se firmaron depositos ni retiradas de la wallet en QA. El cierre del pipeline y su prueba de reutilizacion se siguen en la fila INFRA. |
 
 El candidato de recuperacion se contrasto a las 10:24 UTC contra Mongo y

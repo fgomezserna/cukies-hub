@@ -1,0 +1,5176 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-09-09",
+  "readOnlyProductAudit": true,
+  "noProductChanges": true,
+  "noTransactions": true,
+  "source": {
+    "path": "/Users/fgomezserna/Downloads/cambios actualizado.docx",
+    "sha256": "6748aa52cd9eddd39742d280b6729b5e615b94171585f573821026b64a1547bd",
+    "renderedPages": 5,
+    "paragraphCount": 23,
+    "embeddedImages": 5,
+    "paragraphs": [
+      {
+        "id": "P01",
+        "textSha256": "b61eda6f4b63d533dc50c276c01d55133d6c4b6ad088afd86d31e39d15ddf609",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P02",
+        "textSha256": "47320ca0f4681046ba9c941369bec9f581dd64e197ea8138d04f37c2a8180aab",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P03",
+        "textSha256": "d39d94ad16ffa855ba6b4c0e3457b40216bb50b358bf17cc113305c0c2b2eafc",
+        "empty": false,
+        "images": [
+          "media/image1.png"
+        ]
+      },
+      {
+        "id": "P04",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": []
+      },
+      {
+        "id": "P05",
+        "textSha256": "362eecc2c9a9d3d0c5bf1da2aad106a4b0ee168afc2fadfbdbf07885a08d9d8d",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P06",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": []
+      },
+      {
+        "id": "P07",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": [
+          "media/image2.png"
+        ]
+      },
+      {
+        "id": "P08",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": []
+      },
+      {
+        "id": "P09",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": []
+      },
+      {
+        "id": "P10",
+        "textSha256": "8dade7d49517587fd1ba3ea28bf59ad3f2919b8c1b6ded4b2b372d25641ac28f",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P11",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": [
+          "media/image3.png"
+        ]
+      },
+      {
+        "id": "P12",
+        "textSha256": "4c795436b183117815e6548d174854580c32baaddbdedc65b96edd86767c3485",
+        "empty": false,
+        "images": [
+          "media/image4.png"
+        ]
+      },
+      {
+        "id": "P13",
+        "textSha256": "f70666f9f3995cfc79b0454e6e3d4ea21dcc6a9b454575cf777f54ee1e92c22d",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P14",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": []
+      },
+      {
+        "id": "P15",
+        "textSha256": "aa6aeafa0d6edcafcecd824f30f33680db58304002199c0c8363494a0a74ebd1",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P16",
+        "textSha256": "f3a1b2b8db3dd0e78fe1f65146eaceaa7d5e5ed881f1c294cb0efbc53044597e",
+        "empty": false,
+        "images": [
+          "media/image5.png"
+        ]
+      },
+      {
+        "id": "P17",
+        "textSha256": "9371bd9f472d582f3268c7841911014bb71063243a853deb19717404ccad1c32",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P18",
+        "textSha256": "c4af7141e4daac9c252fd76a996870520db4f65851874b093d0319a0b89a3646",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P19",
+        "textSha256": "a8aefaa7beef8c9ced17cef425fb8c9085758be3b8db13ab6bce70d4bcfdfd2d",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P20",
+        "textSha256": "c6ea23248f912ce49fb12610113fd2d223134d0c1fbe6c7f2bc872e8339e5539",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P21",
+        "textSha256": "b23672475e47adcac0eb928b15ce614f890065626d8a1d400747a5b6ab5df1de",
+        "empty": false,
+        "images": []
+      },
+      {
+        "id": "P22",
+        "textSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "empty": true,
+        "images": []
+      },
+      {
+        "id": "P23",
+        "textSha256": "7ed02142632e829f9e066f7ed52c9f20f5cdd3ec77fb127578cf3f1e31b50ad8",
+        "empty": false,
+        "images": []
+      }
+    ],
+    "images": [
+      {
+        "id": "C1",
+        "file": "word/media/image1.png",
+        "sha256": "91c21b474bba388ae1ebf20e1b3e4473a2a6ce776d12ef979e5185e1acc09983",
+        "visuallyInspected": true
+      },
+      {
+        "id": "C2",
+        "file": "word/media/image2.png",
+        "sha256": "90ea57219a1899d21160d94030361be022144ed54d132067f90f3dbe68bc64e5",
+        "visuallyInspected": true
+      },
+      {
+        "id": "C3",
+        "file": "word/media/image3.png",
+        "sha256": "5bd9dc527fb4e4ed39979e81eac22f0218352164f948210b02786f9349b21889",
+        "visuallyInspected": true
+      },
+      {
+        "id": "C4",
+        "file": "word/media/image4.png",
+        "sha256": "b864d07427a1af76286f41ffb5f1cb0a2bb1c45e8119ad6929c2ae88f170c1da",
+        "visuallyInspected": true
+      },
+      {
+        "id": "C5",
+        "file": "word/media/image5.png",
+        "sha256": "1375bcf7f906d712aa8d5c432d53b3687709645ad812ba33a894a8119accf979",
+        "visuallyInspected": true
+      }
+    ],
+    "allPagesVisuallyInspected": true,
+    "comments": 0,
+    "tables": 0
+  },
+  "git": {
+    "initialCheckout": "4475baaa9a9d560711b8b9e14a38055aecb79c1f",
+    "auditBase": "9745194c46ff8612303c12ef9f9c6fcf1e63cbbd",
+    "main": "4475baaa9a9d560711b8b9e14a38055aecb79c1f",
+    "branch": "codex/docx-coverage-audit-20260909",
+    "worktrees": [
+      {
+        "worktree": "/Users/fgomezserna/Proyectos/cukies-hub",
+        "HEAD": "cdcc5ebd1168a2d51c97292f6e3d34d9bf076fb0",
+        "branch": "refs/heads/codex/legacy-migration-inventory",
+        "exists": true,
+        "dirtyFileCount": 24,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-ambassador-cycle-uYvhT8",
+        "HEAD": "62e5e252ad826ca334c303dd62a77536ad612cdc",
+        "branch": "refs/heads/codex/fix-ambassador-cycle-guard",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-ambassador-explicit-confirm-20260903",
+        "HEAD": "60b78e06cc3c8da5b90bbe05ac25152a2266fa46",
+        "branch": "refs/heads/codex/fix-ambassador-explicit-confirmation",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-ambassador-explicit-staging",
+        "HEAD": "e0ae9d602768f41f2efc5abfa370e19d79db6299",
+        "branch": "refs/heads/codex/sync-ambassador-explicit-confirm-staging",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-backport-uki-swap-y5e8iU",
+        "HEAD": "58d0daf6a610f868e543be01ca9922001a0b4108",
+        "branch": "refs/heads/codex/backport-uki-swap-staging",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-cukie-master-incident-20260829",
+        "HEAD": "ce0f565385c5d3325c692fac4675e37ecf710f0f",
+        "branch": "refs/heads/hotfix/274-cukie-master-balance-counter",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-hotfix-uki-multihop-20260901",
+        "HEAD": "6acf9e9bb1fa5138d1f0031e5382b184f77f1047",
+        "branch": "refs/heads/hotfix/uki-multihop-swap",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-102-credit-pool-floor-20260830",
+        "HEAD": "8ef3602b3d0c65ce79fbf74a8a0c6c8b5055c2dc",
+        "branch": "refs/heads/codex/issue-102-credit-pool-floor",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-104-undistributed-accounting-20260830",
+        "HEAD": "173da68c1a68eba2cedf4803a8a1878ab83584a5",
+        "branch": "refs/heads/codex/issue-104-undistributed-accounting",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-131-cukie-master-uki-first-20260830",
+        "HEAD": "fdbc5313c5d8b0a55fbca3742d90a0ae0586ebba",
+        "branch": "refs/heads/codex/issue-131-cukie-master-uki-first",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-132-treasure-hunt-mobile-stage-20260830",
+        "HEAD": "f21f7b759eb7dfe9a6358b0118870d1a9dd90f9f",
+        "branch": "refs/heads/codex/issue-132-treasure-hunt-mobile-stage",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-277-daily-reward-split-20260830",
+        "HEAD": "96a23f452e343b2889bc20b6bb160e823ede0af4",
+        "branch": "refs/heads/codex/issue-277-daily-reward-split",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-284-weekly-prize-tranches-20260830",
+        "HEAD": "b58298b1151332e6ba47b2a3adca965a1013b278",
+        "branch": "refs/heads/codex/issue-284-weekly-prize-tranches",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-287-ambassador-attribution-20260830",
+        "HEAD": "9e7a4bedda27df57aa0c7b7bfb7787a0c4abcb36",
+        "branch": "refs/heads/codex/issue-287-ambassador-attribution",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-289-dashboard-ia-20260830",
+        "HEAD": "e05597cdc90e95bcfb62477182804090f41ac073",
+        "branch": "refs/heads/codex/issue-289-dashboard-ia",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-290-pancake-verification-20260830",
+        "HEAD": "414174438b9f5120bb6f1531a703c98d56c19dd8",
+        "branch": "refs/heads/codex/issue-290-pancake-testnet-verification",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-290-stage-testnet-links-20260830",
+        "HEAD": "2319e6c927399731d84275f32a07e9fef721d116",
+        "branch": "refs/heads/codex/issue-290-stage-testnet-links",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-292-version-daily-cap-20260830",
+        "HEAD": "d17bd783eb5c5ea34130f070056145c547ea7dca",
+        "branch": "refs/heads/codex/issue-292-version-daily-cap",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-66-reward-batch-preparer-20260829",
+        "HEAD": "c9917b9dfbd60450887769cf4104858cfe802783",
+        "branch": "refs/heads/codex/issue-66-reward-batch-preparer",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-83-cukie-pool-assignment-20260829",
+        "HEAD": "a05e31bc30b11928052f4ff903d0a3a28d1382b6",
+        "branch": "refs/heads/codex/issue-83-cukie-pool-assignment",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-96-resource-combinations-20260829",
+        "HEAD": "b3234a49f41057f2c4d67fb65b96a2a7ffba15f3",
+        "branch": "refs/heads/codex/issue-96-resource-combinations",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-issue-99-weekly-performance-20260830",
+        "HEAD": "926e566579b10c8975f640b054e90f6ae43781c8",
+        "branch": "refs/heads/codex/issue-99-weekly-performance",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-production-ambassadors-20260902",
+        "HEAD": "92551b5873584d3e7245b644d7ad4c283995aab7",
+        "branch": "refs/heads/codex/hide-ambassadors-production",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-review-20260826",
+        "HEAD": "b93322b3eb6d883c2b3cf99cd0ee94a5d4e1f825",
+        "detached": true,
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-sept15-bridge-testnet-20260830",
+        "HEAD": "b87047bfdcae21a516a507e64fb8d8b25ec362c6",
+        "branch": "refs/heads/codex/sept15-bridge-testnet",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-sept15-stage-integration-20260830",
+        "HEAD": "047f66a0ff9d53c5fd6444e0b0eebba2c425cb6d",
+        "branch": "refs/heads/codex/sept15-stage-integration",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-stage-split-audit-20260829",
+        "HEAD": "b7f5ca477b4a4731a663ab8a99071f4717658349",
+        "detached": true,
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-staging-ambassador-parity",
+        "HEAD": "fa257e76d36784323ee1be83e7b7d31126f7c4a7",
+        "branch": "refs/heads/codex/staging-hide-ambassadors-production",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-staging-fast-cycles",
+        "HEAD": "17d463742043f1612097a7c02b7c3626806ea062",
+        "branch": "refs/heads/codex/staging-cycle-activation",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-staking-competition-20260826",
+        "HEAD": "2d17404a8ebc10f5933e5a3ebf4e05a1b936c93f",
+        "branch": "refs/heads/codex/fix-home-spacing-wallet-state",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-uki-bidirectional-mfWerx",
+        "HEAD": "a8353690700597c5ae180ffe56fff1465acbb53b",
+        "branch": "refs/heads/codex/hotfix-uki-bidirectional",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/private/tmp/cukies-hub-uki-bidirectional-staging-O7zsT4",
+        "HEAD": "ef99ecd3192daebe3d17ed4e40e589f745010f93",
+        "branch": "refs/heads/codex/backport-uki-bidirectional-staging",
+        "prunable": "gitdir file points to non-existent location",
+        "exists": false
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/2cf0/cukies-hub",
+        "HEAD": "21c3576bfdba3dba259bdc03e5625d9b00ba6ab5",
+        "branch": "refs/heads/codex/ux-experiencia-integral-20260908",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/8e53/cukies-hub",
+        "HEAD": "60ea4273ac94322f564a2e6d7a92383c0f46ca0f",
+        "branch": "refs/heads/codex/card-assets-final-evidence",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/979a/cukies-hub",
+        "HEAD": "9745194c46ff8612303c12ef9f9c6fcf1e63cbbd",
+        "branch": "refs/heads/codex/docx-coverage-audit-20260909",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-assets-input-delta",
+        "HEAD": "2423be7d85e3c53be45b936625bead9dbd771494",
+        "branch": "refs/heads/codex/assets-input-delta-fix",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-assets-integration-staging",
+        "HEAD": "012954a1a27e369da204db4b8ebe8ef4962bd21d",
+        "branch": "refs/heads/codex/assets-integration-staging",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/fix-staging-wallet-network",
+        "HEAD": "4a64b6a68838e342e7cdfcdafed9a13199cf9b97",
+        "branch": "refs/heads/codex/fix-mobile-drawer-inert",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/hotfix-ambassador-eligibility-20260907",
+        "HEAD": "1b51c571c03e549f5338d627538119488f7ef4e3",
+        "branch": "refs/heads/codex/hotfix-ambassador-eligibility-20260907",
+        "exists": true,
+        "dirtyFileCount": 1,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/hotfix-ambassadors-lifecycle-20260909",
+        "HEAD": "0520dfbf258cdd0a9b62651df0cfcbd9562c522b",
+        "branch": "refs/heads/codex/hotfix-ambassadors-lifecycle-20260909",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/legacy-events-staging",
+        "HEAD": "34905634276b6dc1e41f3ee2f040a0668f837869",
+        "branch": "refs/heads/codex/nft-recurrence-deploy-evidence",
+        "exists": true,
+        "dirtyFileCount": 6,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/staging-ambassador-eligibility-20260907",
+        "HEAD": "599e7ae38898092ac6e901e4c80e8dbfd6aa3180",
+        "branch": "refs/heads/codex/staging-ambassador-eligibility-20260907",
+        "exists": true,
+        "dirtyFileCount": 8,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/staging-ambassadors-lifecycle-20260909",
+        "HEAD": "faaa96de4d98c5458aff11423b397758e2de910f",
+        "branch": "refs/heads/codex/ambassadors-lifecycle-rollout-evidence-20260909",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/staging-testnet-chain-guard",
+        "HEAD": "48dd972f2ab341e3583fea7fdbd5433cc6565840",
+        "branch": "refs/heads/codex/issue-60-nft-testnet-deploy",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/treasure-hunt-polish",
+        "HEAD": "f92636052887226f8b0377a879ed238228d37199",
+        "branch": "refs/heads/codex/treasure-hunt-polish",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/treasure-hunt-presale-competition",
+        "HEAD": "1f2c893e671373f8e03e0e10a70b00ed9293b571",
+        "branch": "refs/heads/codex/treasure-hunt-presale-competition",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/treasure-hunt-ux-redesign",
+        "HEAD": "029cbc3413df4c26933f96c2adf5ce4cc6afa8c7",
+        "branch": "refs/heads/codex/treasure-hunt-ux-redesign",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-hub/world-stack-integration",
+        "HEAD": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
+        "branch": "refs/heads/codex/world-stack-integration",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-world/hub-issue-13-issue-13-20260711-a1",
+        "HEAD": "8632263ad77e5cc4a0a8f84e18cbe9bcf790d37f",
+        "branch": "refs/heads/codex/issue-13-issue-13-20260711-a1",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-world/hub-issue-21-issue-21-20260716-a1",
+        "HEAD": "f92636052887226f8b0377a879ed238228d37199",
+        "branch": "refs/heads/codex/issue-21-issue-21-20260716-a1",
+        "exists": true,
+        "dirtyFileCount": 6,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-world/hub-issue-22-issue-22-20260716-a1",
+        "HEAD": "f92636052887226f8b0377a879ed238228d37199",
+        "branch": "refs/heads/codex/issue-22-issue-22-20260716-a1",
+        "exists": true,
+        "dirtyFileCount": 7,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-world/hub-issue-23-issue-23-20260716-a1",
+        "HEAD": "f92636052887226f8b0377a879ed238228d37199",
+        "branch": "refs/heads/codex/issue-23-issue-23-20260716-a1",
+        "exists": true,
+        "dirtyFileCount": 16,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-world/hub-issue-39-issue-39-20260716-a1",
+        "HEAD": "f92636052887226f8b0377a879ed238228d37199",
+        "branch": "refs/heads/codex/issue-39-issue-39-20260716-a1",
+        "exists": true,
+        "dirtyFileCount": 8,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-world/hub-issue-40-issue-40-20260716-a1",
+        "HEAD": "f92636052887226f8b0377a879ed238228d37199",
+        "branch": "refs/heads/codex/issue-40-issue-40-20260716-a1",
+        "exists": true,
+        "dirtyFileCount": 13,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/cukies-world/hub-issue-80-issue-80-20260717-a1",
+        "HEAD": "f92636052887226f8b0377a879ed238228d37199",
+        "branch": "refs/heads/codex/issue-80-stats-cards-tests",
+        "exists": true,
+        "dirtyFileCount": 1,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/e3dc/cukies-hub",
+        "HEAD": "4e7c370b6795172d1a2ec411bbadb01ede9e8cfe",
+        "branch": "refs/heads/codex/marketplace-final-evidence",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/.codex/worktrees/pool-single-experience/cukies-hub",
+        "HEAD": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e",
+        "branch": "refs/heads/codex/pool-single-experience",
+        "exists": true,
+        "dirtyFileCount": 10,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/Proyectos/cukies-hub-archive-20260829",
+        "HEAD": "0766b0025f9334dd6d08199003370ff6c9eb04c3",
+        "branch": "refs/heads/codex/archive-uki-new-economy-db-20260829",
+        "exists": true,
+        "dirtyFileCount": 343,
+        "statusSummary": "dirty"
+      },
+      {
+        "worktree": "/Users/fgomezserna/Proyectos/cukies-hub-deploy",
+        "HEAD": "ae0b1f322d2e2640b93ef3cfff03d43296e5eb8c",
+        "branch": "refs/heads/codex/deployment-docs-reconcile",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/Proyectos/cukies-hub-staging-batch-01",
+        "HEAD": "d2cedeb90f11473549af4fdd986a49532401e853",
+        "branch": "refs/heads/codex/staging-batch-01-empty-public-env-fix",
+        "exists": true,
+        "dirtyFileCount": 0,
+        "statusSummary": "clean"
+      },
+      {
+        "worktree": "/Users/fgomezserna/Proyectos/cukies-hub-staging-ux-foundation",
+        "HEAD": "90bd5d412544d72f5767f504deaa406920747f6c",
+        "branch": "refs/heads/codex/ambassador-program-v1",
+        "exists": true,
+        "dirtyFileCount": 20,
+        "statusSummary": "dirty"
+      }
+    ],
+    "remoteRefs": [
+      "origin 4475baaa9a9d560711b8b9e14a38055aecb79c1f 2026-09-09T16:01:54+02:00 fix: enforce ambassador membership lifecycle and sponsor controls (#351)",
+      "origin/cambios-dapp-1 17256b2d9fcf84283fa2ae074494efdde38fe9bc 2025-07-14T10:28:23+02:00 fix: sync pnpm-lock.yaml with package.json",
+      "origin/cambios-dapp-15072025 54d73821c4c9ab803892e2600a6ffc1dec7ef90d 2025-07-16T00:45:09+02:00 fix: adjust aspect ratio and overlay height for non-playable games in GamesPage component to enhance responsiveness. Ensured existing functionalities remain intact.",
+      "origin/cambios-dapp-3 72197db86df7e5e1f32549e6c3ad1bf33c9d97a8 2025-07-14T19:29:46+02:00 Elimina las entradas de archivos de depuración de Firebase en .gitignore para mantener el archivo limpio y organizado. Se asegura la funcionalidad existente sin afectar otras partes de la aplicación.",
+      "origin/codex/ambassador-program-v1 90bd5d412544d72f5767f504deaa406920747f6c 2026-09-02T00:44:40+02:00 fix: remove ambassador page black surface",
+      "origin/codex/ambassadors-lifecycle-rollout-evidence-20260909 faaa96de4d98c5458aff11423b397758e2de910f 2026-09-09T18:48:08+02:00 docs: record ambassador hotfix rollout verification",
+      "origin/codex/assets-integration-staging 012954a1a27e369da204db4b8ebe8ef4962bd21d 2026-09-08T21:53:20+02:00 fix: separate staging deploy guard command",
+      "origin/codex/assets-workers-staging 94f7fe3844fa4813ab66aca670e49f274fed6e20 2026-09-08T19:45:58+02:00 fix: bound staging guard API retry window",
+      "origin/codex/card-assets-completion 1f6f09756dc0d4734a2f29244ffa74a9ee29377f 2026-09-09T05:36:41+02:00 fix: wire indexed Stage identity and version card monitor units",
+      "origin/codex/card-assets-final-evidence 60ea4273ac94322f564a2e6d7a92383c0f46ca0f 2026-09-09T06:49:47+02:00 docs: close staging card image recovery evidence",
+      "origin/codex/card-legacy-daemon-start 4dc0165e6693e75e194e6bf5a3b761f5eb2e9c08 2026-09-09T06:36:03+02:00 fix: start legacy card daemon through shell",
+      "origin/codex/coolify-cached-deploys 57f9f7010a3a8dcfa7a04391d78f6ba253eb4e6a 2026-09-09T14:39:30+02:00 fix: initialize release paths in runner step context",
+      "origin/codex/coolify-ci-activation-proof 7797344b2a97311352f2955b5c81dc7f8a002c38 2026-09-09T15:40:18+02:00 fix: rebuild only web image for isolated standalone packaging changes",
+      "origin/codex/credit-cycle-and-cukie-actions 7e116f05d70b2268746b93cceeb62c7fcc8852b5 2026-09-09T12:38:26+02:00 fix: synchronize credit periods and recover prior pool custody",
+      "origin/codex/credit-cycle-rollout-record a64540c243f2ffe457abd9581d9d7bdbeac87c72 2026-09-09T13:05:48+02:00 docs: record credit cycle and Pool recovery staging verification",
+      "origin/codex/credit-historical-containment bcc44a9c5dd4a57e21f8d32501fbca7801389398 2026-09-08T20:48:21+02:00 docs: clarify active staging credit runtime",
+      "origin/codex/credit-pool-integrity-exclusions 9fda696f48a20ebe8fc3a5fed81620dfc6e1e6fd 2026-09-08T19:02:14+02:00 fix: exclude credit runs with open integrity incidents from rewards",
+      "origin/codex/credit-pool-mongo-compatibility e8005a05f17cfc1a51fd5645b8341ad773d567da 2026-09-08T19:24:53+02:00 fix: support staging MongoDB in reward integrity lookup",
+      "origin/codex/credit-recovery-verified 5cd4f8d8167b5f7e907343703268dcc538b71c82 2026-09-08T21:30:19+02:00 docs: verify staging credit recovery and idle source freshness",
+      "origin/codex/credit-source-freshness 3117b995b498895382e636d31bfe46b79b2013f1 2026-09-08T21:10:03+02:00 docs: track NFT recovery and recurring credit freshness cause",
+      "origin/codex/deployment-docs-reconcile ae0b1f322d2e2640b93ef3cfff03d43296e5eb8c 2026-09-09T19:10:32+02:00 docs: unificar el despliegue por imágenes de staging",
+      "origin/codex/fix-home-spacing-wallet-state 2d17404a8ebc10f5933e5a3ebf4e05a1b936c93f 2026-08-27T20:23:47+02:00 fix: refine post-listing home layout",
+      "origin/codex/fix-pool-cursor-manifest 1836eae17598cade54fc2f594aba882017a9824e 2026-09-08T14:40:21+02:00 fix: select required pool cursors before health validation",
+      "origin/codex/fix-stage-indexer-bootstrap d8cfd5eb3b6e023b79e893d1fbc4afcf4c11c121 2026-09-08T01:09:39+02:00 fix: complete indexer deployment identity configuration",
+      "origin/codex/hotfix-ambassador-eligibility-20260907 1b51c571c03e549f5338d627538119488f7ef4e3 2026-09-07T10:59:34+02:00 fix: require eligible links and gasless ambassador confirmation",
+      "origin/codex/hotfix-ambassadors-lifecycle-20260909 0520dfbf258cdd0a9b62651df0cfcbd9562c522b 2026-09-09T15:44:50+02:00 fix: enforce ambassador membership lifecycle and sponsor controls",
+      "origin/codex/issue-102-credit-pool-floor 8ef3602b3d0c65ce79fbf74a8a0c6c8b5055c2dc 2026-08-30T01:02:49+02:00 fix: version credit pool floor for issue 102",
+      "origin/codex/issue-104-undistributed-accounting 173da68c1a68eba2cedf4803a8a1878ab83584a5 2026-08-30T02:01:33+02:00 fix: enforce undistributed UKI accounting for issue 104",
+      "origin/codex/issue-13-issue-13-20260711-a1 8632263ad77e5cc4a0a8f84e18cbe9bcf790d37f 2026-07-12T12:22:54+02:00 fix(dapp): secure Telegram account linking",
+      "origin/codex/issue-131-cukie-master-uki-first fdbc5313c5d8b0a55fbca3742d90a0ae0586ebba 2026-08-30T04:12:34+02:00 feat(stage): simplificar entrada Cukie Master por UKI",
+      "origin/codex/issue-132-treasure-hunt-mobile-stage f21f7b759eb7dfe9a6358b0118870d1a9dd90f9f 2026-08-30T04:35:58+02:00 fix(stage): estabilizar Treasure Hunt en movil",
+      "origin/codex/issue-232-staging-main-gate 348cf5feb6ba6cab11c39a0849bfdb3fa9428528 2026-08-28T12:23:10+02:00 docs: define staging-first branch governance",
+      "origin/codex/issue-233-route-policy ba19936335ba8724fcf5f393e05755d570bb5a72 2026-08-08T14:00:15+02:00 fix: enforce sensitive route access policy (#233)",
+      "origin/codex/issue-235-ci-quality-gate ad3c25eecd4bf03ff5fcccb8b718bc5cb8bdb0da 2026-08-08T13:11:04+02:00 ci: enforce fail-closed monorepo quality gate (#235)",
+      "origin/codex/issue-249-legacy-transition 7914f35c219630e07f1a2ba923f5921468a8ee35 2026-08-28T13:08:26+02:00 feat: add preview-only legacy transition tooling",
+      "origin/codex/issue-252-uki-event-normalization 3b4132097c36c91d33c3503cff6e159cd52d9868 2026-08-28T13:17:17+02:00 fix(indexer): canonicalize UKI event evidence",
+      "origin/codex/issue-254-bsc-deployment-identity 61e5d49f298866c83c453acf05fb9dbde40283e5 2026-08-28T13:28:59+02:00 fix: validate BSC deployment receipt identity",
+      "origin/codex/issue-256-bsc-canonical-guard 8b006f5e51b12e56c12ac787029134895612afdf 2026-08-28T13:36:07+02:00 fix: block BSC ingestion on canonical reorgs",
+      "origin/codex/issue-258-bsc-bootstrap-drift fdbad0a058e793be971a8d76a24e94f59e5fc1c8 2026-08-28T13:50:26+02:00 fix: reject BSC cursor bootstrap drift",
+      "origin/codex/issue-277-daily-reward-split 96a23f452e343b2889bc20b6bb160e823ede0af4 2026-08-30T00:08:19+02:00 test: verify daily reward split for issue 277",
+      "origin/codex/issue-284-weekly-prize-tranches b58298b1151332e6ba47b2a3adca965a1013b278 2026-08-30T01:37:05+02:00 fix: seal weekly reward tranches for issue 284",
+      "origin/codex/issue-287-ambassador-attribution 9e7a4bedda27df57aa0c7b7bfb7787a0c4abcb36 2026-08-30T02:33:29+02:00 feat: resolve issue 287 ambassador attribution",
+      "origin/codex/issue-289-dashboard-ia e05597cdc90e95bcfb62477182804090f41ac073 2026-08-30T02:48:23+02:00 docs: update issue 289 dashboard architecture",
+      "origin/codex/issue-290-pancake-testnet-verification 414174438b9f5120bb6f1531a703c98d56c19dd8 2026-08-30T04:02:39+02:00 fix(stage): verificar liquidez Pancake en testnet",
+      "origin/codex/issue-290-stage-testnet-links 2319e6c927399731d84275f32a07e9fef721d116 2026-08-30T03:27:44+02:00 fix: isolate staging landing links from mainnet",
+      "origin/codex/issue-292-version-daily-cap d17bd783eb5c5ea34130f070056145c547ea7dca 2026-08-30T03:09:57+02:00 feat: version reward daily cap for issue 292",
+      "origin/codex/issue-60-nft-testnet-deploy 48dd972f2ab341e3583fea7fdbd5433cc6565840 2026-08-07T13:45:16+02:00 docs: record staging NFT deployment evidence",
+      "origin/codex/issue-83-cukie-pool-assignment a05e31bc30b11928052f4ff903d0a3a28d1382b6 2026-08-29T19:55:39+02:00 fix: enforce Cukie Pool assignment order for issue 83",
+      "origin/codex/issue-96-resource-combinations b3234a49f41057f2c4d67fb65b96a2a7ffba15f3 2026-08-29T19:45:02+02:00 test: cover game resource combinations for issue 96",
+      "origin/codex/issue-99-weekly-performance 926e566579b10c8975f640b054e90f6ae43781c8 2026-08-30T01:15:56+02:00 fix: bind weekly ranking sources to pool credits",
+      "origin/codex/legacy-card-worker-staging 987c9c1c8727804e7360bbe7cc045a6334629ee3 2026-09-08T23:21:47+02:00 fix: unblock guarded legacy card publishing",
+      "origin/codex/legacy-events-staging 1631714ccf1eed5726b80acdd6c247032a7d904c 2026-09-07T23:15:39+02:00 docs: record legacy worker validation and archive RPC gap",
+      "origin/codex/marketplace-continuity 732787f60f3582c0d7b8531610009c64f44e2215 2026-09-09T13:26:04+02:00 test: type tron action race fixture",
+      "origin/codex/marketplace-e2e-staging d8ada14c594997ffdf4055fc061bea51cb40a86d 2026-09-09T11:43:44+02:00 fix: restore marketplace listing and detail flows",
+      "origin/codex/marketplace-escrow-owner 3b93dd673c2070012a38be0cfa339a9ccdf4a0f1 2026-09-09T14:12:51+02:00 test: fail closed on missing marketplace seller",
+      "origin/codex/nft-operation-recurrence a19f9aa4165d48f2d0f5e2f11afdfe25b18d3eda 2026-09-09T14:30:32+02:00 docs: record deployment window handoff and capacity requirement",
+      "origin/codex/sept15-bridge-testnet b87047bfdcae21a516a507e64fb8d8b25ec362c6 2026-08-30T05:52:59+02:00 feat: harden testnet bridge relayer",
+      "origin/codex/sept15-stage-integration 047f66a0ff9d53c5fd6444e0b0eebba2c425cb6d 2026-08-30T03:38:18+02:00 fix: isolate staging landing links from mainnet",
+      "origin/codex/shared-app-runtime fd072b6564d4ebd1436adffefda411571f1d60dc 2026-09-09T11:11:18+02:00 fix: coordinate wallet and data recovery in shared layout runtime",
+      "origin/codex/shared-runtime-rollout-evidence e1c233d8103992801f796d4b860777b9a134784d 2026-09-09T11:38:15+02:00 docs: record shared runtime staging rollout and live verification",
+      "origin/codex/staging-30-minute-cycles f1a1d9d540548504bbd47f8ffc9f43bd8dd28a9d 2026-09-04T11:37:34+02:00 feat: support isolated accelerated staging economy cycles",
+      "origin/codex/staging-ambassador-eligibility-20260907 599e7ae38898092ac6e901e4c80e8dbfd6aa3180 2026-09-07T11:04:51+02:00 test: keep ambassador invitation route regressions from main",
+      "origin/codex/staging-ambassadors-lifecycle-20260909 18c1c7207fbc05064847dc1b5ce13fddad4d760c 2026-09-09T16:12:51+02:00 fix: backport ambassador lifecycle hotfix to staging",
+      "origin/codex/staging-batch-01-coolify-build-fix 395998d72a11e1cb471ff6c076f85c8e673adedb 2026-08-31T11:43:58+02:00 fix: share dapp build args across staging schedulers",
+      "origin/codex/staging-batch-01-empty-public-env-fix d2cedeb90f11473549af4fdd986a49532401e853 2026-08-31T11:51:28+02:00 fix: tolerate empty public build URLs in staging",
+      "origin/codex/staging-batch-01-treasure-hunt-scroll 026dcd341bb7fa1235834ff4be3da87befe654d7 2026-08-31T11:10:40+02:00 fix: stop Treasure Hunt mobile scroll flicker",
+      "origin/codex/staging-dashboard-refresh bebfe44f476ead7da4902e92f697cfb657bc5d75 2026-09-08T16:23:22+02:00 fix: refresh dashboard after wallet activity",
+      "origin/codex/staging-slot-history-correction 5e6ee836310c5924bbaa492e0244a70539f5dc9a 2026-09-08T18:17:35+02:00 docs: record recovered runtime and controlled rollout plan",
+      "origin/codex/staging-tournament-close-mongo44 7a23d96cbc244507366d4d98c0a2af8dc55afd4b 2026-09-01T15:05:28+02:00 fix: switch Treasure Hunt to credit mode after tournament",
+      "origin/codex/staging-verification-record 09cf9c00620cf682220d86553ca86a1cd48c988a 2026-09-08T14:57:52+02:00 docs: record verified staging UX and data recovery",
+      "origin/codex/sync-ambassador-explicit-confirm-staging e0ae9d602768f41f2efc5abfa370e19d79db6299 2026-09-03T19:14:23+02:00 fix: require explicit ambassador confirmation (#314)",
+      "origin/codex/ux-data-consistency 114da492640fe530213f3df9d676cc2552aaa46c 2026-09-08T14:11:35+02:00 docs: include staging deployment in authorized implementation",
+      "origin/codex/world-stack-integration f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1 2026-09-09T13:48:26+02:00 feat: maintain World services in Hub deployment stack",
+      "origin/feat/issue_19 4a63806bd9fac1379e8663bde2dac851c805e8e7 2025-07-27T18:28:07+02:00 feat: improve game loading skeleton with modern integrated design",
+      "origin/feat/issue_20 b9ad032790879f2b91b258091b96b3ec3f0a6845 2025-07-27T18:10:58+02:00 feat: optimize asset loading performance for Sybil-Slayer game",
+      "origin/feat/issue_32 887af015c532bee39fab55a0f560e5b5afe4155f 2025-07-27T19:19:56+02:00 feat: allow simultaneous Generate and Verify buttons in Telegram quest",
+      "origin/feat/issue_37 b831d2341029e2f79c1ecfdfcb44c7b2e5b643f7 2025-07-28T11:15:16+02:00 fix: update variable names for clarity in username logic",
+      "origin/feature/game-telegram-chat 4317434c52f29149a76f8a9d6439ee3e862da666 2025-07-21T17:59:35+02:00 Merge feature/game-telegram-chat with main branch",
+      "origin/hyppie-road/dev 820bc50a21af2cbe546fad33eb041d9b01bebc20 2025-07-15T12:05:28+02:00 Merge branch 'main' into hyppie-road/dev",
+      "origin/hyppie-tower/dev 9a71639d792fda8ef797196e037018f10f764aa3 2025-07-16T15:30:14+02:00 mejoras!",
+      "origin/issue-10-implementation 48e540216416fcc56c895e793e1b8643eb9c64aa 2025-07-21T16:29:05+02:00 fix: update general leaderboard to use GameResult data instead of User XP",
+      "origin/issue-9-implementation e49702206b0c0e5bcef3a0a00e411ea9ff5c6a4c 2025-07-18T10:44:17+02:00 fix: correct sound button scaling to match game UI behavior",
+      "origin/main 4475baaa9a9d560711b8b9e14a38055aecb79c1f 2026-09-09T16:01:54+02:00 fix: enforce ambassador membership lifecycle and sponsor controls (#351)",
+      "origin/master fea283b1e6268da5f85bf75c1aca1c09c2134ecb 2025-06-27T10:20:47+02:00 Agrega un nuevo archivo environment.json para configurar la opción agentCanUpdateSnapshot, mejorando la gestión de configuraciones del proyecto. Se mantiene la funcionalidad existente sin afectar otras partes de la aplicación.",
+      "origin/production 8ad254567fe15a28854946c9e5337618b9752166 2026-05-13T11:52:46+02:00 feat: add Cukies NFT tools hub (#161)",
+      "origin/staging 9745194c46ff8612303c12ef9f9c6fcf1e63cbbd 2026-09-09T19:11:44+02:00 docs: unificar el despliegue por imágenes de staging (#354)",
+      "origin/versionmovil1 9c9d304a424870693f184eb5de56cb48ac2ad0f9 2025-12-02T09:39:10+00:00 feat(dapp): Integrate MongoDB support and enhance database configuration"
+    ],
+    "documentationBase": "6803252de3edcbf48c6a050408c846bd8df9ef7b",
+    "stagingDelta": {
+      "pr": 355,
+      "mergedAt": "2026-09-09T17:20:01Z",
+      "head": "8d995050d9e2332cd3a2b109f285af0bd1ed9149",
+      "merge": "6803252de3edcbf48c6a050408c846bd8df9ef7b",
+      "publication": "Pending coordinator final QA at capture"
+    }
+  },
+  "github": {
+    "openIssuesCount": 121,
+    "openIssues": [
+      {
+        "number": 321,
+        "title": "[Launch] Resolver RPC BSC para backfill legacy y lectura de staging",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/321"
+      },
+      {
+        "number": 292,
+        "title": "[UKI-060.6] Versionar el presupuesto diario futuro sin alterar históricos",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/292"
+      },
+      {
+        "number": 290,
+        "title": "[STAGE] Evitar enlaces mainnet hardcodeados en la home de app 28",
+        "milestone": "Phase 0 - Landing live, compra cerrada",
+        "labels": [
+          "area:dapp",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/290"
+      },
+      {
+        "number": 289,
+        "title": "[UKI-031.0] Actualizar arquitectura de información del Dashboard",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:ux",
+          "type:task",
+          "priority:p1",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/289"
+      },
+      {
+        "number": 287,
+        "title": "[UKI-060.6] Atribucion directa de embajadores y pago 5%",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/287"
+      },
+      {
+        "number": 284,
+        "title": "[UKI-060.5] Cierre semanal y siete tramos inmutables",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/284"
+      },
+      {
+        "number": 277,
+        "title": "[UKI-060.4] Reparto diario base jugador y pools",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/277"
+      },
+      {
+        "number": 258,
+        "title": "[RECOVERY][BSC] Bloquear drift de identidad en cursores sellados",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/258"
+      },
+      {
+        "number": 256,
+        "title": "[RECOVERY][BSC] Bloquear ingesta ante reorg canónico",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/256"
+      },
+      {
+        "number": 254,
+        "title": "[RECOVERY][BSC] Validar identidad del receipt de despliegue",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/254"
+      },
+      {
+        "number": 252,
+        "title": "[INDEXER][P0] Rescatar normalización canónica de eventos UKI",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/252"
+      },
+      {
+        "number": 251,
+        "title": "[RECOVERY][P0] Descomponer y rescatar uki-new-economy-db sobre staging",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "area:ops",
+          "type:epic",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/251"
+      },
+      {
+        "number": 249,
+        "title": "[DATA][P0] Rescatar herramienta preview-only de transición legacy",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "area:security",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/249"
+      },
+      {
+        "number": 235,
+        "title": "[CI][P0] Añadir gates fail-closed y contrato de calidad del monorepo",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:security",
+          "area:ops",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/235"
+      },
+      {
+        "number": 234,
+        "title": "[OPS][P0] Validar configuración tipada y coherente por entorno",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:security",
+          "area:ops",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/234"
+      },
+      {
+        "number": 233,
+        "title": "[SECURITY][P0] Aplicar política central a rutas internas, admin y debug",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:security",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/233"
+      },
+      {
+        "number": 232,
+        "title": "[OPS][P0] Bloquear promoción a main sin validación previa en staging",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:security",
+          "area:ops",
+          "type:task",
+          "priority:p0",
+          "agent-no-automerge",
+          "agent-running"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/232"
+      },
+      {
+        "number": 221,
+        "title": "[STAGING][OPS] Evitar ventana 404 durante redeploy del compose",
+        "milestone": null,
+        "labels": [
+          "area:ops",
+          "priority:p1",
+          "needs-validation"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/221"
+      },
+      {
+        "number": 220,
+        "title": "[PRODUCTION][P0] Cuki card worker en restart-loop continuo en app 12",
+        "milestone": null,
+        "labels": [
+          "area:ops",
+          "priority:p0",
+          "blocked",
+          "needs-validation"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/220"
+      },
+      {
+        "number": 216,
+        "title": "[STAGING] Hacer inmutables las URLs del renderer de cards",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/216"
+      },
+      {
+        "number": 213,
+        "title": "[UKI-050.4] Guardarraíl de emisión diaria y techo acumulado UKI",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:backend",
+          "area:security",
+          "type:task",
+          "priority:p0",
+          "needs-validation"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/213"
+      },
+      {
+        "number": 183,
+        "title": "[TH-MP-002] Reconciliar GameSessions multiplayer huérfanas al terminalizar",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:security",
+          "type:task",
+          "priority:p2"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/183"
+      },
+      {
+        "number": 174,
+        "title": "[RC] UKI launch dry-run 2026-05-13",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:security",
+          "area:ops"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/174"
+      },
+      {
+        "number": 160,
+        "title": "Rotar secretos expuestos en build legacy marketplace",
+        "milestone": null,
+        "labels": [],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/160"
+      },
+      {
+        "number": 141,
+        "title": "[UKI-004] Comunicacion, restyling y sistema visual de lanzamiento",
+        "milestone": "Phase 0 - Landing live, compra cerrada",
+        "labels": [
+          "area:dapp",
+          "area:ux",
+          "type:epic",
+          "priority:p0",
+          "needs-validation",
+          "needs-ux-image",
+          "area:brand",
+          "area:copy",
+          "area:visual-design"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/141"
+      },
+      {
+        "number": 140,
+        "title": "[UKI-091.3] Ajuste de parametros con governance interna",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/140"
+      },
+      {
+        "number": 139,
+        "title": "[UKI-091.2] Soporte a wallets/NFTs",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/139"
+      },
+      {
+        "number": 138,
+        "title": "[UKI-091.1] Daily reconciliation",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/138"
+      },
+      {
+        "number": 137,
+        "title": "[UKI-091] Primeros 7 dias de operacion",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:epic",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/137"
+      },
+      {
+        "number": 135,
+        "title": "[UKI-090.2] Monitorizacion",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:security",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/135"
+      },
+      {
+        "number": 133,
+        "title": "[UKI-090] Launch readiness",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:security",
+          "area:ops",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/133"
+      },
+      {
+        "number": 132,
+        "title": "[UKI-082.3] Flujo juego completo",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/132"
+      },
+      {
+        "number": 131,
+        "title": "[UKI-082.2] Flujo Cukie Master completo",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/131"
+      },
+      {
+        "number": 130,
+        "title": "[UKI-082.1] Flujo preventa completo",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/130"
+      },
+      {
+        "number": 129,
+        "title": "[UKI-082] QA end-to-end testnet",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "area:ops",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/129"
+      },
+      {
+        "number": 126,
+        "title": "[UKI-081.1] Test coverage contratos",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:contracts",
+          "area:security",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/126"
+      },
+      {
+        "number": 125,
+        "title": "[UKI-081] Seguridad contratos",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:contracts",
+          "area:security",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/125"
+      },
+      {
+        "number": 124,
+        "title": "[UKI-080.3] Rate limits y cooldowns",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "area:security",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/124"
+      },
+      {
+        "number": 123,
+        "title": "[UKI-080.2] Validacion minima de score",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "area:security",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/123"
+      },
+      {
+        "number": 122,
+        "title": "[UKI-080.1] Firmar session economy token",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "area:security",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/122"
+      },
+      {
+        "number": 121,
+        "title": "[UKI-080] Antifraude de partidas",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "area:security",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/121"
+      },
+      {
+        "number": 120,
+        "title": "[UKI-072.3] Batch approval",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "area:ops",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/120"
+      },
+      {
+        "number": 119,
+        "title": "[UKI-072.2] Dashboard jobs",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "area:ops",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/119"
+      },
+      {
+        "number": 118,
+        "title": "[UKI-072.1] Roles admin",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "area:ops",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/118"
+      },
+      {
+        "number": 117,
+        "title": "[UKI-072] Admin/Ops console",
+        "milestone": "Phase 5 - Launch readiness",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "area:ops",
+          "type:epic",
+          "priority:p1",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/117"
+      },
+      {
+        "number": 109,
+        "title": "[UKI-070] Arquitectura de informacion dapp UKI",
+        "milestone": "Phase 0 - Landing live, compra cerrada",
+        "labels": [
+          "area:dapp",
+          "area:ux",
+          "type:epic",
+          "priority:p0",
+          "area:visual-design"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/109"
+      },
+      {
+        "number": 108,
+        "title": "[UKI-061.3] Reconciliacion claim on-chain/off-chain",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/108"
+      },
+      {
+        "number": 107,
+        "title": "[UKI-061.2] UI claim",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/107"
+      },
+      {
+        "number": 106,
+        "title": "[UKI-061.1] API rewards claimable",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/106"
+      },
+      {
+        "number": 105,
+        "title": "[UKI-061] Claim UX/API",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:epic",
+          "priority:p1",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/105"
+      },
+      {
+        "number": 104,
+        "title": "[UKI-060.3] Reglas de tesoreria para UKI no convertidos",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/104"
+      },
+      {
+        "number": 103,
+        "title": "[UKI-060.2] Reglas de pool de Cukies",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/103"
+      },
+      {
+        "number": 102,
+        "title": "[UKI-060.1] Reglas de pool de creditos",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/102"
+      },
+      {
+        "number": 101,
+        "title": "[UKI-060] Reward allocation engine",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/101"
+      },
+      {
+        "number": 100,
+        "title": "[UKI-052.3] Aplicar reglas subida/bajada",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/100"
+      },
+      {
+        "number": 99,
+        "title": "[UKI-052.2] Calculo de performance semanal",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/99"
+      },
+      {
+        "number": 98,
+        "title": "[UKI-052.1] Modelo de rank por juego/semana",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/98"
+      },
+      {
+        "number": 97,
+        "title": "[UKI-052] Ranking semanal",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:epic",
+          "priority:p0",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/97"
+      },
+      {
+        "number": 96,
+        "title": "[UKI-051.4] Integracion con juego existente",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/96"
+      },
+      {
+        "number": 95,
+        "title": "[UKI-051.3] Settlement segun recursos usados",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/95"
+      },
+      {
+        "number": 94,
+        "title": "[UKI-051.2] Calculo de UKI generado",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/94"
+      },
+      {
+        "number": 93,
+        "title": "[UKI-051.1] Preparacion de recursos antes de partida",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/93"
+      },
+      {
+        "number": 92,
+        "title": "[UKI-051] Treasure Hunt economia v1",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:epic",
+          "priority:p0",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/92"
+      },
+      {
+        "number": 91,
+        "title": "[UKI-050.3] API comun para juegos",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/91"
+      },
+      {
+        "number": 90,
+        "title": "[UKI-050.2] Session economy lifecycle",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/90"
+      },
+      {
+        "number": 89,
+        "title": "[UKI-050.1] `GameEconomyConfig`",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/89"
+      },
+      {
+        "number": 88,
+        "title": "[UKI-050] Motor multi-juego de economia",
+        "milestone": "Phase 4 - Game economy staging",
+        "labels": [
+          "area:games",
+          "area:backend",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/88"
+      },
+      {
+        "number": 87,
+        "title": "[UKI-042.3] UI configuracion creditos diarios",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/87"
+      },
+      {
+        "number": 86,
+        "title": "[UKI-042.2] UI ruta NFT points",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/86"
+      },
+      {
+        "number": 84,
+        "title": "[UKI-042] UI Cukie Master",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:ux",
+          "type:epic",
+          "priority:p1",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/84"
+      },
+      {
+        "number": 83,
+        "title": "[UKI-041.3] Asignacion de Cukie prestado a partida",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/83"
+      },
+      {
+        "number": 82,
+        "title": "[UKI-041.2] Implementar pool positions",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/82"
+      },
+      {
+        "number": 81,
+        "title": "[UKI-041.1] Reglas soft staking NFT",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/81"
+      },
+      {
+        "number": 80,
+        "title": "[UKI-041] Pool de Cukies",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:data",
+          "type:epic",
+          "priority:p0",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/80"
+      },
+      {
+        "number": 79,
+        "title": "[UKI-040.3] API disponibilidad para juegos",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/79"
+      },
+      {
+        "number": 78,
+        "title": "[UKI-040.2] Deposito automatico a pool",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/78"
+      },
+      {
+        "number": 77,
+        "title": "[UKI-040.1] Ledger de creditos",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/77"
+      },
+      {
+        "number": 76,
+        "title": "[UKI-040] Creditos de competicion",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:games",
+          "area:backend",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/76"
+      },
+      {
+        "number": 75,
+        "title": "[UKI-031.3] UI alertas de estado NFT",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/75"
+      },
+      {
+        "number": 74,
+        "title": "[UKI-031.2] UI resumen slots Cukie Master",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/74"
+      },
+      {
+        "number": 73,
+        "title": "[UKI-031.1] API resumen wallet",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:task",
+          "priority:p1"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/73"
+      },
+      {
+        "number": 72,
+        "title": "[UKI-031] Dashboard tecnico de wallet",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:dapp",
+          "area:backend",
+          "area:ux",
+          "type:epic",
+          "priority:p1",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/72"
+      },
+      {
+        "number": 71,
+        "title": "[UKI-030.4] UI vesting personal",
+        "milestone": "Phase 1 - Preventa abierta",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:ux",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/71"
+      },
+      {
+        "number": 70,
+        "title": "[UKI-030.3] UI compra ASM -> UKI",
+        "milestone": "Phase 1 - Preventa abierta",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:ux",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/70"
+      },
+      {
+        "number": 69,
+        "title": "[UKI-030.2] UI conectar BSC",
+        "milestone": "Phase 1 - Preventa abierta",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:ux",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/69"
+      },
+      {
+        "number": 67,
+        "title": "[UKI-030] UX/API preventa",
+        "milestone": "Phase 1 - Preventa abierta",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:ux",
+          "type:epic",
+          "priority:p0",
+          "needs-validation",
+          "needs-ux-image"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/67"
+      },
+      {
+        "number": 66,
+        "title": "[UKI-023.4] Job de cierre rewards",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/66"
+      },
+      {
+        "number": 65,
+        "title": "[UKI-023.3] Job de cierre semanal ranking",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/65"
+      },
+      {
+        "number": 64,
+        "title": "[UKI-023.2] Job de expiracion de creditos",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/64"
+      },
+      {
+        "number": 62,
+        "title": "[UKI-023] Jobs diarios y semanales",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:ops",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/62"
+      },
+      {
+        "number": 57,
+        "title": "[UKI-021.3] Job de reconciliacion ownership",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/57"
+      },
+      {
+        "number": 56,
+        "title": "[UKI-021.2] Implementar lock/unlock atomico",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/56"
+      },
+      {
+        "number": 55,
+        "title": "[UKI-021.1] Implementar lectura normalizada BSC/TRON",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/55"
+      },
+      {
+        "number": 54,
+        "title": "[UKI-021] `NftInventoryService`",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/54"
+      },
+      {
+        "number": 53,
+        "title": "[UKI-020.3] Definir idempotencia",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/53"
+      },
+      {
+        "number": 52,
+        "title": "[UKI-020.2] Definir ledger interno de creditos",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/52"
+      },
+      {
+        "number": 51,
+        "title": "[UKI-020.1] Disenar modelos Prisma/Mongo",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/51"
+      },
+      {
+        "number": 50,
+        "title": "[UKI-020] Modelo de datos de economia",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/50"
+      },
+      {
+        "number": 49,
+        "title": "[UKI-015.3] Script generador de Merkle root",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/49"
+      },
+      {
+        "number": 48,
+        "title": "[UKI-015.2] Implementar distributor",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/48"
+      },
+      {
+        "number": 47,
+        "title": "[UKI-015.1] Elegir mecanismo de claim",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/47"
+      },
+      {
+        "number": 46,
+        "title": "[UKI-015] `RewardsDistributor`",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/46"
+      },
+      {
+        "number": 45,
+        "title": "[UKI-014.3] Exponer snapshots para cupos",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/45"
+      },
+      {
+        "number": 44,
+        "title": "[UKI-014.2] Implementar staking UKI",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/44"
+      },
+      {
+        "number": 43,
+        "title": "[UKI-014.1] Especificar cupos por UKI",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/43"
+      },
+      {
+        "number": 42,
+        "title": "[UKI-014] `UKIStaking` para Cukie Master",
+        "milestone": "Phase 3 - Cukie Master",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "area:backend",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/42"
+      },
+      {
+        "number": 41,
+        "title": "[UKI-013.3] Integracion con preventa",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/41"
+      },
+      {
+        "number": 40,
+        "title": "[UKI-013.2] Implementar vault",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/40"
+      },
+      {
+        "number": 39,
+        "title": "[UKI-013.1] Especificar calendarios de vesting",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/39"
+      },
+      {
+        "number": 38,
+        "title": "[UKI-013] `VestingVault`",
+        "milestone": "Phase 2 - Claim, vesting y token ownership",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/38"
+      },
+      {
+        "number": 37,
+        "title": "[UKI-012.3] Extension opcional BNB/USDT",
+        "milestone": "Phase 1 - Preventa abierta",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "type:task",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/37"
+      },
+      {
+        "number": 34,
+        "title": "[UKI-012] `Presale` y compra con ASM",
+        "milestone": "Phase 1 - Preventa abierta",
+        "labels": [
+          "area:contracts",
+          "area:dapp",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/34"
+      },
+      {
+        "number": 30,
+        "title": "[UKI-011] `UKIToken`",
+        "milestone": "Phase 1 - Preventa abierta",
+        "labels": [
+          "area:contracts",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/30"
+      },
+      {
+        "number": 23,
+        "title": "[UKI-003] Matriz de riesgos legales/comunicacion tecnica",
+        "milestone": "Phase 0 - Landing live, compra cerrada",
+        "labels": [
+          "area:contracts",
+          "area:backend",
+          "area:ux",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/23"
+      },
+      {
+        "number": 19,
+        "title": "[UKI-002] Auditoria de datos existentes en Mongo/marketplace",
+        "milestone": "Phase 0 - Landing live, compra cerrada",
+        "labels": [
+          "area:backend",
+          "area:data",
+          "type:epic",
+          "priority:p0"
+        ],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/19"
+      },
+      {
+        "number": 14,
+        "title": "Cambios DAPP",
+        "milestone": null,
+        "labels": [],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/14"
+      },
+      {
+        "number": 13,
+        "title": "BD Y PRE-PROD. CUKIES-HUB",
+        "milestone": null,
+        "labels": [],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/13"
+      },
+      {
+        "number": 11,
+        "title": "SIGUIENTES PASOS TH",
+        "milestone": null,
+        "labels": [],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/11"
+      },
+      {
+        "number": 10,
+        "title": "Versión Móvil",
+        "milestone": null,
+        "labels": [],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/10"
+      },
+      {
+        "number": 7,
+        "title": "Multiplayer",
+        "milestone": null,
+        "labels": [],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/7"
+      },
+      {
+        "number": 5,
+        "title": "Pendiente probar",
+        "milestone": null,
+        "labels": [],
+        "url": "https://github.com/fgomezserna/cukies-hub/issues/5"
+      }
+    ],
+    "pullRequestsInspected": [
+      {
+        "number": 354,
+        "title": "docs: unificar el despliegue por imágenes de staging",
+        "state": "MERGED",
+        "headRefName": "codex/deployment-docs-reconcile",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "9745194c46ff8612303c12ef9f9c6fcf1e63cbbd"
+        },
+        "mergedAt": "2026-09-09T17:11:44Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/354"
+      },
+      {
+        "number": 353,
+        "title": "docs: cerrar evidencia del hotfix de Embajadores en main y staging",
+        "state": "MERGED",
+        "headRefName": "codex/ambassadors-lifecycle-rollout-evidence-20260909",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "7f56123d7bc3c1ca3c9cb0602493b09bdd6af9bb"
+        },
+        "mergedAt": "2026-09-09T16:51:33Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/353"
+      },
+      {
+        "number": 352,
+        "title": "fix: trasladar a staging el ciclo de Embajadores verificado en main",
+        "state": "MERGED",
+        "headRefName": "codex/staging-ambassadors-lifecycle-20260909",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+        },
+        "mergedAt": "2026-09-09T14:14:28Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/352"
+      },
+      {
+        "number": 351,
+        "title": "fix: exigir Cukie Master y confirmar patrocinador en Embajadores",
+        "state": "MERGED",
+        "headRefName": "codex/hotfix-ambassadors-lifecycle-20260909",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "4475baaa9a9d560711b8b9e14a38055aecb79c1f"
+        },
+        "mergedAt": "2026-09-09T14:01:55Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/351"
+      },
+      {
+        "number": 350,
+        "title": "fix: completar despliegue de imágenes y corregir assets standalone",
+        "state": "MERGED",
+        "headRefName": "codex/coolify-ci-activation-proof",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "ac521466553a9fcbb6e582017e9e0cbb2cdd68fc"
+        },
+        "mergedAt": "2026-09-09T13:44:05Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/350"
+      },
+      {
+        "number": 349,
+        "title": "ci: imágenes por componente y Mongo de staging en LXC",
+        "state": "MERGED",
+        "headRefName": "codex/coolify-cached-deploys",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "0896fbd708617311a8db17a3e05387c1ae5ad2c5"
+        },
+        "mergedAt": "2026-09-09T12:45:43Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/349"
+      },
+      {
+        "number": 348,
+        "title": "fix: preserve Legacy marketplace seller in escrow",
+        "state": "MERGED",
+        "headRefName": "codex/marketplace-escrow-owner",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "c5306e2b5e2a5a689ff8b611d7a972a1b3ce90ad"
+        },
+        "mergedAt": "2026-09-09T12:25:36Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/348"
+      },
+      {
+        "number": 347,
+        "title": "fix: unify NFT custody checks and preserve pending inventory",
+        "state": "MERGED",
+        "headRefName": "codex/nft-operation-recurrence",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "8d89676f4e7e9584e8362d1fe6a79a64ef150fc1"
+        },
+        "mergedAt": "2026-09-09T12:40:11Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/347"
+      },
+      {
+        "number": 346,
+        "title": "feat: mantener Game y matchmaking en el stack de Hub",
+        "state": "OPEN",
+        "headRefName": "codex/world-stack-integration",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/346"
+      },
+      {
+        "number": 345,
+        "title": "docs: record credit cycle and Pool recovery staging verification",
+        "state": "MERGED",
+        "headRefName": "codex/credit-cycle-rollout-record",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "ddc645123dd48911e46ac3eb1d0c1be2fe27e0ed"
+        },
+        "mergedAt": "2026-09-09T11:07:54Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/345"
+      },
+      {
+        "number": 344,
+        "title": "fix: reconcile and harden Legacy marketplace actions",
+        "state": "MERGED",
+        "headRefName": "codex/marketplace-continuity",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "53088a33fcdca428a2f6d11967b63c69d1e4fccb"
+        },
+        "mergedAt": "2026-09-09T11:33:22Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/344"
+      },
+      {
+        "number": 343,
+        "title": "fix: synchronize credits and restore prior Pool custody actions",
+        "state": "MERGED",
+        "headRefName": "codex/credit-cycle-and-cukie-actions",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "bae6f3b022297ac431aa417ac8e8127d82d1913c"
+        },
+        "mergedAt": "2026-09-09T10:40:07Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/343"
+      },
+      {
+        "number": 342,
+        "title": "fix: restore Marketplace end to end",
+        "state": "MERGED",
+        "headRefName": "codex/marketplace-e2e-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "32b27fce8678d11a077d07504c72000a00c16597"
+        },
+        "mergedAt": "2026-09-09T09:50:44Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/342"
+      },
+      {
+        "number": 341,
+        "title": "docs: verify shared runtime deployment on staging",
+        "state": "MERGED",
+        "headRefName": "codex/shared-runtime-rollout-evidence",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "b09e3f372886eca39c4f441115b7438723f895f3"
+        },
+        "mergedAt": "2026-09-09T09:40:11Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/341"
+      },
+      {
+        "number": 340,
+        "title": "fix: centralize wallet and data recovery in the app layout",
+        "state": "MERGED",
+        "headRefName": "codex/shared-app-runtime",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "43d8a2ffa318478d74d2289f741309f3ade2e2ea"
+        },
+        "mergedAt": "2026-09-09T09:17:26Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/340"
+      },
+      {
+        "number": 339,
+        "title": "docs: cerrar evidencia de recuperación de imágenes en staging",
+        "state": "MERGED",
+        "headRefName": "codex/card-assets-final-evidence",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "82e8d438dc65b8724afe0df4939bf04926ac75cb"
+        },
+        "mergedAt": "2026-09-09T04:50:30Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/339"
+      },
+      {
+        "number": 338,
+        "title": "fix: arrancar daemon legacy mediante shell",
+        "state": "MERGED",
+        "headRefName": "codex/card-legacy-daemon-start",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "740fb4476285a635e904c5b2898096fc76e0c943"
+        },
+        "mergedAt": "2026-09-09T04:39:30Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/338"
+      },
+      {
+        "number": 337,
+        "title": "fix: finish card assets and guarded permanent workers",
+        "state": "MERGED",
+        "headRefName": "codex/card-assets-completion",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "80608ea10c2c5bb887e4f7020e635eb2f6027ca2"
+        },
+        "mergedAt": "2026-09-09T03:50:52Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/337"
+      },
+      {
+        "number": 336,
+        "title": "fix: enable guarded legacy card publishing and image propagation",
+        "state": "MERGED",
+        "headRefName": "codex/legacy-card-worker-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "e3d05a6214d93f3556e61729c4c1f0ef1b7a42c3"
+        },
+        "mergedAt": "2026-09-08T21:25:14Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/336"
+      },
+      {
+        "number": 335,
+        "title": "fix: harden staged card asset backfill",
+        "state": "MERGED",
+        "headRefName": "codex/assets-integration-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "f4cd1bda1b1d59008bc5f6ff99a6c8ec72964581"
+        },
+        "mergedAt": "2026-09-08T19:54:46Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/335"
+      },
+      {
+        "number": 334,
+        "title": "docs: cerrar la recuperación verificada de créditos en staging",
+        "state": "MERGED",
+        "headRefName": "codex/credit-recovery-verified",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "337d5719b5d47c19020b000c3b270a1beaceb2a0"
+        },
+        "mergedAt": "2026-09-08T19:31:54Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/334"
+      },
+      {
+        "number": 333,
+        "title": "fix: mantener actualizados los créditos entre repartos",
+        "state": "MERGED",
+        "headRefName": "codex/credit-source-freshness",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "67303f66f0b64797fffa21a4722b3f0a672a07c1"
+        },
+        "mergedAt": "2026-09-08T19:11:18Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/333"
+      },
+      {
+        "number": 332,
+        "title": "fix: reanudar créditos tras contener las incidencias históricas",
+        "state": "MERGED",
+        "headRefName": "codex/credit-historical-containment",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "bd5567f90fb9d47318e96766efc785b322d4b8a3"
+        },
+        "mergedAt": "2026-09-08T18:49:31Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/332"
+      },
+      {
+        "number": 331,
+        "title": "fix: adaptar el filtro de integridad a MongoDB de staging",
+        "state": "MERGED",
+        "headRefName": "codex/credit-pool-mongo-compatibility",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "2620904915ce3522d22a74271c9e92dc9ec4bc03"
+        },
+        "mergedAt": "2026-09-08T17:27:17Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/331"
+      },
+      {
+        "number": 330,
+        "title": "fix: excluir repartos con incidencias abiertas de los premios del pool",
+        "state": "MERGED",
+        "headRefName": "codex/credit-pool-integrity-exclusions",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "5b02253a114a70ce94a3ab6d0973ec87b35dd1cf"
+        },
+        "mergedAt": "2026-09-08T17:05:17Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/330"
+      },
+      {
+        "number": 329,
+        "title": "fix: preserve NFT slot history after withdrawals",
+        "state": "MERGED",
+        "headRefName": "codex/staging-slot-history-correction",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "92eb725b78b596d77ad3ec1d8081a48515ebd36b"
+        },
+        "mergedAt": "2026-09-08T16:30:11Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/329"
+      },
+      {
+        "number": 328,
+        "title": "fix: verify published card bytes before indexing",
+        "state": "MERGED",
+        "headRefName": "codex/assets-workers-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "d5babb90efa75a3a5784153733067b959d2f1a58"
+        },
+        "mergedAt": "2026-09-08T15:35:16Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/328"
+      },
+      {
+        "number": 327,
+        "title": "feat: publish existing NFT cards through asset gateway",
+        "state": "MERGED",
+        "headRefName": "codex/assets-workers-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "d47c1d7544d04bc236ab1ae3c864e68e87df5799"
+        },
+        "mergedAt": "2026-09-08T15:26:59Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/327"
+      },
+      {
+        "number": 325,
+        "title": "fix: actualizar el resumen tras cambios en cupos y créditos",
+        "state": "MERGED",
+        "headRefName": "codex/staging-dashboard-refresh",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "78fb0f85bdc7769e9733dd9c7a3839145540036c"
+        },
+        "mergedAt": "2026-09-08T14:24:36Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/325"
+      },
+      {
+        "number": 324,
+        "title": "docs: registrar la verificación publicada de UX y datos",
+        "state": "MERGED",
+        "headRefName": "codex/staging-verification-record",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "159e1e8af0f322df3f04ae59588989420d0a5d7f"
+        },
+        "mergedAt": "2026-09-08T12:59:50Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/324"
+      },
+      {
+        "number": 323,
+        "title": "fix: recuperar el inventario del Pool con eventos administrativos",
+        "state": "MERGED",
+        "headRefName": "codex/fix-pool-cursor-manifest",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "16e7f075adaf9bc26f0ed69a4344a2e466fc992c"
+        },
+        "mergedAt": "2026-09-08T12:41:48Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/323"
+      },
+      {
+        "number": 322,
+        "title": "fix: datos de staking coherentes y UX de lanzamiento",
+        "state": "MERGED",
+        "headRefName": "codex/ux-data-consistency",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "26dd9908bc363c8eb9352aae974cca28d52c8916"
+        },
+        "mergedAt": "2026-09-08T12:12:49Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/322"
+      },
+      {
+        "number": 320,
+        "title": "fix: complete indexer deployment identity configuration",
+        "state": "MERGED",
+        "headRefName": "codex/fix-stage-indexer-bootstrap",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "ed2d50da47ef5eeef83162b9cfda9e247821c930"
+        },
+        "mergedAt": "2026-09-07T23:11:59Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/320"
+      },
+      {
+        "number": 319,
+        "title": "feat: cover all contract events and isolate legacy workers",
+        "state": "MERGED",
+        "headRefName": "codex/legacy-events-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "7d0d1ced1bb5949c7dbf4966810d0eec226f4e26"
+        },
+        "mergedAt": "2026-09-07T22:35:58Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/319"
+      },
+      {
+        "number": 318,
+        "title": "fix: require eligible ambassador links and gasless confirmation",
+        "state": "MERGED",
+        "headRefName": "codex/hotfix-ambassador-eligibility-20260907",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "fb2b19023e7edd824bc6eb86dc5409025cc3ee1e"
+        },
+        "mergedAt": "2026-09-07T09:02:28Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/318"
+      },
+      {
+        "number": 317,
+        "title": "fix: sync ambassador hotfix and recover staging RPC reads",
+        "state": "MERGED",
+        "headRefName": "codex/staging-ambassador-eligibility-20260907",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4"
+        },
+        "mergedAt": "2026-09-07T09:11:30Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/317"
+      },
+      {
+        "number": 316,
+        "title": "Staging: ciclos económicos de 30 minutos",
+        "state": "MERGED",
+        "headRefName": "codex/staging-30-minute-cycles",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "17d463742043f1612097a7c02b7c3626806ea062"
+        },
+        "mergedAt": "2026-09-04T09:38:23Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/316"
+      },
+      {
+        "number": 315,
+        "title": "fix: sincronizar confirmación explícita de embajadores en staging",
+        "state": "MERGED",
+        "headRefName": "codex/sync-ambassador-explicit-confirm-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "6ef327429d3a32c0135a3ec50e3140c0a55aa6c1"
+        },
+        "mergedAt": "2026-09-03T17:19:33Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/315"
+      },
+      {
+        "number": 314,
+        "title": "fix: confirmar embajador solo desde la invitación",
+        "state": "MERGED",
+        "headRefName": "codex/fix-ambassador-explicit-confirmation",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "94d4feaacf9b601d345f97c6c39a2dff2b96d1ba"
+        },
+        "mergedAt": "2026-09-03T17:10:58Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/314"
+      },
+      {
+        "number": 313,
+        "title": "fix: sincronizar bloqueo de registro de embajadores en staging",
+        "state": "MERGED",
+        "headRefName": "codex/sync-hotfix-312-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "3ee3b095a47dac7cbc3023285c90d95c78081b86"
+        },
+        "mergedAt": "2026-09-03T12:24:43Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/313"
+      },
+      {
+        "number": 312,
+        "title": "fix: bind ambassador attribution to initial registration",
+        "state": "MERGED",
+        "headRefName": "codex/fix-ambassador-cycle-guard",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "e6e136bf567ffa85a8f9ee8ea052c774ff3afb94"
+        },
+        "mergedAt": "2026-09-03T11:55:11Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/312"
+      },
+      {
+        "number": 311,
+        "title": "feat: mantener paridad de visibilidad de Embajadores",
+        "state": "MERGED",
+        "headRefName": "codex/staging-hide-ambassadors-production",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "7b6799cf47e33998199c458807ef316ab566fbd0"
+        },
+        "mergedAt": "2026-09-02T09:48:07Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/311"
+      },
+      {
+        "number": 310,
+        "title": "feat: ocultar Embajadores por entorno",
+        "state": "MERGED",
+        "headRefName": "codex/hide-ambassadors-production",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "04904d21326a9e19d256794c814882cf459feb63"
+        },
+        "mergedAt": "2026-09-02T09:41:37Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/310"
+      },
+      {
+        "number": 309,
+        "title": "fix: alinear gate de embajadores en staging",
+        "state": "MERGED",
+        "headRefName": "codex/staging-ambassador-write-gate",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "2208eea35c3e1a4f16e0f6f5ebc4a560d68ac7dd"
+        },
+        "mergedAt": "2026-09-02T09:00:54Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/309"
+      },
+      {
+        "number": 308,
+        "title": "fix: inyectar gate de altas de embajadores",
+        "state": "MERGED",
+        "headRefName": "codex/production-ambassadors-enable-writes",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "585f276156edb98040daa2e39f5056b478ba21e7"
+        },
+        "mergedAt": "2026-09-02T08:49:32Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/308"
+      },
+      {
+        "number": 307,
+        "title": "feat: activar programa de embajadores",
+        "state": "MERGED",
+        "headRefName": "codex/production-ambassadors-v1",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "49fd7f1d07c96e734aa18c14f0ae5e68d0a0d789"
+        },
+        "mergedAt": "2026-09-02T08:30:38Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/307"
+      },
+      {
+        "number": 306,
+        "title": "fix: integrar compra UKI bidireccional en staging",
+        "state": "MERGED",
+        "headRefName": "codex/backport-uki-bidirectional-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "bfc16ca9629772e90475314ebd7ef4f4adbff86a"
+        },
+        "mergedAt": "2026-09-01T11:12:13Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/306"
+      },
+      {
+        "number": 305,
+        "title": "fix: compra UKI bidireccional y soporte USDC",
+        "state": "MERGED",
+        "headRefName": "codex/hotfix-uki-bidirectional",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "d9fb552562411afcf5b0c958915dff1bd3fdf0e6"
+        },
+        "mergedAt": "2026-09-01T11:06:34Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/305"
+      },
+      {
+        "number": 304,
+        "title": "Backport: compra directa de UKI en el hero",
+        "state": "MERGED",
+        "headRefName": "codex/backport-uki-swap-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "1bd17c38fb9969f7e5e63ef872f2a3b72ea7d71e"
+        },
+        "mergedAt": "2026-09-01T10:40:21Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/304"
+      },
+      {
+        "number": 303,
+        "title": "Hotfix: compra directa de UKI en el hero",
+        "state": "MERGED",
+        "headRefName": "hotfix/uki-multihop-swap",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "8e794f81f405ee2098553822e310cec5ebee2a31"
+        },
+        "mergedAt": "2026-09-01T10:29:19Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/303"
+      },
+      {
+        "number": 302,
+        "title": "fix: aceptar URL pública vacía durante el build de staging",
+        "state": "MERGED",
+        "headRefName": "codex/staging-batch-01-empty-public-env-fix",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "b9a3607cdc99d6ef9e8e762c0191121a07a37c64"
+        },
+        "mergedAt": "2026-08-31T09:52:53Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/302"
+      },
+      {
+        "number": 301,
+        "title": "fix: corregir el build de los schedulers en Coolify",
+        "state": "MERGED",
+        "headRefName": "codex/staging-batch-01-coolify-build-fix",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "24257eda0c4ac35524d3ad4796b783ba2c1458fa"
+        },
+        "mergedAt": "2026-08-31T09:45:02Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/301"
+      },
+      {
+        "number": 300,
+        "title": "fix: estabilizar el scroll móvil de Treasure Hunt",
+        "state": "MERGED",
+        "headRefName": "codex/staging-batch-01-treasure-hunt-scroll",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "a2257d8b70be51743fdc432e1e976d149567d24c"
+        },
+        "mergedAt": "2026-08-31T09:14:00Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/300"
+      },
+      {
+        "number": 299,
+        "title": "Bridge Cukies Stage: base custodial y guardas testnet",
+        "state": "OPEN",
+        "headRefName": "codex/sept15-bridge-testnet",
+        "baseRefName": "codex/sept15-stage-integration",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/299"
+      },
+      {
+        "number": 298,
+        "title": "fix(stage): estabilizar Treasure Hunt móvil y validar 2.000 UKI",
+        "state": "OPEN",
+        "headRefName": "codex/issue-132-treasure-hunt-mobile-stage",
+        "baseRefName": "codex/sept15-stage-integration",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/298"
+      },
+      {
+        "number": 297,
+        "title": "feat(stage): simplificar Cukie Master con foco UKI",
+        "state": "OPEN",
+        "headRefName": "codex/issue-131-cukie-master-uki-first",
+        "baseRefName": "codex/sept15-stage-integration",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/297"
+      },
+      {
+        "number": 296,
+        "title": "fix(stage): verificar y habilitar pool ASM/UKI en Testnet",
+        "state": "OPEN",
+        "headRefName": "codex/issue-290-pancake-testnet-verification",
+        "baseRefName": "codex/sept15-stage-integration",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/296"
+      },
+      {
+        "number": 295,
+        "title": "chore(stage): integrar candidata técnica del bloque del 15",
+        "state": "MERGED",
+        "headRefName": "codex/sept15-stage-integration",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "047f66a0ff9d53c5fd6444e0b0eebba2c425cb6d"
+        },
+        "mergedAt": "2026-08-30T10:31:39Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/295"
+      },
+      {
+        "number": 294,
+        "title": "fix: aislar enlaces de Stage de BSC mainnet",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-290-stage-testnet-links",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/294"
+      },
+      {
+        "number": 293,
+        "title": "[UKI-060.6] Versionar el presupuesto diario futuro",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-292-version-daily-cap",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/293"
+      },
+      {
+        "number": 291,
+        "title": "[UKI-031.0] Arquitectura de información del Dashboard",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-289-dashboard-ia",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/291"
+      },
+      {
+        "number": 288,
+        "title": "[UKI-060.6] Atribución directa de embajadores y pago 5%",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-287-ambassador-attribution",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/288"
+      },
+      {
+        "number": 286,
+        "title": "[UKI-060.3] Sellar y publicar el UKI no distribuido 80/10/10",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-104-undistributed-accounting",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/286"
+      },
+      {
+        "number": 285,
+        "title": "[UKI-060.5] Sellar cierre semanal y siete tramos",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-284-weekly-prize-tranches",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/285"
+      },
+      {
+        "number": 283,
+        "title": "fix: acreditar créditos del pool en el ranking semanal",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-99-weekly-performance",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/283"
+      },
+      {
+        "number": 282,
+        "title": "[UKI-060.1] Versiona el mínimo diario del Credit Pool",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-102-credit-pool-floor",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/282"
+      },
+      {
+        "number": 281,
+        "title": "chore: sync production fullscreen fix into staging",
+        "state": "MERGED",
+        "headRefName": "codex/sync-fullscreen-staging",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "2af7544cfab2aa5caefc3ad3a4c4424540d6a78b"
+        },
+        "mergedAt": "2026-08-29T22:53:19Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/281"
+      },
+      {
+        "number": 280,
+        "title": "refactor: remove unused attempt restoration path",
+        "state": "MERGED",
+        "headRefName": "codex/remove-attempt-restoration",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "ac77dff27b336563faa884cb76f9329515c13593"
+        },
+        "mergedAt": "2026-08-29T22:46:04Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/280"
+      },
+      {
+        "number": 279,
+        "title": "fix: restore mobile fullscreen and failed attempts",
+        "state": "MERGED",
+        "headRefName": "codex/fix-mobile-fullscreen-rotation",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "3b0ff3bc9165d2ea30ef1e64fc8cc2eb3f57b51e"
+        },
+        "mergedAt": "2026-08-29T22:37:58Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/279"
+      },
+      {
+        "number": 278,
+        "title": "[UKI-060.4] Verifica reparto diario base jugador y pools",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-277-daily-reward-split",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/278"
+      },
+      {
+        "number": 276,
+        "title": "fix: calcular Cukie Masters desde UKI computable",
+        "state": "MERGED",
+        "headRefName": "hotfix/274-cukie-master-balance-counter",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "49d9c69cfbf6378179ce5eed30f2d3da0bc683ce"
+        },
+        "mergedAt": "2026-08-29T17:59:11Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/276"
+      },
+      {
+        "number": 275,
+        "title": "fix: blindar orden y cuotas del Cukie Pool (#83)",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-83-cukie-pool-assignment",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/275"
+      },
+      {
+        "number": 273,
+        "title": "test: cubrir combinaciones de recursos del juego (#96)",
+        "state": "CLOSED",
+        "headRefName": "codex/issue-96-resource-combinations",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/273"
+      },
+      {
+        "number": 272,
+        "title": "[UKI-023.4] Preparar batch de rewards pendiente de aprobación",
+        "state": "MERGED",
+        "headRefName": "codex/issue-66-reward-batch-preparer",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "c955d6a7486ed956da3c465f8c8993c08aba6437"
+        },
+        "mergedAt": "2026-08-29T16:57:37Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/272"
+      },
+      {
+        "number": 271,
+        "title": "test: cubrir el flujo económico staging de UKI-082.3",
+        "state": "MERGED",
+        "headRefName": "codex/issue-132-game-reward-e2e",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "03e961b0fe5783c79ffeecd4963cd932fd32ce76"
+        },
+        "mergedAt": "2026-08-29T16:27:42Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/271"
+      },
+      {
+        "number": 270,
+        "title": "Sync main b1deb10 into staging",
+        "state": "MERGED",
+        "headRefName": "sync/main-b1deb10",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "b7f5ca477b4a4731a663ab8a99071f4717658349"
+        },
+        "mergedAt": "2026-08-29T13:03:55Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/270"
+      },
+      {
+        "number": 269,
+        "title": "[HOTFIX] Mostrar partidas disponibles en staking",
+        "state": "MERGED",
+        "headRefName": "hotfix/268-staking-tournament-attempts",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "b1deb10cf7c1cf1dd905f282fbc0909c5d287f33"
+        },
+        "mergedAt": "2026-08-29T12:50:09Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/269"
+      },
+      {
+        "number": 267,
+        "title": "chore: sync main d341076 into staging",
+        "state": "MERGED",
+        "headRefName": "sync/main-d341076",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "7c1a31a90e09086a245be85bb29ff725bc7c4a6a"
+        },
+        "mergedAt": "2026-08-29T12:18:23Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/267"
+      },
+      {
+        "number": 266,
+        "title": "[HOTFIX][P0] Estabilizar staking y cupos del torneo en producción",
+        "state": "MERGED",
+        "headRefName": "hotfix/265-tournament-staking-reads",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "d3410764ed4b4e8c810fd5a4a57dfc05a0ccd5cb"
+        },
+        "mergedAt": "2026-08-29T12:06:05Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/266"
+      },
+      {
+        "number": 264,
+        "title": "fix: desbloquear el cierre diario de rewards",
+        "state": "MERGED",
+        "headRefName": "codex/issue-66-reward-day-selector",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "b5c5478022309b18c9919abac5fbc5ca35dc0d54"
+        },
+        "mergedAt": "2026-08-29T15:40:47Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/264"
+      },
+      {
+        "number": 263,
+        "title": "fix: alinear el batch limit del runtime de créditos",
+        "state": "MERGED",
+        "headRefName": "codex/issue-262-credit-batch-limit",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "6425c0cbe53d098604736c45d39b9ce62eeb5d3a"
+        },
+        "mergedAt": "2026-08-28T23:29:25Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/263"
+      },
+      {
+        "number": 261,
+        "title": "feat: recuperar el flujo completo de Cukie Master",
+        "state": "MERGED",
+        "headRefName": "codex/issue-131-cukie-master-full-flow",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "33b32fcacfbebd1255ec95a077407ee14eebd59d"
+        },
+        "mergedAt": "2026-08-28T23:06:22Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/261"
+      },
+      {
+        "number": 260,
+        "title": "fix: recuperar la entrega diaria de créditos de competición",
+        "state": "MERGED",
+        "headRefName": "codex/issue-63-credit-runtime-recovery",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "90f379a5e9aea6a2d384a28df84dbc14c0aab5f0"
+        },
+        "mergedAt": "2026-08-28T23:03:09Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/260"
+      },
+      {
+        "number": 259,
+        "title": "[RECOVERY][BSC] Bloquear drift de identidad en cursores sellados",
+        "state": "OPEN",
+        "headRefName": "codex/issue-258-bsc-bootstrap-drift",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/259"
+      },
+      {
+        "number": 257,
+        "title": "[RECOVERY][BSC] Bloquear ingesta ante reorg canónico",
+        "state": "OPEN",
+        "headRefName": "codex/issue-256-bsc-canonical-guard",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/257"
+      },
+      {
+        "number": 255,
+        "title": "[RECOVERY][BSC] Validar identidad del receipt de despliegue",
+        "state": "OPEN",
+        "headRefName": "codex/issue-254-bsc-deployment-identity",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/255"
+      },
+      {
+        "number": 253,
+        "title": "fix(indexer): normalizar evidencia de eventos UKI",
+        "state": "OPEN",
+        "headRefName": "codex/issue-252-uki-event-normalization",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/253"
+      },
+      {
+        "number": 250,
+        "title": "feat(indexer): rescatar transición legacy preview-only",
+        "state": "OPEN",
+        "headRefName": "codex/issue-249-legacy-transition",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/250"
+      },
+      {
+        "number": 248,
+        "title": "release: promover ajustes de home a producción",
+        "state": "MERGED",
+        "headRefName": "staging",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "2a059aca173e719501e338b2f69620fe606b598f"
+        },
+        "mergedAt": "2026-08-27T18:53:21Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/248"
+      },
+      {
+        "number": 247,
+        "title": "fix: ajustar espaciado y estado de wallet en la home",
+        "state": "MERGED",
+        "headRefName": "codex/fix-home-spacing-wallet-state",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "5ec51f7dd42c242bef9ea34b98c36bbf864b60ac"
+        },
+        "mergedAt": "2026-08-27T18:30:35Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/247"
+      },
+      {
+        "number": 246,
+        "title": "release: publicar la nueva home operativa de UKI",
+        "state": "MERGED",
+        "headRefName": "staging",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "446cc0bbf2654e893c3ee01415d6e77fe4ef52ec"
+        },
+        "mergedAt": "2026-08-27T17:43:13Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/246"
+      },
+      {
+        "number": 245,
+        "title": "feat: sustituir la home de preventa por el hub UKI activo",
+        "state": "MERGED",
+        "headRefName": "codex/home-post-listing",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "19dcba14cf854f7c7de611309cea2680537ea73a"
+        },
+        "mergedAt": "2026-08-27T17:24:36Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/245"
+      },
+      {
+        "number": 244,
+        "title": "Simplificar UX móvil de Treasure Hunt y staking UKI",
+        "state": "MERGED",
+        "headRefName": "codex/fix-competition-mobile-ux",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "0ddb8e1100ce998d0db12af8b7f2a4d3eff2544d"
+        },
+        "mergedAt": "2026-08-27T13:55:37Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/244"
+      },
+      {
+        "number": 243,
+        "title": "fix: support guarded production deployment",
+        "state": "MERGED",
+        "headRefName": "codex/fix-production-deployment",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "c612e0861649792e6d9b6d4f895614978cfbb880"
+        },
+        "mergedAt": "2026-08-27T12:28:12Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/243"
+      },
+      {
+        "number": 242,
+        "title": "fix: propagar bloque fuente del sorteo en producción",
+        "state": "MERGED",
+        "headRefName": "codex/fix-mainnet-draw-source",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "af3925aebe295aa31cab61fb0cd8e864dce362be"
+        },
+        "mergedAt": "2026-08-27T11:57:54Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/242"
+      },
+      {
+        "number": 241,
+        "title": "release: publicar staking UKI y torneo desactivado",
+        "state": "MERGED",
+        "headRefName": "staging",
+        "baseRefName": "main",
+        "mergeCommit": {
+          "oid": "5b667a5fb45e13411cc97159ad73d68799e1a601"
+        },
+        "mergedAt": "2026-08-27T11:52:26Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/241"
+      },
+      {
+        "number": 240,
+        "title": "feat: preparar listing UKI mainnet, staking y lock LP",
+        "state": "MERGED",
+        "headRefName": "codex/mainnet-uki-launch-prep",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "e8d13a3479affe646b05e27564a4f4e79a9fe93e"
+        },
+        "mergedAt": "2026-08-27T11:51:14Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/240"
+      },
+      {
+        "number": 239,
+        "title": "[SECURITY][P0] Política central para rutas sensibles",
+        "state": "OPEN",
+        "headRefName": "codex/issue-233-route-policy",
+        "baseRefName": "codex/issue-235-ci-quality-gate",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/239"
+      },
+      {
+        "number": 238,
+        "title": "CI P0: contrato fail-closed de calidad del monorepo",
+        "state": "OPEN",
+        "headRefName": "codex/issue-235-ci-quality-gate",
+        "baseRefName": "codex/issue-232-staging-main-gate",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/238"
+      },
+      {
+        "number": 237,
+        "title": "fix: keep closed mobile drawer out of focus",
+        "state": "MERGED",
+        "headRefName": "codex/fix-mobile-drawer-inert",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "e27d1b54fd6f02235676a8b5ae3698f93e546c58"
+        },
+        "mergedAt": "2026-08-08T09:43:52Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/237"
+      },
+      {
+        "number": 236,
+        "title": "[OPS][P0] Enforce staging-to-main promotion gate",
+        "state": "OPEN",
+        "headRefName": "codex/issue-232-staging-main-gate",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/236"
+      },
+      {
+        "number": 231,
+        "title": "feat: harden staging wallets and redesign Cukie Master",
+        "state": "MERGED",
+        "headRefName": "codex/fix-staging-wallet-network",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "99065c7c4e726dbebee9b1e2b7c75fb8e585690f"
+        },
+        "mergedAt": "2026-08-08T09:06:12Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/231"
+      },
+      {
+        "number": 230,
+        "title": "docs: documentar despliegue NFT y smoke Cukie Master staging",
+        "state": "OPEN",
+        "headRefName": "codex/issue-60-nft-testnet-deploy",
+        "baseRefName": "staging",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/230"
+      },
+      {
+        "number": 229,
+        "title": "[UKI-042.1] Activar UI de staking UKI en Cukie Master",
+        "state": "MERGED",
+        "headRefName": "codex/issue-85-ui-uki-staking",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "51c2304e24ad007d807aa1377525d4bbdc814c80"
+        },
+        "mergedAt": "2026-08-07T10:12:47Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/229"
+      },
+      {
+        "number": 228,
+        "title": "fix: propagate staging identity to guarded workers",
+        "state": "MERGED",
+        "headRefName": "codex/issue-213-worker-staging-guard-env",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "321b3efa2bc2eb37dee2b73637f9dd3eeb729a07"
+        },
+        "mergedAt": "2026-08-06T20:32:25Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/228"
+      },
+      {
+        "number": 227,
+        "title": "docs: actualizar checklist de economia staging",
+        "state": "MERGED",
+        "headRefName": "codex/issue-213-staging-checklist",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "e20ac2e8092f930be5658dd45fc7fb66c4205534"
+        },
+        "mergedAt": "2026-08-06T21:51:06Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/227"
+      },
+      {
+        "number": 226,
+        "title": "feat: bootstrap versionado de reglas de staging",
+        "state": "MERGED",
+        "headRefName": "codex/issue-213-versioned-staging-rules",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "509ef4cafe0683cee08b683a0537aa38895106db"
+        },
+        "mergedAt": "2026-08-06T20:15:29Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/226"
+      },
+      {
+        "number": 225,
+        "title": "feat: fuente NFT verificada para BSC Testnet (#60)",
+        "state": "MERGED",
+        "headRefName": "codex/issue-60-nft-testnet-source",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "ee00751f1489546f747274a4a3606ff0e4957027"
+        },
+        "mergedAt": "2026-08-06T19:44:46Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/225"
+      },
+      {
+        "number": 224,
+        "title": "feat: indexar staking y vesting UKI con identidad verificada",
+        "state": "MERGED",
+        "headRefName": "codex/issue-59-uki-source-indexing",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "b4cb62d8c70598fbbc7ff34dc3724abb76e9c760"
+        },
+        "mergedAt": "2026-08-06T18:52:44Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/224"
+      },
+      {
+        "number": 223,
+        "title": "fix: aplicar reparto UKI no distribuido 80/5/5/10",
+        "state": "MERGED",
+        "headRefName": "codex/issue-213-undistributed-policy",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "2aaa810c5c97f4f39fd2a94b4e645a76de6db52d"
+        },
+        "mergedAt": "2026-08-06T18:03:38Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/223"
+      },
+      {
+        "number": 222,
+        "title": "fix: reconciliar Cukie Master en 5 cupos por ruta",
+        "state": "MERGED",
+        "headRefName": "codex/issue-214-five-per-route-source",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "048087e8cf0d761cdd0e3cd4039c669d6e4aeb20"
+        },
+        "mergedAt": "2026-08-06T17:44:11Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/222"
+      },
+      {
+        "number": 219,
+        "title": "docs: registrar verificación exacta en BscScan Testnet",
+        "state": "MERGED",
+        "headRefName": "codex/staging-bscscan-mirror-proof",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "196f51e0b0b1f50223d47fc1defcbb03bbcb1552"
+        },
+        "mergedAt": "2026-08-06T16:35:59Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/219"
+      },
+      {
+        "number": 218,
+        "title": "docs: record staging card worker activation",
+        "state": "MERGED",
+        "headRefName": "codex/staging-card-worker-activation-docs",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "b7d7dda089a209f73f455d18eca87a15a71139d3"
+        },
+        "mergedAt": "2026-08-06T16:14:33Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/218"
+      },
+      {
+        "number": 217,
+        "title": "fix: make card image URLs immutable",
+        "state": "MERGED",
+        "headRefName": "codex/issue-216-immutable-card-urls",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "1db2a58a5e88de956f8cec0c5464337ca6a8bc6a"
+        },
+        "mergedAt": "2026-08-06T15:39:31Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/217"
+      },
+      {
+        "number": 215,
+        "title": "feat: guardarraíl diario y acumulado de emisión UKI",
+        "state": "MERGED",
+        "headRefName": "codex/issue-213-uki-emission-budget",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "067091806661d4118c2d5ec7f06a3d1b0516e2ef"
+        },
+        "mergedAt": "2026-08-06T14:27:10Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/215"
+      },
+      {
+        "number": 212,
+        "title": "fix: keep staging card uploads fail closed",
+        "state": "MERGED",
+        "headRefName": "codex/staging-card-worker-s3-guard",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "bda26b098b72e01d612cbc02f803d7afcd322b26"
+        },
+        "mergedAt": "2026-08-06T13:25:40Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/212"
+      },
+      {
+        "number": 211,
+        "title": "docs: record exact testnet source verification",
+        "state": "MERGED",
+        "headRefName": "codex/staging-contract-source-verification",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "121282a4f98ea053a6902a5caf3c2566f23b00e7"
+        },
+        "mergedAt": "2026-08-06T13:06:29Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/211"
+      },
+      {
+        "number": 210,
+        "title": "fix: restore full dapp regression suite",
+        "state": "MERGED",
+        "headRefName": "codex/staging-full-suite-cleanup",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "9d6f3d2cd2d38924f8605d7168c540f94b65d42b"
+        },
+        "mergedAt": "2026-08-06T12:56:54Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/210"
+      },
+      {
+        "number": 209,
+        "title": "feat: add gated economy runtime APIs to staging",
+        "state": "MERGED",
+        "headRefName": "codex/staging-economy-runtime-api",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "e1f52a354e2fb6bad98395268f7f63bb4db3a6a8"
+        },
+        "mergedAt": "2026-08-06T12:29:08Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/209"
+      },
+      {
+        "number": 208,
+        "title": "docs: reconcile final staging readiness",
+        "state": "MERGED",
+        "headRefName": "codex/staging-final-readiness-docs",
+        "baseRefName": "staging",
+        "mergeCommit": {
+          "oid": "edf814ac5948584ef51a44288bc5196c0b0f1592"
+        },
+        "mergedAt": "2026-08-06T11:55:33Z",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/208"
+      }
+    ],
+    "milestones": [
+      {
+        "number": 12,
+        "title": "Phase 0 - Landing live, compra cerrada",
+        "openIssues": 5,
+        "closedIssues": 22
+      },
+      {
+        "number": 13,
+        "title": "Phase 1 - Preventa abierta",
+        "openIssues": 7,
+        "closedIssues": 10
+      },
+      {
+        "number": 14,
+        "title": "Phase 2 - Claim, vesting y token ownership",
+        "openIssues": 20,
+        "closedIssues": 0
+      },
+      {
+        "number": 15,
+        "title": "Phase 3 - Cukie Master",
+        "openIssues": 32,
+        "closedIssues": 7
+      },
+      {
+        "number": 16,
+        "title": "Phase 4 - Game economy staging",
+        "openIssues": 19,
+        "closedIssues": 1
+      },
+      {
+        "number": 17,
+        "title": "Phase 5 - Launch readiness",
+        "openIssues": 29,
+        "closedIssues": 9
+      }
+    ],
+    "openPullRequestsCount": 15,
+    "openPullRequests": [
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/world-stack-integration",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 346,
+        "state": "OPEN",
+        "title": "feat: mantener Game y matchmaking en el stack de Hub",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/346"
+      },
+      {
+        "baseRefName": "codex/sept15-stage-integration",
+        "headRefName": "codex/sept15-bridge-testnet",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 299,
+        "state": "OPEN",
+        "title": "Bridge Cukies Stage: base custodial y guardas testnet",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/299"
+      },
+      {
+        "baseRefName": "codex/sept15-stage-integration",
+        "headRefName": "codex/issue-132-treasure-hunt-mobile-stage",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 298,
+        "state": "OPEN",
+        "title": "fix(stage): estabilizar Treasure Hunt móvil y validar 2.000 UKI",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/298"
+      },
+      {
+        "baseRefName": "codex/sept15-stage-integration",
+        "headRefName": "codex/issue-131-cukie-master-uki-first",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 297,
+        "state": "OPEN",
+        "title": "feat(stage): simplificar Cukie Master con foco UKI",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/297"
+      },
+      {
+        "baseRefName": "codex/sept15-stage-integration",
+        "headRefName": "codex/issue-290-pancake-testnet-verification",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 296,
+        "state": "OPEN",
+        "title": "fix(stage): verificar y habilitar pool ASM/UKI en Testnet",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/296"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-258-bsc-bootstrap-drift",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 259,
+        "state": "OPEN",
+        "title": "[RECOVERY][BSC] Bloquear drift de identidad en cursores sellados",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/259"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-256-bsc-canonical-guard",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 257,
+        "state": "OPEN",
+        "title": "[RECOVERY][BSC] Bloquear ingesta ante reorg canónico",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/257"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-254-bsc-deployment-identity",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 255,
+        "state": "OPEN",
+        "title": "[RECOVERY][BSC] Validar identidad del receipt de despliegue",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/255"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-252-uki-event-normalization",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 253,
+        "state": "OPEN",
+        "title": "fix(indexer): normalizar evidencia de eventos UKI",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/253"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-249-legacy-transition",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 250,
+        "state": "OPEN",
+        "title": "feat(indexer): rescatar transición legacy preview-only",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/250"
+      },
+      {
+        "baseRefName": "codex/issue-235-ci-quality-gate",
+        "headRefName": "codex/issue-233-route-policy",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 239,
+        "state": "OPEN",
+        "title": "[SECURITY][P0] Política central para rutas sensibles",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/239"
+      },
+      {
+        "baseRefName": "codex/issue-232-staging-main-gate",
+        "headRefName": "codex/issue-235-ci-quality-gate",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 238,
+        "state": "OPEN",
+        "title": "CI P0: contrato fail-closed de calidad del monorepo",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/238"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-232-staging-main-gate",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 236,
+        "state": "OPEN",
+        "title": "[OPS][P0] Enforce staging-to-main promotion gate",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/236"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-60-nft-testnet-deploy",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 230,
+        "state": "OPEN",
+        "title": "docs: documentar despliegue NFT y smoke Cukie Master staging",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/230"
+      },
+      {
+        "baseRefName": "staging",
+        "headRefName": "codex/issue-13-issue-13-20260711-a1",
+        "mergeCommit": null,
+        "mergedAt": null,
+        "number": 185,
+        "state": "OPEN",
+        "title": "fix(dapp): secure Telegram account linking",
+        "url": "https://github.com/fgomezserna/cukies-hub/pull/185"
+      }
+    ],
+    "openPullRequestsInventoryNote": "Complete open PR listing (limit 500), distinct from the 120 recent PR snapshot; includes PR185 outside that recent window."
+  },
+  "relatedTasks": [
+    {
+      "id": "01a0859a-cf4d-77a0-a137-6db60a0a0f96",
+      "title": "Optimiza despliegues lentos en stage",
+      "status": "active",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a0814e-0ea0-7070-877c-701f264243e7",
+      "title": "Ajusta flujo de embajadores (3)",
+      "status": "idle",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a07aec-6bc1-7203-8f43-357ed4b8931c",
+      "title": "Orquestador de tareas",
+      "status": "active",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a08621-beff-7d40-9aa8-db104e643659",
+      "title": "Actualizar reglas de embajadores",
+      "status": "idle",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a085a9-ce55-75e0-831e-b356608c2ab9",
+      "title": "Identifica los dos proyectos",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a0817d-b179-7ba0-aa3e-bbeca0d0dc0a",
+      "title": "Publica assets NFT en MinIO y regenera…",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/.codex/worktrees/8e53/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a08145-3d11-7711-b921-a54e029929a1",
+      "title": "Diseña la experiencia integral de Cukies…",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/.codex/worktrees/2cf0/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "019f7177-9f04-7e71-b9c0-09fa0265145b",
+      "title": "Define next project steps",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Documents/UnrealProjects/cukies.world.game",
+      "hostId": "local"
+    },
+    {
+      "id": "6a9f1cbe-9818-83eb-b705-0233cef1f091",
+      "title": "Ajusta flujo embajadores",
+      "status": "idle"
+    },
+    {
+      "id": "01a07cc6-4956-7150-a566-15112d49af34",
+      "title": "Ajusta flujo de embajadores (2)",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "6a440043-5a60-83eb-a9fd-cbfa64225704",
+      "title": "Vídeo explicativo UKI Cukies",
+      "status": "idle"
+    },
+    {
+      "id": "01a06b90-7f5c-7940-a2c6-6b900b419a52",
+      "title": "Revisar ramas del repositorio (2)",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a047bd-e005-7611-b8ff-bd53ab400ffb",
+      "title": "Revisar ramas del repositorio",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a066a3-fde0-7461-a260-399d4641510f",
+      "title": "Revisar distribución de tokens (2)",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a061a7-a24f-7380-9469-5e33ed1d2d60",
+      "title": "Revisar distribución de tokens",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a06151-7da8-7a60-a311-66a533b56269",
+      "title": "Analiza arbitraje UKI y ASM",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a06151-1284-77e0-9a4d-b2d200524efb",
+      "title": "Revisar distribución de tokens",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a03d56-e4d0-7873-8ac4-1b51be8bc3e5",
+      "title": "Revisar listing y staking UKI",
+      "status": "notLoaded",
+      "cwd": "/Users/fgomezserna/Proyectos/cukies-hub",
+      "hostId": "local"
+    },
+    {
+      "id": "01a0854e-bdff-7fe0-a7b5-2916abed2270",
+      "title": "Recupera precios, compraventa y fichas…",
+      "status": "idle",
+      "cwd": "/Users/fgomezserna/.codex/worktrees/e3dc/cukies-hub",
+      "hostId": "local"
+    }
+  ],
+  "runtime": {
+    "observedAt": "2026-09-09T17:20:58.069190+00:00",
+    "mode": "read-only docker ps/inspect, values allowlisted; no secrets exported",
+    "containers": [
+      {
+        "service": "cukie-pool-scheduler",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:40.629215152Z",
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "weekly-ranking-scheduler",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:40.576621723Z",
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "competition-credit-scheduler",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:40.645696762Z",
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "game-economy-scheduler",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:40.594652231Z",
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "reward-accounting-scheduler",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:40.637843936Z",
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "reward-batch-publisher",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:40.671671317Z",
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "cukie-master-scheduler",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:40.487573886Z",
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "cuki-card-worker-legacy",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:34.115428093Z",
+        "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "chain-indexer",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:34.142933333Z",
+        "image": "192.168.1.207:5000/cukies-hub/chain-indexer:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:e16908cc0c68cced1a22795c316c2ecec4ca845d6f8e6815de7ef4976037848d",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "dapp",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:34.131832456Z",
+        "image": "192.168.1.207:5000/cukies-hub/dapp:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:8de58e969b5591ba697ba9683530f3679dbc36db737fe18c9947a29a992e313b",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        },
+        "adminHmacConfigured": true,
+        "databaseTargets": {
+          "DATABASE_URL": {
+            "host": "192.168.1.221",
+            "db": "cukies-hub-staging"
+          },
+          "CUKIES_DATABASE_URL": {
+            "host": "192.168.1.221",
+            "db": "cukies-legacy-staging"
+          }
+        },
+        "economyDatabaseName": "cukieshub-new-staging"
+      },
+      {
+        "service": "cuki-card-worker",
+        "environment": "staging",
+        "state": "running",
+        "startedAt": "2026-09-09T17:16:34.099239257Z",
+        "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+        "settings": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "true",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+          "NEXT_PUBLIC_CUKIES_BRIDGE_MODE": "disabled",
+          "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+          "GAME_SYBILSLASH": "https://cukieshub.eurekand.com/treasurehunt-game"
+        }
+      },
+      {
+        "service": "chain-indexer",
+        "environment": "production",
+        "state": "running",
+        "startedAt": "2026-09-09T14:09:24.074547138Z",
+        "image": "jookw8ow8woks088s44404ok-chain-indexer",
+        "settings": {
+          "APP_ENV": "production",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "56",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "false",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "false",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "false",
+          "GAME_SYBILSLASH": "https://treasurehunt.cukies.world/"
+        }
+      },
+      {
+        "service": "dapp",
+        "environment": "production",
+        "state": "running",
+        "startedAt": "2026-09-09T14:09:24.081909017Z",
+        "image": "jookw8ow8woks088s44404ok-dapp",
+        "settings": {
+          "APP_ENV": "production",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "56",
+          "NEXT_PUBLIC_AMBASSADORS_VISIBLE": "false",
+          "COMPETITION_CREDITS_RUNTIME_ENABLED": "false",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "CUKIE_POOL_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "false",
+          "GAME_SYBILSLASH": "https://treasurehunt.cukies.world/"
+        },
+        "adminHmacConfigured": true,
+        "databaseTargets": {
+          "DATABASE_URL": {
+            "host": "192.168.1.221",
+            "db": "cukies-hub"
+          },
+          "CUKIES_DATABASE_URL": {
+            "host": "192.168.1.221",
+            "db": "cukies"
+          }
+        },
+        "economyDatabaseName": "cukieshub-new"
+      }
+    ],
+    "legacyIndexerRunning": false,
+    "bridgeRelayerRunning": false
+  },
+  "publicProbes": [
+    {
+      "env": "stage",
+      "url": "https://cukieshub.eurekand.com/api/health",
+      "status": 200,
+      "at": "2026-09-09T17:19:34.265100+00:00",
+      "contentType": "application/json",
+      "bytes": 256,
+      "sha256": "4506b84d737e1c841f59a3e70581940211112581853abd86a2ebe381fcc136d1",
+      "response": {
+        "status": "ok",
+        "app": "cukies-hub",
+        "environment": "staging",
+        "gitSha": "9745194c46ff8612303c12ef9f9c6fcf1e63cbbd",
+        "gitRef": "staging",
+        "buildTime": null,
+        "coolify": {
+          "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
+          "fqdn": "cukies-hub.eurekand.com,cukieshub.eurekand.com"
+        }
+      }
+    },
+    {
+      "env": "stage",
+      "url": "https://cukieshub.eurekand.com/api/games/config",
+      "status": 400,
+      "at": "2026-09-09T17:19:34.404543+00:00",
+      "contentType": "application/json",
+      "bytes": 40,
+      "sha256": "c4dc7beddbf34d72a4711bbb6ae7f35f0d2c78d793ce5db40fa352686f70db07",
+      "response": {
+        "error": "gameId parameter is required"
+      }
+    },
+    {
+      "env": "stage",
+      "url": "https://cukieshub.eurekand.com/api/marketplace/v1/catalog?scope=all&limit=2",
+      "status": 200,
+      "at": "2026-09-09T17:19:34.861750+00:00",
+      "contentType": "application/json",
+      "bytes": 2722,
+      "sha256": "bac4a27eba0d2f47535d4d3512cfe0485ff364d66b43548a672073115965ad1c",
+      "response": {
+        "status": "ok",
+        "data": {
+          "cursors": {
+            "legacyOffset": 2,
+            "ukiCursor": null
+          },
+          "hasMore": true,
+          "legacyFacets": {
+            "states": [
+              {
+                "value": "available",
+                "count": 10020
+              },
+              {
+                "value": "staking",
+                "count": 6231
+              },
+              {
+                "value": "onSale",
+                "count": 981
+              },
+              {
+                "value": "breeding",
+                "count": 216
+              },
+              {
+                "value": "inBridge",
+                "count": 16
+              }
+            ],
+            "networks": [
+              {
+                "value": "TRON",
+                "count": 13059
+              },
+              {
+                "value": "BSC",
+                "count": 4405
+              }
+            ],
+            "types": [
+              {
+                "value": "1",
+                "count": 9744
+              },
+              {
+                "value": "2",
+                "count": 4728
+              },
+              {
+                "value": "3",
+                "count": 1958
+              },
+              {
+                "value": "4",
+                "count": 792
+              },
+              {
+                "value": "5",
+                "count": 226
+              },
+              {
+                "value": "6",
+                "count": 16
+              }
+            ],
+            "generations": [
+              {
+                "value": "1",
+                "count": 12100
+              },
+              {
+                "value": "2",
+                "count": 5364
+              }
+            ]
+          },
+          "sources": {
+            "legacy": "ready",
+            "uki": "unavailable"
+          },
+          "legacyNetworks": {
+            "BSC": "ready",
+            "TRON": "ready"
+          },
+          "sampleItems": [
+            {
+              "source": "legacy",
+              "tokenId": "4000000007954",
+              "network": "TRON",
+              "state": "onSale",
+              "imageUrl": "https://assets-staging.cukies.world/NDAwMDAwMDAwNzk1NA/15b8d132be3f51a9a3238041ef0417d91c2a568674468b718b60842c524a5176.png",
+              "priceOriginal": "900000000"
+            },
+            {
+              "source": "legacy",
+              "tokenId": "2000000004314",
+              "network": "TRON",
+              "state": "onSale",
+              "imageUrl": "https://assets-staging.cukies.world/MjAwMDAwMDAwNDMxNA/aa819eccfe1e5ebf9da8d7954084f858c801ee3368d23763c22b785767d6665b.png",
+              "priceOriginal": "3333000000"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "env": "stage",
+      "url": "https://cukieshub.eurekand.com/api/marketplace/v1/orders?limit=2",
+      "status": 503,
+      "at": "2026-09-09T17:19:34.970727+00:00",
+      "contentType": "application/json",
+      "bytes": 55,
+      "sha256": "edd83ba2f715bff98997304dddac447c3c9f4cc66295cc1e1d87a6b32919271e",
+      "response": {
+        "status": "error",
+        "code": "UKI_MARKETPLACE_UNAVAILABLE"
+      }
+    },
+    {
+      "env": "stage",
+      "url": "https://cukieshub.eurekand.com/api/cukies?network=BSC&limit=1",
+      "status": 200,
+      "at": "2026-09-09T17:19:35.079439+00:00",
+      "contentType": "application/json",
+      "bytes": 762,
+      "sha256": "132a922ee9dd89fba6606b448c5dec71911f38a34aff581d30173d600395e7b4",
+      "response": {
+        "source": "mongo",
+        "total": 18,
+        "offset": 0,
+        "limit": 1,
+        "facets": {
+          "states": [
+            {
+              "value": "available",
+              "count": 18
+            }
+          ],
+          "networks": [
+            {
+              "value": "BSC",
+              "count": 18
+            }
+          ],
+          "types": [],
+          "generations": []
+        },
+        "sampleItemCount": 1
+      }
+    },
+    {
+      "env": "stage",
+      "url": "https://cukieshub.eurekand.com/api/legacy-marketplace/config",
+      "status": 200,
+      "at": "2026-09-09T17:19:35.218440+00:00",
+      "contentType": "application/json",
+      "bytes": 3930,
+      "sha256": "79d2f96c945a3d8740b718bd3c9405565159e40d6a64e508c028ba8ecba28358",
+      "response": {
+        "source": {
+          "url": "https://marketplace.cukies.world/",
+          "extractedAt": "2026-05-12",
+          "securityIssueUrl": "https://github.com/fgomezserna/cukies-hub/issues/160"
+        },
+        "endpoints": {
+          "graphQl": "https://api.cukies.world/data-graphql/graphql",
+          "authRestBase": "https://api.cukies.world/auth",
+          "nftImageBase": "https://cukies.s3.eu-west-3.amazonaws.com/png/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe"
+        },
+        "contracts": {
+          "bsc": {
+            "chainId": 56,
+            "chainName": "BNB Smart Chain",
+            "rpcUrl": "https://bsc-rpc.publicnode.com",
+            "blockExplorerBaseUrl": "https://bscscan.com",
+            "contracts": {
+              "token": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+              "points": "0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2",
+              "stakingPoints": "0xF381bfB59A2ae9623eFBce2C83AafF60f783cc6F",
+              "breedingPoints": "0x39Be8C4FA342C5f3C10d7c16941A0946D29Ade4A",
+              "marketplace": "0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91",
+              "bridge": "0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E"
+            }
+          },
+          "tron": {
+            "chainName": "TRON mainnet",
+            "rpcUrl": "https://api.trongrid.io",
+            "readRpcUrl": "https://tron-rpc.publicnode.com",
+            "contracts": {
+              "mint": "TUrjiyFSa1pq8TGZJnsTAHcgyxnnRmZjN7",
+              "token": "TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe",
+              "referrals": "TZ4QM9RF1pxfoxnPY8UGAQEEwq5SDoZXk4",
+              "points": "TWwNJEySYrkNXTpDBF7WfGwkoW4YTZ4yKA",
+              "stakingPoints": "TUfbQaVERA1TmT31LU3HWJS6xsW3B8VfUY",
+              "breedingPoints": "TXrvQKgzWpsMkp9ebiF1uXNPRgKxNanB9S",
+              "marketplace": "TWDoJEq4eVd9vUgQ6f5knjqouRBPyGDzSB",
+              "bridge": "TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ"
+            }
+          }
+        },
+        "operations": {
+          "marketplace": [
+            "buyToken(tokenId)",
+            "putTokenOnSale(tokenId, price)",
+            "cancelTokenSale(tokenId)",
+            "changeMarketTokenPrice(tokenId, price)",
+            "feeCancelPrice()",
+            "marketFeePercentage()"
+          ],
+          "token": [
+            "ownerOf(tokenId)",
+            "tokenURI(tokenId)",
+            "getCukie(tokenId)",
+            "getType(tokenId)",
+            "isApprovedForAll(owner, operator)",
+            "setApprovalForAll(operator, approved)",
+            "transferFrom(from, to, tokenId)"
+          ],
+          "farming": [
+            "stake(tokenId)",
+            "unstake(tokenId)",
+            "getTokensOwner(owner)",
+            "calcPoints(tokenId)",
+            "pointsToType(typeId)"
+          ],
+          "breeding": [
+            "start(parent1, parent2)",
+            "breed(breedId)",
+            "getAllBreedsOwner(owner)",
+            "getActiveBreedsOwner(owner)",
+            "getCostPoints(parent1, parent2)",
+            "getMaxBreedsByCukie()"
+          ],
+          "bridge": [
+            "jumpInBridge(tokenId, owner, destinationNetwork)",
+            "jumpOutBridge(...)",
+            "bridgePrice()"
+          ]
+        },
+        "abiEntries": {
+          "bsc": {
+            "token": 46,
+            "points": 23,
+            "stakingPoints": 28,
+            "breedingPoints": 41,
+            "marketplace": 31,
+            "bridge": 20
+          },
+          "tron": {
+            "mint": 27,
+            "token": 41,
+            "referrals": 14,
+            "points": 23,
+            "stakingPoints": 28,
+            "breedingPoints": 41,
+            "marketplace": 31,
+            "bridge": 20
+          }
+        }
+      }
+    },
+    {
+      "env": "stage",
+      "url": "https://cukieshub.eurekand.com/api/cukies/points?network=BSC&limit=1",
+      "status": 200,
+      "at": "2026-09-09T17:19:35.329968+00:00",
+      "contentType": "application/json",
+      "bytes": 146,
+      "sha256": "b799ec802d73f2459655e1d2c480627c1459302ef0d2b6df9475e97916945173",
+      "response": {
+        "source": "mongo",
+        "total": 0,
+        "offset": 0,
+        "limit": 1,
+        "summary": {
+          "totalPoints": 0,
+          "totalTransactions": 0,
+          "facets": {
+            "networks": [],
+            "types": []
+          }
+        },
+        "sampleItemCount": 0
+      }
+    },
+    {
+      "env": "prod",
+      "url": "https://cukies.world/api/health",
+      "status": 200,
+      "at": "2026-09-09T17:19:35.581459+00:00",
+      "contentType": "application/json",
+      "bytes": 239,
+      "sha256": "ee9455fb1d76907803c36ff04fc277fd934580e7f4fc5b6f95bd6fefb3489847",
+      "response": {
+        "status": "ok",
+        "app": "cukies-hub",
+        "environment": "production",
+        "gitSha": "4475baaa9a9d560711b8b9e14a38055aecb79c1f",
+        "gitRef": "main",
+        "buildTime": null,
+        "coolify": {
+          "resourceUuid": "jookw8ow8woks088s44404ok",
+          "fqdn": "cukies.world,www.cukies.world"
+        }
+      }
+    },
+    {
+      "env": "prod",
+      "url": "https://cukies.world/api/games/config",
+      "status": 400,
+      "at": "2026-09-09T17:19:35.729354+00:00",
+      "contentType": "application/json",
+      "bytes": 40,
+      "sha256": "c4dc7beddbf34d72a4711bbb6ae7f35f0d2c78d793ce5db40fa352686f70db07",
+      "response": {
+        "error": "gameId parameter is required"
+      }
+    },
+    {
+      "env": "prod",
+      "url": "https://cukies.world/api/marketplace/v1/catalog?scope=all&limit=2",
+      "status": 404,
+      "at": "2026-09-09T17:19:35.867206+00:00",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 12970,
+      "sha256": "bb0036695680a03d4a456ef6ac86922455753504f6fe08bd102b7147ae058b10"
+    },
+    {
+      "env": "prod",
+      "url": "https://cukies.world/api/marketplace/v1/orders?limit=2",
+      "status": 404,
+      "at": "2026-09-09T17:19:36.001426+00:00",
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 12928,
+      "sha256": "ceabf818b8750760bd2e894fc334a6a178fcd603a19ae77cb107db442a98a79d"
+    },
+    {
+      "env": "prod",
+      "url": "https://cukies.world/api/cukies?network=BSC&limit=1",
+      "status": 200,
+      "at": "2026-09-09T17:19:36.443939+00:00",
+      "contentType": "application/json",
+      "bytes": 1685,
+      "sha256": "bac7dac0c2b4773cc2a9d6f25c7c6926b7db6ff7910254f1593d07bc8151c22a",
+      "response": {
+        "source": "mongo",
+        "total": 4405,
+        "offset": 0,
+        "limit": 1,
+        "facets": {
+          "states": [
+            {
+              "value": "available",
+              "count": 14352
+            },
+            {
+              "value": "staking",
+              "count": 2331
+            },
+            {
+              "value": "onSale",
+              "count": 685
+            },
+            {
+              "value": "breeding",
+              "count": 88
+            },
+            {
+              "value": "inBridge",
+              "count": 8
+            }
+          ],
+          "networks": [
+            {
+              "value": "TRON",
+              "count": 13059
+            },
+            {
+              "value": "BSC",
+              "count": 4405
+            }
+          ],
+          "types": [
+            {
+              "value": "1",
+              "count": 9744
+            },
+            {
+              "value": "2",
+              "count": 4728
+            },
+            {
+              "value": "3",
+              "count": 1958
+            },
+            {
+              "value": "4",
+              "count": 792
+            },
+            {
+              "value": "5",
+              "count": 226
+            },
+            {
+              "value": "6",
+              "count": 16
+            }
+          ],
+          "generations": [
+            {
+              "value": "1",
+              "count": 12100
+            },
+            {
+              "value": "2",
+              "count": 5364
+            }
+          ]
+        },
+        "sampleItemCount": 1
+      }
+    },
+    {
+      "env": "prod",
+      "url": "https://cukies.world/api/legacy-marketplace/config",
+      "status": 200,
+      "at": "2026-09-09T17:19:36.583064+00:00",
+      "contentType": "application/json",
+      "bytes": 3885,
+      "sha256": "2c9a0a3c6b11fbd9db86b1afe1e9b0d0b75df0b53ea90c90d70d5e7f4d9dea57",
+      "response": {
+        "source": {
+          "url": "https://marketplace.cukies.world/",
+          "extractedAt": "2026-05-12",
+          "securityIssueUrl": "https://github.com/fgomezserna/cukies-hub/issues/160"
+        },
+        "endpoints": {
+          "graphQl": "https://api.cukies.world/data-graphql/graphql",
+          "authRestBase": "https://api.cukies.world/auth",
+          "nftImageBase": "https://cukies.s3.eu-west-3.amazonaws.com/png/tokens/v2/TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe"
+        },
+        "contracts": {
+          "bsc": {
+            "chainId": 56,
+            "chainName": "BNB Smart Chain",
+            "rpcUrl": "https://bsc-dataseed.binance.org",
+            "blockExplorerBaseUrl": "https://bscscan.com",
+            "contracts": {
+              "token": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+              "points": "0x6875F0C9547c35F7EE700230FE8B9A7687F3ddB2",
+              "stakingPoints": "0xF381bfB59A2ae9623eFBce2C83AafF60f783cc6F",
+              "breedingPoints": "0x39Be8C4FA342C5f3C10d7c16941A0946D29Ade4A",
+              "marketplace": "0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91",
+              "bridge": "0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E"
+            }
+          },
+          "tron": {
+            "chainName": "TRON mainnet",
+            "rpcUrl": "https://api.trongrid.io",
+            "contracts": {
+              "mint": "TUrjiyFSa1pq8TGZJnsTAHcgyxnnRmZjN7",
+              "token": "TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe",
+              "referrals": "TZ4QM9RF1pxfoxnPY8UGAQEEwq5SDoZXk4",
+              "points": "TWwNJEySYrkNXTpDBF7WfGwkoW4YTZ4yKA",
+              "stakingPoints": "TUfbQaVERA1TmT31LU3HWJS6xsW3B8VfUY",
+              "breedingPoints": "TXrvQKgzWpsMkp9ebiF1uXNPRgKxNanB9S",
+              "marketplace": "TWDoJEq4eVd9vUgQ6f5knjqouRBPyGDzSB",
+              "bridge": "TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ"
+            }
+          }
+        },
+        "operations": {
+          "marketplace": [
+            "buyToken(tokenId)",
+            "putTokenOnSale(tokenId, price)",
+            "cancelTokenSale(tokenId)",
+            "changeMarketTokenPrice(tokenId, price)",
+            "feeCancelPrice()",
+            "marketFeePercentage()"
+          ],
+          "token": [
+            "ownerOf(tokenId)",
+            "tokenURI(tokenId)",
+            "getCukie(tokenId)",
+            "getType(tokenId)",
+            "isApprovedForAll(owner, operator)",
+            "setApprovalForAll(operator, approved)",
+            "transferFrom(from, to, tokenId)"
+          ],
+          "farming": [
+            "stake(tokenId)",
+            "unstake(tokenId)",
+            "getTokensOwner(owner)",
+            "calcPoints(tokenId)",
+            "pointsToType(typeId)"
+          ],
+          "breeding": [
+            "start(parent1, parent2)",
+            "breed(breedId)",
+            "getAllBreedsOwner(owner)",
+            "getActiveBreedsOwner(owner)",
+            "getCostPoints(parent1, parent2)",
+            "getMaxBreedsByCukie()"
+          ],
+          "bridge": [
+            "jumpInBridge(tokenId, owner, destinationNetwork)",
+            "jumpOutBridge(...)",
+            "bridgePrice()"
+          ]
+        },
+        "abiEntries": {
+          "bsc": {
+            "token": 46,
+            "points": 23,
+            "stakingPoints": 28,
+            "breedingPoints": 41,
+            "marketplace": 31,
+            "bridge": 20
+          },
+          "tron": {
+            "mint": 27,
+            "token": 41,
+            "referrals": 14,
+            "points": 23,
+            "stakingPoints": 28,
+            "breedingPoints": 41,
+            "marketplace": 31,
+            "bridge": 20
+          }
+        }
+      }
+    },
+    {
+      "env": "prod",
+      "url": "https://cukies.world/api/cukies/points?network=BSC&limit=1",
+      "status": 200,
+      "at": "2026-09-09T17:19:36.693977+00:00",
+      "contentType": "application/json",
+      "bytes": 672,
+      "sha256": "46ca6febc780daab7c8e693dbfd28e0274afb5c61e0ecfae46b178a2dac98e72",
+      "response": {
+        "source": "mongo",
+        "total": 3094,
+        "offset": 0,
+        "limit": 1,
+        "summary": {
+          "totalPoints": 1126936,
+          "totalTransactions": 3094,
+          "facets": {
+            "networks": [
+              {
+                "value": "BSC",
+                "count": 3094
+              }
+            ],
+            "types": [
+              {
+                "value": "Breeding",
+                "count": 1226
+              },
+              {
+                "value": "Unstake",
+                "count": 1868
+              }
+            ]
+          }
+        },
+        "sampleItemCount": 1
+      }
+    }
+  ],
+  "scopeLimits": [
+    "No authenticated browser session operated; Edge1995115583 reserved by Pool coordinator.",
+    "No wallet signing, purchase, transfer, DB writes, deployment, or issue closure.",
+    "Previous QA is attributed to its original time and commit; test code was inspected, not reexecuted.",
+    "Transient 404s during 17:16 infrastructure restart are not evidence of stable regression.",
+    "Pool PR355 in separate coordinator task; no duplicated implementation.",
+    "Pool 6803252 final QA is an attributed coordinator handoff; authenticated UI was not operated by this auditor."
+  ],
+  "gameAssetsEvidence": "2026-09-09-game-docx-probes.json",
+  "orchestratorPoolHandoff": {
+    "sourceThreadId": "01a07aec-6bc1-7203-8f43-357ed4b8931c",
+    "observedAtWindowUtc": [
+      "2026-09-09T17:29:00Z",
+      "2026-09-09T17:33:00Z"
+    ],
+    "attribution": "Authenticated UI and runtime QA performed by the coordinator and its verifier; this audit read the supplied artifacts and handoff, without operating their browser/wallet.",
+    "pullRequest": 355,
+    "commit": "6803252de3edcbf48c6a050408c846bd8df9ef7b",
+    "ci": {
+      "runId": 34382259657,
+      "status": "success",
+      "duration": "8m53s"
+    },
+    "ui": {
+      "collection": {
+        "total": 12,
+        "wallet": 2,
+        "pool": 9,
+        "master": 1
+      },
+      "pendingOldVaultTokens": [
+        "98000001",
+        "98000003",
+        "98000004"
+      ],
+      "withdrawnToken": "98000007",
+      "withdrawAvailableAtUtc": "2026-09-10T14:00:00Z",
+      "verifiedRecoveryToken": "98000003",
+      "recoveryIdentityAndBeneficiaryVerified": true,
+      "prematureWithdrawButtonAbsent": true,
+      "currentPoolPositions": 6,
+      "currentPoolPlayable": 5,
+      "currentPoolWithdrawableToken": "98000008",
+      "oldVaultBannerAbsentFromNormalPool": true,
+      "responsive": {
+        "effectiveCssViewportWidth": 521,
+        "zoomPercent": 75,
+        "scrollWidthEqualsClientWidth": true
+      },
+      "remaining": [
+        "Global recovery banner persists and predates PR355; root cause not established.",
+        "Recovery title/token visually repeated.",
+        "Three old-vault positions remain physically custodied until withdrawal; no global migration completion.",
+        "First reload encountered ERR_BLOCKED_BY_CLIENT; normal reload recovered and wallet reconnected without new signature. No complete console-error absence asserted."
+      ]
+    },
+    "runtimeSummary": {
+      "runningServices": 11,
+      "restartCount": 0,
+      "dappIndexerSchedulersHealthy": true,
+      "cardGuardsPass": 2,
+      "capacityHeartbeatAgeSeconds": 26,
+      "imagesMissing": 0,
+      "indexerLastObservedBlock": 130063570,
+      "indexerErrors": [],
+      "srvFreeGB": 21,
+      "mongoCurrentCheck": "TCP 192.168.1.221:27018 only",
+      "mongoPrimaryLastEvidenceAtUtc": "2026-09-09T17:18:00Z",
+      "attribution": "Summary from coordinator verifier Luna verificar_pool_stage_runtime; no separate raw command output file supplied."
+    },
+    "artifacts": {
+      "health.json": {
+        "sourcePath": "/tmp/pool-stage-runtime-6803252/health.json",
+        "sha256": "d7b28f09fe6a054055f3c5df73514a387e680ef6a028e26665a316059ebaf8a2",
+        "data": {
+          "status": "ok",
+          "app": "cukies-hub",
+          "environment": "staging",
+          "gitSha": "6803252de3edcbf48c6a050408c846bd8df9ef7b",
+          "gitRef": "staging",
+          "buildTime": null,
+          "coolify": {
+            "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
+            "fqdn": "cukies-hub.eurekand.com,cukieshub.eurekand.com"
+          }
+        }
+      },
+      "plan.json": {
+        "sourcePath": "/tmp/pool-stage-runtime-6803252/cukies-staging-release-6803252de3edcbf48c6a050408c846bd8df9ef7b/plan.json",
+        "sha256": "f883adc0dd8afd519802c819826a0aec0e1d5b61f14ffe43848c58f39180196c",
+        "data": {
+          "head": "6803252de3edcbf48c6a050408c846bd8df9ef7b",
+          "base": "9745194c46ff8612303c12ef9f9c6fcf1e63cbbd",
+          "baseReason": "last-successful-deploy",
+          "planReason": "component-changes",
+          "refinement": null,
+          "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "nx": {
+            "available": true,
+            "projects": [
+              "dapp"
+            ],
+            "affected": [
+              "dapp"
+            ],
+            "stderr": null
+          },
+          "changedFiles": [
+            "dapp/__tests__/components/cukie-pool-status-panel.test.tsx",
+            "dapp/__tests__/components/my-cukies-panel.test.tsx",
+            "dapp/__tests__/components/nft-vault-recovery-panel.test.tsx",
+            "dapp/src/app/(app)/cukie-hodler/page.tsx",
+            "dapp/src/app/(app)/cukie-hodler/recuperar/page.tsx",
+            "dapp/src/components/cukie-pool/status-panel.tsx",
+            "dapp/src/components/cukies/my-cukies-panel.tsx",
+            "dapp/src/components/nft-vault/recovery-panel.tsx",
+            "docs/antes-del-15-seguimiento.md",
+            "docs/evidence/2026-09-09-pool-test-retirements.json"
+          ],
+          "build": [
+            "dapp"
+          ],
+          "reuse": [
+            {
+              "component": "chain-indexer",
+              "image": "192.168.1.207:5000/cukies-hub/chain-indexer:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:e16908cc0c68cced1a22795c316c2ecec4ca845d6f8e6815de7ef4976037848d",
+              "digest": "sha256:e16908cc0c68cced1a22795c316c2ecec4ca845d6f8e6815de7ef4976037848d",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            },
+            {
+              "component": "cuki-card-worker",
+              "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+              "digest": "sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            },
+            {
+              "component": "schedulers",
+              "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+              "digest": "sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            },
+            {
+              "component": "cukies-bridge-relayer",
+              "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5e495fa05d0138db01a05cdb62fc7e2e753a85835e2d3c77b3fa8946ec43d033",
+              "digest": "sha256:5e495fa05d0138db01a05cdb62fc7e2e753a85835e2d3c77b3fa8946ec43d033",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            }
+          ],
+          "imageEnv": {
+            "dapp": "CUKIES_IMAGE_DAPP",
+            "chain-indexer": "CUKIES_IMAGE_CHAIN_INDEXER",
+            "cuki-card-worker": "CUKIES_IMAGE_CUKI_CARD_WORKER",
+            "schedulers": "CUKIES_IMAGE_SCHEDULERS",
+            "cukies-bridge-relayer": "CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER"
+          }
+        }
+      },
+      "deploy-result.json": {
+        "sourcePath": "/tmp/pool-stage-runtime-6803252/cukies-staging-release-6803252de3edcbf48c6a050408c846bd8df9ef7b/deploy-result.json",
+        "sha256": "700388ef1af3037485d6c6a87dfcc08c1c6f45104a824aa0492e097875ac1574",
+        "data": {
+          "deploymentUuid": "q8cgs8c0sgc8osko8w084sos",
+          "healthSha": "6803252de3edcbf48c6a050408c846bd8df9ef7b",
+          "environment": "staging",
+          "resourceUuid": "u4s804o4wwcckowgk0woo4wg",
+          "healthUrl": "https://cukieshub.eurekand.com/api/health",
+          "deploymentTimeoutMs": 1800000,
+          "healthTimeoutMs": 15000,
+          "status": "finished"
+        }
+      },
+      "manifest.json": {
+        "sourcePath": "/tmp/pool-stage-runtime-6803252/cukies-staging-release-6803252de3edcbf48c6a050408c846bd8df9ef7b/manifest.json",
+        "sha256": "f0f52550d2a0df9de495265710c390ce4a04d0392150fa084d9596b82aa34028",
+        "data": {
+          "environment": "staging",
+          "chainId": "97",
+          "commit": "6803252de3edcbf48c6a050408c846bd8df9ef7b",
+          "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "deploymentUuid": "q8cgs8c0sgc8osko8w084sos",
+          "components": {
+            "chain-indexer": {
+              "component": "chain-indexer",
+              "image": "192.168.1.207:5000/cukies-hub/chain-indexer:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:e16908cc0c68cced1a22795c316c2ecec4ca845d6f8e6815de7ef4976037848d",
+              "digest": "sha256:e16908cc0c68cced1a22795c316c2ecec4ca845d6f8e6815de7ef4976037848d",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            },
+            "cuki-card-worker": {
+              "component": "cuki-card-worker",
+              "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+              "digest": "sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            },
+            "schedulers": {
+              "component": "schedulers",
+              "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+              "digest": "sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            },
+            "cukies-bridge-relayer": {
+              "component": "cukies-bridge-relayer",
+              "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5e495fa05d0138db01a05cdb62fc7e2e753a85835e2d3c77b3fa8946ec43d033",
+              "digest": "sha256:5e495fa05d0138db01a05cdb62fc7e2e753a85835e2d3c77b3fa8946ec43d033",
+              "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+            },
+            "dapp": {
+              "image": "192.168.1.207:5000/cukies-hub/dapp:6803252de3edcbf48c6a050408c846bd8df9ef7b-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:731a49e5cc2cee5eebbba00914b348df21b70905d1d7bd579ce5a383fbb23eb1",
+              "digest": "sha256:731a49e5cc2cee5eebbba00914b348df21b70905d1d7bd579ce5a383fbb23eb1",
+              "tag": "6803252de3edcbf48c6a050408c846bd8df9ef7b-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+              "sourceSha": "6803252de3edcbf48c6a050408c846bd8df9ef7b"
+            }
+          }
+        }
+      }
+    },
+    "windowHandoff": "Coordinator ceded deployment window back to INFRA after QA; no documentation deployment.",
+    "uiReport": {
+      "path": "docs/evidence/2026-09-09-pool-ui-qa.md",
+      "sourcePath": "/tmp/cukies-pool-ui-qa-20260909.md",
+      "sha256": "238ee05725d6a983f9da780ef677d0cc43cb7ce0b7dc9a76cdebed05785d8d21",
+      "screenshots": "Inline in coordinator task only; no local PNG files.",
+      "productCheckLogs": "Lint/test/build results were reported in agent output; no persistent raw log files supplied."
+    }
+  },
+  "coverage": {
+    "originalNumberedPointsIncludingGeneral": 16,
+    "additionalRequirements": 3,
+    "originalAndGeneralChecks": 57,
+    "additionalChecks": 37,
+    "totalAtomicChecks": 94,
+    "idGroups": {
+      "J": 6,
+      "M": 7,
+      "CR": 2,
+      "E": 26,
+      "PO": 1,
+      "MC": 10,
+      "G": 5,
+      "SV": 4,
+      "L": 15,
+      "V": 18
+    },
+    "traceabilityDocument": "docs/antes-del-15-cobertura-cambios-20260909.md",
+    "canonicalState": "docs/antes-del-15-seguimiento.md",
+    "sourceLocatorNote": "P01-P23 are source paragraph IDs; PO01 is the Pool requirement ID."
+  }
+}
