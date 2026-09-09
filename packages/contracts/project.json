@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "contracts",
+  "projectType": "library",
+  "sourceRoot": "packages/contracts",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/artifacts", "{projectRoot}/cache"],
+      "options": {
+        "command": "pnpm exec hardhat compile",
+        "cwd": "packages/contracts"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec hardhat test",
+        "cwd": "packages/contracts"
+      }
+    }
+  },
+  "tags": ["scope:contracts"]
+}

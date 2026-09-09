@@ -1,4 +1,6 @@
 .git
+.nx
+**/.nx
 .next
 .next-dev
 .secrets

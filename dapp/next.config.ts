@@ -20,6 +20,7 @@ const treasureHuntBaseUrl = treasureHuntPublicBaseUrl();
 
 const nextConfig: NextConfig = {
   /* config options here */
+  ...(process.env.CUKIES_STANDALONE === 'true' ? { output: 'standalone' } : {}),
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },

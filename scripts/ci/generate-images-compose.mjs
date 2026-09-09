@@ -1,0 +1,136 @@
+#!/usr/bin/env node
+
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+const SERVICE_IMAGES = Object.freeze({
+  dapp: 'CUKIES_IMAGE_DAPP',
+  'chain-indexer': 'CUKIES_IMAGE_CHAIN_INDEXER',
+  'legacy-chain-indexer': 'CUKIES_IMAGE_CHAIN_INDEXER',
+  'cuki-card-worker': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
+  'cuki-card-worker-legacy': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
+  'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
+  'cukie-master-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
+  'competition-credit-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
+  'game-economy-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
+  'cukie-pool-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
+  'weekly-ranking-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
+  'reward-accounting-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
+  'reward-batch-publisher': 'CUKIES_IMAGE_SCHEDULERS',
+});
+
+const GENERATED_HEADER = [
+  '# GENERATED FILE. Do not edit directly.',
+  '# Source: docker-compose.coolify.yml',
+  '# Regenerate with: node scripts/ci/generate-images-compose.mjs --write',
+  '',
+].join('\n');
+
+function serviceBlocks(lines) {
+  const starts = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^  ([a-z0-9-]+):$/);
+    if (match) starts.push({ index, name: match[1] });
+  }
+  return starts.map((entry, position) => ({
+    ...entry,
+    end: starts[position + 1]?.index ?? lines.length,
+  }));
+}
+
+function removeBlock(lines, start, end) {
+  return [...lines.slice(0, start), ...lines.slice(end)];
+}
+
+function transformService(lines, name, imageEnv) {
+  const result = [lines[0], `    image: "\${${imageEnv}:?Set ${imageEnv} to an immutable digest reference}"`];
+  let skipBuild = false;
+  for (const line of lines.slice(1)) {
+    if (line === '    <<: *dapp-runtime') continue;
+    if (line === '    build:') {
+      skipBuild = true;
+      continue;
+    }
+    if (skipBuild) {
+      if (/^    [A-Za-z0-9_][A-Za-z0-9_-]*:/.test(line)) skipBuild = false;
+      else continue;
+    }
+    result.push(line);
+  }
+
+  if (name === 'dapp') {
+    const uuidIndex = result.findIndex((line) => line.startsWith('      COOLIFY_RESOURCE_UUID:'));
+    if (uuidIndex !== -1) result.splice(uuidIndex + 1, 0, '      GIT_COMMIT_SHA: ${IMAGE_REVISION:?Set IMAGE_REVISION to the deployed SHA}');
+  }
+  return result;
+}
+
+export function generateImagesCompose(source) {
+  let lines = String(source).replace(/\r\n/g, '\n').trimEnd().split('\n');
+  const servicesMarker = lines.findIndex((line) => line === 'services:');
+  if (servicesMarker === -1) throw new Error('docker-compose.coolify.yml no contiene services.');
+  lines = lines.slice(servicesMarker);
+  for (const block of serviceBlocks(lines).reverse()) {
+    if (block.name === 'staging-mongo') lines = removeBlock(lines, block.index, block.end);
+  }
+
+  const serviceStart = 0;
+  const serviceEnd = lines.slice(serviceStart + 1).findIndex((line) => /^(networks|volumes):$/.test(line));
+  const servicesEnd = serviceEnd === -1 ? lines.length : serviceStart + 1 + serviceEnd;
+  const serviceLines = lines.slice(serviceStart + 1, servicesEnd);
+  const transformed = [];
+  const serviceDocument = ['services:', ...serviceLines];
+  for (const block of serviceBlocks(serviceDocument).slice(0)) {
+    if (!SERVICE_IMAGES[block.name]) {
+      throw new Error(`service ${block.name} no tiene una imagen CI definida.`);
+    }
+    const body = serviceDocument.slice(block.index, block.end);
+    transformed.push(...transformService(body, block.name, SERVICE_IMAGES[block.name]));
+  }
+  lines = [...lines.slice(0, serviceStart + 1), ...transformed, ...lines.slice(servicesEnd)];
+
+  const volumesIndex = lines.findIndex((line) => line === 'volumes:');
+  if (volumesIndex !== -1) {
+    const volumeStarts = [];
+    for (let index = volumesIndex + 1; index < lines.length; index += 1) {
+      const match = lines[index].match(/^  ([a-z0-9-]+):$/);
+      if (match) volumeStarts.push({ index, name: match[1] });
+    }
+    const kept = [];
+    for (const block of volumeStarts) {
+      if (!['staging-mongo-data', 'staging-mongo-config'].includes(block.name)) {
+        kept.push(...lines.slice(block.index, volumeStarts[volumeStarts.indexOf(block) + 1]?.index ?? lines.length));
+      }
+    }
+    lines = kept.length
+      ? [...lines.slice(0, volumesIndex + 1), ...kept]
+      : lines.slice(0, volumesIndex);
+  }
+
+  const output = `${GENERATED_HEADER}${lines.join('\n').trimEnd()}\n`;
+  if (/^\s+build:/m.test(output) || /staging-mongo|staging-mongo-data|staging-mongo-config/.test(output)) {
+    throw new Error('el compose de imágenes conserva build o recursos staging-mongo.');
+  }
+  return output;
+}
+
+async function main() {
+  const root = resolve(new URL('../..', import.meta.url).pathname);
+  const sourcePath = resolve(root, 'docker-compose.coolify.yml');
+  const outputPath = resolve(root, 'docker-compose.images.yml');
+  const generated = generateImagesCompose(await readFile(sourcePath, 'utf8'));
+  if (process.argv.includes('--check')) {
+    const current = await readFile(outputPath, 'utf8').catch(() => null);
+    if (current !== generated) throw new Error('docker-compose.images.yml está desactualizado; ejecuta --write.');
+    return;
+  }
+  if (!process.argv.includes('--write')) throw new Error('usa --write o --check.');
+  await writeFile(outputPath, generated);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

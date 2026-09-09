@@ -5,6 +5,7 @@ dapp-demo
 
 # Monorepo
 node_modules
+.nx/
 .pnpm-debug.log*
 
 # dependencies

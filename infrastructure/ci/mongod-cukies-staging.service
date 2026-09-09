@@ -1,0 +1,19 @@
+[Unit]
+Description=Cukies staging MongoDB (independent of Coolify deployments)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cukies-mongo
+Group=cukies-mongo
+ExecStart=/usr/bin/mongod --config /etc/mongod-cukies-staging.conf
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=120
+LimitNOFILE=64000
+TasksMax=infinity
+MemoryMax=1536M
+CPUQuota=150%
+
+[Install]
+WantedBy=multi-user.target
