@@ -10,6 +10,7 @@ import {
 } from './graphql';
 import {
   getLegacyMarketplaceNftImageUrl,
+  legacyMarketplaceContracts,
   normalizeLegacyMarketplaceNftImageUrl,
 } from './config';
 import {
@@ -169,6 +170,11 @@ function normalizeRelation(value: unknown): LegacyMarketplaceCukiReference | nul
   return {
     id,
     tokenId: id,
+    chainId: document.network === 'BSC' ? 56 : null,
+    collectionAddress:
+      document.network === 'BSC'
+        ? legacyMarketplaceContracts.bsc.contracts.token
+        : legacyMarketplaceContracts.tron.contracts.token,
     cukiNumber: toNumberOrNull(document.cukiNumber),
     network: toStringOrNull(document.network),
     birthNetwork: toStringOrNull(document.birthNetwork),
@@ -370,6 +376,11 @@ function normalizeCuki(document: LegacyCukiDocument): LegacyMarketplaceCukiItem 
   return {
     id,
     tokenId: id,
+    chainId: document.network === 'BSC' ? 56 : null,
+    collectionAddress:
+      document.network === 'BSC'
+        ? legacyMarketplaceContracts.bsc.contracts.token
+        : legacyMarketplaceContracts.tron.contracts.token,
     cukiNumber: toNumberOrNull(document.cukiNumber),
     owner: toStringOrNull(document.user),
     network: toStringOrNull(document.network) ?? 'TRON',
@@ -526,7 +537,9 @@ async function hydrateCukiDocument(
   return hydrateCukiHistory(withRelations);
 }
 
-function buildMongoFilter(params: LegacyMarketplaceListParams) {
+export function buildLegacyMarketplaceMongoFilter(
+  params: LegacyMarketplaceListParams,
+) {
   const filter: Filter<LegacyCukiDocument> = {};
   const search = params.search?.trim();
 
@@ -534,7 +547,10 @@ function buildMongoFilter(params: LegacyMarketplaceListParams) {
     filter.network = params.network;
   }
 
-  if (isLegacyState(params.state)) {
+  if (params.marketplaceOnly) {
+    filter.state = 'onSale';
+    filter.priceOriginal = { $type: 'string', $regex: /^[1-9]\d*$/ };
+  } else if (isLegacyState(params.state)) {
     filter.state = params.state;
   }
 
@@ -668,7 +684,7 @@ export async function listLegacyMarketplaceCukies(
 
   try {
     const collection = await getCukiesCollection();
-    const filter = buildMongoFilter(params);
+    const filter = buildLegacyMarketplaceMongoFilter(params);
     const [items, total, facets] = await Promise.all([
       collection
         .find(filter, { projection: cukiProjection })
@@ -677,18 +693,42 @@ export async function listLegacyMarketplaceCukies(
         .limit(limit)
         .toArray(),
       collection.countDocuments(filter),
-      getFacets(),
+      params.includeFacets === false
+        ? Promise.resolve({ states: [], networks: [], types: [], generations: [] })
+        : getFacets(),
     ]);
 
     return {
       source: 'mongo',
-      items: (await hydrateCukiRelations(items, collection)).map(normalizeCuki),
+      items: (params.hydrateRelations === false
+        ? items
+        : await hydrateCukiRelations(items, collection)).map(normalizeCuki),
       total,
       offset,
       limit,
       facets,
     };
   } catch (mongoError) {
+    const requiresExactMongoQuery = Boolean(
+      params.marketplaceOnly
+      || params.owner?.trim()
+      || params.search?.trim()
+      || params.network
+      || params.state
+      || params.type
+      || params.generation,
+    );
+    if (requiresExactMongoQuery) {
+      return {
+        source: 'empty',
+        items: [],
+        total: 0,
+        offset,
+        limit,
+        facets: { states: [], networks: [], types: [], generations: [] },
+        error: 'Legacy Mongo query unavailable',
+      };
+    }
     try {
       const graphqlResult = await listFromGraphQL({ limit, offset });
 

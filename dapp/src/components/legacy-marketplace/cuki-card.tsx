@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
+import { getLegacyMarketplaceDetailHref } from '@/lib/legacy-marketplace/identity';
 
 import { CukiImage } from './cuki-image';
 import {
@@ -19,7 +20,7 @@ type CukiCardProps = {
 export function CukiCard({ cuki }: CukiCardProps) {
   return (
     <Link
-      href={`/marketplace/${cuki.tokenId}`}
+      href={getLegacyMarketplaceDetailHref(cuki)}
       className="group flex min-w-0 flex-col overflow-hidden rounded-[8px] border border-white/10 bg-black/35 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-lilac-300/35 hover:bg-lilac-950/20"
     >
       <div className="relative aspect-[4/5] min-h-[22rem] bg-[#0d0914] sm:min-h-[24rem]">
@@ -55,7 +56,7 @@ export function CukiCard({ cuki }: CukiCardProps) {
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
-            <p className="uppercase tracking-wide text-slate-500">Precio</p>
+            <p className="uppercase tracking-wide text-slate-500">Precio verificado</p>
             <p className="mt-1 truncate font-semibold text-white">
               {formatLegacyPrice(cuki)}
             </p>
@@ -67,6 +68,9 @@ export function CukiCard({ cuki }: CukiCardProps) {
             </p>
           </div>
         </div>
+        <span className="inline-flex min-h-10 items-center justify-center rounded-[8px] bg-[var(--uki-lilac)] px-4 text-sm font-black text-[#100516] transition group-hover:bg-[#f19bff]">
+          {cuki.state === 'onSale' ? 'Ver ficha y comprar' : 'Abrir ficha para vender'}
+        </span>
       </div>
     </Link>
   );

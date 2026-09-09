@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { listLegacyMarketplaceCukies } from '@/lib/legacy-marketplace/data';
+import {
+  verifyLegacyMarketplaceListingsByNetwork,
+  type LegacyMarketplaceUnavailableNetwork,
+} from '@/lib/legacy-marketplace/live-marketplace';
 import type {
   LegacyMarketplaceCukiItem,
   LegacyMarketplaceListResponse,
@@ -16,6 +20,74 @@ const PAGE_SIZE = 24;
 type CatalogItem =
   | { source: 'legacy'; item: LegacyMarketplaceCukiItem }
   | { source: 'uki'; item: UkiMarketplaceOrderView };
+
+type VerifiedLegacyPage = LegacyMarketplaceListResponse & {
+  scannedOffset: number;
+  unavailableNetworks: LegacyMarketplaceUnavailableNetwork[];
+};
+
+async function listVerifiedLegacyPage(input: {
+  limit: number;
+  offset: number;
+  search?: string;
+  network?: string;
+  type?: string;
+  generation?: string;
+  sort: string;
+}): Promise<VerifiedLegacyPage> {
+  const verified: LegacyMarketplaceCukiItem[] = [];
+  let cursor = input.offset;
+  let last: LegacyMarketplaceListResponse | null = null;
+  const unavailableNetworks = new Set<LegacyMarketplaceUnavailableNetwork>();
+  let facets: LegacyMarketplaceListResponse['facets'] = {
+    states: [],
+    networks: [],
+    types: [],
+    generations: [],
+  };
+  for (let scan = 0; scan < 8 && verified.length < input.limit; scan += 1) {
+    const page = await listLegacyMarketplaceCukies({
+      ...input,
+      offset: cursor,
+      marketplaceOnly: true,
+      includeFacets: scan === 0,
+      hydrateRelations: false,
+    });
+    last = page;
+    if (scan === 0) facets = page.facets;
+    if (page.source === 'empty') throw new Error('LEGACY_MARKETPLACE_UNAVAILABLE');
+    const candidates = page.items.map((item, index) => ({
+      ...item,
+      catalogOffset: cursor + index,
+    }));
+    const verification = await verifyLegacyMarketplaceListingsByNetwork(
+      candidates.filter((item) => (
+        (item.network !== 'BSC' && item.network !== 'TRON')
+        || !unavailableNetworks.has(item.network)
+      )),
+    );
+    verification.unavailableNetworks.forEach((network) => unavailableNetworks.add(network));
+    verified.push(...verification.items);
+    cursor += page.items.length;
+    if (page.items.length < input.limit || cursor >= page.total) break;
+  }
+  if (!last) throw new Error('LEGACY_MARKETPLACE_UNAVAILABLE');
+  if (
+    (input.network === 'BSC' && unavailableNetworks.has('BSC'))
+    || (input.network === 'TRON' && unavailableNetworks.has('TRON'))
+    || unavailableNetworks.size === 2
+  ) {
+    throw new Error('LEGACY_MARKETPLACE_RPC_UNAVAILABLE');
+  }
+  return {
+    ...last,
+    items: verified.slice(0, input.limit),
+    offset: input.offset,
+    facets,
+    scannedOffset: cursor,
+    unavailableNetworks: [...unavailableNetworks],
+  };
+}
 
 function response(body: unknown, status = 200) {
   const result = NextResponse.json(body, { status });
@@ -137,7 +209,7 @@ export async function GET(request: NextRequest) {
     const wantUki = scope !== 'legacy' && network !== 'TRON';
     const [legacyResult, ukiResult] = await Promise.allSettled([
       wantLegacy
-        ? listLegacyMarketplaceCukies({
+        ? listVerifiedLegacyPage({
             limit,
             offset: legacyOffset,
             search,
@@ -151,7 +223,6 @@ export async function GET(request: NextRequest) {
               sort === 'number-desc'
                 ? sort
                 : 'newest',
-            marketplaceOnly: true,
           })
         : Promise.resolve(null),
       wantUki
@@ -189,9 +260,11 @@ export async function GET(request: NextRequest) {
 
     // Consume only prefixes from each source, preserving its cursor for the next page.
     const selected = merged.slice(0, limit);
-    const consumedLegacy = selected.filter(
-      (entry) => entry.source === 'legacy',
-    ).length;
+    const selectedLegacy = selected.filter(
+      (entry): entry is Extract<CatalogItem, { source: 'legacy' }> =>
+        entry.source === 'legacy',
+    );
+    const consumedLegacy = selectedLegacy.length;
     const consumedUki = selected.filter(
       (entry) => entry.source === 'uki',
     ).length;
@@ -200,7 +273,12 @@ export async function GET(request: NextRequest) {
         entry.source === 'uki',
     );
     const lastSelectedUki = selectedUki.at(-1)?.item.catalogCursor;
-    const nextLegacyOffset = legacyOffset + consumedLegacy;
+    const lastSelectedLegacyOffset = selectedLegacy.at(-1)?.item.catalogOffset;
+    const nextLegacyOffset = lastSelectedLegacyOffset !== undefined
+      ? lastSelectedLegacyOffset + 1
+      : legacyItems.length === 0
+        ? legacy?.scannedOffset ?? legacyOffset
+        : legacyOffset;
     const nextUkiCursor =
       consumedUki > 0
         ? lastSelectedUki ?? uki?.nextCursor ?? ukiCursor ?? null
@@ -227,8 +305,22 @@ export async function GET(request: NextRequest) {
             generations: [],
           } satisfies LegacyMarketplaceListResponse['facets']),
         sources: {
-          legacy: legacyResult.status === 'fulfilled' ? 'ready' : 'unavailable',
-          uki: ukiResult.status === 'fulfilled' ? 'ready' : 'unavailable',
+          legacy:
+            wantLegacy && legacyResult.status === 'fulfilled' && legacy?.source !== 'empty'
+              ? 'ready'
+              : 'unavailable',
+          uki:
+            wantUki && ukiResult.status === 'fulfilled' && uki !== null
+              ? 'ready'
+              : 'unavailable',
+        },
+        legacyNetworks: {
+          BSC: legacy?.unavailableNetworks.includes('BSC')
+            ? 'unavailable'
+            : 'ready',
+          TRON: legacy?.unavailableNetworks.includes('TRON')
+            ? 'unavailable'
+            : 'ready',
         },
       },
     });

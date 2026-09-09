@@ -16,6 +16,10 @@ type LegacyTronContractInstance = Record<
 
 export type LegacyTronWebLike = {
   ready?: boolean;
+  fullNode?: { host?: string };
+  address?: {
+    toHex?: (address: string) => string;
+  };
   defaultAddress?: {
     base58?: string;
   };

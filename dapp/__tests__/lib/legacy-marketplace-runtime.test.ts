@@ -4,7 +4,7 @@ import {
 } from '@/lib/legacy-marketplace/runtime';
 
 describe('legacy marketplace runtime safety', () => {
-  it('emula Stage sin montar lecturas, enlaces ni acciones de mainnet', () => {
+  it('permite el marketplace Legacy real en Stage sin habilitar el resto de lecturas mainnet', () => {
     const runtime = buildLegacyMarketplaceRuntime({
       APP_ENV: 'staging',
       NEXT_PUBLIC_APP_ENV: 'staging',
@@ -13,11 +13,12 @@ describe('legacy marketplace runtime safety', () => {
     expect(runtime).toMatchObject({
       appEnv: 'staging',
       legacyMainnetEnabled: false,
-      bscChainId: null,
-      bscExplorerBaseUrl: null,
-      tronExplorerBaseUrl: null,
+      legacyMarketplaceActionsEnabled: true,
+      bscChainId: 56,
+      bscExplorerBaseUrl: 'https://bscscan.com',
+      tronExplorerBaseUrl: 'https://tronscan.org',
     });
-    expect(runtime.reason).toContain('Stage/Testnet');
+    expect(runtime.reason).toBeNull();
   });
 
   it('solo mantiene el marketplace legacy en el entorno de produccion', () => {
@@ -29,6 +30,7 @@ describe('legacy marketplace runtime safety', () => {
     expect(runtime).toEqual({
       appEnv: 'production',
       legacyMainnetEnabled: true,
+      legacyMarketplaceActionsEnabled: true,
       bscChainId: 56,
       bscExplorerBaseUrl: 'https://bscscan.com',
       tronExplorerBaseUrl: 'https://tronscan.org',
@@ -40,11 +42,13 @@ describe('legacy marketplace runtime safety', () => {
     expect(buildLegacyMarketplaceRuntime({})).toMatchObject({
       appEnv: 'unknown',
       legacyMainnetEnabled: false,
+      legacyMarketplaceActionsEnabled: false,
       bscChainId: null,
     });
     expect(buildLegacyMarketplaceRuntime({ APP_ENV: 'preview' })).toMatchObject({
       appEnv: 'unknown',
       legacyMainnetEnabled: false,
+      legacyMarketplaceActionsEnabled: false,
       bscChainId: null,
     });
   });
@@ -58,6 +62,7 @@ describe('legacy marketplace runtime safety', () => {
     expect(runtime).toMatchObject({
       appEnv: 'staging',
       legacyMainnetEnabled: false,
+      legacyMarketplaceActionsEnabled: true,
     });
   });
 

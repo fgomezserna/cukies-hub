@@ -37,7 +37,9 @@ export function formatLegacyPrice(cuki: LegacyMarketplaceCukiItem) {
     }
   }
 
-  return cuki.price !== null ? cuki.price.toLocaleString() : '-';
+  return cuki.price !== null && cuki.price > 0
+    ? cuki.price.toLocaleString('es-ES')
+    : 'Precio no disponible';
 }
 
 export function getTypeLabel(type: LegacyMarketplaceCukiItem['type']) {

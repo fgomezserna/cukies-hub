@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ArrowRight, Cookie, Store } from 'lucide-react';
 
 import { MarketplaceClient } from '@/components/legacy-marketplace/marketplace-client';
+import { LegacyMarketplaceSellerPanel } from '@/components/legacy-marketplace/seller-panel';
 import { UkiMarketplaceSellerPanel } from '@/components/uki-marketplace/seller-panel';
 import { ukiMarketplacePublicConfig } from '@/lib/uki-marketplace/public-config';
 
@@ -33,7 +34,7 @@ export default function MarketplacePage() {
 
       <nav aria-label="Secciones del marketplace" className="flex flex-wrap gap-2 py-6">
         <Link href="#cukies-disponibles" className="rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-4 py-2 text-sm font-black text-[var(--uki-cream)]">Comprar Cukies</Link>
-        {ukiMarketplaceReady ? <Link href="#mis-anuncios" className="rounded-[9px] border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-black text-[var(--uki-text)]">Mis anuncios</Link> : null}
+        <Link href="#mis-anuncios" className="rounded-[9px] border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-black text-[var(--uki-text)]">Vender / mis anuncios</Link>
       </nav>
 
       <section id="cukies-disponibles" className="scroll-mt-24">
@@ -41,16 +42,25 @@ export default function MarketplacePage() {
         {ukiMarketplaceReady ? <span data-testid="uki-marketplace" className="sr-only" aria-hidden="true" /> : null}
       </section>
 
-      {ukiMarketplaceReady ? (
-        <section id="mis-anuncios" className="mt-10 scroll-mt-24 border-t border-white/10 pt-8">
+      <section id="mis-anuncios" className="mt-10 scroll-mt-24 border-t border-white/10 pt-8">
           <div className="mb-5 max-w-2xl">
             <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">Tu espacio de venta</p>
             <h2 className="mt-2 font-headline text-2xl font-black text-[var(--uki-cream)] sm:text-3xl">Gestiona tus anuncios</h2>
             <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">Elige un Cukie de tu colección, fija el precio y revisa tus anuncios activos.</p>
           </div>
-          <UkiMarketplaceSellerPanel />
+          <div className="grid gap-5">
+            <LegacyMarketplaceSellerPanel />
+            <div className="rounded-[14px] border border-white/10 bg-black/25 p-5 sm:p-6">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">V2 · UKI</p>
+              {!ukiMarketplaceReady && (
+                <p className="mt-2 text-sm font-semibold text-amber-100">
+                  El contrato Marketplace V2/UKI no está configurado en este entorno. No se muestran controles ficticios ni se reutiliza el contrato Legacy para UKI.
+                </p>
+              )}
+              <div className="mt-4"><UkiMarketplaceSellerPanel /></div>
+            </div>
+          </div>
         </section>
-      ) : null}
     </div>
   );
 }
