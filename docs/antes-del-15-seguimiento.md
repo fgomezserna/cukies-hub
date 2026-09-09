@@ -66,7 +66,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 
 | ID | Estado y alcance actual | Fuente y fecha | Proximo paso + issue real |
 | --- | --- | --- | --- |
-| INFRA | **WEB Y WORKERS SEPARADOS; CIERRE GRADUAL Y CI DE JUEGO EN VALIDACION**: web app32, workers app28, Mongo LXC2007, builder VM1012 y registry VM1007. Stage sigue `bdab82c`; PR363 esta integrada en Git pero su CI fallo antes del despliegue. | 2026-09-09: [evidencia de entrega](../infrastructure/ci/2026-09-09-rolling-delivery-evidence.json), relevo inicial 1117/1117 HTTP200 y prueba negativa 173/173; sustituciones posteriores detectaron timeout/502 al SIGTERM. [CI34409614718](https://github.com/fgomezserna/cukies-hub/actions/runs/34409614718) fallo a las 22:11 por BuildKit EOF; INFRA confirma OOM del cgroup, no falta de disco. El tunel publico se recupero a las 21:53 tras corregir un argumento incompatible de cloudflared; Stage `bdab82c`, produccion `4475baa`. | Responsable exclusivo `01a0859a-cf4d-77a0-a137-6db60a0a0f96`: reparar builder y completar PR364 (`49f6501`), que incluye cierre gradual y entrega independiente del juego app31. App31 preparada en DockerImage/HEAD, servidor antiguo activo; falta bootstrap servido, game-only, no-op y rollback entre imagenes con wrapper. Despues lote funcional PR359/358 y adaptacion coordinada de PR346 al nuevo CI; World no se integra con el Compose antiguo. Sin retroceder indexador bajo PR362. Main/app12/app13 fuera de estas operaciones; PR361 sigue preparacion. |
+| INFRA | **REGISTRY ACTIVO EN STAGE: WEB, JUEGO Y WORKERS**: web32, Treasure Hunt31 y workers28 sirven `dc4c21e`; Mongo LXC2007, builder VM1012 (12 GiB/BuildKit 9 GiB) y registry VM1007. Coolify descarga imágenes; Git autodeploy OFF. | 2026-09-09 23:20 UTC: [evidencia de entrega](../infrastructure/ci/2026-09-09-rolling-delivery-evidence.json). CI34412775416 construyó seis imágenes; el bootstrap del juego falló por `COOLIFY_BRANCH` ausente y se recuperó explícitamente, conservando el juego anterior hasta readiness. Candidato fallido, rollback web entre imágenes con cierre gradual, vuelta a `dc4c21e` y reemplazo aislado del juego: **1472/1472 HTTP200** entre origen y público. Web/workers y producción conservaron IDs/digests en game-only. Juego 4,31 GB → 510 MB; 551 archivos públicos y 12 JS/CSS comprobados. Indexador: cinco ciclos completos, bloques 130109312→130109562. Journals reconciliados. | El flujo conserva componentes no afectados y no entrega si imágenes/Compose no cambian; comprobar el run de la integración documental final. Después de liberar ventana: lote PR359/358 y adaptación coordinada PR346, con un único propietario CI/Compose/Nx/lock. Main/app12/app13 siguen en su ruta actual; PR361 draft `72ba26a`, app33 sin arrancar, CI prod false. Práctica anónima bloqueada por un guard funcional anterior; no se afirma QA de partida autenticada ni autoscalado. |
 | 0 | Documentado; detalles pendientes de convertir en criterios. | Fuente original; 2026-09-07. | Convertir cada detalle en criterio verificable. |
 | A | **CONFIRMADO POR USUARIO + OBSERVADO LIVE**: pool de liquidez activa desde hace mas de una semana. | `output/verification/pancake-mainnet-20260907.json`, BSC `56`, bloque `120529300`, `2026-09-07T16:50:13Z`; reservas `1.148.104,4871 UKI` + `4.658,0014 ASM`, LP bloqueada hasta `2027-02-23T15:33:10Z`; swaps `2026-08-31` y `2026-09-07`. | Registrar reservas/swaps/locker en cada revision; comprobar logo/ficha y la ruta USDC anunciada en el copy. Rutas BNB/USDT multihop acreditadas. |
 | B | **CONFIRMADO POR USUARIO + OBSERVADO LIVE**: staking y torneo actual post-preventa funcionan. Producto: `Torneo Lanzamiento UKI`; no es el torneo antiguo de preventa. | `https://cukies.world/api/games/treasure-hunt/competition`, HTTP 200, `2026-09-07T16:50:56Z`; contrato `0xad18...59696`, campaña activa hasta `2026-09-15T15:00Z`. | Mantener evidencia de participante/firma separada; no reabrir approve/stake como fallo de estado. |
@@ -190,11 +190,13 @@ de los puntos ya desplegados o en pruebas.
 - [ ] Cargar secretos solo en Coolify; nunca en Git, logs o archivos generados.
 - [ ] Mantener apagados publisher y schedulers que aun no tengan autoridad,
   funding o aprobacion operacional.
-- [ ] Integrar un unico lote en `staging` y seguir el workflow de imagenes de
-  app28; no lanzar un build manual ni activar su autodeploy Git en Coolify.
-  Comprobar el SHA de release en `/api/health` y cada digest contra el manifest,
-  admitiendo `sourceSha` anterior cuando la imagen se reutiliza. El juego app31
-  sigue un despliegue independiente; coordinar tambien su ventana y espacio.
+- [ ] Integrar un unico lote en `staging` y seguir el workflow de seis componentes
+  (web32, lane `treasure-hunt` de app31 y workers app28); no lanzar un build manual
+  ni activar autodeploy Git en Coolify. Comprobar el SHA de release en `/api/health`
+  y cada digest contra el manifest, admitiendo `sourceSha` anterior cuando la imagen
+  se reutiliza. App31 sigue siendo un recurso independiente fuera del Compose de
+  workers, pero usa el mismo workflow. Verificar también health/ready del juego,
+  su `gameCommit` y el `sourceSha` de su imagen.
 - [ ] Comprobar `/api/health`, autenticacion administrativa de `/indexer`,
   cursores, dead letters, incidentes, heartbeats y logs de workers.
 - [ ] Ejecutar smokes de wallet y UX en escritorio y movil; para acciones

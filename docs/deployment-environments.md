@@ -17,13 +17,15 @@ mientras se estabiliza una release.
 
 | Scope | Recurso y rama | Ruta de despliegue | Datos y dominio |
 | --- | --- | --- | --- |
-| Stage / Hub | Web app32 `rwwsc4kkwc0ck84cgk40s8kk`; workers app28 `u4s804o4wwcckowgk0woo4wg`; rama `staging` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201` con web Docker Image y `docker-compose.workers.yml` en app28. Autodeploy Git: **OFF**. `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
-| Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`. Este carril no consume el pipeline de imágenes de app 28. | BSC mainnet y datos de producción; `https://cukies.world`. |
-| Stage / Treasure Hunt | App31 `game-treasurehunt-staging`, `staging`, UUID `lc04cw8gs4koo4swwws0c4ss` | Imagen independiente `treasure-hunt` preparada en el mismo CI/registry. Migración live desde Nixpacks pendiente de ensayo; no pertenece al Compose de workers. | `https://cukieshub.eurekand.com/treasurehunt-game`, `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y origen dapp de staging. |
-| Main / Treasure Hunt | App13 `game-treasurehunt`, `main`, UUID `tkkggwcosc4gksckcc480cwg` | Recurso Nixpacks actual; target equivalente de imágenes preparado, sin activación de producción. | `https://treasurehunt.cukies.world`, basePath vacío; parent/origins exclusivos de producción. |
+| Stage / Hub | Web app32 `rwwsc4kkwc0ck84cgk40s8kk`; workers app28 `u4s804o4wwcckowgk0woo4wg`; rama `staging` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201`. El plan de seis componentes puede actualizar web32 y `docker-compose.workers.yml` en app28, o la lane `treasure-hunt` de app31; app31 sigue fuera del Compose de workers. Autodeploy Git: **OFF**. `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
+| Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`; app12 sigue sirviendo `main`/`4475baa` mientras la migración de registry de PR361 permanece inactiva. | BSC mainnet y datos de producción; `https://cukies.world`. |
+| Stage / Treasure Hunt | App31 `game-treasurehunt-staging`, `staging`, UUID `lc04cw8gs4koo4swwws0c4ss` | Docker Image `treasure-hunt` activo por digest en el mismo CI/registry, fuera del Compose de workers. Bootstrap servido y reemplazo aislado verificados en `dc4c21e`; el fallo inicial de metadata y su recuperación se conservan en la evidencia INFRA. | `https://cukieshub.eurekand.com/treasurehunt-game`, `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y origen dapp de staging. |
+| Main / Treasure Hunt | App13 `game-treasurehunt`, `main`, UUID `tkkggwcosc4gksckcc480cwg` | Nixpacks/e6e136b sigue sirviendo tráfico; el target Docker Image de PR361 está preparado pero la migración por registry/CI permanece inactiva. | `https://treasurehunt.cukies.world`, basePath vacío; parent/origins exclusivos de producción. |
 
-En staging publica la web app32; en producción todavía publica `dapp` de app12.
-Workers y schedulers son internos; app 31 es un recurso independiente.
+En staging publican las imágenes del registry de web32 y Treasure Hunt app31; en producción siguen sirviendo `dapp` de app12 (`main`/`4475baa`) y
+Treasure Hunt app13 (`e6e136b`). App33 es el nuevo recurso web preparado, aún sin
+arrancar. Workers y schedulers son internos; app31 es un recurso independiente fuera
+del Compose, aunque su lane pertenece al workflow común.
 Las tres bases de Stage (`cukies-hub-staging`, `cukies-legacy-staging` y
 `cukieshub-new-staging`) están fuera del Compose operativo y viven en el Mongo
 dedicado de LXC2007, servicio `mongod-cukies-staging`, `192.168.1.221:27018`,
@@ -190,17 +192,19 @@ invariantes sin secretos; no despliegan. El runner dedicado usa las etiquetas
 en Coolify; `CUKIES_BUILD_ENV_JSON` sólo acepta configuración pública validada.
 
 Node 22, pnpm 10.19 y Nx 23.2 seleccionan los componentes afectados desde la última
-release entregada. En staging hay cinco imágenes: dapp, chain-indexer,
-cuki-card-worker, schedulers y cukies-bridge-relayer. Cada referencia fija el
+release entregada. El pipeline declara seis imágenes: dapp, chain-indexer,
+cuki-card-worker, schedulers, cukies-bridge-relayer y treasure-hunt. Cada referencia fija el
 digest y el tag `<sha>-<configHash>`; el manifest distingue commit de release de
 `sourceSha` de cada imagen. Las imágenes no afectadas se reutilizan. Cambiar sólo
 la web conserva los contenedores de workers; documentación sin cambios de imagen
-o topología no inicia ningún deployment del Hub. El juego app31 conserva su
-workflow independiente y puede desplegar por un push documental.
+o topología no inicia ningún deployment del Hub. App31 conserva su recurso Coolify
+independiente fuera del Compose, pero la lane `treasure-hunt` se selecciona en este
+mismo workflow cuando el juego resulta afectado.
 
 El builder BuildKit persistente se llama `cukies-ci`, usa el driver `docker-container`, una sola
 compilación concurrente (`max-parallelism=1`) y caches de capas separados por componente y
-entorno en el registry. El perfil live del 2026-09-09 es host de 8 GiB y contenedor de 6 GiB.
+entorno en el registry. La capacidad comprobada es VM1012 con 12 GiB y un límite de 9 GiB
+para BuildKit.
 `scripts/ci/prepare-buildx.sh` reutiliza el builder existente y **no reconcilia** sus límites ni
 su configuración; solo crea el builder cuando falta. Nx conserva artefactos y base de datos
 juntos bajo el mount `/app/.nx`, con `NX_CACHE_DIRECTORY` y `NX_WORKSPACE_DATA_DIRECTORY`
@@ -241,11 +245,15 @@ terminar con el SHA exacto. Health debe identificar `staging`, la release y app3
 readiness debe confirmar Mongo. Un build verde no prueba todo el runtime.
 
 La evidencia vigente está en la fila INFRA de `antes-del-15-seguimiento.md`.
-Producción sigue temporalmente en app12 mientras se prepara su cambio equivalente;
-app33 está provisionada sin tráfico. Autoscalado y GC del registry requieren su
+Producción mantiene tráfico en app12 (`main`/`4475baa`) y app13 (Nixpacks/
+`e6e136b`); app33 está provisionada pero aún no se ha arrancado. La migración de
+registry/CI de PR361 (`72ba26a`) permanece draft con el gate de entrega en `false`.
+La secuencia de snapshots, autodeploy y cutover está en
+[`deployment-rolling-transition.md`](deployment-rolling-transition.md); el tráfico
+actual se conserva hasta verificarla. Autoscalado y GC del registry requieren su
 propia implementación; el límite de 40 GB anterior corresponde al builder.
 
-El builder dedicado está instalado en VM1012 (`192.168.1.244`, 4 vCPU, 8 GiB RAM,
+El builder dedicado está instalado en VM1012 (`192.168.1.244`, 4 vCPU, 12 GiB RAM,
 120 GiB disco). El runner `cukies-builder-1012` está registrado. Mongo de staging funciona
 en LXC2007, `192.168.1.221:27018`, mediante `mongod-cukies-staging`; el Mongo compartido de
 `27017` se conserva sin cambios.
