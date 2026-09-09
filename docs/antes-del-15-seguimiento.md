@@ -66,7 +66,7 @@ a la reconciliacion; menu/sidebar/dashboard se reorganizan sobre esos flujos.
 
 | ID | Estado y alcance actual | Fuente y fecha | Proximo paso + issue real |
 | --- | --- | --- | --- |
-| INFRA | **MONGO LXC E IMAGENES VERIFICADOS EN STAGING**: LXC2007 `27018`, Mongo 7 fuera del Compose; builder VM1012, registry VM1007 y Coolify app28. Pipeline por push con Nx/BuildKit. | 2026-09-09, Stage `0896fbd`, Coolify `1462` terminado 13:16:47 UTC: 11 servicios/digests y Mongo comprobados. [Migración](../infrastructure/ci/2026-09-09-mongo-lxc-evidence.json): 577.434 documentos reconciliados. [Entrega de imágenes](../infrastructure/ci/2026-09-09-image-deployment-evidence.json): distingue run inicial fallido y recuperación sin rebuild. | Autodeploy Git false, gate CI true. [Procedimiento y manifest por release](deployment-environments.md): solo avanzar estado tras SHA exacto y postflight. Original/volúmenes conservados. Producción no modificada; Coolify puede reiniciar el Compose completo. |
+| INFRA | **MONGO LXC Y CI DE IMAGENES ACTIVOS EN STAGING**: LXC2007 `27018`, Mongo 7 fuera del Compose; builder VM1012, registry VM1007 y Coolify app28. Pipeline por push con Nx/BuildKit. | 2026-09-09: [migración](../infrastructure/ci/2026-09-09-mongo-lxc-evidence.json), 577.434 documentos reconciliados. [Recuperación de espacio, 16:50 UTC](../infrastructure/ci/2026-09-09-storage-recovery-evidence.json): 19 GB liberados, 22,7 GB libres y ambos guards de tarjetas PASS; 11 servicios conservados. [CI 34379350360](https://github.com/fgomezserna/cukies-hub/actions/runs/34379350360) SUCCESS: release `7f56123` servida, build vacío y cinco imágenes reutilizadas de `e6e3cbb`; Coolify `1466` terminado 16:56:39 UTC. | Autodeploy Git app28 false, gate CI true. [Procedimiento y manifest por release](deployment-environments.md): distinguir commit de release y `sourceSha` de imágenes; confirmar digests y postflight. Mongo original/volúmenes y rollback previo conservados. Main/app12 y juego/app31 mantienen build en Coolify; registry GC y autoscalado no están implementados. Coolify puede reiniciar el Compose completo. |
 | 0 | Documentado; detalles pendientes de convertir en criterios. | Fuente original; 2026-09-07. | Convertir cada detalle en criterio verificable. |
 | A | **CONFIRMADO POR USUARIO + OBSERVADO LIVE**: pool de liquidez activa desde hace mas de una semana. | `output/verification/pancake-mainnet-20260907.json`, BSC `56`, bloque `120529300`, `2026-09-07T16:50:13Z`; reservas `1.148.104,4871 UKI` + `4.658,0014 ASM`, LP bloqueada hasta `2027-02-23T15:33:10Z`; swaps `2026-08-31` y `2026-09-07`. | Registrar reservas/swaps/locker en cada revision; comprobar logo/ficha y la ruta USDC anunciada en el copy. Rutas BNB/USDT multihop acreditadas. |
 | B | **CONFIRMADO POR USUARIO + OBSERVADO LIVE**: staking y torneo actual post-preventa funcionan. Producto: `Torneo Lanzamiento UKI`; no es el torneo antiguo de preventa. | `https://cukies.world/api/games/treasure-hunt/competition`, HTTP 200, `2026-09-07T16:50:56Z`; contrato `0xad18...59696`, campaña activa hasta `2026-09-15T15:00Z`. | Mantener evidencia de participante/firma separada; no reabrir approve/stake como fallo de estado. |
@@ -110,7 +110,8 @@ de los puntos ya desplegados o en pruebas.
   `127.0.0.1:37018`: nueva economia BSC `97`, legacy BSC `56`/TRON mainnet
   mediante fixtures/replay y lecturas verificadas. Sin escrituras a produccion.
 - [ ] Ejecutar lint, typecheck, tests y builds de DApp, indexer y cada juego
-  afectado.
+  afectado. Para cambios exclusivamente documentales, validar diff, referencias y
+  coherencia; no repetir pruebas de producto.
 - [ ] Validar `pnpm guard:staging:test` y `pnpm guard:staging` con UUID de Coolify
   `u4s804o4wwcckowgk0woo4wg`, rama `staging`, chain `97` y las tres bases Stage.
 - [ ] Preparar backup/snapshot y plan de migracion antes de cualquier cambio de
@@ -118,8 +119,11 @@ de los puntos ya desplegados o en pruebas.
 - [ ] Cargar secretos solo en Coolify; nunca en Git, logs o archivos generados.
 - [ ] Mantener apagados publisher y schedulers que aun no tengan autoridad,
   funding o aprobacion operacional.
-- [ ] Desplegar un unico SHA identificable y comprobar que `/api/health` lo
-  publica.
+- [ ] Integrar un unico lote en `staging` y seguir el workflow de imagenes de
+  app28; no lanzar un build manual ni activar su autodeploy Git en Coolify.
+  Comprobar el SHA de release en `/api/health` y cada digest contra el manifest,
+  admitiendo `sourceSha` anterior cuando la imagen se reutiliza. El juego app31
+  sigue un despliegue independiente; coordinar tambien su ventana y espacio.
 - [ ] Comprobar `/api/health`, autenticacion administrativa de `/indexer`,
   cursores, dead letters, incidentes, heartbeats y logs de workers.
 - [ ] Ejecutar smokes de wallet y UX en escritorio y movil; para acciones

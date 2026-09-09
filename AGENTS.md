@@ -222,28 +222,32 @@ Staging app 28 uses `.github/workflows/cukies-staging-images.yml`: a push to
 digests and deploys `docker-compose.images.yml` through Coolify. Keep Coolify Git
 autodeploy disabled; do not start a legacy build manually. Read
 `docs/deployment-environments.md` before operating this pipeline. Production app
-12 keeps its existing deployment path.
+12 keeps `docker-compose.coolify.yml`. The separate Treasure Hunt staging app
+31 (`lc04cw8gs4koo4swwws0c4ss`) still builds through Coolify/Nixpacks from `staging`;
+it is outside this image pipeline and can build even after a documentation push.
 
 `docker-compose.coolify.yml` is the topology source; regenerate the image-only
 Compose with `node scripts/ci/generate-images-compose.mjs --write` after changing
 it and verify with `--check`. Mongo staging lives outside Compose in LXC2007 at
 `192.168.1.221:27018`; see `infrastructure/ci/staging-data-handoff.md` for recovery.
-The stack defines:
+Staging services and optional profiles:
 
 - `dapp`: public Next.js app on port `3000`.
 - `chain-indexer`: internal blockchain indexer worker.
-- `cukie-master-scheduler`, `competition-credit-scheduler`, `game-economy-scheduler`, `cukie-pool-scheduler`, `weekly-ranking-scheduler`: internal economy schedulers, disabled until their runtime gates and HMAC credentials are approved.
-- `cuki-card-worker`: internal NFT card renderer/uploader worker. It is active in app 28 against the isolated staging Mongo/MinIO destination; generated URLs are content-addressed and immutable.
+- `cukie-master-scheduler`, `competition-credit-scheduler`, `game-economy-scheduler`, `cukie-pool-scheduler`, `weekly-ranking-scheduler`, `reward-accounting-scheduler` and `reward-batch-publisher`: internal processes sharing the `schedulers` image. Preserve their independent runtime gates and HMAC credentials; a deployment does not authorize enabling them.
+- `cuki-card-worker` and `cuki-card-worker-legacy`: internal NFT render/upload workers sharing the card image, with separate staging data sources and destinations. Generated URLs are content-addressed and immutable.
+- `legacy-chain-indexer` and `cukies-bridge-relayer`: optional profiles; their presence in Compose does not mean they are enabled.
 
 Operational rules:
 
 - Do not commit Coolify secrets, AWS keys, Mongo URLs, OAuth secrets, RPC keys or generated `.env` files.
 - Store runtime secrets in Coolify environment variables. Local worker secrets can live only in ignored `.env.local` files.
-- Before saying a staging worker is deployed, verify app 28 uses `docker-compose.images.yml`, its running image digest matches the release manifest, and its database endpoint is the staging LXC. A green build alone does not verify runtime.
+- Before saying a staging worker is deployed, verify app 28 uses `docker-compose.images.yml`, its running image digest matches the release manifest, and its database endpoint is the staging LXC. The release commit can differ from an image's `sourceSha` when CI reuses it; compare each digest with the manifest. A green build alone does not verify runtime.
 - Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
 - Staging must use `DATABASE_URL` -> `cukies-hub-staging`, `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`, and `CHAIN_INDEXER_DB_NAME`/`CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`.
-- In app 28, `CARD_WORKER_UPLOAD=true` and `COMPOSE_PROFILES=card-worker` are allowed only with the exclusive `cukies-cards-staging` bucket, staging-only credentials and the guard validated. Do not copy those values or credentials to another resource.
-- Validate post-deploy with `/api/health`, `/indexer?collection=chain_indexer_runs`, `/indexer?collection=card_generation_jobs`, and worker logs for `chain-indexer` and `cuki-card-worker`.
+- App 28 uses `COMPOSE_PROFILES=staging-runtime,card-worker,legacy-card-worker`. Preserve each worker's exclusive staging bucket and credentials; do not copy them to another resource. `CARD_WORKER_UPLOAD=true` requires the storage guard to pass.
+- Both card workers require a capacity heartbeat younger than 45 seconds and at least 10 GiB free on Coolify and MinIO. They pause and retry automatically; do not lower the floor or clear volumes to bypass it. Follow the storage recovery section in `docs/deployment-environments.md`.
+- Validate post-deploy with `/api/health`, authenticated `/indexer` views for `chain_indexer_runs` and `card_generation_jobs`, and indexer/both card-worker logs. Inspect only needed metadata; full Docker history or environment output can contain secrets.
 - Use the `coolify-cloudflare` skill when changing Coolify, Traefik labels, domains, tunnels or deployment topology.
 
 ## Testing

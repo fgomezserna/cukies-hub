@@ -1,6 +1,6 @@
 # Mongo de staging en LXC 2007
 
-Estado 2026-09-09: migración live verificada. Las tres bases operan en el LXC;
+Estado 2026-09-09: migración completada y live verificada. Las tres bases operan en el LXC;
 el Mongo original está detenido con sus volúmenes conservados.
 
 [Evidencia de reconciliación y servicio](2026-09-09-mongo-lxc-evidence.json):
@@ -10,7 +10,7 @@ verificados. App 28 usa ahora `docker-compose.images.yml`; el primer rollout de
 imágenes verificado es Coolify `1462`, SHA `0896fbd`. El Compose protegido
 `/root/cukies-mongo-migration-20260909/runtime-lxc.json` conserva la configuración
 del corte de Mongo previo a ese rollout. El flujo vigente y su evidencia están en
-`docs/deployment-environments.md`.
+[`docs/deployment-environments.md`](../../docs/deployment-environments.md).
 
 ## Destino
 
@@ -26,10 +26,14 @@ del corte de Mongo previo a ese rollout. El flujo vigente y su evidencia están 
   0,5 GiB y su servicio a 1,5 GiB. El servicio existente mantiene su configuración.
 - Mongo y cualquier Postgres quedan fuera del ciclo de despliegue de la aplicación.
 
-## Migración controlada
+## Migración histórica y repetición controlada
+
+La migración descrita aquí ya está completada. Los pasos siguientes son el registro
+histórico y solo sirven para repetir una operación controlada con una ventana,
+backup, reconciliación y validación equivalentes; no son pasos pendientes de app 28.
 
 1. Desactivar el autodeploy de app 28 y mantener
-   `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=false`. Esperar a que no haya despliegues
+   `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=false` durante una repetición controlada. Esperar a que no haya despliegues
    activos ni en cola de app 28 antes de detener clientes.
 2. Inventariar todos sus contenedores, configuración y variables en un directorio
    protegido del host; nunca imprimir credenciales ni persistirlas en el repo.
@@ -49,11 +53,11 @@ del corte de Mongo previo a ese rollout. El flujo vigente y su evidencia están 
 7. Cambiar solo los endpoints de staging en Coolify y recrear sus clientes con las
    imágenes ya desplegadas. Retirar el servicio Mongo del Compose operativo, sin
    borrar sus volúmenes. Verificar web, consultas de aplicación y avance de workers.
-8. Reactivar TTL tras reconciliar. El autodeploy Git permanece desactivado durante
-   la transición al pipeline de imágenes; activarlo en CI solo tras integrar y
-   verificar el nuevo flujo.
+8. Reactivar TTL tras reconciliar. El autodeploy Git de app 28 permanece desactivado;
+   la entrega normal se habilita únicamente mediante el workflow de imágenes y su
+   postflight verificado.
 
-## Rollback
+## Rollback y límites
 
 Los datos originales y la configuración anterior permanecen en VM1001. El
 contenedor preservado se llama `cukies-mongo-rollback-20260909`, está detenido
@@ -63,9 +67,11 @@ releases no lo asocian al proyecto. Sus volúmenes siguen montados y no se han e
 aceptar escrituras en el destino, se puede volver a los endpoints originales y
 arrancar los clientes con la configuración guardada. Tras aceptar escrituras en
 el LXC, no volver al origen sin reconciliar el delta: hacerlo perdería datos nuevos.
-No restaurar sobre el Mongo compartido de `27017` ni usar `resync.sh`, que copia en
-la dirección histórica contraria. No limpiar los volúmenes originales durante la
-validación.
+No es un rollback a ciegas. No restaurar sobre el Mongo compartido de `27017` ni usar
+`resync.sh`, que copia en la dirección histórica contraria. No limpiar los volúmenes
+originales durante la validación. Cualquier rollback de imágenes conserva el manifest
+previo y sus digests, reaplica el Compose de imágenes y vuelve a comprobar health; no
+vuelve al Compose legacy ni cambia la base de datos.
 
 ## Evidencia
 
