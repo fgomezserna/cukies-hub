@@ -208,12 +208,14 @@ COPY --from=dapp-build /app/dapp/public /tmp/cukies-dapp-public/
 COPY --from=dapp-build /app/dapp/prisma /tmp/cukies-dapp-prisma/
 
 RUN if [ -f /app/dapp/server.js ]; then \
-      mkdir -p /app/dapp/.next /app/dapp/public /app/dapp/prisma; \
+      mkdir -p /app/dapp/.next; \
+      rm -rf /app/dapp/.next/static /app/dapp/public /app/dapp/prisma; \
       mv /tmp/cukies-next-static /app/dapp/.next/static; \
       mv /tmp/cukies-dapp-public /app/dapp/public; \
       mv /tmp/cukies-dapp-prisma /app/dapp/prisma; \
     else \
-      mkdir -p /app/.next /app/public /app/prisma; \
+      mkdir -p /app/.next; \
+      rm -rf /app/.next/static /app/public /app/prisma; \
       mv /tmp/cukies-next-static /app/.next/static; \
       mv /tmp/cukies-dapp-public /app/public; \
       mv /tmp/cukies-dapp-prisma /app/prisma; \
