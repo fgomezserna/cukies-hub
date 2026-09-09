@@ -20,10 +20,39 @@ const MARKETPLACE = `0x${'5'.repeat(40)}`;
 const UKI_MARKETPLACE = `0x${'8'.repeat(40)}`;
 const BRIDGE = `0x${'6'.repeat(40)}`;
 const WALLET = `0x${'a'.repeat(40)}`;
+const RECIPIENT = `0x${'c'.repeat(40)}`;
 const BATCH_ID = `0x${'b'.repeat(64)}`;
+
+function assertNoOverlappingUpdatePaths(update: Record<string, unknown>) {
+  const paths: Array<{ operator: string; path: string }> = [];
+  for (const [operator, payload] of Object.entries(update)) {
+    if (!operator.startsWith('$') || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      continue;
+    }
+    for (const path of Object.keys(payload as Record<string, unknown>)) {
+      const overlap = paths.find(({ path: previousPath }) => (
+        path === previousPath
+        || path.startsWith(`${previousPath}.`)
+        || previousPath.startsWith(`${path}.`)
+      ));
+      if (overlap) {
+        throw new Error(
+          `Mongo update path conflict: ${operator}.${path} overlaps `
+          + `${overlap.operator}.${overlap.path}`,
+        );
+      }
+      paths.push({ operator, path });
+    }
+  }
+}
 
 class MemoryCollection {
   readonly documents = new Map<string, Record<string, unknown>>();
+  readonly updates: Array<{
+    filter: Record<string, unknown>;
+    update: Record<string, Record<string, unknown>>;
+    options: { upsert?: boolean };
+  }> = [];
 
   async findOne(filter: Record<string, unknown>) {
     return [...this.documents.values()].find((document) => (
@@ -58,6 +87,8 @@ class MemoryCollection {
     update: Record<string, Record<string, unknown>>,
     options: { upsert?: boolean } = {},
   ) {
+    assertNoOverlappingUpdatePaths(update);
+    this.updates.push({ filter, update, options });
     const byId = typeof filter._id === 'string' ? this.documents.get(filter._id) : undefined;
     const existing = byId ?? await this.findOne(
       Object.fromEntries(Object.entries(filter).filter(([key]) => !key.startsWith('$'))),
@@ -478,6 +509,57 @@ test('materializes TOKEN_V2 under collection identity and rejects TOKEN cursor s
   assert.equal(projected?.chainId, 97);
   assert.equal(projected?.collectionAddressNormalized, TOKEN_V2.toLowerCase());
   assert.equal(projected?.rarity, 5);
+
+  const cukies = context.collections.get('cukies');
+  const transferUpdate = cukies?.updates.find(({ update }) => (
+    update.$set?.mintEventId === mint._id
+  ));
+  assert.equal(transferUpdate?.update.$set?.price, 0);
+  assert.equal('price' in (transferUpdate?.update.$setOnInsert ?? {}), false);
+
+  await projectEvent(context.store as never, mint);
+  assert.equal(context.collections.get('tx_nfts')?.documents.size, 1);
+
+  const existingCukie = context.collections.get('cukies')?.documents.get(documentId);
+  assert.ok(existingCukie);
+  Object.assign(existingCukie, { marketplaceListingStatus: 'active', state: 'onSale' });
+  context.collections.get('marketplace_listings')?.documents.set('listing-v2', {
+    _id: 'listing-v2',
+    tokenId: '97000001',
+    status: 'active',
+  });
+
+  const transfer = {
+    ...event('Transfer', normalizeDomainEvent('BSC', 'Transfer', 'TOKEN_V2', {
+      from: WALLET,
+      to: RECIPIENT,
+      tokenId: args.tokenId,
+    }), 31),
+    contractAlias: 'TOKEN_V2' as const,
+    contractAddress: TOKEN_V2,
+  };
+  assert.equal(await projectEvent(context.store as never, transfer), null);
+  assert.equal(
+    context.collections.get('cukies')?.documents.get(documentId)?.ownerNormalized,
+    RECIPIENT.toLowerCase(),
+  );
+  assert.equal(context.collections.get('cukies')?.documents.get(documentId)?.rarity, 5);
+  assert.equal(context.collections.get('cukies')?.documents.get(documentId)?.generation, 2);
+  assert.equal(
+    context.collections.get('cukies')?.documents.get(documentId)?.marketplaceListingStatus,
+    'invalid',
+  );
+  assert.equal(
+    context.collections.get('marketplace_listings')?.documents.get('listing-v2')?.status,
+    'invalid',
+  );
+  assert.equal(context.collections.get('tx_nfts')?.documents.size, 2);
+  await projectEvent(context.store as never, transfer);
+  assert.equal(
+    context.collections.get('marketplace_listings')?.documents.get('listing-v2')?.status,
+    'invalid',
+  );
+  assert.equal(context.collections.get('tx_nfts')?.documents.size, 2);
 
   await assert.rejects(
     () => projectEvent(context.store as never, {
