@@ -10,7 +10,7 @@ import { requireValue } from './cli-args.mjs';
 import { canonicalizeBuildEnv } from './build-env.mjs';
 import { assertStagingApplication, buildImageEnvironment, deployAndVerify } from './coolify-release.mjs';
 import { generateImagesCompose } from './generate-images-compose.mjs';
-import { chooseReleasePlan } from './release-plan.mjs';
+import { COMPONENTS, chooseReleasePlan } from './release-plan.mjs';
 import { createSuccessfulState, readReleaseState, writeReleaseStateAtomic } from './release-state.mjs';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -57,6 +57,37 @@ test('release plan selecciona dapp por config nueva y reutiliza los demás diges
   assert.deepEqual(plan.build, ['dapp']);
   assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer']);
   assert.match(plan.reuse[0].image, /@sha256:/);
+});
+
+test('release plan reutiliza los cinco digests para cambios de orquestación y documentación', () => {
+  const plan = chooseReleasePlan({
+    state: completeState,
+    head: SHA_B,
+    configHash: HASH_A,
+    changedFiles: [
+      'scripts/ci/coolify-release.mjs',
+      'scripts/ci/release-plan.mjs',
+      'scripts/ci/release-state.mjs',
+      'scripts/ci/ci.test.mjs',
+      'docs/release-workflow.md',
+      'docs/deployment-environments.md',
+    ],
+    nxProjects: [],
+    baseAncestor: true,
+  });
+  assert.deepEqual(plan.build, []);
+  assert.deepEqual(plan.reuse.map((entry) => entry.component), COMPONENTS);
+  assert.equal(new Set(plan.reuse.map((entry) => entry.digest)).size, 1);
+
+  const buildScript = chooseReleasePlan({
+    state: completeState,
+    head: SHA_B,
+    configHash: HASH_A,
+    changedFiles: ['scripts/ci/build-images.mjs'],
+    nxProjects: [],
+    baseAncestor: true,
+  });
+  assert.deepEqual(buildScript.build, COMPONENTS);
 });
 
 test('dos releases sucesivas conservan workers construidos en un SHA anterior', () => {
@@ -176,7 +207,52 @@ test('Coolify release patches image refs in bulk and verifies the served SHA', a
   assert.equal(calls[0][2].git_commit_sha, SHA_B);
   assert.equal(calls[0][2].docker_compose_raw, 'services: {}\n');
   assert.equal(calls[1][2].find((entry) => entry.key === 'CUKIES_IMAGE_CUKI_CARD_WORKER').value, completeState.components['cuki-card-worker'].image);
-  assert.equal(buildImageEnvironment(manifest).length, 7);
+  const environment = buildImageEnvironment(manifest);
+  assert.equal(environment.length, 7);
+  assert.ok(environment.every((entry) => entry.is_runtime && entry.is_buildtime));
+});
+
+test('Coolify acepta HEAD durante queued/in_progress y confirma el SHA al finalizar', async () => {
+  const statuses = [
+    { status: 'queued', commit: 'HEAD' },
+    { status: 'in_progress', commit: 'HEAD' },
+    { status: 'finished', commit: SHA_B },
+  ];
+  let poll = 0;
+  const result = await deployAndVerify({
+    client: {
+      patchApplication: async () => {},
+      getApplication: async () => stagingApplication,
+      patchEnvs: async () => {},
+      start: async () => ({ deployment_uuid: 'deploy-head' }),
+      getDeployment: async () => statuses[poll++],
+    },
+    compose: 'services: {}\n',
+    manifest: { environment: 'staging', commit: SHA_B, configHash: HASH_B, components: completeState.components },
+    fetchImpl: async () => ({ ok: true, json: async () => ({ status: 'ok', environment: 'staging', gitSha: SHA_B, coolify: { resourceUuid: 'u4s804o4wwcckowgk0woo4wg' } }) }),
+    sleep: async () => {},
+  });
+  assert.equal(result.healthSha, SHA_B);
+  assert.equal(poll, 3);
+});
+
+test('Coolify rechaza HEAD en finished y un SHA concreto incorrecto', async () => {
+  const run = (deployment) => deployAndVerify({
+    client: {
+      patchApplication: async () => {},
+      getApplication: async () => stagingApplication,
+      patchEnvs: async () => {},
+      start: async () => ({ deployment_uuid: 'deploy-invalid' }),
+      getDeployment: async () => deployment,
+    },
+    compose: 'services: {}\n',
+    manifest: { environment: 'staging', commit: SHA_B, configHash: HASH_B, components: completeState.components },
+    fetchImpl: async () => ({ ok: true, json: async () => ({}) }),
+    sleep: async () => {},
+  });
+
+  await assert.rejects(() => run({ status: 'finished', commit: 'HEAD' }), /terminó sin confirmar el SHA/);
+  await assert.rejects(() => run({ status: 'in_progress', commit: SHA_A }), /corresponde a .* no al SHA/);
 });
 
 test('Coolify preflight blocks mutations when the application source is wrong', async () => {

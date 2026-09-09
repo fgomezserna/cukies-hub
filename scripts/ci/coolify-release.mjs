@@ -116,10 +116,10 @@ export function buildImageEnvironment(manifest) {
       schedulers: 'CUKIES_IMAGE_SCHEDULERS',
       'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
     }[component];
-    return { key: env, value: value.image, is_literal: true, is_runtime: true, is_buildtime: false };
+    return { key: env, value: value.image, is_literal: true, is_runtime: true, is_buildtime: true };
   });
-  entries.push({ key: 'IMAGE_REVISION', value: manifest.commit, is_literal: true, is_runtime: true, is_buildtime: false });
-  entries.push({ key: 'CUKIES_BUILD_ENV_HASH', value: manifest.configHash, is_literal: true, is_runtime: true, is_buildtime: false });
+  entries.push({ key: 'IMAGE_REVISION', value: manifest.commit, is_literal: true, is_runtime: true, is_buildtime: true });
+  entries.push({ key: 'CUKIES_BUILD_ENV_HASH', value: manifest.configHash, is_literal: true, is_runtime: true, is_buildtime: true });
   return entries;
 }
 
@@ -144,9 +144,15 @@ export async function deployAndVerify({ client, compose, manifest, resourceUuid 
     const current = await client.getDeployment(deployment);
     const status = statusOf(current);
     const deploymentCommit = current?.commit ?? current?.commit_sha ?? current?.commitSha;
-    if (deploymentCommit && deploymentCommit !== manifest.commit) throw new Error(`Coolify deployment ${deployment} corresponde a ${deploymentCommit}, no al SHA ${manifest.commit}.`);
+    const sentinelCommit = deploymentCommit === undefined || deploymentCommit === null || deploymentCommit === '' || deploymentCommit === 'HEAD';
+    if (!sentinelCommit && deploymentCommit !== manifest.commit) throw new Error(`Coolify deployment ${deployment} corresponde a ${deploymentCommit}, no al SHA ${manifest.commit}.`);
     if (TERMINAL_FAILURES.has(status)) throw new Error(`Coolify deployment ${deployment} terminó en ${status}${diagnosticOf(current) ? `: ${diagnosticOf(current)}` : '.'}`);
-    if (status === 'finished') { finished = current; break; }
+    if (status === 'finished') {
+      if (deploymentCommit !== manifest.commit) throw new Error(`Coolify deployment ${deployment} terminó sin confirmar el SHA ${manifest.commit}; commit=${deploymentCommit ?? '(ausente)'}.`);
+      finished = current;
+      break;
+    }
+    if (sentinelCommit && !['queued', 'in_progress'].includes(status)) throw new Error(`Coolify deployment ${deployment} devolvió commit ${deploymentCommit ?? '(ausente)'} en estado ${status || '(ausente)'}.`);
     await sleep(pollMs);
   }
   if (!finished) throw new Error(`Coolify deployment ${deployment} no terminó dentro del timeout.`);

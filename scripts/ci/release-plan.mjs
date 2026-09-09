@@ -26,6 +26,12 @@ const PROJECT_COMPONENT = Object.freeze({
 });
 
 const ALL_REASON = 'first-run-or-invalid-base';
+const ORCHESTRATION_ONLY_PATHS = new Set([
+  'scripts/ci/coolify-release.mjs',
+  'scripts/ci/release-plan.mjs',
+  'scripts/ci/release-state.mjs',
+  'scripts/ci/ci.test.mjs',
+]);
 
 function validSha(value) {
   return typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value);
@@ -42,7 +48,7 @@ export function componentForPath(path) {
   if (path.startsWith('packages/chain-indexer/')) return ['chain-indexer'];
   if (path.startsWith('packages/cuki-card-worker/')) return ['cuki-card-worker'];
   if (path.startsWith('packages/cukies-bridge-relayer/')) return ['cukies-bridge-relayer'];
-  if (path.startsWith('scripts/ci/')) return [...COMPONENTS];
+  if (path.startsWith('scripts/ci/')) return ORCHESTRATION_ONLY_PATHS.has(path) ? [] : [...COMPONENTS];
   return [];
 }
 
