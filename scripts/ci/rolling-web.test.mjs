@@ -127,6 +127,7 @@ test('rolling web respeta el orden readiness/finished/health y parchea solo la i
     docker_registry_image_tag: `sha256-${DIGEST_B.slice(7)}`,
   });
   assert.ok(fake.calls[2][2].every((entry) => entry.is_runtime && !entry.is_buildtime && entry.is_literal));
+  assert.equal(fake.calls[2][2].find((entry) => entry.key === 'COOLIFY_BRANCH')?.value, target.gitBranch);
 });
 
 test('si el despliegue falla, nunca hace stop y restaura config y metadata anteriores', async () => {
@@ -152,6 +153,7 @@ test('si el despliegue falla, nunca hace stop y restaura config y metadata anter
   });
   const restoreEnvs = fake.calls.find(([, , data]) => Array.isArray(data) && data[0]?.value === SHA_A);
   assert.equal(restoreEnvs?.[2].find((entry) => entry.key === 'CUKIES_BUILD_ENV_HASH').value, HASH_A);
+  assert.equal(restoreEnvs?.[2].find((entry) => entry.key === 'COOLIFY_BRANCH').value, target.gitBranch);
 });
 
 test('rechaza un target de otra rama/entorno antes de mutar Coolify', async () => {
