@@ -32,6 +32,15 @@ import {
   type LegacyMarketplaceListParams,
   type LegacyMarketplaceListResponse,
 } from './types';
+import {
+  readLegacyMarketplaceLiveState,
+} from './live-marketplace';
+import {
+  buildLegacyMarketplaceReconciliationCasFilter,
+  buildLegacyMarketplaceReconciliation,
+  type LegacyMarketplaceReconciliation,
+  type LegacyMarketplaceReconciliationSnapshot,
+} from './reconciliation';
 
 type LegacyCukiDocument = {
   _id: string;
@@ -53,6 +62,10 @@ type LegacyCukiDocument = {
   state?: unknown;
   timeStamp?: unknown;
   priceOriginal?: unknown;
+  marketplaceListingStatus?: unknown;
+  marketplaceReconciliationFingerprint?: unknown;
+  marketplaceReconciledAt?: unknown;
+  updatedAt?: unknown;
 };
 
 type LegacyHistoryDocument = {
@@ -109,6 +122,8 @@ const cukiProjection = {
   state: 1,
   timeStamp: 1,
   priceOriginal: 1,
+  marketplaceListingStatus: 1,
+  marketplaceReconciliationFingerprint: 1,
 };
 
 async function getCukiesCollection() {
@@ -402,6 +417,67 @@ function normalizeCuki(document: LegacyCukiDocument): LegacyMarketplaceCukiItem 
     history: normalizeHistory(document.history),
     timestamp: toNumberOrNull(document.timeStamp),
   };
+}
+
+async function persistLegacyMarketplaceReconciliation(
+  collection: Collection<LegacyCukiDocument>,
+  reconciliation: LegacyMarketplaceReconciliation,
+  snapshot: LegacyMarketplaceReconciliationSnapshot,
+) {
+  const result = await collection.updateOne(
+    {
+      $and: [
+        buildLegacyMarketplaceReconciliationCasFilter(snapshot),
+        {
+          marketplaceReconciliationFingerprint: {
+            $ne: reconciliation.fingerprint,
+          },
+        },
+      ],
+    } as Filter<LegacyCukiDocument>,
+    {
+      $set: {
+        user: reconciliation.item.owner,
+        state: reconciliation.item.state,
+        price: reconciliation.item.price,
+        priceOriginal: reconciliation.item.priceOriginal,
+        marketplaceListingStatus: reconciliation.marketplaceListingStatus,
+        marketplaceReconciliationFingerprint: reconciliation.fingerprint,
+        marketplaceReconciledAt: new Date(),
+        updatedAt: new Date(),
+      },
+    },
+  );
+  return result.modifiedCount === 1;
+}
+
+export async function reconcileLegacyMarketplaceCuki(
+  tokenId: string,
+  expectedNetwork: LegacyCukiNetwork,
+) {
+  const collection = await getCukiesCollection();
+  const document = await collection.findOne(
+    { _id: tokenId },
+    { projection: cukiProjection },
+  );
+  if (!document) return null;
+  const indexed = normalizeCuki(document);
+  if (indexed.network !== expectedNetwork) return null;
+  const live = await readLegacyMarketplaceLiveState(indexed);
+  const reconciliation = buildLegacyMarketplaceReconciliation(indexed, live);
+  const changed = await persistLegacyMarketplaceReconciliation(
+    collection,
+    reconciliation,
+    {
+      tokenId,
+      network: document.network,
+      owner: document.user,
+      state: document.state,
+      priceOriginal: document.priceOriginal,
+      fingerprint: document.marketplaceReconciliationFingerprint,
+    },
+  );
+  return { ...reconciliation, changed, paused: live.paused };
 }
 
 async function hydrateCukiRelations(

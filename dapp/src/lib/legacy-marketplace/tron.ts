@@ -22,6 +22,7 @@ export type LegacyTronWebLike = {
   };
   defaultAddress?: {
     base58?: string;
+    hex?: string;
   };
   contract: (
     abi: unknown,
@@ -132,6 +133,7 @@ export async function sendLegacyTronContract(
   functionName: string,
   args: readonly unknown[] = [],
   options?: Record<string, unknown>,
+  beforeSend?: () => void,
 ) {
   const contract = await getLegacyTronContract(tronWeb, contractName);
   const method = contract[functionName];
@@ -150,6 +152,7 @@ export async function sendLegacyTronContract(
     );
   }
 
+  beforeSend?.();
   return call.send(options);
 }
 

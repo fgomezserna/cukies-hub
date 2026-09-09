@@ -26,7 +26,7 @@ jest.mock('@/lib/legacy-marketplace/data', () => ({
   getLegacyMarketplaceCuki: jest.fn(),
 }));
 jest.mock('@/lib/legacy-marketplace/live-marketplace', () => ({
-  verifyLegacyMarketplaceListings: jest.fn(),
+  readLegacyMarketplaceLiveState: jest.fn(),
 }));
 jest.mock('@/components/legacy-marketplace/marketplace-actions', () => ({
   MarketplaceActions: () => <div data-testid="marketplace-actions" />,
@@ -38,7 +38,7 @@ jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
 import MarketplaceDetailPage from '@/app/(app)/marketplace/[tokenId]/page';
 import { getLegacyMarketplaceCuki } from '@/lib/legacy-marketplace/data';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
-import { verifyLegacyMarketplaceListings } from '@/lib/legacy-marketplace/live-marketplace';
+import { readLegacyMarketplaceLiveState } from '@/lib/legacy-marketplace/live-marketplace';
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
 
 const detail = {
@@ -70,7 +70,14 @@ describe('ficha del Marketplace Legacy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (getLegacyMarketplaceCuki as jest.Mock).mockResolvedValue(detail);
-    (verifyLegacyMarketplaceListings as jest.Mock).mockResolvedValue([]);
+    (readLegacyMarketplaceLiveState as jest.Mock).mockResolvedValue({
+      network: 'TRON',
+      owner: detail.owner,
+      isOnSale: false,
+      paused: false,
+      price: 0,
+      priceOriginal: '0',
+    });
   });
 
   it('recupera la ficha rica desde la fuente Legacy para la URL histórica', async () => {

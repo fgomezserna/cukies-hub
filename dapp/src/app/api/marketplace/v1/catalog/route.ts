@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listLegacyMarketplaceCukies } from '@/lib/legacy-marketplace/data';
 import {
   verifyLegacyMarketplaceListingsByNetwork,
+  type LegacyMarketplacePausedNetwork,
   type LegacyMarketplaceUnavailableNetwork,
 } from '@/lib/legacy-marketplace/live-marketplace';
 import type {
@@ -24,6 +25,7 @@ type CatalogItem =
 type VerifiedLegacyPage = LegacyMarketplaceListResponse & {
   scannedOffset: number;
   unavailableNetworks: LegacyMarketplaceUnavailableNetwork[];
+  pausedNetworks: LegacyMarketplacePausedNetwork[];
 };
 
 async function listVerifiedLegacyPage(input: {
@@ -39,6 +41,7 @@ async function listVerifiedLegacyPage(input: {
   let cursor = input.offset;
   let last: LegacyMarketplaceListResponse | null = null;
   const unavailableNetworks = new Set<LegacyMarketplaceUnavailableNetwork>();
+  const pausedNetworks = new Set<LegacyMarketplacePausedNetwork>();
   let facets: LegacyMarketplaceListResponse['facets'] = {
     states: [],
     networks: [],
@@ -63,10 +66,14 @@ async function listVerifiedLegacyPage(input: {
     const verification = await verifyLegacyMarketplaceListingsByNetwork(
       candidates.filter((item) => (
         (item.network !== 'BSC' && item.network !== 'TRON')
-        || !unavailableNetworks.has(item.network)
+        || (!unavailableNetworks.has(item.network) && !pausedNetworks.has(item.network))
       )),
     );
     verification.unavailableNetworks.forEach((network) => unavailableNetworks.add(network));
+    verification.pausedNetworks.forEach((network) => pausedNetworks.add(network));
+    // Preserve the Mongo candidate order and offset. Reconciliation belongs to
+    // confirmed actions; mutating this filtered set while scanning would shift
+    // skip/offset pagination and omit or repeat valid listings.
     verified.push(...verification.items);
     cursor += page.items.length;
     if (page.items.length < input.limit || cursor >= page.total) break;
@@ -86,6 +93,7 @@ async function listVerifiedLegacyPage(input: {
     facets,
     scannedOffset: cursor,
     unavailableNetworks: [...unavailableNetworks],
+    pausedNetworks: [...pausedNetworks],
   };
 }
 
@@ -317,9 +325,13 @@ export async function GET(request: NextRequest) {
         legacyNetworks: {
           BSC: legacy?.unavailableNetworks.includes('BSC')
             ? 'unavailable'
+            : legacy?.pausedNetworks.includes('BSC')
+              ? 'paused'
             : 'ready',
           TRON: legacy?.unavailableNetworks.includes('TRON')
             ? 'unavailable'
+            : legacy?.pausedNetworks.includes('TRON')
+              ? 'paused'
             : 'ready',
         },
       },

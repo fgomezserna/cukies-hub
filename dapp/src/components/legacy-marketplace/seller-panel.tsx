@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, RefreshCw, Wallet } from 'lucide-react';
 import { useAccount } from 'wagmi';
 
@@ -15,6 +15,43 @@ import type {
 import { CukiCard } from './cuki-card';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
+type WalletPage = { address: string; network: string; offset: number };
+const PAGE_SIZE = 60;
+
+async function fetchWalletPages(
+  pages: WalletPage[],
+  signal?: AbortSignal,
+) {
+  const results = await Promise.all(
+    pages.map(async (wallet) => {
+      const query = new URLSearchParams({
+        owner: wallet.address,
+        network: wallet.network,
+        state: 'available',
+        limit: String(PAGE_SIZE),
+        offset: String(wallet.offset),
+        sort: 'number-asc',
+      });
+      const response = await fetch(`/api/legacy-marketplace/cukies?${query}`, {
+        cache: 'no-store',
+        signal,
+      });
+      if (!response.ok) throw new Error('LEGACY_INVENTORY_UNAVAILABLE');
+      const payload = await response.json() as LegacyMarketplaceListResponse;
+      if (payload.source === 'empty') throw new Error('LEGACY_INVENTORY_UNAVAILABLE');
+      return { wallet, payload };
+    }),
+  );
+  return {
+    items: results.flatMap(({ payload }) => payload.items),
+    nextPages: results.flatMap(({ wallet, payload }) => {
+      const nextOffset = payload.offset + payload.items.length;
+      return nextOffset < payload.total
+        ? [{ ...wallet, offset: nextOffset }]
+        : [];
+    }),
+  };
+}
 
 export function LegacyMarketplaceSellerPanel() {
   const { address } = useAccount();
@@ -25,7 +62,10 @@ export function LegacyMarketplaceSellerPanel() {
   } = useTronLink();
   const [state, setState] = useState<LoadState>('idle');
   const [items, setItems] = useState<LegacyMarketplaceCukiItem[]>([]);
+  const [nextPages, setNextPages] = useState<WalletPage[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
+  const loadGenerationRef = useRef(0);
+  const loadMoreControllerRef = useRef<AbortController | null>(null);
   const wallets = useMemo(
     () => [
       ...(address ? [{ address, network: 'BSC' }] : []),
@@ -35,42 +75,71 @@ export function LegacyMarketplaceSellerPanel() {
   );
 
   useEffect(() => {
+    loadGenerationRef.current += 1;
+    const generation = loadGenerationRef.current;
+    loadMoreControllerRef.current?.abort();
+    loadMoreControllerRef.current = null;
     if (wallets.length === 0) {
       setItems([]);
+      setNextPages([]);
       setState('idle');
       return;
     }
     const controller = new AbortController();
     setState('loading');
-    Promise.all(
-      wallets.map(async (wallet) => {
-        const query = new URLSearchParams({
-          owner: wallet.address,
-          network: wallet.network,
-          state: 'available',
-          limit: '60',
-          sort: 'number-asc',
-        });
-        const response = await fetch(`/api/legacy-marketplace/cukies?${query}`, {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error('LEGACY_INVENTORY_UNAVAILABLE');
-        return response.json() as Promise<LegacyMarketplaceListResponse>;
-      }),
+    setItems([]);
+    setNextPages([]);
+    fetchWalletPages(
+      wallets.map((wallet) => ({ ...wallet, offset: 0 })),
+      controller.signal,
     )
-      .then((results) => {
-        if (controller.signal.aborted) return;
-        setItems(results.flatMap((result) => result.items));
+      .then((result) => {
+        if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
+        setItems(result.items);
+        setNextPages(result.nextPages);
         setState('ready');
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
         setItems([]);
         setState('unavailable');
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      loadMoreControllerRef.current?.abort();
+    };
   }, [reloadKey, wallets]);
+
+  async function loadMore() {
+    if (nextPages.length === 0 || state === 'loading') return;
+    const generation = loadGenerationRef.current;
+    loadMoreControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadMoreControllerRef.current = controller;
+    setState('loading');
+    try {
+      const result = await fetchWalletPages(nextPages, controller.signal);
+      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
+      setItems((current) => {
+        const byIdentity = new Map(
+          [...current, ...result.items].map((item) => [
+            `${item.network}:${item.tokenId}`,
+            item,
+          ]),
+        );
+        return [...byIdentity.values()];
+      });
+      setNextPages(result.nextPages);
+      setState('ready');
+    } catch {
+      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
+      setState('unavailable');
+    } finally {
+      if (loadMoreControllerRef.current === controller) {
+        loadMoreControllerRef.current = null;
+      }
+    }
+  }
 
   return (
     <div className="rounded-[14px] border border-white/10 bg-black/25 p-5 sm:p-6">
@@ -116,9 +185,19 @@ export function LegacyMarketplaceSellerPanel() {
         </p>
       )}
       {items.length > 0 && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {items.map((item) => <CukiCard key={`${item.network}-${item.tokenId}`} cuki={item} />)}
-        </div>
+        <>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {items.map((item) => <CukiCard key={`${item.network}-${item.tokenId}`} cuki={item} />)}
+          </div>
+          {nextPages.length > 0 && (
+            <div className="mt-5 flex justify-center">
+              <Button type="button" variant="outline" disabled={state === 'loading'} onClick={() => void loadMore()}>
+                {state === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Cargar más Cukies
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

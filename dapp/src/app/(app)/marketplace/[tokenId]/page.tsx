@@ -34,12 +34,15 @@ import type {
   LegacyMarketplaceCukiItem,
   LegacyMarketplaceCukiReference,
 } from '@/lib/legacy-marketplace/types';
-import { getLegacyMarketplaceCuki } from '@/lib/legacy-marketplace/data';
+import {
+  getLegacyMarketplaceCuki,
+} from '@/lib/legacy-marketplace/data';
 import {
   getLegacyMarketplaceDetailHref,
   matchesLegacyMarketplaceIdentity,
 } from '@/lib/legacy-marketplace/identity';
-import { verifyLegacyMarketplaceListings } from '@/lib/legacy-marketplace/live-marketplace';
+import { readLegacyMarketplaceLiveState } from '@/lib/legacy-marketplace/live-marketplace';
+import { buildLegacyMarketplaceReconciliation } from '@/lib/legacy-marketplace/reconciliation';
 
 type MarketplaceDetailPageProps = {
   params: Promise<{
@@ -290,17 +293,11 @@ export default async function MarketplaceDetailPage({
   ) {
     notFound();
   }
-  const [verifiedListing] = indexedCuki.state === 'onSale'
-    ? await verifyLegacyMarketplaceListings([indexedCuki])
-    : [];
-  const cuki = indexedCuki.state === 'onSale' && !verifiedListing
-    ? {
-        ...indexedCuki,
-        state: 'unknown',
-        price: null,
-        priceOriginal: null,
-      }
-    : verifiedListing ?? indexedCuki;
+  const live = await readLegacyMarketplaceLiveState(indexedCuki);
+  const reconciled = buildLegacyMarketplaceReconciliation(indexedCuki, live).item;
+  const cuki = live.paused
+    ? { ...reconciled, state: 'unknown', price: null, priceOriginal: null }
+    : reconciled;
 
   const originAction = getOriginAction(cuki);
   const originDate = getOriginDate(cuki);

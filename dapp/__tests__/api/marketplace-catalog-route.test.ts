@@ -9,6 +9,7 @@ jest.mock('@/lib/legacy-marketplace/live-marketplace', () => ({
   verifyLegacyMarketplaceListingsByNetwork: jest.fn(async (items: unknown[]) => ({
     items,
     unavailableNetworks: [],
+    pausedNetworks: [],
   })),
 }));
 
@@ -80,6 +81,7 @@ describe('/api/marketplace/v1/catalog', () => {
     verifyLegacy.mockImplementation(async (items: unknown[]) => ({
       items,
       unavailableNetworks: [],
+      pausedNetworks: [],
     }));
   });
 
@@ -190,10 +192,11 @@ describe('/api/marketplace/v1/catalog', () => {
       facets,
     }));
     verifyLegacy
-      .mockResolvedValueOnce({ items: [], unavailableNetworks: [] })
+      .mockResolvedValueOnce({ items: [], unavailableNetworks: [], pausedNetworks: [] })
       .mockImplementation(async (items: unknown[]) => ({
         items,
         unavailableNetworks: [],
+        pausedNetworks: [],
       }));
 
     const response = await GET(request('scope=legacy&limit=24'));
@@ -219,6 +222,7 @@ describe('/api/marketplace/v1/catalog', () => {
     verifyLegacy.mockResolvedValue({
       items: [bsc],
       unavailableNetworks: ['TRON'],
+      pausedNetworks: [],
     });
 
     const response = await GET(request('scope=legacy&limit=24'));
@@ -227,5 +231,57 @@ describe('/api/marketplace/v1/catalog', () => {
     expect(body.data.items.map((entry: { item: { tokenId: string } }) => entry.item.tokenId)).toEqual(['1']);
     expect(body.data.sources.legacy).toBe('ready');
     expect(body.data.legacyNetworks).toEqual({ BSC: 'ready', TRON: 'unavailable' });
+  });
+
+  it('mantiene el cursor estable si el precio vivo difiere del orden indexado', async () => {
+    const expensive = { ...legacyItem('1', 2_000_000_000), price: 1, priceOriginal: '1' };
+    const cheap = { ...legacyItem('2', 1_999_999_999), price: 2, priceOriginal: '2' };
+    legacyList.mockResolvedValue({
+      source: 'mongo',
+      items: [expensive, cheap],
+      total: 2,
+      offset: 0,
+      limit: 24,
+      facets,
+    });
+    verifyLegacy.mockImplementation(async (items: Array<{ tokenId: string }>) => ({
+      items: items.map((item) => ({
+        ...item,
+        price: item.tokenId === '1' ? 10 : 5,
+        priceOriginal: item.tokenId === '1' ? '10' : '5',
+      })),
+      unavailableNetworks: [],
+      pausedNetworks: [],
+    }));
+
+    const response = await GET(request('scope=legacy&network=BSC&limit=24&sort=price-asc'));
+    const body = await response.json();
+
+    expect(body.data.items.map((entry: { item: { tokenId: string } }) => entry.item.tokenId)).toEqual(['1', '2']);
+    expect(body.data.cursors.legacyOffset).toBe(2);
+  });
+
+  it('distingue una pausa contractual sin convertir anuncios en cancelados', async () => {
+    const bsc = legacyItem('1', 2_000_000_000, 'BSC');
+    legacyList.mockResolvedValue({
+      source: 'mongo',
+      items: [bsc],
+      total: 1,
+      offset: 0,
+      limit: 24,
+      facets,
+    });
+    verifyLegacy.mockResolvedValue({
+      items: [],
+      unavailableNetworks: [],
+      pausedNetworks: ['BSC'],
+    });
+
+    const response = await GET(request('scope=legacy&network=BSC&limit=24'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.items).toEqual([]);
+    expect(body.data.legacyNetworks.BSC).toBe('paused');
   });
 });
