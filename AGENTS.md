@@ -217,7 +217,18 @@ The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through
   - Branch: `main`
   - Public URL: `https://cukies.world`
 
-Use `docker-compose.coolify.yml` for the new hub deployment. It defines:
+Staging app 28 uses `.github/workflows/cukies-staging-images.yml`: a push to
+`staging` builds affected images on the dedicated runner, publishes immutable
+digests and deploys `docker-compose.images.yml` through Coolify. Keep Coolify Git
+autodeploy disabled; do not start a legacy build manually. Read
+`docs/deployment-environments.md` before operating this pipeline. Production app
+12 keeps its existing deployment path.
+
+`docker-compose.coolify.yml` is the topology source; regenerate the image-only
+Compose with `node scripts/ci/generate-images-compose.mjs --write` after changing
+it and verify with `--check`. Mongo staging lives outside Compose in LXC2007 at
+`192.168.1.221:27018`; see `infrastructure/ci/staging-data-handoff.md` for recovery.
+The stack defines:
 
 - `dapp`: public Next.js app on port `3000`.
 - `chain-indexer`: internal blockchain indexer worker.
@@ -228,7 +239,7 @@ Operational rules:
 
 - Do not commit Coolify secrets, AWS keys, Mongo URLs, OAuth secrets, RPC keys or generated `.env` files.
 - Store runtime secrets in Coolify environment variables. Local worker secrets can live only in ignored `.env.local` files.
-- Before saying a worker is deployed, verify the actual Coolify resource is using `docker-compose.coolify.yml`, not a single Nixpacks app.
+- Before saying a staging worker is deployed, verify app 28 uses `docker-compose.images.yml`, its running image digest matches the release manifest, and its database endpoint is the staging LXC. A green build alone does not verify runtime.
 - Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
 - Staging must use `DATABASE_URL` -> `cukies-hub-staging`, `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`, and `CHAIN_INDEXER_DB_NAME`/`CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`.
 - In app 28, `CARD_WORKER_UPLOAD=true` and `COMPOSE_PROFILES=card-worker` are allowed only with the exclusive `cukies-cards-staging` bucket, staging-only credentials and the guard validated. Do not copy those values or credentials to another resource.
