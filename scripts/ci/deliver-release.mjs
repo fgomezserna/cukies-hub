@@ -44,12 +44,18 @@ export async function deployWorkers({ client, targets, manifest, compose, sleepI
   throw new Error(`Timeout esperando workers ${deploymentUuid}.`);
 }
 
-export async function deliverRelease({ client, manifest, previous, compose, targets = resolveCoolifyTargets(manifest.environment), webDeploy = deployRollingWeb, workerDeploy = deployWorkers, recordProgress = async () => {} }) {
+export async function deliverRelease({ client, manifest, previous, compose, targets = resolveCoolifyTargets(manifest.environment), webDeploy = deployRollingWeb, workerDeploy = deployWorkers, recordProgress = async () => {}, sleepImpl = sleep }) {
   const decision = chooseDelivery({ manifest, previous, compose });
   if (decision.skip) return { status: 'skipped', reason: 'images-and-workers-compose-unchanged', servedSha: previous.commit, decision };
   await recordProgress({ phase: 'web-starting', commit: manifest.commit, environment: manifest.environment, webResourceUuid: targets.web.resourceUuid, workersResourceUuid: targets.workers.resourceUuid });
   const web = await webDeploy({ client, target: targets.web, manifest, previousManifest: previous });
-  await recordProgress({ phase: decision.workers ? 'workers-starting' : 'web-verified', web, candidate: manifest });
+  await recordProgress({ phase: 'web-verified', web, candidate: manifest });
+  if (decision.workers) {
+    // During the initial split the old web belongs to the workers resource.
+    // Give requests routed before the switch time to finish before Compose stops it.
+    if (previous?.deliveryMode !== 'rolling') await sleepImpl(60_000);
+    await recordProgress({ phase: 'workers-starting' });
+  }
   const workers = decision.workers ? await workerDeploy({ client, targets, manifest, compose }) : null;
   await recordProgress({ phase: 'delivery-verified', web, workers });
   Object.assign(manifest, { deliveryMode: 'rolling', workersComposeHash: decision.workersComposeHash, deploymentUuid: web.deploymentUuid, webResourceUuid: targets.web.resourceUuid, workersResourceUuid: targets.workers.resourceUuid });

@@ -57,13 +57,22 @@ test('workers reject production resource and do not mutate it', async () => {
 test('a worker failure leaves an explicit record of the web already serving', async () => {
   const progress = [];
   await assert.rejects(deliverRelease({ client: {}, manifest: manifest(), previous: null, compose,
-    recordProgress: async (record) => progress.push(record),
+    recordProgress: async (record) => progress.push({ ...progress.at(-1), ...record }), sleepImpl: async () => {},
     webDeploy: async () => ({ deploymentUuid: 'web-ready', healthSha: sha }),
     workerDeploy: async () => { throw new Error('worker failed'); } }), /worker failed/);
   assert.equal(progress.at(-1).phase, 'workers-starting');
   assert.equal(progress.at(-1).web.healthSha, sha);
   assert.equal(progress.at(-1).candidate.commit, sha);
   assert.equal(progress.some((record) => record.phase === 'delivery-verified'), false);
+});
+
+test('initial split drains old web traffic before stopping its Compose resource', async () => {
+  const calls = [];
+  await deliverRelease({ client: {}, manifest: manifest(), previous: null, compose,
+    webDeploy: async () => { calls.push('web-ready'); return { deploymentUuid: 'web-new' }; },
+    sleepImpl: async (ms) => { calls.push(ms); },
+    workerDeploy: async () => { calls.push('workers'); return { deploymentUuid: 'workers-new' }; } });
+  assert.deepEqual(calls, ['web-ready', 60_000, 'workers']);
 });
 
 test('pending or corrupt journals block a subsequent delivery', async () => {

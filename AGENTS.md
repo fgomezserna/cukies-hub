@@ -201,14 +201,13 @@ Required environment variables in `dapp/.env.local`:
 
 ## Coolify Deployment
 
-Rolling delivery is being validated in staging: app32 (`rwwsc4kkwc0ck84cgk40s8kk`) is the dedicated Docker Image web resource; app28 retains workers. Follow [the transition procedure](docs/deployment-rolling-transition.md) and verify the live delivery mode before acting. Production is not enabled until its own resource, configuration and rehearsal are complete.
+Rolling delivery is active in staging (failure/rollback rehearsal remains tracked in the transition evidence): app32 (`rwwsc4kkwc0ck84cgk40s8kk`) is the dedicated Docker Image web resource; app28 retains workers. Follow [the transition procedure](docs/deployment-rolling-transition.md) and verify the live delivery mode before acting. Production is not enabled until its own resource, configuration and rehearsal are complete.
 
 The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through Traefik/Cloudflare.
 
 - Staging/integration app:
-  - Coolify resource: `game-hub-staging`
-  - Application ID: `28`
-  - UUID: `u4s804o4wwcckowgk0woo4wg`
+  - Web resource: `cukies-hub-staging-web`, app32, UUID `rwwsc4kkwc0ck84cgk40s8kk`
+  - Workers resource: `game-hub-staging`, app28, UUID `u4s804o4wwcckowgk0woo4wg`
   - Branch: `staging`
   - Public URL: `https://cukieshub.eurekand.com`
   - Chain/data: BSC Testnet (`97`), `cukies-hub-staging`, `cukies-legacy-staging`, `cukieshub-new-staging`.
@@ -219,9 +218,9 @@ The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through
   - Branch: `main`
   - Public URL: `https://cukies.world`
 
-Staging app 28 uses `.github/workflows/cukies-images.yml`: a push to
+Staging apps 32 and 28 use `.github/workflows/cukies-images.yml`: a push to
 `staging` builds affected images on the dedicated runner, publishes immutable
-digests and deploys `docker-compose.images.yml` through Coolify. Keep Coolify Git
+digests and rolls the web in app32, then reconciles app28 with `docker-compose.workers.yml` only when worker images or topology change. Keep Coolify Git
 autodeploy disabled; do not start a legacy build manually. Read
 `docs/deployment-environments.md` before operating this pipeline. Production app
 12 keeps `docker-compose.coolify.yml`. The separate Treasure Hunt staging app
@@ -244,7 +243,7 @@ Operational rules:
 
 - Do not commit Coolify secrets, AWS keys, Mongo URLs, OAuth secrets, RPC keys or generated `.env` files.
 - Store runtime secrets in Coolify environment variables. Local worker secrets can live only in ignored `.env.local` files.
-- Before saying a staging worker is deployed, verify app 28 uses `docker-compose.images.yml`, its running image digest matches the release manifest, and its database endpoint is the staging LXC. The release commit can differ from an image's `sourceSha` when CI reuses it; compare each digest with the manifest. A green build alone does not verify runtime.
+- Before saying a staging worker is deployed, verify app 28 uses `docker-compose.workers.yml`, its running image digest matches the release manifest, and its database endpoint is the staging LXC. The release commit can differ from an image's `sourceSha` when CI reuses it; compare each digest with the manifest. A green build alone does not verify runtime.
 - Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
 - Staging must use `DATABASE_URL` -> `cukies-hub-staging`, `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`, and `CHAIN_INDEXER_DB_NAME`/`CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`.
 - App 28 uses `COMPOSE_PROFILES=staging-runtime,card-worker,legacy-card-worker`. Preserve each worker's exclusive staging bucket and credentials; do not copy them to another resource. `CARD_WORKER_UPLOAD=true` requires the storage guard to pass.

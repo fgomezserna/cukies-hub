@@ -200,9 +200,12 @@ RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
 FROM base AS dapp
 
 ARG IMAGE_REVISION
+ARG NEXT_PUBLIC_APP_ENV
 
 ENV NODE_ENV=production \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    CUKIES_IMAGE_REVISION=$IMAGE_REVISION
 
 # Coolify's Docker Image rolling health check runs curl inside the container.
 RUN apt-get update \
