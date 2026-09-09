@@ -14,13 +14,13 @@ source ~/.zshrc >/dev/null 2>&1 &&
 
 ## Flujo por defecto de agentes
 
-Para trabajo que se pueda separar con seguridad, el coordinador se limita a razonamiento y orquestación: conserva la decisión, el reparto, la revisión de evidencia/diff y la integración; delega la ejecución rutinaria en agentes baratos `gpt-5.6-luna`. El flujo por defecto es: auditor Luna `medium` para lectura por puntos, implementador Luna `high` para un parche acotado y verificador Luna `high` independiente cuando el riesgo lo justifique. Luna admite `low`, `medium`, `high`, `xhigh` y `max`; `max` solo se permite como escalada justificada dentro de Luna. El coordinador no duplica implementación ni rastreo rutinario. Las operaciones privilegiadas ya autorizadas por el usuario se ejecutan si la herramienta solo está disponible para la raíz.
+Para trabajo que se pueda separar con seguridad, Astra `max` conserva la decisión, el reparto, la revisión de evidencia/diff y la integración; delega la ejecución rutinaria en `gpt-5.6-luna` con esfuerzo `max`. Por decisión del usuario, `max` es el valor por defecto para ambos modelos: auditor, investigador, implementador y tester usan Luna Max; el coordinador y reviewer usan Astra Max. La revisión independiente adicional se aplica cuando el riesgo lo justifique. El coordinador no duplica implementación ni rastreo rutinario. Las operaciones privilegiadas ya autorizadas por el usuario se ejecutan si la herramienta solo está disponible para la raíz.
 
 - Invocar mediante `collaboration.spawn_agent` con exactamente los campos `task_name`, `model`, `reasoning_effort`, `fork_turns` y `message`; el encargo autocontenido va dentro de `message`. Fijar siempre el modelo y esfuerzo indicados para el rol. No crear chats, cron ni subcomandos/configuración ficticios.
 - Reutilizar un agente solo para el mismo alcance, modelo y esfuerzo; no resucitar agentes Astra anteriores para trabajo barato. Si Luna no está disponible, declararlo y pedir preferencia en ese momento; no escalar silenciosamente a un modelo más caro.
-- Concurrencia máxima: `min(3, capacidad del runtime)`; normalmente 1-2 workers, sin subdelegación. Agrupar 2-5 puntos relacionados y no lanzar un agente por check. Para documentación pequeña, editar localmente sin ceremonia.
+- Concurrencia máxima por defecto: `min(2, capacidad del runtime)`, sin subdelegación. Agrupar 2-5 puntos relacionados y no lanzar un agente por check. Para documentación pequeña, editar localmente sin ceremonia.
 - Hacer una pasada y, como máximo, una corrección acotada por hallazgos. Cada pasada debe limitarse orientativamente a 15-20 consultas focales y un resultado de 300 palabras más tabla/apéndice; si falta evidencia, registrar el hueco y replantear el alcance con el coordinador, sin abandonar el objetivo ni esperar permiso rutinario.
-- Los límites son operativos, no cuotas garantizadas. No inventar precios o porcentajes de ahorro ni recurrir a API facturada o resets para este flujo sin petición expresa. Las auditorías solo leen: no implementan ni mutan sistemas remotos. Seguridad y economía se escalan al coordinador para revisión; eso no concede potencia máxima ni una aprobación nueva.
+- Los límites son operativos, no cuotas garantizadas. No inventar precios o porcentajes de ahorro ni recurrir a API facturada o resets para este flujo sin petición expresa. Max no garantiza menor consumo. Las auditorías solo leen: no implementan ni mutan sistemas remotos. Seguridad y economía se escalan al coordinador para revisión; usar Max no concede autorizaciones nuevas.
 
 Ejemplo de invocación real para una auditoría de solo lectura:
 
@@ -28,7 +28,7 @@ Ejemplo de invocación real para una auditoría de solo lectura:
 {
   "task_name": "auditar_issue_123_puntos_a_b",
   "model": "gpt-5.6-luna",
-  "reasoning_effort": "medium",
+  "reasoning_effort": "max",
   "fork_turns": "none",
   "message": "Rol auditor, solo lectura. ISSUE-123, puntos A-B. Consulta como máximo 15-20 fuentes focales; no edites archivos del repo ni mutes sistemas remotos. Usa la evidencia disponible y registra en /tmp/issue-123-audit.md cada punto con ID, código, local, Stage/Prod, hasta 2 rutas, bloqueo y próximo paso. Sin evidencia informa sin verificar; no conviertas ese estado en pendiente o falla. Devuelve un resumen de hasta 300 palabras y la ruta del resultado."
 }
