@@ -24,8 +24,8 @@ export function BreedingPageShell({
               Breeding Cukies
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Flujo para crear nuevos Cukies: elige padres compatibles, valida
-              coste y revisa las crias activas o terminadas.
+              Consulta padres compatibles, coste y crías activas o terminadas.
+              Las acciones requieren un gate operativo activo.
             </p>
             <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
               {[

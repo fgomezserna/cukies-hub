@@ -58,7 +58,7 @@ type TronBridgeSnapshot = {
 };
 
 type EnabledBridgeRuntime = {
-  bscChainId: 97;
+  bscChainId: 56 | 97;
   bscNetworkLabel: string;
   bscTokenAddress: Address;
   bscBridgeAddress: Address;
@@ -66,6 +66,8 @@ type EnabledBridgeRuntime = {
   tronRpcUrl: string;
   tronTokenAddress: string;
   tronBridgeAddress: string;
+  operationsEnabled: boolean;
+  readOnly: boolean;
 };
 
 function enabledBridgeRuntime(
@@ -73,7 +75,7 @@ function enabledBridgeRuntime(
 ): EnabledBridgeRuntime | null {
   if (
     !config.enabled ||
-    config.bsc.chainId !== 97 ||
+    (config.bsc.chainId !== 56 && config.bsc.chainId !== 97) ||
     !config.bsc.collectionAddress ||
     !config.bsc.endpointAddress ||
     !config.tron.collectionAddress ||
@@ -92,6 +94,8 @@ function enabledBridgeRuntime(
     tronRpcUrl: config.tron.rpcUrl,
     tronTokenAddress: config.tron.collectionAddress,
     tronBridgeAddress: config.tron.endpointAddress,
+    operationsEnabled: config.operationsEnabled,
+    readOnly: !config.operationsEnabled,
   };
 }
 
@@ -286,6 +290,8 @@ function BridgeOperationsClient({
     tronRpcUrl,
     tronTokenAddress,
     tronBridgeAddress,
+    operationsEnabled,
+    readOnly,
   } = runtime;
   const { address, chainId, isConnected } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
@@ -554,6 +560,10 @@ function BridgeOperationsClient({
   }
 
   async function approveBridge() {
+    if (!operationsEnabled) {
+      setStatus('El bridge Legacy se encuentra en modo lectura; no se solicitan approvals.');
+      return;
+    }
     if (sourceNetwork === 'BSC') {
       if (!ensureBsc()) return;
       setStatus('Enviando approval del bridge en BSC...');
@@ -586,6 +596,10 @@ function BridgeOperationsClient({
   }
 
   async function startBridge() {
+    if (!operationsEnabled) {
+      setStatus('El bridge Legacy se encuentra en modo lectura; no se envian transacciones.');
+      return;
+    }
     if (!selectedCuki) {
       setStatus('Selecciona un Cukie para enviar al bridge.');
       return;
@@ -727,6 +741,18 @@ function BridgeOperationsClient({
         </aside>
       </section>
 
+      {readOnly && (
+        <div
+          role="status"
+          className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
+        >
+          Contratos Legacy identificados en sus redes existentes. Esta vista
+          permite consultar wallet, estado y movimientos desde este entorno; approvals,
+          transferencias y relayer permanecen bloqueados hasta una activación
+          operativa revisada.
+        </div>
+      )}
+
       {!ready && (
         <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
           {sourceNetwork === 'BSC' ? (
@@ -784,7 +810,7 @@ function BridgeOperationsClient({
                   key={cuki.tokenId}
                   cuki={cuki}
                   selected={selectedCuki?.tokenId === cuki.tokenId}
-                  disabled={!ready}
+                  disabled={!ready || !operationsEnabled}
                   onSelect={() => setSelectedCuki(cuki)}
                 />
               ))
@@ -838,7 +864,7 @@ function BridgeOperationsClient({
           {!approved && (
             <Button
               onClick={() => void approveBridge()}
-              disabled={disabled || !ready}
+              disabled={disabled || !ready || !operationsEnabled}
               variant="outline"
               className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
@@ -852,6 +878,7 @@ function BridgeOperationsClient({
             disabled={
               disabled ||
               !ready ||
+              !operationsEnabled ||
               !selectedCuki ||
               !approved ||
               !destinationOwner ||

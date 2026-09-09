@@ -1,11 +1,15 @@
 export type LegacyMarketplaceEnvironment = Partial<Record<
-  'APP_ENV' | 'NEXT_PUBLIC_APP_ENV',
+  | 'APP_ENV'
+  | 'NEXT_PUBLIC_APP_ENV'
+  | 'NEXT_PUBLIC_LEGACY_MAINNET_OPERATIONS_ENABLED',
   string | undefined
 >>;
 
 export type LegacyMarketplaceRuntime = Readonly<{
   appEnv: 'staging' | 'production' | 'unknown';
   legacyMainnetEnabled: boolean;
+  legacyMainnetReadEnabled: boolean;
+  legacyMainnetOperationsEnabled: boolean;
   legacyMarketplaceActionsEnabled: boolean;
   bscChainId: 56 | null;
   bscExplorerBaseUrl: string | null;
@@ -28,12 +32,21 @@ export function buildLegacyMarketplaceRuntime(
   const appEnv = rawAppEnv === 'staging' || rawAppEnv === 'production'
     ? rawAppEnv
     : 'unknown';
+  const legacyMainnetReadEnabled = appEnv === 'staging' || appEnv === 'production';
   const legacyMainnetEnabled = appEnv === 'production';
+  const legacyMainnetOperationsEnabled =
+    legacyMainnetReadEnabled
+    && (
+      appEnv === 'production'
+      || environmentValue(environment, 'NEXT_PUBLIC_LEGACY_MAINNET_OPERATIONS_ENABLED') === 'true'
+    );
   const legacyMarketplaceActionsEnabled = appEnv === 'staging' || appEnv === 'production';
 
   return Object.freeze({
     appEnv,
     legacyMainnetEnabled,
+    legacyMainnetReadEnabled,
+    legacyMainnetOperationsEnabled,
     legacyMarketplaceActionsEnabled,
     bscChainId: legacyMarketplaceActionsEnabled ? 56 : null,
     bscExplorerBaseUrl: legacyMarketplaceActionsEnabled ? 'https://bscscan.com' : null,
@@ -47,6 +60,8 @@ export function buildLegacyMarketplaceRuntime(
 export const legacyMarketplaceRuntime = buildLegacyMarketplaceRuntime({
   NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
   APP_ENV: process.env.APP_ENV,
+  NEXT_PUBLIC_LEGACY_MAINNET_OPERATIONS_ENABLED:
+    process.env.NEXT_PUBLIC_LEGACY_MAINNET_OPERATIONS_ENABLED,
 });
 
 export function getLegacyPointExplorerUrl(
@@ -61,12 +76,12 @@ export function getLegacyPointExplorerUrl(
   }
   if (
     network === 'BSC'
-    && runtime.legacyMainnetEnabled
+    && runtime.legacyMainnetReadEnabled
     && (chainId === 56 || chainId === null)
   ) {
     return `https://bscscan.com/tx/${txId}`;
   }
-  if (network === 'TRON' && runtime.legacyMainnetEnabled) {
+  if (network === 'TRON' && runtime.legacyMainnetReadEnabled) {
     return `https://tronscan.org/#/transaction/${txId}`;
   }
   return null;

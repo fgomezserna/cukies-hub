@@ -164,7 +164,7 @@ export function CukiePointsClient() {
     chainId: 56,
     query: {
       enabled:
-        legacyMarketplaceRuntime.legacyMainnetEnabled && Boolean(address),
+        legacyMarketplaceRuntime.legacyMainnetReadEnabled && Boolean(address),
     },
   });
   const { data: bscTotal } = useReadContract({
@@ -173,7 +173,7 @@ export function CukiePointsClient() {
     functionName: 'getTotalPoints',
     chainId: 56,
     query: {
-      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled,
+      enabled: legacyMarketplaceRuntime.legacyMainnetReadEnabled,
     },
   });
   const { data: bscEmitted } = useReadContract({
@@ -182,7 +182,7 @@ export function CukiePointsClient() {
     functionName: 'getTotalPointsEmited',
     chainId: 56,
     query: {
-      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled,
+      enabled: legacyMarketplaceRuntime.legacyMainnetReadEnabled,
     },
   });
   const { data: bscBurned } = useReadContract({
@@ -191,7 +191,7 @@ export function CukiePointsClient() {
     functionName: 'getTotalPointsBurned',
     chainId: 56,
     query: {
-      enabled: legacyMarketplaceRuntime.legacyMainnetEnabled,
+      enabled: legacyMarketplaceRuntime.legacyMainnetReadEnabled,
     },
   });
 
@@ -199,7 +199,7 @@ export function CukiePointsClient() {
     const requestId = tronRequestRef.current + 1;
     tronRequestRef.current = requestId;
     if (
-      !legacyMarketplaceRuntime.legacyMainnetEnabled ||
+      !legacyMarketplaceRuntime.legacyMainnetReadEnabled ||
       !tronAddress ||
       !window.tronWeb
     ) {
@@ -387,10 +387,16 @@ export function CukiePointsClient() {
 
   return (
     <div className="grid gap-6">
-      {!legacyMarketplaceRuntime.legacyMainnetEnabled && (
+      {!legacyMarketplaceRuntime.legacyMainnetReadEnabled && (
         <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100">
-          Puedes consultar tus puntos y movimientos. Las acciones están pausadas
-          temporalmente mientras completamos la actualización del servicio.
+          Las lecturas Legacy no están disponibles en este entorno. No se
+          mostrarán ceros hasta que exista una fuente verificada.
+        </div>
+      )}
+      {legacyMarketplaceRuntime.legacyMainnetReadEnabled && (
+        <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-4 text-sm text-lilac-100">
+          Lectura de CukiePoints desde los contratos Legacy existentes. Este
+          entorno mantiene sus datos indexados y no habilita escrituras ni firmas.
         </div>
       )}
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -424,7 +430,7 @@ export function CukiePointsClient() {
                   ? shortWallet(tronAddress)
                   : 'TronLink no conectado'}
               </span>
-              {legacyMarketplaceRuntime.legacyMainnetEnabled &&
+              {legacyMarketplaceRuntime.legacyMainnetReadEnabled &&
                 !isTronConnected && (
                   <Button
                     size="sm"

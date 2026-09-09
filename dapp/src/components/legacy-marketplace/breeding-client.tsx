@@ -28,6 +28,7 @@ import {
   readLegacyBscContract,
 } from '@/lib/legacy-marketplace/bsc';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
+import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import {
   readLegacyTronContract,
   sendLegacyTronContract,
@@ -324,6 +325,8 @@ export function BreedingClient({
   const bscReady = network === 'BSC' && isConnected && chainId === 56;
   const tronReady = network === 'TRON' && isTronConnected;
   const ready = network === 'BSC' ? bscReady : tronReady;
+  const readEnabled = legacyMarketplaceRuntime.legacyMainnetReadEnabled;
+  const operationsEnabled = legacyMarketplaceRuntime.legacyMainnetOperationsEnabled;
   const parentsSelected = Boolean(
     parent1 && parent2 && !sameToken(parent1, parent2),
   );
@@ -333,8 +336,9 @@ export function BreedingClient({
     abi: legacyMarketplaceBscAbis.breedingPoints,
     functionName: 'getMaxBreedsByCukie',
     query: {
-      enabled: network === 'BSC',
+      enabled: network === 'BSC' && readEnabled,
     },
+    chainId: 56,
   });
   const { data: bscPoints } = useReadContract({
     address: bscPointsAddress,
@@ -342,8 +346,9 @@ export function BreedingClient({
     functionName: 'getPoints',
     args: address ? [address] : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(address),
+      enabled: network === 'BSC' && readEnabled && Boolean(address),
     },
+    chainId: 56,
   });
   const { data: bscApproved } = useReadContract({
     address: bscTokenAddress,
@@ -351,8 +356,9 @@ export function BreedingClient({
     functionName: 'isApprovedForAll',
     args: address ? [address, bscBreedingAddress] : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(address),
+      enabled: network === 'BSC' && readEnabled && Boolean(address),
     },
+    chainId: 56,
   });
   const { data: bscCost } = useReadContract({
     address: bscBreedingAddress,
@@ -363,8 +369,9 @@ export function BreedingClient({
         ? [BigInt(parent1.tokenId), BigInt(parent2.tokenId)]
         : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(parent1 && parent2),
+      enabled: network === 'BSC' && readEnabled && Boolean(parent1 && parent2),
     },
+    chainId: 56,
   });
 
   const maxBreeds = useMemo(() => {
@@ -463,7 +470,7 @@ export function BreedingClient({
   }, [address, tronAddress]);
 
   const fetchBscActiveBreeds = useCallback(async () => {
-    if (!address) return [];
+    if (!address || !readEnabled) return [];
 
     const ids =
       (await readLegacyBscContract<readonly bigint[]>(
@@ -488,7 +495,7 @@ export function BreedingClient({
     );
 
     return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
-  }, [address]);
+  }, [address, readEnabled]);
 
   const fetchTronActiveBreeds = useCallback(async () => {
     if (!tronAddress || !window.tronWeb) return [];
@@ -618,6 +625,10 @@ export function BreedingClient({
 
   function ensureBsc() {
     if (network !== 'BSC') return false;
+    if (!operationsEnabled) {
+      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
+      return false;
+    }
     if (!isConnected) {
       setStatus('Conecta una wallet EVM desde el header.');
       return false;
@@ -631,6 +642,10 @@ export function BreedingClient({
 
   async function ensureTron() {
     if (network !== 'TRON') return false;
+    if (!operationsEnabled) {
+      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
+      return false;
+    }
     if (!isTronInstalled) {
       setStatus('Instala o activa TronLink para operar breeding en TRON.');
       return false;
@@ -770,10 +785,20 @@ export function BreedingClient({
     setParent2(cuki);
   }
 
-  const disabled = isWriting || isSwitchingChain;
+  const disabled = isWriting || isSwitchingChain || !operationsEnabled;
 
   return (
     <div className="grid gap-6">
+      {readEnabled && !operationsEnabled && (
+        <div
+          role="status"
+          className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
+        >
+          Lectura de Crías sobre los contratos Legacy existentes. Este entorno mantiene
+          datos y cursores aislados; approval, inicio y apertura de crías están
+          bloqueados hasta habilitar el gate operativo revisado.
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-white/10 bg-black/30 p-3">
         <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
           {(['BSC', 'TRON'] as const).map((item) => (
