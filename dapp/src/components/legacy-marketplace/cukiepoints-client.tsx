@@ -418,8 +418,7 @@ export function CukiePointsClient() {
       )}
       {legacyMarketplaceRuntime.legacyMainnetReadEnabled && (
         <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-4 text-sm text-lilac-100">
-          Puedes consultar tus Cukie Points Legacy. Las acciones de escritura y
-          firma estarán disponibles cuando finalice la revisión.
+          Consulta tus Cukie Points Legacy.
         </div>
       )}
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">

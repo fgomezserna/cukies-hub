@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRightLeft,
@@ -307,6 +307,7 @@ function BridgeOperationsClient({
     paused: null,
     approved: null,
   });
+  const tronSnapshotRequestRef = useRef(0);
 
   const destinationNetwork = getDestinationNetwork(sourceNetwork);
   const sourceOwner = sourceNetwork === 'BSC' ? address : tronAddress;
@@ -348,8 +349,16 @@ function BridgeOperationsClient({
     sourceNetwork === 'BSC'
       ? formatBscBridgePrice(bscBridgePrice as bigint | undefined)
       : tronSnapshot.price ?? '-';
-  const bridgePaused =
-    sourceNetwork === 'BSC' ? Boolean(bscPaused) : tronSnapshot.paused === true;
+  const bridgePaused: boolean | null =
+    sourceNetwork === 'BSC'
+      ? typeof bscPaused === 'boolean' ? bscPaused : null
+      : tronSnapshot.paused;
+  const bridgeStatusLabel =
+    bridgePaused === null
+      ? 'Sin verificar'
+      : bridgePaused
+        ? 'Pausado'
+        : 'Disponible';
   const approved =
     sourceNetwork === 'BSC'
       ? Boolean(bscApproved)
@@ -443,18 +452,32 @@ function BridgeOperationsClient({
   }, [address, tronAddress]);
 
   const refreshTronSnapshot = useCallback(async () => {
+    const requestId = tronSnapshotRequestRef.current + 1;
+    tronSnapshotRequestRef.current = requestId;
     const currentTronWeb = getLegacyTronWeb();
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const clearSnapshot = () => setTronSnapshot({
+      price: null,
+      rawPrice: null,
+      paused: null,
+      approved: null,
+    });
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        requestId === tronSnapshotRequestRef.current
+        && latestTronWeb?.defaultAddress?.base58 === requestAddress
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, tronRpcUrl)
+      );
+    };
     if (
-      !tronAddress
+      !requestAddress
       || !currentTronWeb
       || !isLegacyTronWalletOnRpc(currentTronWeb, tronRpcUrl)
     ) {
-      setTronSnapshot({
-        price: null,
-        rawPrice: null,
-        paused: null,
-        approved: null,
-      });
+      clearSnapshot();
       if (tronAddress && currentTronWeb && tronWalletRpcOrigin !== tronRpcUrl) {
         setStatus(`Cambia TronLink a ${tronNetworkLabel} para consultar el bridge.`);
       }
@@ -480,26 +503,28 @@ function BridgeOperationsClient({
           legacyMarketplaceTronAbis.token,
           tronTokenAddress,
           'isApprovedForAll',
-          [tronAddress, tronBridgeAddress],
+          [requestAddress, tronBridgeAddress],
         ),
       ]);
-      if (!isLegacyTronWalletOnRpc(getLegacyTronWeb(), tronRpcUrl)) {
-        setTronSnapshot({
-          price: null,
-          rawPrice: null,
-          paused: null,
-          approved: null,
-        });
-        setStatus(`Cambia TronLink a ${tronNetworkLabel} para consultar el bridge.`);
+      if (!contextIsCurrent()) {
+        clearSnapshot();
+        if (getLegacyTronWalletRpcOrigin(getLegacyTronWeb()) !== tronRpcUrl) {
+          setStatus(`Cambia TronLink a ${tronNetworkLabel} para consultar el bridge.`);
+        }
         return;
       }
       setTronSnapshot({
         price: formatTronBridgePrice(price),
         rawPrice: String(price),
-        paused: Boolean(paused),
+        paused: typeof paused === 'boolean' ? paused : null,
         approved: Boolean(approval),
       });
     } catch (error) {
+      if (!contextIsCurrent()) {
+        clearSnapshot();
+        return;
+      }
+      clearSnapshot();
       setStatus(getErrorMessage(error));
     }
   }, [
@@ -621,6 +646,11 @@ function BridgeOperationsClient({
       return;
     }
 
+    if (bridgePaused === null) {
+      setStatus('El estado del bridge aún no se ha podido verificar.');
+      return;
+    }
+
     if (bridgePaused) {
       setStatus('El bridge esta pausado en la red origen.');
       return;
@@ -701,7 +731,7 @@ function BridgeOperationsClient({
               ['Origen', sourceNetwork, Network],
               ['Destino', destinationNetwork, Route],
               ['Coste del bridge', bridgePrice, ArrowRightLeft],
-              ['Estado', bridgePaused ? 'Pausado' : 'Disponible', ShieldAlert],
+              ['Estado', bridgeStatusLabel, ShieldAlert],
             ].map(([label, value, Icon]) => (
               <div
                 key={String(label)}
@@ -897,7 +927,7 @@ function BridgeOperationsClient({
               !selectedCuki ||
               !approved ||
               !destinationOwner ||
-              bridgePaused
+              bridgePaused !== false
             }
             className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
           >

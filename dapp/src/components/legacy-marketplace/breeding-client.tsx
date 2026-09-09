@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Baby,
@@ -324,6 +324,8 @@ export function BreedingClient({
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isLoadingBreeds, setIsLoadingBreeds] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const activeBreedsRequestRef = useRef(0);
+  const tronSnapshotRequestRef = useRef(0);
 
   const owner = network === 'BSC' ? address : tronAddress;
   const tronWeb = getLegacyTronWeb();
@@ -508,7 +510,17 @@ export function BreedingClient({
 
   const fetchTronActiveBreeds = useCallback(async () => {
     const currentTronWeb = getLegacyTronWeb();
-    if (!tronAddress || !currentTronWeb) return [];
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        latestTronWeb?.defaultAddress?.base58 === requestAddress
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+      );
+    };
+    if (!requestAddress || !currentTronWeb) return [];
     if (tronWalletRpcOrigin !== LEGACY_TRON_MAINNET_RPC_URL) {
       setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
       return [];
@@ -523,8 +535,9 @@ export function BreedingClient({
         currentTronWeb,
         'breedingPoints',
         'getAllBreedsOwner',
-        [tronAddress],
+        [requestAddress],
       )) ?? [];
+    if (!contextIsCurrent()) return [];
     const breeds = await Promise.all(
       ids.map(async (id) =>
         normalizeBreedTuple(
@@ -540,8 +553,10 @@ export function BreedingClient({
       ),
     );
 
-    if (!isLegacyTronWalletOnRpc(getLegacyTronWeb(), LEGACY_TRON_MAINNET_RPC_URL)) {
-      setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+    if (!contextIsCurrent()) {
+      if (getLegacyTronWalletRpcOrigin(getLegacyTronWeb()) !== LEGACY_TRON_MAINNET_RPC_URL) {
+        setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      }
       return [];
     }
 
@@ -549,14 +564,18 @@ export function BreedingClient({
   }, [tronAddress, tronWalletRpcOrigin]);
 
   const refreshActiveBreeds = useCallback(async () => {
+    const requestId = activeBreedsRequestRef.current + 1;
+    activeBreedsRequestRef.current = requestId;
     setIsLoadingBreeds(true);
     try {
       const breeds =
         network === 'BSC'
           ? await fetchBscActiveBreeds()
           : await fetchTronActiveBreeds();
+      if (requestId !== activeBreedsRequestRef.current) return;
       setActiveBreeds(breeds.filter((breed) => !breed.completed));
     } catch (error) {
+      if (requestId !== activeBreedsRequestRef.current) return;
       setStatus(getErrorMessage(error));
       setActiveBreeds([]);
     } finally {
@@ -565,16 +584,32 @@ export function BreedingClient({
   }, [fetchBscActiveBreeds, fetchTronActiveBreeds, network]);
 
   const refreshTronSnapshot = useCallback(async () => {
+    const requestId = tronSnapshotRequestRef.current + 1;
+    tronSnapshotRequestRef.current = requestId;
     const currentTronWeb = getLegacyTronWeb();
-    if (
-      network !== 'TRON'
-      || !tronAddress
-      || !currentTronWeb
-      || !isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
-    ) {
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const clearSnapshot = () => {
       setTronMaxBreeds(null);
       setTronPoints(null);
       setTronApproved(null);
+    };
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        requestId === tronSnapshotRequestRef.current
+        && latestTronWeb?.defaultAddress?.base58 === requestAddress
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+      );
+    };
+    if (
+      network !== 'TRON'
+      || !requestAddress
+      || !currentTronWeb
+      || !isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+    ) {
+      clearSnapshot();
       if (
         network === 'TRON'
         && tronAddress
@@ -594,26 +629,31 @@ export function BreedingClient({
           'getMaxBreedsByCukie',
         ),
         readLegacyTronContract<unknown>(currentTronWeb, 'points', 'getPoints', [
-          tronAddress,
+          requestAddress,
         ]),
         readLegacyTronContract<unknown>(
           currentTronWeb,
           'token',
           'isApprovedForAll',
-          [tronAddress, tronBreedingAddress],
+          [requestAddress, tronBreedingAddress],
         ),
       ]);
-      if (!isLegacyTronWalletOnRpc(getLegacyTronWeb(), LEGACY_TRON_MAINNET_RPC_URL)) {
-        setTronMaxBreeds(null);
-        setTronPoints(null);
-        setTronApproved(null);
-        setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      if (!contextIsCurrent()) {
+        clearSnapshot();
+        if (getLegacyTronWalletRpcOrigin(getLegacyTronWeb()) !== LEGACY_TRON_MAINNET_RPC_URL) {
+          setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+        }
         return;
       }
       setTronMaxBreeds(Number(max));
       setTronPoints(formatPoints(String(userPoints)));
       setTronApproved(Boolean(approval));
     } catch (error) {
+      if (!contextIsCurrent()) {
+        clearSnapshot();
+        return;
+      }
+      clearSnapshot();
       setStatus(getErrorMessage(error));
     }
   }, [network, tronAddress, tronWalletRpcOrigin]);
@@ -621,6 +661,7 @@ export function BreedingClient({
   useEffect(() => {
     setParent1(null);
     setParent2(null);
+    setActiveBreeds([]);
     setStatus(null);
   }, [network]);
 

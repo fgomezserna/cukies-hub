@@ -29,7 +29,8 @@ de Coolify.
 ## Verificación local
 
 - `pnpm --dir dapp test -- --runInBand __tests__/lib/legacy-marketplace-runtime.test.ts __tests__/lib/cukies-bridge-runtime.test.ts __tests__/components/cukiepoints-client.test.tsx` — 3 suites, 15 tests OK.
-- `pnpm --dir dapp exec jest --runInBand` — suite completa: 234 suites, 1.887 tests OK.
+- `pnpm --dir dapp exec jest --runInBand` — suite completa: 235 suites, 1.890 tests OK.
+- Suites focales Legacy/UI: 6 suites, 32 tests OK, incluyendo wallet desconectada/Nile sin estado verificado, mainnet válida y respuesta tardía de cuenta A descartada tras cambiar a B.
 - Compilación focal de `runtime.ts` y `bridge-runtime.ts` con TypeScript — OK.
 - `pnpm --dir dapp lint` — OK, sin warnings ni errores.
 - `pnpm --dir dapp typecheck` — OK después de ejecutar `pnpm --dir dapp exec prisma generate` (necesario porque la instalación inicial usó `--ignore-scripts`).
