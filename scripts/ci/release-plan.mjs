@@ -41,6 +41,7 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/rolling-web.test.mjs',
   'scripts/ci/env-ci.test.mjs',
   'scripts/ci/worker-compose.test.mjs',
+  'scripts/ci/image-ref.mjs',
 ]);
 
 const DAPP_DOCKERFILE_REFINEMENT_REASON = 'dockerfile-ci-final-dapp-stage-only';
@@ -95,7 +96,9 @@ export function isDappFinalStageOnlyChange(baseDockerfile, headDockerfile) {
 }
 
 function isSafeRefinementPath(path) {
-  return path.startsWith('docs/')
+  if (path.startsWith('dapp/scripts/') || path.startsWith('packages/economy-schedulers/')) return false;
+  return (componentForPath(path).length === 1 && componentForPath(path)[0] === 'dapp')
+    || path.startsWith('docs/')
     || path === 'AGENTS.md'
     || /^infrastructure\/ci\/[^/]+\.(?:md|json)$/.test(path)
     || ORCHESTRATION_ONLY_PATHS.has(path);
