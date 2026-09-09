@@ -824,6 +824,7 @@ export function CukiePoolStatusPanel() {
     const vaultAddress = ukiNftVaults.cukiePoolNftVaultAddress;
     if (
       !user?.walletAddress
+      || !address
       || !identityReady
       || mutatingAssetId
       || walletOperationLockRef.current

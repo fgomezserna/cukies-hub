@@ -6,23 +6,26 @@ export type NftTransactionContext = {
   vault: string;
 };
 
-export function nftTransactionContextMatches(
-  expected: NftTransactionContext,
-  current: NftTransactionContext | null,
-) {
-  return Boolean(
-    current
-    && current.chainId === expected.chainId
-    && current.wallet.toLowerCase() === expected.wallet.toLowerCase()
-    && current.vault.toLowerCase() === expected.vault.toLowerCase(),
-  );
-}
-
-export function nftTransactionContextFromNullable(input: {
+type NftTransactionContextInput = {
   wallet: string | null | undefined;
   chainId: number | null | undefined;
   vault: string | null | undefined;
-}): NftTransactionContext | null {
+};
+
+export function nftTransactionContextMatches(
+  expected: NftTransactionContext,
+  current: NftTransactionContextInput | null,
+) {
+  const normalizedCurrent = current ? nftTransactionContextFromNullable(current) : null;
+  return Boolean(
+    normalizedCurrent
+    && normalizedCurrent.chainId === expected.chainId
+    && normalizedCurrent.wallet.toLowerCase() === expected.wallet.toLowerCase()
+    && normalizedCurrent.vault.toLowerCase() === expected.vault.toLowerCase(),
+  );
+}
+
+export function nftTransactionContextFromNullable(input: NftTransactionContextInput): NftTransactionContext | null {
   if (!input.wallet || input.chainId == null || !input.vault) return null;
   return { wallet: input.wallet, chainId: input.chainId, vault: input.vault };
 }
