@@ -34,19 +34,57 @@ function rarityLabel(cukie: MyCukieCollectionItem) {
   } as const)[cukie.rarity];
 }
 
-function stateLabel(cukie: MyCukieCollectionItem) {
+function recoveryTimestamp(value: string | null | undefined) {
+  if (!value || !/^\d+$/.test(value)) return null;
+  try {
+    const seconds = BigInt(value);
+    if (seconds === BigInt(0)) return null;
+    const milliseconds = seconds * BigInt(1_000);
+    const date = new Date(Number(milliseconds));
+    if (!Number.isSafeInteger(Number(milliseconds)) || Number.isNaN(date.getTime())) return null;
+    return { seconds, label: new Intl.DateTimeFormat('es-ES', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'UTC',
+    }).format(date) };
+  } catch {
+    return null;
+  }
+}
+
+function collectionState(cukie: MyCukieCollectionItem) {
   if (cukie.custody === 'cukie_pool_recovery') {
-    if (cukie.recoveryWithdrawableAt) {
-      try {
-        const withdrawableAt = BigInt(cukie.recoveryWithdrawableAt);
-        const nowSeconds = BigInt(Math.floor(Date.now() / 1_000));
-        if (withdrawableAt <= nowSeconds) return 'Vault anterior · listo según calendario';
-      } catch {
-        // An invalid timestamp stays pending; it must never look withdrawable.
-      }
+    const requested = Boolean(recoveryTimestamp(cukie.recoveryExitRequestedAt));
+    const withdrawableAt = recoveryTimestamp(cukie.recoveryWithdrawableAt);
+    const nowSeconds = BigInt(Math.floor(Date.now() / 1_000));
+    if (!requested && recoveryTimestamp(cukie.recoveryWithdrawableAt)) {
+      return {
+        label: 'Estado pendiente de confirmar',
+        detail: 'El estado de salida no se ha podido confirmar. Este NFT no está disponible en tu wallet.',
+      };
     }
-    if (cukie.recoveryExitRequestedAt) return 'Vault anterior · salida solicitada';
-    return 'Vault anterior · salida pendiente';
+    if (!requested) {
+      return {
+        label: 'En el Pool',
+        detail: 'Puedes solicitar la retirada de este Cukie cuando quieras.',
+      };
+    }
+    if (!withdrawableAt) {
+      return {
+        label: 'Salida solicitada · fecha no disponible',
+        detail: 'La solicitud de salida está registrada, pero no hay una fecha verificable para retirarlo todavía.',
+      };
+    }
+    if (withdrawableAt.seconds <= nowSeconds) {
+      return {
+        label: 'Retirada disponible',
+        detail: `La espera terminó. Puedes retirarlo desde ${withdrawableAt.label} UTC.`,
+      };
+    }
+    return {
+      label: 'Salida solicitada',
+      detail: `La retirada estará disponible desde ${withdrawableAt.label} UTC.`,
+    };
   }
   if (cukie.state === 'cukie_master') return 'En Cukie Master';
   if (cukie.state === 'in_pool') {
@@ -66,12 +104,17 @@ function stateLabel(cukie: MyCukieCollectionItem) {
   } as const)[cukie.state] ?? 'En uso';
 }
 
+function stateLabel(cukie: MyCukieCollectionItem) {
+  const state = collectionState(cukie);
+  return typeof state === 'string' ? state : state.label;
+}
+
 function itemAction(cukie: MyCukieCollectionItem) {
   if (cukie.custody === 'cukie_pool_recovery') {
     const query = new URLSearchParams({ tokenId: cukie.tokenId });
     if (cukie.recoveryVaultAddress) query.set('recoveryVault', cukie.recoveryVaultAddress);
     if (cukie.collectionAddress) query.set('collection', cukie.collectionAddress);
-    return { href: `/cukie-hodler/recuperar?${query.toString()}#pool-recovery`, label: 'Gestionar recuperación' };
+    return { href: `/cukie-hodler/recuperar?${query.toString()}#pool-recovery`, label: recoveryActionLabel(cukie) };
   }
   if (cukie.custody === 'cukie_pool') {
     return { href: '/cukie-hodler#mis-cukies-aportados', label: 'Gestionar en el pool' };
@@ -85,8 +128,24 @@ function itemAction(cukie: MyCukieCollectionItem) {
   return { href: `/marketplace/${cukie.tokenId}`, label: 'Ver ficha' };
 }
 
+function recoveryActionLabel(cukie: MyCukieCollectionItem) {
+  if (!recoveryTimestamp(cukie.recoveryExitRequestedAt)) {
+    return recoveryTimestamp(cukie.recoveryWithdrawableAt)
+      ? 'Consultar posición'
+      : 'Solicitar retirada';
+  }
+  const withdrawableAt = recoveryTimestamp(cukie.recoveryWithdrawableAt);
+  if (!withdrawableAt) return 'Consultar posición';
+  return withdrawableAt.seconds <= BigInt(Math.floor(Date.now() / 1_000))
+    ? 'Retirar Cukie'
+    : 'Ver retirada';
+}
+
 function itemActionDescription(cukie: MyCukieCollectionItem) {
-  if (cukie.custody === 'cukie_pool_recovery') return 'Está en un vault Pool anterior. Comprueba la posición para solicitar la salida según su calendario.';
+  if (cukie.custody === 'cukie_pool_recovery') {
+    const state = collectionState(cukie);
+    return typeof state === 'string' ? state : state.detail;
+  }
   if (cukie.custody === 'cukie_pool') return 'Consulta o retira la aportación al pool.';
   if (cukie.custody === 'cukie_master') return 'Gestiona la posición depositada en Cukie Master.';
   if (cukie.state === 'available') return 'Puedes aportarlo al pool cuando quieras.';

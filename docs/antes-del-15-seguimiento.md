@@ -895,7 +895,7 @@ Seguimiento de este lote en `codex/credit-cycle-and-cukie-actions`:
 | --- | --- | --- |
 | Corte de creditos | Desplegado en Stage `bae6f3b`: el corte 11:00 abre ambas rutas a las 11:00:54.863. El primer intento registra `CREDIT_CUTOFF_BLOCK_MISSING` y `CREDIT_WATERMARK_UNHEALTHY_OR_STALE`. La UI informa reparto en proceso y retira el aviso automaticamente al terminar. | Verificado un corte posterior al deploy; conserva la espera del indexador y no promete liquidacion instantanea. |
 | Configuracion de cupos pendientes | Stage `bae6f3b`: fecha elegible por cupo, configuracion futura agrupada por corte y controles habilitados durante `qualifying`. La UI real muestra tres NFT elegibles desde el corte 11:30 y reparto preparado 200 jugar / 100 pool. | Configuracion anticipada comprobada sin adelantar grants ni guardar cambios de reparto en QA. |
-| Pool anterior | Contraste `ownerOf` + `positionOf` en BSC 97 a las 09:56: los IDs `98000001`, `98000003`, `98000004`, `98000007` siguen en `0xd405acff1bba872be893e796c39f3eacbde2872b`, con la wallet como beneficiaria y sin salida solicitada. El vault actual es `0x359b8fc829eb6d320df6301c8f323af9ae773b41`. Los 11 disponibles de la observacion anterior eran un resultado de UI; siete estan realmente en la wallet y cuatro en el Pool sustituido. | Excluir la custodia anterior de disponibles y ofrecer recuperacion con allowlist, prueba de beneficiario y calendario del contrato anterior. Sin reset, backfill ni transaccion automatica. |
+| Retiradas de prueba del Pool sustituido | **BSC Testnet verificado el 2026-09-09 a las 17:05 UTC**, bloque `130059996`: `98000007` vuelve a la wallet `0x26789b…0c13`; `98000001`, `98000003` y `98000004` tienen salida solicitada y siguen depositados hasta **2026-09-10 14:00 UTC / 16:00 Andorra**. Cuatro recibos correctos y lectura conjunta de propietario/posicion. [Evidencia RPC](evidence/2026-09-09-pool-test-retirements.json). La UI de retirada especifica esta en revision en `codex/pool-single-experience`, aun sin desplegar. | Mostrar un unico Pool con estado y fecha de retirada; conservar validacion de red, coleccion, contrato y beneficiario. Pendiente retirar los tres NFT tras el plazo y verificar cadena/indexacion. No se declara vacio el contrato ni terminada una migracion global: el censo se limita a estos cuatro NFT. |
 | Actualizacion y acciones | **Desplegado y contrastado en Stage, 2026-09-09 13:21 UTC.** PR [#347](https://github.com/fgomezserna/cukies-hub/pull/347), merge `8d89676`, servido dentro de `0896fbd` (PR #349). El despliegue `a76af1841ccb57fbdc12d071` termino a las 13:16:47 UTC usando las imagenes publicadas; el primer workflow CI quedo fallido y se recupero el despliegue explicitamente. Custodia y ciclo transaccional compartidos; inventario y pendientes conservados por identidad. QA autenticada Master/Pool/Mis Cukies y sonda RO Mongo+BSC 97 coherentes: 12 Cukies = 2 wallet + 9 Pool (5 actuales y 4 anteriores) + 1 Master; indexador `ready`, sin errores de consola. Master ya bloquea `98000001`, `03`, `04` por estar en Pool. Lint, tipos, build y 228 suites / 1.844 tests correctos. [Evidencia](legacy-marketplace/evidence/2026-09-09-credit-period-and-pool-custody.json). | Codigo publicado y lecturas verificadas. La conservacion durante refresh/transaccion queda cubierta por regresion; no se firmaron depositos ni retiradas de la wallet en QA. El cierre del pipeline y su prueba de reutilizacion se siguen en la fila INFRA. |
 
 El candidato de recuperacion se contrasto a las 10:24 UTC contra Mongo y
@@ -904,6 +904,23 @@ Pool anterior y ocho disponibles. El `98000005` ya habia vuelto a la wallet
 desde la observacion de las 09:49; ambos estados quedan fechados, no se fuerza
 un saldo historico como expectativa actual. Los ocho disponibles no ofrecen
 venta UKI porque ese contrato no esta configurado en staging.
+
+Decision del usuario del 2026-09-09: la sustitucion del contrato de pruebas no
+introduce un producto llamado «Pool anterior». La experiencia habitual muestra
+el Pool y las retiradas de cada Cukie; el destino concreto sigue validandose
+internamente y no convierte los depositos existentes en saldo disponible.
+La sustitucion en Stage se hizo para acelerar su calendario de pruebas. Las
+posiciones conservadas en el contrato sustituido mantienen el calendario con
+el que se depositaron hasta su retirada real.
+
+Las operaciones autorizadas de esta tarde son `withdraw` de `98000007`
+(`0x3e2441756f5f7842bee3b40246aff064599d2dfd013fd5c0ca1948f4f2ad8587`) y
+`requestExit` de `98000001`, `98000003` y `98000004`; sus hashes completos,
+recibos y estado en un mismo bloque estan en la evidencia enlazada en la fila.
+Son operaciones BSC 97, valor nativo cero, del beneficiario al contrato
+sustituido. No se operaron los depositos del Pool actual ni produccion. No
+retirar el contrato sustituido de la allowlist mientras conserve posiciones
+pendientes. La retirada de los tres NFT tras el plazo aun no se ha ejecutado.
 
 La configuracion publica `NEXT_PUBLIC_CUKIE_POOL_RECOVERY_VAULT_ADDRESSES`
 admite solo vaults anteriores declarados para la red configurada. En app 28

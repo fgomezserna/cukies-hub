@@ -275,6 +275,7 @@ describe('CukiePoolStatusPanel', () => {
 
     expect(await screen.findByText('1 Cukie está disponible para partidas')).toBeInTheDocument();
     expect(screen.getByText('1 Cukie para aportar')).toBeInTheDocument();
+    expect(screen.getByText('Depósito registrado')).toBeInTheDocument();
     expect(screen.getByText(/Todo al día/i)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Cukie #7' })).toHaveAttribute(
       'data-src',

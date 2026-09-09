@@ -24,7 +24,7 @@ export default function CukieHodlerPage() {
                 Aporta tus Cukies y participa en lo que generen
               </h1>
               <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-                Consulta cuáles puedes aportar, cuáles están disponibles para partidas y qué tienes que hacer para recuperarlos.
+                Consulta cuáles puedes aportar, cuáles están disponibles para partidas y cómo solicitar su salida.
               </p>
             </div>
 

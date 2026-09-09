@@ -5,8 +5,8 @@ import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import { NftVaultRecoveryPanel } from '@/components/nft-vault/recovery-panel';
 
 export const metadata: Metadata = {
-  title: 'Recuperar un Cukie | Cukies World',
-  description: 'Recupera un Cukie depositado que no aparece en el Pool de Cukies.',
+  title: 'Retirar Cukie | Cukies World',
+  description: 'Consulta el estado de tu Cukie y solicita su retirada cuando corresponda.',
 };
 
 export default function RecoverPoolCukiePage() {
@@ -24,13 +24,13 @@ export default function RecoverPoolCukiePage() {
         <header className="mt-6 border-b border-white/10 pb-7">
           <div className="flex items-center gap-3 text-sm font-bold text-[var(--uki-lilac)]">
             <ShieldAlert className="h-5 w-5" aria-hidden="true" />
-            <span>Ayuda para una posición existente</span>
+            <span>Salida de Cukie</span>
           </div>
           <h1 className="mt-3 max-w-3xl text-balance font-headline text-4xl font-black leading-tight tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">
-            Recupera un Cukie que no aparece
+            Retirar Cukie
           </h1>
           <p className="mt-4 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-            Usa esta herramienta solo si ya depositaste el Cukie y no figura en tu pool. Si aparece en la pantalla anterior, gestiona su salida desde allí.
+            Consulta su estado y solicita la retirada cuando corresponda.
           </p>
         </header>
 
