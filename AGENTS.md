@@ -138,39 +138,22 @@ Required environment variables in `dapp/.env.local`:
 
 ## Coolify Deployment
 
-The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through Traefik/Cloudflare.
+Production keeps the product and data from `main`; staging features are promoted separately.
+The image pipeline is `.github/workflows/cukies-images.yml`: push -> dedicated builder
+VM1012 (`192.168.1.244`) -> OCI registry VM1007 (`192.168.1.207:5000`) -> Coolify
+VM1001 (`192.168.1.201`). Read [the deployment procedure](docs/deployment-rolling-transition.md).
 
-- Staging/integration app:
-  - Coolify resource: `game-hub-staging`
-  - Application ID: `28`
-  - UUID: `u4s804o4wwcckowgk0woo4wg`
-  - Branch: `staging`
-  - Public URL: `https://cukieshub.eurekand.com`
-  - Chain/data: BSC Testnet (`97`), `cukies-hub-staging`, `cukies-legacy-staging`, `cukieshub-new-staging`.
-- Production app:
-  - Coolify resource: `game-hub`
-  - Application ID: `12`
-  - UUID: `jookw8ow8woks088s44404ok`
-  - Branch: `main`
-  - Public URL: `https://cukies.world`
-
-Use `docker-compose.coolify.yml` for the new hub deployment. It defines:
-
-- `dapp`: public Next.js app on port `3000`.
-- `chain-indexer`: internal blockchain indexer worker.
-- `cukie-master-scheduler`, `competition-credit-scheduler`, `game-economy-scheduler`, `cukie-pool-scheduler`, `weekly-ranking-scheduler`: internal economy schedulers, disabled until their runtime gates and HMAC credentials are approved.
-- `cuki-card-worker`: internal NFT card renderer/uploader worker. It is active in app 28 against the isolated staging Mongo/MinIO destination; generated URLs are content-addressed and immutable.
-
-Operational rules:
-
-- Do not commit Coolify secrets, AWS keys, Mongo URLs, OAuth secrets, RPC keys or generated `.env` files.
-- Store runtime secrets in Coolify environment variables. Local worker secrets can live only in ignored `.env.local` files.
-- Before saying a worker is deployed, verify the actual Coolify resource is using `docker-compose.coolify.yml`, not a single Nixpacks app.
-- Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
-- Staging must use `DATABASE_URL` -> `cukies-hub-staging`, `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`, and `CHAIN_INDEXER_DB_NAME`/`CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`.
-- In app 28, `CARD_WORKER_UPLOAD=true` and `COMPOSE_PROFILES=card-worker` are allowed only with the exclusive `cukies-cards-staging` bucket, staging-only credentials and the guard validated. Do not copy those values or credentials to another resource.
-- Validate post-deploy with `/api/health`, `/indexer?collection=chain_indexer_runs`, `/indexer?collection=card_generation_jobs`, and worker logs for `chain-indexer` and `cuki-card-worker`.
-- Use the `coolify-cloudflare` skill when changing Coolify, Traefik labels, domains, tunnels or deployment topology.
+- Production: web app33 `uo8gswsg84c488cowko0kkkg`, workers app12 `jookw8ow8woks088s44404ok`, branch `main`, `https://cukies.world`.
+- Staging: web app32 `rwwsc4kkwc0ck84cgk40s8kk`, workers app28 `u4s804o4wwcckowgk0woo4wg`, branch `staging`, `https://cukieshub.eurekand.com`.
+- During bootstrap, app33 stays private and app12 continues serving the existing production web. Confirm runtime and GitHub Environment gates before operating.
+- `infrastructure/ci/components.json` declares this branch's images: dapp, chain-indexer and cuki-card-worker. Existing schedulers use the DApp image and their disabled profiles stay unchanged. Staging has additional packages; do not import them solely for this infrastructure change.
+- `docker-compose.coolify.yml` is the topology source. Generate image and worker Compose files with `node scripts/ci/generate-images-compose.mjs --write`, then verify `--check`. Normal rolling operation uses `docker-compose.workers.yml`; Mongo stays external.
+- Web Docker Image has `/api/ready`, no host port or fixed container name, and a 60-second stop timeout. Preserve auth keys and database URLs across web replacements.
+- Git autodeploy must be OFF before CI delivery is enabled. `CUKIES_DELIVERY_MODE=rolling` and `CUKIES_IMAGE_DEPLOY_ENABLED=true` enable the new lane; false builds without delivery. Keep production and staging GitHub Environments, config hashes and state paths separate.
+- Verify public health/readiness identity and live image digests. Worker health alone is insufficient: check indexer progress, enabled profiles and storage guards where applicable. A docs-only commit may be newer than the SHA served because it does not deploy.
+- A failed or unknown delivery leaves a durable journal. Reconcile actual web/workers before retrying; do not delete the journal to silence it. Roll back using a retained manifest/digest, without rebuilding or reverting databases.
+- Keep Mongo, OAuth, HMAC, RPC and S3 credentials in Coolify or ignored local env files. Never print full Docker environments/history or commit secrets. Do not copy staging credentials or runtime gates into production.
+- Use `coolify-cloudflare` when changing resources, labels, domains, tunnels or topology.
 
 ## Testing
 

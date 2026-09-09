@@ -13,6 +13,8 @@ export const PRODUCTION_TARGET = Object.freeze({
   indexerDatabaseName: 'cukieshub-new',
   authHosts: new Set(['cukies.world', 'www.cukies.world']),
   stakingAddress: '0xad18ff665e99d0033c3bb9d73182c2b03df59696',
+  webResourceUuid: 'uo8gswsg84c488cowko0kkkg',
+  webApplicationId: '33',
 });
 
 export class ProductionGuardError extends Error {
@@ -106,10 +108,13 @@ export function validateProductionEnvironment(environment = process.env, scope =
     PRODUCTION_TARGET.gitBranch,
     failures,
   );
+  const expectedResourceUuid = scope === 'dapp'
+    ? PRODUCTION_TARGET.webResourceUuid
+    : PRODUCTION_TARGET.coolifyResourceUuid;
   const coolifyResourceUuid = requireExact(
     environment,
     'COOLIFY_RESOURCE_UUID',
-    PRODUCTION_TARGET.coolifyResourceUuid,
+    expectedResourceUuid,
     failures,
   );
   const databaseName = requireMongoDatabase(
@@ -220,7 +225,9 @@ export function validateProductionEnvironment(environment = process.env, scope =
     scope,
     appEnv,
     gitBranch,
-    coolifyApplicationId: PRODUCTION_TARGET.coolifyApplicationId,
+    coolifyApplicationId: scope === 'dapp'
+      ? PRODUCTION_TARGET.webApplicationId
+      : PRODUCTION_TARGET.coolifyApplicationId,
     coolifyResourceUuid,
     publicChainId,
     indexerChainId,
