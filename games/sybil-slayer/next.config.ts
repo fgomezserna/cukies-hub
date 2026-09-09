@@ -9,12 +9,14 @@ if (configuredBasePath && !/^\/[a-z0-9][a-z0-9/_-]*$/i.test(configuredBasePath))
 const nextConfig: NextConfig = {
 
   basePath: configuredBasePath,
+  output: 'standalone',
 
   /* config options here */
   env: {
     NEXT_PUBLIC_GAME_CACHE_VERSION:
       process.env.NEXT_PUBLIC_GAME_CACHE_VERSION ??
       process.env.SOURCE_COMMIT ??
+      process.env.IMAGE_REVISION ??
       'dev',
   },
   typescript: {

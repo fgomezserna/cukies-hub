@@ -13,7 +13,7 @@ export async function readReleaseState(path) {
   });
 }
 
-export function createSuccessfulState({ previous = null, head, configHash, components, deploymentUuid, healthSha, environment, chainId, deliveryMode, workersComposeHash, webResourceUuid, workersResourceUuid }) {
+export function createSuccessfulState({ previous = null, head, configHash, components, deploymentUuid, healthSha, environment, chainId, deliveryMode, workersComposeHash, webResourceUuid, workersResourceUuid, gameResourceUuid, gameDeploymentUuid, webCommit, gameCommit }) {
   const deployment = resolveDeploymentEnvironment(environment);
   if (chainId !== undefined && String(chainId) !== deployment.chainId) {
     throw new Error(`release state no corresponde al entorno ${deployment.environment}/${deployment.chainId}.`);
@@ -24,6 +24,10 @@ export function createSuccessfulState({ previous = null, head, configHash, compo
   if (!/^[0-9a-f]{64}$/i.test(configHash ?? '')) throw new Error('config hash inválido.');
   const normalizedComponents = Object.fromEntries(CI_COMPONENTS.map((component) => {
     const entry = components?.[component];
+    // The game lane was added after the five-component state format. Allow a
+    // legacy state to be read and rewritten while the release plan builds the
+    // missing game image; once it exists, a missing entry is an error.
+    if (!entry && component === 'treasure-hunt' && !previous?.components?.[component]) return null;
     assertEnvironmentMetadata(entry, deployment, { allowLegacy: deployment.environment === 'staging', context: `imagen de ${component}` });
     const value = assertImmutableImageEntry(component, entry);
     return [component, {
@@ -35,7 +39,10 @@ export function createSuccessfulState({ previous = null, head, configHash, compo
       environment: deployment.environment,
       chainId: deployment.chainId,
     }];
-  }));
+  }).filter(Boolean));
+  const resolvedWebCommit = webCommit ?? previous?.webCommit ?? previous?.commit ?? (healthSha === head ? head : null);
+  const resolvedGameCommit = gameCommit ?? previous?.gameCommit
+    ?? (previous?.components?.['treasure-hunt'] ? previous.commit : null);
   return {
     schemaVersion: 1,
     environment: deployment.environment,
@@ -43,8 +50,17 @@ export function createSuccessfulState({ previous = null, head, configHash, compo
     commit: head,
     configHash,
     deploymentUuid: deploymentUuid ?? null,
-    ...(deliveryMode === 'rolling' ? { deliveryMode, workersComposeHash, webResourceUuid, workersResourceUuid } : {}),
+    ...(deliveryMode === 'rolling' ? {
+      deliveryMode,
+      workersComposeHash,
+      webResourceUuid,
+      workersResourceUuid,
+      gameResourceUuid: gameResourceUuid ?? previous?.gameResourceUuid ?? null,
+      gameDeploymentUuid: gameDeploymentUuid ?? previous?.gameDeploymentUuid ?? null,
+    } : {}),
     components: normalizedComponents,
+    webCommit: resolvedWebCommit,
+    gameCommit: resolvedGameCommit,
     previousCommit: previous?.commit ?? null,
     updatedAt: new Date().toISOString(),
   };

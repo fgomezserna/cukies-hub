@@ -85,6 +85,18 @@
       { "env": "GAME_HYPPIE_ROAD" },
       { "env": "GAME_TOWER_BUILDER" }
     ],
+    "gameBuildEnv": [
+      { "env": "SOURCE_COMMIT" },
+      { "env": "IMAGE_REVISION" },
+      { "env": "CUKIES_BUILD_ENV_HASH" },
+      { "env": "NEXT_PUBLIC_APP_ENV" },
+      { "env": "NEXT_PUBLIC_GAME_BASE_PATH" },
+      { "env": "NEXT_PUBLIC_DAPP_ORIGIN" },
+      { "env": "NEXT_PUBLIC_PARENT_URL" },
+      { "env": "NEXT_PUBLIC_PUSHER_KEY" },
+      { "env": "NEXT_PUBLIC_PUSHER_CLUSTER" },
+      { "env": "NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED" }
+    ],
     "schedulerRuntimeManifest": [
       "{workspaceRoot}/packages/economy-schedulers/package.json"
     ]

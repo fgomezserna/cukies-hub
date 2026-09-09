@@ -21,7 +21,7 @@ const HASH_B = 'b'.repeat(64);
 const completeState = {
   commit: SHA_A,
   configHash: HASH_A,
-  components: Object.fromEntries(['dapp', 'chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer'].map((component) => [component, {
+  components: Object.fromEntries(COMPONENTS.map((component) => [component, {
     image: `192.168.1.207:5000/cukies-hub/${component}:${SHA_A}-${HASH_A}@sha256:${'1'.repeat(64)}`,
     digest: `sha256:${'1'.repeat(64)}`,
     configHash: HASH_A,
@@ -44,7 +44,7 @@ test('requireValue rechaza flags sin valor y no lee argv[0]', () => {
 
 test('release plan construye todo en primera ejecución y con una base inválida', () => {
   const first = chooseReleasePlan({ state: null, head: SHA_B, configHash: HASH_A });
-  assert.deepEqual(first.build, ['dapp', 'chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer']);
+  assert.deepEqual(first.build, [...COMPONENTS]);
   assert.equal(first.base, null);
 
   const invalid = chooseReleasePlan({ state: completeState, head: SHA_B, configHash: HASH_A, baseAncestor: false });
@@ -52,8 +52,9 @@ test('release plan construye todo en primera ejecución y con una base inválida
   assert.equal(invalid.baseReason, 'first-run-or-invalid-base');
 });
 
-test('el wrapper PID1 solo invalida la imagen dapp', () => {
-  assert.deepEqual(componentForPath('scripts/docker-dapp-server.mjs'), ['dapp']);
+test('el wrapper PID1 compartido invalida dapp y treasure hunt, y el entrypoint game solo el juego', () => {
+  assert.deepEqual(componentForPath('scripts/docker-dapp-server.mjs'), ['dapp', 'treasure-hunt']);
+  assert.deepEqual(componentForPath('scripts/docker-start-game-ci.mjs'), ['treasure-hunt']);
 });
 
 test('el comparador de Dockerfile limita el refinamiento al stage final dapp', () => {
@@ -112,7 +113,7 @@ test('Dockerfile solo en dapp descarta Nx global y conserva cuatro imágenes', (
   });
 
   assert.deepEqual(plan.build, ['dapp']);
-  assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer']);
+  assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer', 'treasure-hunt']);
   assert.deepEqual(plan.nx.affected, []);
   assert.equal(plan.planReason, 'dockerfile-ci-final-dapp-stage-only');
   assert.equal(plan.refinement.reason, plan.planReason);
@@ -145,7 +146,7 @@ test('una fuente adicional fuera de la lista segura conserva el fallback global'
 
 test('release plan selecciona dapp por config nueva y reutiliza los demás digests', () => {
   const plan = chooseReleasePlan({ state: completeState, head: SHA_B, configHash: HASH_B, changedFiles: [], nxProjects: [], baseAncestor: true });
-  assert.deepEqual(plan.build, ['dapp']);
+  assert.deepEqual(plan.build, ['dapp', 'treasure-hunt']);
   assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer']);
   assert.match(plan.reuse[0].image, /@sha256:/);
 });
@@ -187,7 +188,7 @@ test('dos releases sucesivas conservan workers construidos en un SHA anterior', 
   const plan = chooseReleasePlan({ state, head: 'c'.repeat(40), configHash: HASH_A,
     changedFiles: ['dapp/src/app/page.tsx'], baseAncestor: true });
   assert.deepEqual(plan.build, ['dapp']);
-  assert.equal(plan.reuse.length, 4);
+  assert.equal(plan.reuse.length, 5);
   assert.ok(plan.reuse.every((entry) => entry.sourceSha === SHA_A));
 });
 
@@ -324,7 +325,7 @@ test('Coolify release patches image refs in bulk and verifies the served SHA', a
   assert.equal(calls[0][2].docker_compose_raw, 'services: {}\n');
   assert.equal(calls[1][2].find((entry) => entry.key === 'CUKIES_IMAGE_CUKI_CARD_WORKER').value, completeState.components['cuki-card-worker'].image);
   const environment = buildImageEnvironment(manifest);
-  assert.equal(environment.length, 7);
+  assert.equal(environment.length, 8);
   assert.ok(environment.every((entry) => entry.is_runtime && entry.is_buildtime));
 });
 

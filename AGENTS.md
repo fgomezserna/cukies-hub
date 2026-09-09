@@ -229,9 +229,13 @@ Staging apps 32 and 28 use `.github/workflows/cukies-images.yml`: a push to
 digests and rolls the web in app32, then reconciles app28 with `docker-compose.workers.yml` only when worker images or topology change. Keep Coolify Git
 autodeploy disabled; do not start a legacy build manually. Read
 `docs/deployment-environments.md` before operating this pipeline. Production app
-12 keeps `docker-compose.coolify.yml`. The separate Treasure Hunt staging app
-31 (`lc04cw8gs4koo4swwws0c4ss`) still builds through Coolify/Nixpacks from `staging`;
-it is outside this image pipeline and can build even after a documentation push.
+12 keeps `docker-compose.coolify.yml`. Treasure Hunt (`games/sybil-slayer`) has
+its own `treasure-hunt` image and delivery target: staging app31
+(`lc04cw8gs4koo4swwws0c4ss`), production app13
+(`tkkggwcosc4gksckcc480cwg`). Its image lane is prepared; verify the live migration
+record before assuming either resource has left Nixpacks. A game-only delivery
+must preserve Hub web/workers containers. Keep `webCommit` and `gameCommit`
+separate from the aggregate release commit and each image's `sourceSha`.
 
 `docker-compose.coolify.yml` is the topology source; regenerate the image-only
 Compose with `node scripts/ci/generate-images-compose.mjs --write` after changing

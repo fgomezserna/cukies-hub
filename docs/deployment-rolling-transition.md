@@ -86,6 +86,41 @@ ese servicio del Compose: hay que comprobar los contenedores reales.
 
 ## Migración y ensayo
 
+### Juego independiente
+
+`treasure-hunt` se construye desde `games/sybil-slayer` con Nx y una caché Next
+propia. Su imagen standalone incluye servidor, chunks y assets públicos; Coolify
+sólo debe descargar el digest. Los cambios del juego seleccionan esa imagen sin
+reiniciar app32 ni app28. El manifest conserva por separado el commit agregado,
+`webCommit`, `gameCommit` y el `sourceSha` de cada imagen: una imagen reutilizada
+puede ser anterior a la metadata de su despliegue.
+
+El primer paso desde Nixpacks exige snapshot privado de app31, imagen previa y
+variables existentes; se desactiva su autodeploy Git y se prepara el recurso como
+Docker Image, sin iniciarlo ni retirar el contenedor actual. El bootstrap exige
+`git_commit_sha=HEAD` y ausencia de imagen del juego en el estado previo; si ya
+hay un SHA fijado sin manifest verificable, se reconcilia antes de continuar.
+El siguiente push construye el candidato en CI, fija digest/SHA e inicia el
+relevo con health check. El entregador no convierte por sí solo un recurso
+Nixpacks. App31 conserva puerto 3000 y el basePath
+`/treasurehunt-game`; sus endpoints son `/treasurehunt-game/api/health` y
+`/treasurehunt-game/api/ready`. Comprueban HTTP, versión y drenaje, sin afirmar
+salud de las APIs del Hub ni de Mongo.
+
+Las [labels de staging](../infrastructure/ci/staging-game.labels) mantienen host
+y ruta. El router nuevo tiene prioridad 101 para superar al antiguo 100 durante
+el relevo y al Hub 91; usa nombre de servicio independiente para introducir
+health checks activos sin colisionar con la configuración anterior. Las
+[labels de producción](../infrastructure/ci/production-game.labels) están
+preparadas para app13, sin cambiar el servicio live.
+
+Antes de registrar la migración como activa: verificar digest/SHA/guard,
+health/ready, página y assets bajo basePath, manifest y CSP `frame-ancestors`;
+después ensayar un cambio sólo del juego y un push documental sin reinicios.
+La prueba de HTTP no sustituye jugar una sesión autenticada completa.
+
+### Hub y workers
+
 1. Conservar snapshots privados de configuración, último manifest y estado
    durable. Mantener Mongo externo, volúmenes y credenciales existentes.
 2. Construir la primera imagen desde la rama de ese entorno y validar la web

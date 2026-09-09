@@ -14,6 +14,7 @@ const TARGETS = Object.freeze({
   'cuki-card-worker': 'cuki-card-worker',
   schedulers: 'schedulers',
   'cukies-bridge-relayer': 'cukies-bridge-relayer',
+  'treasure-hunt': 'treasure-hunt',
 });
 
 function run(command, args, { capture = false } = {}) {

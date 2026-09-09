@@ -14,6 +14,7 @@ const IMAGE_ENV = Object.freeze({
   'cuki-card-worker': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
   schedulers: 'CUKIES_IMAGE_SCHEDULERS',
   'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
+  'treasure-hunt': 'CUKIES_IMAGE_TREASURE_HUNT',
 });
 
 const PROJECT_COMPONENT = Object.freeze({
@@ -24,6 +25,9 @@ const PROJECT_COMPONENT = Object.freeze({
   'cuki-card-worker': 'cuki-card-worker',
   '@cukies/cukies-bridge-relayer': 'cukies-bridge-relayer',
   'cukies-bridge-relayer': 'cukies-bridge-relayer',
+  'sybil-slayer': 'treasure-hunt',
+  '@cukies/sybil-slayer': 'treasure-hunt',
+  'treasure-hunt': 'treasure-hunt',
 });
 
 const ALL_REASON = 'first-run-or-invalid-base';
@@ -41,6 +45,7 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/rolling-web.test.mjs',
   'scripts/ci/env-ci.test.mjs',
   'scripts/ci/worker-compose.test.mjs',
+  'scripts/ci/game-lane.test.mjs',
   'scripts/ci/image-ref.mjs',
 ]);
 
@@ -55,13 +60,15 @@ function unique(values) {
 }
 
 export function componentForPath(path) {
-  if (path === 'scripts/docker-dapp-server.mjs') return ['dapp'];
+  if (path === 'scripts/docker-dapp-server.mjs') return ['dapp', 'treasure-hunt'];
+  if (path === 'scripts/docker-start-game-ci.mjs') return ['treasure-hunt'];
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|\.npmrc|\.dockerignore|Dockerfile\.ci|docker-compose\.coolify\.yml|docker-compose\.images\.yml|scripts\/docker-start(?:-ci)?\.sh|scripts\/assert-.*\.mjs)$/.test(path)) return [...COMPONENTS];
   if (path.startsWith('dapp/scripts/') || path.startsWith('packages/economy-schedulers/')) return ['schedulers'];
   if (path.startsWith('dapp/')) return ['dapp'];
   if (path.startsWith('packages/chain-indexer/')) return ['chain-indexer'];
   if (path.startsWith('packages/cuki-card-worker/')) return ['cuki-card-worker'];
   if (path.startsWith('packages/cukies-bridge-relayer/')) return ['cukies-bridge-relayer'];
+  if (path.startsWith('games/sybil-slayer/')) return ['treasure-hunt'];
   if (path.startsWith('scripts/ci/')) return ORCHESTRATION_ONLY_PATHS.has(path) ? [] : [...COMPONENTS];
   return [];
 }
@@ -125,7 +132,7 @@ export function chooseReleasePlan({ state, head, configHash, environment, change
   const effectiveNxAffected = refinedDappOnly ? [] : nxAffected;
   const affected = firstOrInvalid
     ? [...COMPONENTS]
-    : unique([...pathAffected, ...effectiveNxAffected, ...(configChanged ? ['dapp'] : [])]);
+    : unique([...pathAffected, ...effectiveNxAffected, ...(configChanged ? ['dapp', 'treasure-hunt'] : [])]);
   const build = firstOrInvalid ? [...COMPONENTS] : affected;
   const reuse = [];
   if (!firstOrInvalid) {
