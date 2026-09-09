@@ -98,6 +98,8 @@ test('Dockerfile solo en dapp descarta Nx global y conserva cuatro imágenes', (
       'docs/release-workflow.md',
       'AGENTS.md',
       'infrastructure/ci/evidence.json',
+      'dapp/src/app/api/ready/route.ts',
+      'dapp/__tests__/api/ready-route.test.ts',
     ],
     nxProjects: ['dapp', 'chain-indexer', 'cuki-card-worker', 'schedulers', 'cukies-bridge-relayer'],
     dockerfileBefore: baseDockerfile,
@@ -196,6 +198,31 @@ test('release plan reconstruye una entrada reutilizable con digest o componente 
 test('scheduler changes rebuild only their independent runtime', () => {
   const plan = chooseReleasePlan({ state: completeState, head: SHA_B, configHash: HASH_A, changedFiles: ['dapp/scripts/game-economy-scheduler.mjs'], baseAncestor: true });
   assert.deepEqual(plan.build, ['schedulers']);
+});
+
+test('Dockerfile final dapp mezclado con scheduler conserva el fallback global', () => {
+  const dockerfile = [
+    'FROM node:22-bookworm-slim AS base',
+    '',
+    'FROM base AS dapp',
+    'COPY old /app',
+    '',
+    'FROM base AS chain-indexer',
+    'CMD ["old"]',
+    '',
+  ].join('\n');
+  const plan = chooseReleasePlan({
+    state: completeState,
+    head: SHA_B,
+    configHash: HASH_A,
+    changedFiles: ['Dockerfile.ci', 'dapp/scripts/game-economy-scheduler.mjs'],
+    nxProjects: COMPONENTS,
+    dockerfileBefore: dockerfile,
+    dockerfileAfter: dockerfile.replace('COPY old /app', 'COPY new /app'),
+    baseAncestor: true,
+  });
+  assert.deepEqual(plan.build, COMPONENTS);
+  assert.equal(plan.refinement, null);
 });
 
 test('build environment rejects runtime secrets and cross-environment values', () => {
