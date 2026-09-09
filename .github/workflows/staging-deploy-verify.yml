@@ -1,0 +1,140 @@
+name: Staging deploy verification
+run-name: Staging deploy ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - staging
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: staging-deploy-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-attest-staging:
+    name: release/staging-verify-and-attest
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: Staging
+      url: https://cukieshub.eurekand.com
+    steps:
+      # actions/create-github-app-token v2, pinned. The key is released only after approval of the
+      # protected Staging environment and cannot be read by workflows on arbitrary branches.
+      - name: Mint the dedicated release status token
+        id: release_app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.RELEASE_GATE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_GATE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-statuses: write
+
+      - name: Publish pending staging statuses
+        env:
+          GH_TOKEN: ${{ steps.release_app.outputs.token }}
+          STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          for context in release/staging-deployed release/staging-validated; do
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state='pending' \
+              -f context="$context" \
+              -f description='Protected staging verification is running.' \
+              -f target_url="$STATUS_TARGET_URL" >/dev/null
+          done
+
+      # actions/checkout v4.2.2. The push SHA is protected staging, never unreviewed PR code.
+      - name: Checkout the exact staging commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Wait for the exact staging health contract
+        env:
+          RELEASE_CANDIDATE_SHA: ${{ github.sha }}
+          STAGING_HEALTH_URL: https://cukieshub.eurekand.com/api/health
+          DEPLOYMENT_VERIFY_TIMEOUT_MS: '900000'
+          DEPLOYMENT_VERIFY_INTERVAL_MS: '15000'
+          DEPLOYMENT_REQUEST_TIMEOUT_MS: '15000'
+        run: node scripts/release/verify-deployment.mjs
+
+      - name: Run the minimum public smoke
+        env:
+          STAGING_PUBLIC_URL: https://cukieshub.eurekand.com/
+        run: |
+          set -euo pipefail
+          http_code="$(curl --silent --show-error --max-time 30 --output /dev/null --write-out '%{http_code}' "$STAGING_PUBLIC_URL")"
+          if [[ "$http_code" != '200' ]]; then
+            echo "Public staging smoke failed with HTTP ${http_code}." >&2
+            exit 1
+          fi
+          echo 'Public staging smoke returned HTTP 200.'
+
+      - name: Publish exact deployment success for internal QA
+        env:
+          GH_TOKEN: ${{ steps.release_app.outputs.token }}
+          STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state='success' \
+            -f context='release/staging-deployed' \
+            -f description='Exact staging deployment and public smoke passed.' \
+            -f target_url="$STATUS_TARGET_URL" >/dev/null
+
+      - name: Verify protected environment and current-run provenance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ATTESTATION_CONTEXT: staging-push-qa
+          RELEASE_CANDIDATE_SHA: ${{ github.sha }}
+          RELEASE_STATUS_CREATOR_LOGIN: ${{ steps.release_app.outputs.app-slug }}[bot]
+        run: >-
+          node scripts/release/verify-attestations.mjs
+          --repository "$GITHUB_REPOSITORY"
+          --staging-push-qa-current-run
+
+      - name: Verify the exact staging health contract again
+        env:
+          RELEASE_CANDIDATE_SHA: ${{ github.sha }}
+          STAGING_HEALTH_URL: https://cukieshub.eurekand.com/api/health
+          DEPLOYMENT_VERIFY_TIMEOUT_MS: '120000'
+          DEPLOYMENT_VERIFY_INTERVAL_MS: '10000'
+          DEPLOYMENT_REQUEST_TIMEOUT_MS: '15000'
+        run: node scripts/release/verify-deployment.mjs
+
+      - name: Publish terminal staging statuses
+        if: always() && steps.release_app.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.release_app.outputs.token }}
+          JOB_STATUS: ${{ job.status }}
+          STATUS_TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          post_status() {
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -f state="$1" \
+              -f context="$2" \
+              -f description="$3" \
+              -f target_url="$STATUS_TARGET_URL" >/dev/null
+          }
+          case "$JOB_STATUS" in
+            success)
+              post_status success release/staging-validated 'Protected staging QA passed for this exact SHA.'
+              ;;
+            cancelled)
+              post_status error release/staging-deployed 'Protected staging verification was cancelled.'
+              post_status error release/staging-validated 'Protected staging QA was cancelled.'
+              ;;
+            *)
+              post_status failure release/staging-deployed 'Protected staging deployment verification failed.'
+              post_status failure release/staging-validated 'Protected staging QA failed.'
+              ;;
+          esac
