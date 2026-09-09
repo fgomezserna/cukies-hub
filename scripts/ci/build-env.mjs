@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
+import { requireValue } from './cli-args.mjs';
+import { resolveDeploymentEnvironment } from './deployment-environment.mjs';
 
 const PUBLIC_KEY = /^(NEXT_PUBLIC_[A-Z0-9_]+|GAME_[A-Z0-9_]+|DISCORD_CLIENT_ID|TWITTER_CLIENT_ID)$/;
 const SECRET_KEY = /(SECRET|PASSWORD|PRIVATE_KEY|API_KEY|DATABASE_URL|MONGO_URL|ACCESS_KEY|AWS_SECRET)/i;
@@ -14,10 +16,13 @@ export const BUILD_ENV_ALLOWLIST = Object.freeze([
 ]);
 
 function fail(message) {
-  throw new Error(`CUKIES_STAGING_BUILD_ENV_JSON inválido: ${message}`);
+  throw new Error(`CUKIES_BUILD_ENV_JSON inválido: ${message}`);
 }
 
-export function canonicalizeBuildEnv(input, { environment = 'staging', chainId = '97' } = {}) {
+export function canonicalizeBuildEnv(input, { environment = 'staging', chainId } = {}) {
+  const deployment = resolveDeploymentEnvironment(environment);
+  const expectedChainId = chainId === undefined ? deployment.chainId : String(chainId);
+  if (expectedChainId !== deployment.chainId) fail(`chainId ${expectedChainId} no pertenece a ${deployment.environment}.`);
   let parsed;
   try {
     parsed = typeof input === 'string' ? JSON.parse(input) : input;
@@ -38,17 +43,17 @@ export function canonicalizeBuildEnv(input, { environment = 'staging', chainId =
     result[key] = String(value);
   }
 
-  if (result.NEXT_PUBLIC_APP_ENV !== environment) {
-    fail(`NEXT_PUBLIC_APP_ENV debe ser ${environment}.`);
+  if (result.NEXT_PUBLIC_APP_ENV !== deployment.environment) {
+    fail(`NEXT_PUBLIC_APP_ENV debe ser ${deployment.environment}.`);
   }
-  if (result.NEXT_PUBLIC_UKI_CHAIN_ID !== chainId) {
-    fail(`NEXT_PUBLIC_UKI_CHAIN_ID debe ser ${chainId}.`);
+  if (result.NEXT_PUBLIC_UKI_CHAIN_ID !== expectedChainId) {
+    fail(`NEXT_PUBLIC_UKI_CHAIN_ID debe ser ${expectedChainId}.`);
   }
 
   const canonical = JSON.stringify(Object.fromEntries(Object.entries(result).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))));
   return Object.freeze({
-    environment,
-    chainId,
+    environment: deployment.environment,
+    chainId: deployment.chainId,
     config: result,
     canonical,
     hash: createHash('sha256').update(canonical).digest('hex'),
@@ -56,14 +61,21 @@ export function canonicalizeBuildEnv(input, { environment = 'staging', chainId =
 }
 
 async function main() {
-  const source = process.env.CUKIES_STAGING_BUILD_ENV_JSON;
-  if (typeof source !== 'string' || source.trim() === '') fail('CUKIES_STAGING_BUILD_ENV_JSON es obligatorio.');
+  const environmentName = requireValue(process.argv, '--environment', { fallback: process.env.CUKIES_DEPLOY_ENVIRONMENT ?? 'staging' });
+  const deployment = resolveDeploymentEnvironment(environmentName);
+  const source = process.env.CUKIES_BUILD_ENV_JSON
+    ?? (deployment.environment === 'staging' ? process.env.CUKIES_STAGING_BUILD_ENV_JSON : undefined);
+  if (typeof source !== 'string' || source.trim() === '') {
+    fail(deployment.environment === 'staging'
+      ? 'CUKIES_BUILD_ENV_JSON es obligatorio (o CUKIES_STAGING_BUILD_ENV_JSON durante la transición).'
+      : 'CUKIES_BUILD_ENV_JSON es obligatorio para production.');
+  }
   const outputIndex = process.argv.indexOf('--output');
   if (outputIndex !== -1 && (!process.argv[outputIndex + 1] || process.argv[outputIndex + 1].startsWith('--'))) {
     fail('--output requiere una ruta explicita.');
   }
   const outputPath = outputIndex === -1 ? null : process.argv[outputIndex + 1];
-  const result = canonicalizeBuildEnv(source, { environment: 'staging', chainId: '97' });
+  const result = canonicalizeBuildEnv(source, deployment);
   if (outputPath) await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
   console.log(JSON.stringify({ hash: result.hash, canonical: result.canonical, keys: Object.keys(result.config) }));
 }

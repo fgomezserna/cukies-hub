@@ -19,6 +19,9 @@ export const STAGING_TARGET = Object.freeze({
   authHosts: new Set(['cukieshub.eurekand.com', 'cukies-hub.eurekand.com']),
 });
 
+export const STAGING_DAPP_RESOURCE_UUID = 'rwwsc4kkwc0ck84cgk40s8kk';
+export const STAGING_DAPP_APPLICATION_ID = '32';
+
 export class StagingGuardError extends Error {
   constructor(failures) {
     super(`STAGING-ONLY guard rejected the operation:\n- ${failures.join('\n- ')}`);
@@ -163,12 +166,13 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     STAGING_TARGET.gitBranch,
     failures,
   );
-  const coolifyResourceUuid = requireExact(
-    environment,
-    'COOLIFY_RESOURCE_UUID',
-    STAGING_TARGET.coolifyResourceUuid,
-    failures,
-  );
+  const coolifyResourceUuid = required(environment, 'COOLIFY_RESOURCE_UUID', failures);
+  const allowedResourceUuids = scope === 'dapp'
+    ? [STAGING_TARGET.coolifyResourceUuid, STAGING_DAPP_RESOURCE_UUID]
+    : [STAGING_TARGET.coolifyResourceUuid];
+  if (coolifyResourceUuid && !allowedResourceUuids.includes(coolifyResourceUuid)) {
+    failures.push(`COOLIFY_RESOURCE_UUID must equal ${allowedResourceUuids.join(' or ')}`);
+  }
 
   let publicChainId = null;
   let indexerChainId = null;
@@ -366,7 +370,9 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
     scope,
     appEnv,
     gitBranch,
-    coolifyApplicationId: STAGING_TARGET.coolifyApplicationId,
+    coolifyApplicationId: coolifyResourceUuid === STAGING_DAPP_RESOURCE_UUID
+      ? STAGING_DAPP_APPLICATION_ID
+      : STAGING_TARGET.coolifyApplicationId,
     coolifyResourceUuid,
     publicChainId,
     indexerChainId,

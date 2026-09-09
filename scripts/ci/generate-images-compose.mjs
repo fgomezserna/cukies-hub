@@ -114,18 +114,124 @@ export function generateImagesCompose(source) {
   return output;
 }
 
+const DAPP_INTERNAL_URL = 'http://dapp-${COOLIFY_RESOURCE_UUID}:3000';
+const WEB_URL = '${CUKIES_WEB_URL:?Set CUKIES_WEB_URL}';
+const WEB_RESOURCE_UUID = '${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}';
+
+function removeDappService(lines) {
+  const blocks = serviceBlocks(lines);
+  const dapp = blocks.find((block) => block.name === 'dapp');
+  if (!dapp) throw new Error('docker-compose.images.yml no contiene el servicio dapp.');
+  return removeBlock(lines, dapp.index, dapp.end);
+}
+
+function removeDappDependency(lines) {
+  const result = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index] !== '    depends_on:') {
+      result.push(lines[index]);
+      continue;
+    }
+
+    const end = lines.slice(index + 1).findIndex((line) => line && !/^      /.test(line));
+    const blockEnd = end === -1 ? lines.length : index + 1 + end;
+    const dependencyLines = lines.slice(index + 1, blockEnd);
+    const kept = [];
+    for (let dependencyIndex = 0; dependencyIndex < dependencyLines.length; dependencyIndex += 1) {
+      const dependency = dependencyLines[dependencyIndex];
+      if (dependency === '      dapp:') {
+        dependencyIndex += 1;
+        while (
+          dependencyIndex < dependencyLines.length
+          && /^        /.test(dependencyLines[dependencyIndex])
+        ) dependencyIndex += 1;
+        dependencyIndex -= 1;
+        continue;
+      }
+      kept.push(dependency);
+    }
+    if (kept.length > 0) result.push('    depends_on:', ...kept);
+    index = blockEnd - 1;
+  }
+  return result;
+}
+
+function rewriteWorkerService(lines) {
+  const hasDappUrl = lines.some((line) => line.includes(DAPP_INTERNAL_URL));
+  if (!hasDappUrl) return lines;
+
+  const result = lines.map((line) => line
+    .replaceAll(DAPP_INTERNAL_URL, WEB_URL)
+    .replaceAll('process.env.COOLIFY_RESOURCE_UUID', 'process.env.CUKIES_WEB_RESOURCE_UUID'));
+  const uuidIndex = result.findIndex((line) => line.startsWith('      COOLIFY_RESOURCE_UUID:'));
+  if (uuidIndex === -1) throw new Error('servicio worker con URL dapp sin COOLIFY_RESOURCE_UUID.');
+  result.splice(uuidIndex, 0, `      CUKIES_WEB_RESOURCE_UUID: ${WEB_RESOURCE_UUID}`);
+  return result;
+}
+
+export function generateWorkersCompose(source) {
+  const generatedImages = generateImagesCompose(source);
+  let lines = generatedImages.trimEnd().split('\n');
+  const servicesMarker = lines.findIndex((line) => line === 'services:');
+  if (servicesMarker === -1) throw new Error('docker-compose.images.yml no contiene services.');
+
+  lines = removeDappService(lines);
+  const servicesEnd = lines.slice(servicesMarker + 1)
+    .findIndex((line) => /^(networks|volumes):$/.test(line));
+  const end = servicesEnd === -1 ? lines.length : servicesMarker + 1 + servicesEnd;
+  const services = lines.slice(servicesMarker + 1, end);
+  const transformed = [];
+  for (const block of serviceBlocks(['services:', ...services])) {
+    transformed.push(...rewriteWorkerService(
+      removeDappDependency(['services:', ...services].slice(block.index, block.end)),
+    ));
+  }
+  lines = [
+    ...lines.slice(0, servicesMarker + 1),
+    ...transformed,
+    ...lines.slice(end),
+  ];
+
+  const output = `${lines.join('\n').trimEnd()}\n`;
+  if (
+    /^\s+build:/m.test(output)
+    || /(^|\n)  dapp:\n/.test(output)
+    || /(^|\n)      dapp:/.test(output)
+    || /^    ports:/m.test(output)
+    || output.includes(DAPP_INTERNAL_URL)
+  ) {
+    throw new Error('el compose de workers conserva dapp, una dependencia dapp, build, ports o una URL interna.');
+  }
+  return output;
+}
+
 async function main() {
   const root = resolve(new URL('../..', import.meta.url).pathname);
   const sourcePath = resolve(root, 'docker-compose.coolify.yml');
-  const outputPath = resolve(root, 'docker-compose.images.yml');
-  const generated = generateImagesCompose(await readFile(sourcePath, 'utf8'));
+  const imagesPath = resolve(root, 'docker-compose.images.yml');
+  const workersPath = resolve(root, 'docker-compose.workers.yml');
+  const source = await readFile(sourcePath, 'utf8');
+  const generatedImages = generateImagesCompose(source);
+  const generatedWorkers = generateWorkersCompose(source);
   if (process.argv.includes('--check')) {
-    const current = await readFile(outputPath, 'utf8').catch(() => null);
-    if (current !== generated) throw new Error('docker-compose.images.yml está desactualizado; ejecuta --write.');
+    const [currentImages, currentWorkers] = await Promise.all([
+      readFile(imagesPath, 'utf8').catch(() => null),
+      readFile(workersPath, 'utf8').catch(() => null),
+    ]);
+    if (currentImages !== generatedImages) {
+      throw new Error('docker-compose.images.yml está desactualizado; el archivo existente debe permanecer igual.');
+    }
+    if (currentWorkers !== generatedWorkers) {
+      throw new Error('docker-compose.workers.yml está desactualizado; ejecuta --write.');
+    }
     return;
   }
   if (!process.argv.includes('--write')) throw new Error('usa --write o --check.');
-  await writeFile(outputPath, generated);
+  const currentImages = await readFile(imagesPath, 'utf8').catch(() => null);
+  if (currentImages !== generatedImages) {
+    throw new Error('docker-compose.images.yml no coincide con generateImagesCompose; no se sobrescribe.');
+  }
+  await writeFile(workersPath, generatedWorkers);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

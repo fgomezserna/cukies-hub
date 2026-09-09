@@ -201,6 +201,8 @@ Required environment variables in `dapp/.env.local`:
 
 ## Coolify Deployment
 
+Rolling delivery is being validated in staging: app32 (`rwwsc4kkwc0ck84cgk40s8kk`) is the dedicated Docker Image web resource; app28 retains workers. Follow [the transition procedure](docs/deployment-rolling-transition.md) and verify the live delivery mode before acting. Production is not enabled until its own resource, configuration and rehearsal are complete.
+
 The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through Traefik/Cloudflare.
 
 - Staging/integration app:
@@ -217,7 +219,7 @@ The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through
   - Branch: `main`
   - Public URL: `https://cukies.world`
 
-Staging app 28 uses `.github/workflows/cukies-staging-images.yml`: a push to
+Staging app 28 uses `.github/workflows/cukies-images.yml`: a push to
 `staging` builds affected images on the dedicated runner, publishes immutable
 digests and deploys `docker-compose.images.yml` through Coolify. Keep Coolify Git
 autodeploy disabled; do not start a legacy build manually. Read

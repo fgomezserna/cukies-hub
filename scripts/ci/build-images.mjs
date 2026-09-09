@@ -4,6 +4,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { dirname } from 'node:path';
 import { requireValue } from './cli-args.mjs';
+import { canonicalizeBuildEnv } from './build-env.mjs';
+import { assertEnvironmentMetadata, resolveDeploymentEnvironment } from './deployment-environment.mjs';
 import { assertImmutableImageEntry } from './image-ref.mjs';
 
 const TARGETS = Object.freeze({
@@ -36,7 +38,8 @@ function imageRef(registry, component, tag) {
 }
 
 export function cacheRef(registry, environment, component) {
-  return `${registry.replace(/\/$/, '')}/cukies-cache/${environment}-${component}:buildkit`;
+  const deployment = resolveDeploymentEnvironment(environment);
+  return `${registry.replace(/\/$/, '')}/cukies-cache/${deployment.cacheNamespace}-${component}:buildkit`;
 }
 
 export function immutableImage({ registry, component, tag, digest }) {
@@ -44,11 +47,18 @@ export function immutableImage({ registry, component, tag, digest }) {
   return `${imageRef(registry, component, tag)}@${digest}`;
 }
 
-export async function buildComponents({ components, registry, sha, configHash, buildEnvJsonPath, manifestPath, builder = process.env.BUILDX_BUILDER ?? 'cukies-ci', docker = 'docker', runCommand = run }) {
+export async function buildComponents({ components, registry, sha, configHash, buildEnvJsonPath, manifestPath, environment, builder = process.env.BUILDX_BUILDER ?? 'cukies-ci', docker = 'docker', runCommand = run }) {
+  const deployment = resolveDeploymentEnvironment(environment);
   if (!registry) throw new Error('CUKIES_REGISTRY es obligatorio.');
   if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error('SHA de imagen inválido.');
   if (!/^[0-9a-f]{64}$/i.test(configHash)) throw new Error('config hash inválido.');
   const buildEnv = JSON.parse(await readFile(buildEnvJsonPath, 'utf8'));
+  assertEnvironmentMetadata(buildEnv, deployment, { allowLegacy: deployment.environment === 'staging', context: 'build env' });
+  const canonicalBuildEnv = canonicalizeBuildEnv(buildEnv.config ?? buildEnv, deployment);
+  if (buildEnv.hash !== undefined && buildEnv.hash !== canonicalBuildEnv.hash) {
+    throw new Error('build env contiene un hash incoherente.');
+  }
+  if (canonicalBuildEnv.hash !== configHash) throw new Error('config hash no corresponde al build env.');
   const tag = `${sha}-${configHash}`;
   const result = {};
   for (const component of components) {
@@ -60,10 +70,10 @@ export async function buildComponents({ components, registry, sha, configHash, b
       'buildx', 'build', '--builder', builder, '--platform', 'linux/amd64',
       '--file', 'Dockerfile.ci', '--target', target,
       '--tag', ref, '--push', '--provenance=false', '--sbom=false',
-      '--cache-from', `type=registry,ref=${cacheRef(registry, 'staging', component)}`,
-      '--cache-to', `type=registry,ref=${cacheRef(registry, 'staging', component)},mode=max,image-manifest=true,oci-mediatypes=true`,
+      '--cache-from', `type=registry,ref=${cacheRef(registry, deployment.environment, component)}`,
+      '--cache-to', `type=registry,ref=${cacheRef(registry, deployment.environment, component)},mode=max,image-manifest=true,oci-mediatypes=true`,
       '--metadata-file', metadataPath,
-      ...Object.entries(buildEnv.config).flatMap(([key, value]) => ['--build-arg', `${key}=${value}`]),
+      ...Object.entries(canonicalBuildEnv.config).flatMap(([key, value]) => ['--build-arg', `${key}=${value}`]),
       '--build-arg', `CUKIES_BUILD_ENV_HASH=${configHash}`,
       '--build-arg', `IMAGE_REVISION=${sha}`,
       '--build-arg', 'NX_VERSION=23.2.0',
@@ -72,7 +82,7 @@ export async function buildComponents({ components, registry, sha, configHash, b
     const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
     const digest = metadata['containerimage.digest'];
     const image = immutableImage({ registry, component, tag, digest });
-    result[component] = { image, digest, tag, configHash, sourceSha: sha };
+    result[component] = { image, digest, tag, configHash, sourceSha: sha, environment: deployment.environment, chainId: deployment.chainId };
   }
   await mkdir(dirname(manifestPath), { recursive: true });
   return result;
@@ -86,6 +96,8 @@ async function main() {
   const sha = requireValue(process.argv, '--sha', { fallback: process.env.GITHUB_SHA });
   const configHash = requireValue(process.argv, '--config-hash', { fallback: process.env.CUKIES_BUILD_ENV_HASH });
   const buildEnvJsonPath = requireValue(process.argv, '--build-env-json');
+  const environmentName = requireValue(process.argv, '--environment', { fallback: process.env.CUKIES_DEPLOY_ENVIRONMENT ?? 'staging' });
+  const deployment = resolveDeploymentEnvironment(environmentName);
   const built = await buildComponents({
     components,
     registry,
@@ -93,16 +105,19 @@ async function main() {
     configHash,
     buildEnvJsonPath,
     manifestPath,
+    environment: deployment.environment,
   });
   const plan = JSON.parse(await readFile(planPath, 'utf8'));
+  assertEnvironmentMetadata(plan, deployment, { allowLegacy: deployment.environment === 'staging', context: 'release plan' });
   const reuse = plan.reuse.map((entry) => {
+    assertEnvironmentMetadata(entry, deployment, { allowLegacy: deployment.environment === 'staging', context: `reutilización de ${entry.component}` });
     const valid = assertImmutableImageEntry(entry.component, entry);
     return [entry.component, valid];
   });
   const componentsManifest = Object.fromEntries(reuse.concat(Object.entries(built)));
   const manifest = {
-    environment: 'staging',
-    chainId: '97',
+    environment: deployment.environment,
+    chainId: deployment.chainId,
     commit: sha,
     configHash,
     deploymentUuid: null,
