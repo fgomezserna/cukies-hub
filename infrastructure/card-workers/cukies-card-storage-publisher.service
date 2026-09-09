@@ -1,0 +1,13 @@
+[Unit]
+Description=Private Stage card storage capacity publisher
+After=network-online.target
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /etc/cukies/card-workers/storage-heartbeat.py publish
+UMask=0077
+TimeoutStartSec=12
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/root/.mc
+PrivateTmp=true

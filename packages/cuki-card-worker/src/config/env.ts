@@ -46,6 +46,8 @@ export function loadCardWorkerEnvFiles() {
   }
 }
 
+const optionalIdentityValue = (value: unknown) => typeof value === 'string' && value.trim() === '' ? undefined : value;
+
 const envSchema = z.object({
   CARD_WORKER_MONGO_URL: z.string().optional(),
   CHAIN_INDEXER_MONGO_URL: z.string().optional(),
@@ -70,9 +72,9 @@ const envSchema = z.object({
   CARD_WORKER_VERIFY_PUBLIC: z.string().default('true'),
   CARD_WORKER_BACKFILL_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
   CARD_WORKER_BACKFILL_MANIFEST_PATH: z.string().optional(),
-  CARD_WORKER_SOURCE_NETWORK: z.string().optional(),
-  CARD_WORKER_SOURCE_CHAIN_ID: z.coerce.number().int().positive().optional(),
-  CARD_WORKER_SOURCE_COLLECTION: z.string().optional(),
+  CARD_WORKER_SOURCE_NETWORK: z.preprocess(optionalIdentityValue, z.string().optional()),
+  CARD_WORKER_SOURCE_CHAIN_ID: z.preprocess(optionalIdentityValue, z.coerce.number().int().positive().optional()),
+  CARD_WORKER_SOURCE_COLLECTION: z.preprocess(optionalIdentityValue, z.string().optional()),
   CARD_WORKER_SOURCE_FORMAT: z.enum(['indexed', 'legacy']).default('indexed'),
   CARD_WORKER_LEGACY_STAGING_ENABLED: z.string().default('false'),
 });
@@ -123,6 +125,10 @@ export function getCardWorkerConfig(sourceIdentityOverride?: AssetIdentityContex
 
   const dbName = env.CARD_WORKER_DB_NAME ?? env.CHAIN_INDEXER_DB_NAME ?? 'cukieshub-new';
   assertCardWorkerSourceConfig({ sourceFormat, legacyStagingEnabled, dbName });
+  if (sourceFormat === 'indexed' && dbName === 'cukieshub-new-staging'
+    && (!sourceIdentity || sourceIdentity.network !== 'BSC' || sourceIdentity.chainId !== 97)) {
+    throw new Error('El worker indexed Stage requiere contexto explícito BSC/97/colección completo.');
+  }
 
   return {
     mongoUrl,

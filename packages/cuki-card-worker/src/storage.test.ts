@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { ObjectId } from 'mongodb';
+import { readFile } from 'node:fs/promises';
 
 import { CardWorkerStore } from './storage/mongo.js';
+import { getCardWorkerConfig } from './config/env.js';
 import type { CardWorkerConfig, CukiDocument } from './types.js';
 
 const config: CardWorkerConfig = {
@@ -113,6 +115,53 @@ function storeFor(documents: CukiDocument[], configOverride = config) {
   Object.defineProperty(store, 'config', { value: configOverride });
   return { collection, store };
 }
+
+describe('contexto Compose indexed hasta la reclamación real', () => {
+  it('transmite contexto completo, reclama metadata sin chain/colección y mantiene el fencing de conflictos', async (t) => {
+    const compose = await readFile(new URL('../../../docker-compose.coolify.yml', import.meta.url), 'utf8');
+    const indexed = compose.split('  cuki-card-worker:\n')[1].split('  cuki-card-worker-legacy:\n')[0];
+    const values: Record<string, string> = {
+      CARD_WORKER_MONGO_URL: 'mongodb://unused/cukieshub-new-staging', CARD_WORKER_DB_NAME: 'cukieshub-new-staging',
+      CARD_WORKER_SOURCE_FORMAT: 'indexed', CARD_WORKER_LEGACY_STAGING_ENABLED: 'false',
+      CARD_WORKER_SOURCE_NETWORK: 'BSC', CARD_WORKER_SOURCE_CHAIN_ID: '97',
+      CARD_WORKER_SOURCE_COLLECTION: '0xd4c7b16db234d7f62ba6a8f30153faf85feabec8',
+    };
+    const before = Object.fromEntries(Object.keys(values).map(key => [key, process.env[key]]));
+    t.after(() => {for (const [key, value] of Object.entries(before)) {if (value === undefined) delete process.env[key]; else process.env[key] = value;}});
+    for (const key of ['CARD_WORKER_SOURCE_NETWORK', 'CARD_WORKER_SOURCE_CHAIN_ID', 'CARD_WORKER_SOURCE_COLLECTION']) {
+      const line = indexed.match(new RegExp(`^      ${key}: (.+)$`, 'm'))?.[1];
+      assert.equal(line, '${' + key + ':-}', `${key} must be wired, optional while profile is off`);
+      process.env[key] = line.replace(/\$\{([^:}]+):-\}/g, (_all, variable: string) => values[variable] ?? '');
+    }
+    for (const [key, value] of Object.entries(values)) if (!key.startsWith('CARD_WORKER_SOURCE_')) process.env[key] = value;
+    process.env.CARD_WORKER_SOURCE_FORMAT = 'indexed';
+    const resolved = getCardWorkerConfig();
+    assert.deepEqual(resolved.sourceIdentity, {network: 'BSC', chainId: 97, collectionAddressNormalized: values.CARD_WORKER_SOURCE_COLLECTION});
+    const doc: CukiDocument = {_id: '97:collection:98000001', tokenId: '98000001', network: 'BSC', rarity: 1, generation: 1, needsImage: true};
+    const {store, collection} = storeFor([{...doc, _id: 'conflict', chainId: 56}, doc], resolved);
+    assert.equal((await store.claimNextCuki(resolved.sourceIdentity!))?._id, doc._id);
+    assert.equal(collection.updates, 1);
+    assert.equal(doc.chainId, undefined);
+    assert.equal(doc.collectionAddressNormalized, undefined);
+
+    for (const key of ['CARD_WORKER_SOURCE_NETWORK', 'CARD_WORKER_SOURCE_CHAIN_ID', 'CARD_WORKER_SOURCE_COLLECTION']) process.env[key] = '';
+    assert.throws(() => getCardWorkerConfig(), /contexto explícito/);
+    process.env.CARD_WORKER_SOURCE_NETWORK = 'BSC';
+    assert.throws(() => getCardWorkerConfig(), /requiere/);
+    process.env.CARD_WORKER_SOURCE_FORMAT = 'legacy';
+    process.env.CARD_WORKER_LEGACY_STAGING_ENABLED = 'true';
+    process.env.CARD_WORKER_DB_NAME = 'cukies-legacy-staging';
+    assert.equal(getCardWorkerConfig().sourceIdentity, null, 'RAWlegacy never inherits indexed context');
+    process.env.CARD_WORKER_SOURCE_FORMAT = 'indexed';
+    process.env.CARD_WORKER_DB_NAME = 'cukieshub-new';
+    process.env.CARD_WORKER_SOURCE_NETWORK = '';
+    assert.equal(getCardWorkerConfig().sourceIdentity, null, 'fully identified production documents need no Stage context');
+    process.env.CARD_WORKER_SOURCE_NETWORK = 'BSC';
+    process.env.CARD_WORKER_SOURCE_CHAIN_ID = '56';
+    process.env.CARD_WORKER_SOURCE_COLLECTION = values.CARD_WORKER_SOURCE_COLLECTION;
+    assert.equal(getCardWorkerConfig().sourceIdentity?.chainId, 56);
+  });
+});
 
 function candidate(_id: string | number, identity: Partial<CukiDocument>): CukiDocument {
   return {

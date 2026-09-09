@@ -1,0 +1,12 @@
+[Unit]
+Description=Signed Stage card storage capacity receiver
+After=network-online.target
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /etc/cukies/card-workers/storage-heartbeat.py receive
+UMask=0077
+TimeoutStartSec=12
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/etc/cukies/card-workers/capacity
