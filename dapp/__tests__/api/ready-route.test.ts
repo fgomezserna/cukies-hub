@@ -61,4 +61,13 @@ describe('GET /api/ready', () => {
       imageSha: 'd'.repeat(40),
     });
   });
+
+  it('propaga 503 cuando el guard central de readiness detecta drain', async () => {
+    mockReadiness.mockResolvedValue({ status: 'not_ready' });
+
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    expect(mockReadiness).toHaveBeenCalledTimes(1);
+  });
 });

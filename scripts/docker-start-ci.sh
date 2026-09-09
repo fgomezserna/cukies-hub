@@ -27,9 +27,9 @@ esac
 case "${service}" in
   dapp)
     if [ -f /app/server.js ]; then
-      exec node /app/server.js
+      exec node /app/scripts/docker-dapp-server.mjs /app/server.js
     fi
-    exec node /app/dapp/server.js
+    exec node /app/scripts/docker-dapp-server.mjs /app/dapp/server.js
     ;;
   chain-indexer)
     pnpm --dir /app/packages/chain-indexer run setup:prod

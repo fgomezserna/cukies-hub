@@ -3,6 +3,7 @@ import {
   resetDeploymentReadinessForTests,
   type ReadinessDatabase,
 } from '@/lib/deployment-readiness';
+import { unlinkSync, writeFileSync } from 'node:fs';
 
 function database(overrides: Partial<ReadinessDatabase> = {}): ReadinessDatabase {
   return {
@@ -15,6 +16,12 @@ describe('deployment readiness probe', () => {
   beforeEach(() => {
     resetDeploymentReadinessForTests();
     delete process.env.CUKIES_READINESS_TIMEOUT_MS;
+    delete process.env.CUKIES_DAPP_DRAIN_MARKER_PATH;
+    try {
+      unlinkSync('/tmp/cukies-dapp-readiness-test-draining');
+    } catch {
+      // The marker is absent for the normal cases.
+    }
   });
 
   it('queda ready solo con un ping Mongo exitoso', async () => {
@@ -62,5 +69,19 @@ describe('deployment readiness probe', () => {
 
     await checkDeploymentReadiness({ database: db });
     expect(db.$runCommandRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignora la caché y no toca Mongo mientras existe el marcador de drain', async () => {
+    const db = database();
+    await expect(checkDeploymentReadiness({ database: db })).resolves.toEqual({ status: 'ready' });
+    expect(db.$runCommandRaw).toHaveBeenCalledTimes(1);
+
+    const marker = '/tmp/cukies-dapp-readiness-test-draining';
+    process.env.CUKIES_DAPP_DRAIN_MARKER_PATH = marker;
+    writeFileSync(marker, 'draining\n');
+
+    await expect(checkDeploymentReadiness({ database: db })).resolves.toEqual({ status: 'not_ready' });
+    expect(db.$runCommandRaw).toHaveBeenCalledTimes(1);
+    unlinkSync(marker);
   });
 });
