@@ -1,0 +1,357 @@
+{
+  "date": "2026-09-09",
+  "scope": "Ambassador lifecycle hotfix: main first, then staging; product publication and funded claims remain separate.",
+  "main": {
+    "commit": "4475baaa9a9d560711b8b9e14a38055aecb79c1f",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/351",
+    "healthUrl": "https://cukies.world/api/health",
+    "chainId": 56,
+    "deployment": {
+      "id": 1464,
+      "uuid": "ysko448k0kkoo8c40s408g0s",
+      "finishedAt": "2026-09-09T14:09:27Z"
+    },
+    "healthExactShaVerified": true,
+    "indexerAdvancedAfterDeployment": true,
+    "publicVisibilityEnabled": false,
+    "migration": {
+      "event": "ambassador_migration_verified",
+      "at": "2026-09-09T14:10:13.048Z",
+      "result": {
+        "event": "presale_ambassadors_materialized",
+        "mode": "apply",
+        "environment": "production",
+        "chainId": 56,
+        "databaseName": "cukieshub-new",
+        "scanned": 394,
+        "preservedExisting": 1,
+        "defaultMissing": 19,
+        "materialized": 19
+      },
+      "replay": {
+        "event": "presale_ambassadors_materialized",
+        "mode": "apply",
+        "environment": "production",
+        "chainId": 56,
+        "databaseName": "cukieshub-new",
+        "scanned": 394,
+        "preservedExisting": 20,
+        "defaultMissing": 0,
+        "materialized": 0
+      },
+      "baselineRelations": 377,
+      "baselineProfiles": 15,
+      "existingRelationsUnchanged": true,
+      "existingInvitationCodesUnchanged": true,
+      "baselineHash": "837e57aa0997bb34424c5f0659be58271fa7e7e297cfef22704ee779d838efea",
+      "totalRelations": 396
+    },
+    "localValidation": {
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "build": "PASS",
+      "jestSuites": 172,
+      "jestTests": 1479,
+      "stagingGuardTests": 31
+    },
+    "adminProbe": {
+      "unsignedStatus": 401,
+      "signedSelfCycleStatus": 409,
+      "sponsorCorrectionsApplied": 0
+    },
+    "invitations": {
+      "httpCounts": {
+        "200": 3,
+        "404": 12
+      },
+      "priorCodesUnchanged": true,
+      "interpretation": "404 establishes link inactivity, not the cause."
+    }
+  },
+  "staging": {
+    "commit": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/352",
+    "healthUrl": "https://cukieshub.eurekand.com/api/health",
+    "chainId": 97,
+    "workflow": {
+      "runId": 34362306780,
+      "attempt": 3,
+      "conclusion": "success",
+      "url": "https://github.com/fgomezserna/cukies-hub/actions/runs/34362306780"
+    },
+    "deployment": {
+      "id": 1465,
+      "uuid": "e8g0owgswk0cc8kgowo48004",
+      "finishedAt": "2026-09-09T14:54:12Z"
+    },
+    "healthExactShaVerified": true,
+    "runningServicesWithMatchingImages": 11,
+    "indexerAdvancedAfterDeployment": true,
+    "migration": {
+      "event": "ambassador_migration_verified",
+      "at": "2026-09-09T14:55:10.234Z",
+      "result": {
+        "event": "presale_ambassadors_materialized",
+        "mode": "apply",
+        "environment": "staging",
+        "chainId": 97,
+        "databaseName": "cukieshub-new-staging",
+        "scanned": 2,
+        "preservedExisting": 0,
+        "defaultMissing": 2,
+        "materialized": 2
+      },
+      "replay": {
+        "event": "presale_ambassadors_materialized",
+        "mode": "apply",
+        "environment": "staging",
+        "chainId": 97,
+        "databaseName": "cukieshub-new-staging",
+        "scanned": 2,
+        "preservedExisting": 2,
+        "defaultMissing": 0,
+        "materialized": 0
+      },
+      "baselineRelations": 1,
+      "baselineProfiles": 2,
+      "existingRelationsUnchanged": true,
+      "existingInvitationCodesUnchanged": true,
+      "baselineHash": "4e83c09209db9a22dcd657dc8127990c39637da8795ff2e1cdb1e77779d96a99",
+      "totalRelations": 3
+    },
+    "localValidation": {
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "build": "PASS",
+      "jestSuites": 232,
+      "jestTests": 1870,
+      "stagingGuardTests": 105,
+      "generatedCompose": "PASS"
+    },
+    "qa": {
+      "wallet": "0xf2d96aecea8f4eec1c29bd103985c833d910eb54",
+      "authenticationSteps": [
+        {
+          "name": "staging health preflight",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "chain preflight",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "public ambassadors section",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "wallet challenge",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "wallet login",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "dashboard section after login",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "cukie-master section after login",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "summary before sponsor",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "attribution before sponsor",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "default Cukies World confirmation challenge",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "default Cukies World attribution",
+          "status": 201,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "summary after sponsor",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "attribution after sponsor",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        }
+      ],
+      "loginAndNavigationPreserveUnconfirmedSponsor": true,
+      "confirmedSponsor": "Cukies World",
+      "isCukieMaster": false,
+      "canInvite": false,
+      "profile": null,
+      "adminSteps": [
+        {
+          "name": "health preflight",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "chain preflight",
+          "status": 200,
+          "ok": true,
+          "detail": "ok"
+        },
+        {
+          "name": "cycle rejection",
+          "status": 409,
+          "ok": false,
+          "detail": {
+            "status": "error",
+            "code": "AMBASSADOR_ADMIN_CONFLICT"
+          }
+        },
+        {
+          "name": "QA CW to ephemeral",
+          "status": 200,
+          "ok": true,
+          "detail": {
+            "status": "ok",
+            "changed": true,
+            "overrideId": "ambassador-override:qa-admin-1788965747239-912688e5ba10"
+          }
+        },
+        {
+          "name": "idempotent replay",
+          "status": 200,
+          "ok": true,
+          "detail": {
+            "status": "ok",
+            "changed": false,
+            "overrideId": "ambassador-override:qa-admin-1788965747239-912688e5ba10"
+          }
+        },
+        {
+          "name": "stale expected sponsor",
+          "status": 409,
+          "ok": false,
+          "detail": {
+            "status": "error",
+            "code": "AMBASSADOR_ADMIN_CONFLICT"
+          }
+        },
+        {
+          "name": "restore ephemeral to CW",
+          "status": 200,
+          "ok": true,
+          "detail": {
+            "status": "ok",
+            "changed": true,
+            "overrideId": "ambassador-override:qa-restore-1788965747613-6f7e8a3baa18"
+          }
+        }
+      ],
+      "adminExpectedRejections": [
+        {
+          "name": "cycle rejection",
+          "status": 409
+        },
+        {
+          "name": "stale expected sponsor",
+          "status": 409
+        }
+      ],
+      "adminRestoredSponsor": "Cukies World",
+      "addedQaRelationships": 1,
+      "onChainTransactions": 0
+    },
+    "invitations": {
+      "httpCounts": {
+        "404": 2
+      },
+      "priorCodesUnchanged": true,
+      "interpretation": "404 establishes link inactivity, not the cause."
+    },
+    "releaseManifest": {
+      "environment": "staging",
+      "chainId": "97",
+      "commit": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e",
+      "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+      "deploymentUuid": null,
+      "components": {
+        "dapp": {
+          "image": "192.168.1.207:5000/cukies-hub/dapp:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:8de58e969b5591ba697ba9683530f3679dbc36db737fe18c9947a29a992e313b",
+          "digest": "sha256:8de58e969b5591ba697ba9683530f3679dbc36db737fe18c9947a29a992e313b",
+          "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+        },
+        "schedulers": {
+          "image": "192.168.1.207:5000/cukies-hub/schedulers:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+          "digest": "sha256:5ef9b0e1c991282f0d7368726c75e8cf7670b8150056d1989089f380898a9df8",
+          "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+        },
+        "chain-indexer": {
+          "image": "192.168.1.207:5000/cukies-hub/chain-indexer:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:e16908cc0c68cced1a22795c316c2ecec4ca845d6f8e6815de7ef4976037848d",
+          "digest": "sha256:e16908cc0c68cced1a22795c316c2ecec4ca845d6f8e6815de7ef4976037848d",
+          "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+        },
+        "cuki-card-worker": {
+          "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+          "digest": "sha256:f71b80014f6083d595da951e2d2bdec0dc800f66501913ec6a3f775763309204",
+          "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+        },
+        "cukies-bridge-relayer": {
+          "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19@sha256:5e495fa05d0138db01a05cdb62fc7e2e753a85835e2d3c77b3fa8946ec43d033",
+          "digest": "sha256:5e495fa05d0138db01a05cdb62fc7e2e753a85835e2d3c77b3fa8946ec43d033",
+          "tag": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e-ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "configHash": "ddb24d09084c562ce8c6fba9dbcba049ff109c241a756e5891f9b499474ebe19",
+          "sourceSha": "e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e"
+        }
+      }
+    }
+  },
+  "builderRecovery": {
+    "attempt1": "BuildKit process killed by cgroup memory limit; no ENOSPC observed.",
+    "attempt2": "Nx recursive-task error; stale task row not observed.",
+    "applied": "Persistent BuildKit maximum parallelism aligned from 2 to 1 with versioned prepare-buildx.sh; memory limit unchanged. Only BuildKit restarted while idle.",
+    "nxProbe": "Read-only cache probe found no workspace-data; no SQL deletion or global cache prune performed."
+  },
+  "limits": [
+    "No funded claim, reward distribution, or forced live Master loss/recovery in this QA.",
+    "Existing production visibility remains disabled.",
+    "One existing level at 5%; future 5%/2% and conditional second level at 3% are feasible but not activated."
+  ]
+}
