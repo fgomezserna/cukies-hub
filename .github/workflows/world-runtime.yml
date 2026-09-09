@@ -1,0 +1,76 @@
+name: World runtime
+
+on:
+  push:
+    paths:
+      - "packages/world-*"
+      - "packages/world-*/**"
+      - "infrastructure/world/**"
+      - "docker-compose.coolify.yml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - ".npmrc"
+      - ".github/workflows/world-runtime.yml"
+  pull_request:
+    paths:
+      - "packages/world-*"
+      - "packages/world-*/**"
+      - "infrastructure/world/**"
+      - "docker-compose.coolify.yml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - ".npmrc"
+      - ".github/workflows/world-runtime.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: world-runtime-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install World workspace dependencies
+        run: pnpm install --frozen-lockfile --filter "@cukies/world-api..." --filter "@cukies/world-matchmaking..."
+
+      - name: Build World packages
+        run: pnpm build:world
+
+      - name: Test World shared package
+        run: pnpm --filter @cukies/world-shared run test
+
+      - name: Test World API package
+        run: pnpm --filter @cukies/world-api run test
+
+      - name: Test World matchmaking package
+        run: pnpm --filter @cukies/world-matchmaking run test
+
+      - name: Test infrastructure contract
+        run: node --test infrastructure/world/tests/*.test.mjs
+
+      - name: Build World API image
+        run: docker build --file infrastructure/world/Dockerfile --build-arg WORLD_PACKAGE=world-api --tag world-api:ci .
+
+      - name: Build World matchmaking image and run local smoke
+        run: |
+          docker build --file infrastructure/world/Dockerfile --build-arg WORLD_PACKAGE=world-matchmaking --tag world-matchmaking:ci .
+          WORLD_API_IMAGE=world-api:ci WORLD_MATCHMAKING_IMAGE=world-matchmaking:ci node infrastructure/world/tests/runtime-smoke.mjs
