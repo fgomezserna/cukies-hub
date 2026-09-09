@@ -10,7 +10,7 @@ import { requireValue } from './cli-args.mjs';
 import { canonicalizeBuildEnv } from './build-env.mjs';
 import { assertStagingApplication, buildImageEnvironment, deployAndVerify } from './coolify-release.mjs';
 import { generateImagesCompose } from './generate-images-compose.mjs';
-import { COMPONENTS, chooseReleasePlan, isDappFinalStageOnlyChange } from './release-plan.mjs';
+import { COMPONENTS, chooseReleasePlan, componentForPath, isDappFinalStageOnlyChange } from './release-plan.mjs';
 import { createSuccessfulState, readReleaseState, writeReleaseStateAtomic } from './release-state.mjs';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -50,6 +50,10 @@ test('release plan construye todo en primera ejecución y con una base inválida
   const invalid = chooseReleasePlan({ state: completeState, head: SHA_B, configHash: HASH_A, baseAncestor: false });
   assert.deepEqual(invalid.build, first.build);
   assert.equal(invalid.baseReason, 'first-run-or-invalid-base');
+});
+
+test('el wrapper PID1 solo invalida la imagen dapp', () => {
+  assert.deepEqual(componentForPath('scripts/docker-dapp-server.mjs'), ['dapp']);
 });
 
 test('el comparador de Dockerfile limita el refinamiento al stage final dapp', () => {

@@ -16,8 +16,28 @@ La web no publica un puerto del host ni usa un nombre fijo de contenedor.
 Coolify arranca su reemplazo, exige `/api/ready` y después termina la instancia
 anterior. `/api/ready` hace un ping read-only a Mongo con timeout; `/api/health`
 identifica la release y el recurso, pero no prueba disponibilidad de Mongo.
-Next.js recibe `deploymentId` al construir la imagen y conserva su manejo de
-SIGTERM para terminar las solicitudes pendientes. Hay que probar sesiones y
+Next.js recibe `deploymentId` al construir la imagen. El wrapper
+`scripts/docker-dapp-server.mjs` recibe las señales como PID1: mantiene la web
+sana 5 segundos, marca `/api/ready` como no disponible y conserva el servidor
+otros 5 segundos antes de enviar SIGTERM a Next. Fuerza la salida a los 25
+segundos si el hijo no termina. Coolify instalado ejecuta `docker stop --time=30`;
+el `--stop-timeout=60` del contenedor no sustituye ese límite explícito.
+
+Este cierre requiere health checks activos de Traefik sobre cada backend:
+`loadbalancer.healthcheck.path=/api/ready`, `interval=2s`, `timeout=1s` y
+`port=3000`. El health check de Docker, por sí solo, no retira a tiempo una
+instancia que está terminando. No se añaden reintentos de escrituras.
+Producción usará el servicio y router nuevos `cukies-production-web-v2`, con
+prioridad 91 y health checks activos. Así no coinciden dos definiciones
+diferentes del mismo servicio durante el primer relevo. Las labels se aplican
+sólo a app33 como `custom_labels` (base64 en la API de Coolify); están versionadas en
+[`infrastructure/ci/production-web.labels`](../infrastructure/ci/production-web.labels);
+este backport sólo la documenta y no la aplica remotamente.
+El primer retiro de una imagen sin wrapper no valida el cierre:
+hay que repetir la sustitución cuando la instancia anterior también lo incluya.
+Producción requiere su configuración equivalente antes de activar app33.
+
+Hay que probar sesiones y
 recursos de una pestaña abierta durante la transición, además de los probes HTTP.
 
 Los workers permanecen en un único recurso. `docker-compose.workers.yml` se
@@ -58,7 +78,10 @@ imagen web para un rollback.
 Compose de workers no cambiaron. Un cambio exclusivamente documental puede
 quedar en HEAD sin alterar el SHA servido; el estado durable conserva el último
 despliegue real. Si cambia sólo la imagen web, no se reinician workers. Si cambian
-workers, la web se verifica antes de reconciliar su único recurso.
+workers, la web se vuelve a desplegar con el digest reutilizado para actualizar
+la metadata de release y se verifica antes de reconciliar su único recurso.
+Seleccionar una sola imagen para build no garantiza que Coolify reinicie sólo
+ese servicio del Compose: hay que comprobar los contenedores reales.
 
 ## Migración y ensayo
 
