@@ -1,0 +1,12 @@
+traefik.enable=true
+traefik.docker.network=coolify
+traefik.http.routers.cukies-staging-web-v2.entrypoints=websecure
+traefik.http.routers.cukies-staging-web-v2.rule=Host(`cukies-hub.eurekand.com`) || Host(`cukieshub.eurekand.com`)
+traefik.http.routers.cukies-staging-web-v2.priority=91
+traefik.http.routers.cukies-staging-web-v2.tls=true
+traefik.http.routers.cukies-staging-web-v2.service=cukies-staging-web-v2
+traefik.http.services.cukies-staging-web-v2.loadbalancer.server.port=3000
+traefik.http.services.cukies-staging-web-v2.loadbalancer.healthcheck.path=/api/ready
+traefik.http.services.cukies-staging-web-v2.loadbalancer.healthcheck.port=3000
+traefik.http.services.cukies-staging-web-v2.loadbalancer.healthcheck.interval=2s
+traefik.http.services.cukies-staging-web-v2.loadbalancer.healthcheck.timeout=1s

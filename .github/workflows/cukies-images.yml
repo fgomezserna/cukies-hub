@@ -27,7 +27,7 @@ jobs:
       - name: Verify deployment invariants
         run: |
           node scripts/ci/generate-images-compose.mjs --check
-          node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs
+          node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs
 
   build-push-deploy:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
@@ -126,7 +126,7 @@ jobs:
           node -e 'const fs=require("fs"); const plan=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); fs.appendFileSync(process.env.GITHUB_OUTPUT,`dapp=${plan.build.includes("dapp")}\n`)' "$CUKIES_RUN_DIR/plan.json"
 
       - name: Verify deployment invariants
-        run: node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs
+        run: node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs
 
       - name: Validate affected web application
         if: steps.plan.outputs.dapp == 'true'

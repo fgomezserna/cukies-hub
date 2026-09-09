@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { isDappDraining } from '@/lib/dapp-drain-marker';
 
 const DEFAULT_TIMEOUT_MS = 1_000;
 const MIN_TIMEOUT_MS = 100;
@@ -71,6 +72,11 @@ async function runPing(
 export function checkDeploymentReadiness(
   options: DeploymentReadinessOptions = {},
 ): Promise<DeploymentReadinessResult> {
+  // Check before cachedProbe and before touching Prisma/Mongo so a retiring
+  // container becomes unhealthy immediately after its private drain marker is
+  // written.
+  if (isDappDraining()) return Promise.resolve({ status: 'not_ready' });
+
   const now = Date.now();
   if (cachedProbe && cachedProbe.expiresAt > now) {
     return Promise.resolve(cachedProbe.result);

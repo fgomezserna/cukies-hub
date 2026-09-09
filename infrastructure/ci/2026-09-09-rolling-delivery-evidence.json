@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-09T20:25:00Z",
+  "observedAt": "2026-09-09T21:18:00Z",
   "scope": "staging rolling handoff; production unchanged",
   "ciRun": "https://github.com/fgomezserna/cukies-hub/actions/runs/34388372470",
   "handoff": {
@@ -57,7 +57,7 @@
     "commit": "16466025030bfb9a0a3c784431988c5840430f93",
     "test": "candidate-health-port-3001",
     "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
-    "error": "Coolify deployment wkkswswws0w0k4cs04k0gook termin\u00f3 en failed.",
+    "error": "Coolify deployment wkkswswws0w0k4cs04k0gook terminó en failed.",
     "finishedAt": "2026-09-09T20:22:35.652Z",
     "restoredHealthPort": "3000",
     "publicProbes": {
@@ -78,12 +78,109 @@
       130085318,
       130085703
     ],
-    "browser": "Existing Edge tab /cukies: 12 NFTs = 2 wallet + 9 Pool + 1 Master after refresh; wallet remains recognized. Pre-existing recovery banner remains."
+    "browser": "Existing Edge tab /cukies: 12 NFTs = 2 wallet + 9 Pool + 1 Master after refresh; wallet remains recognized. Pre-existing recovery banner remains.",
+    "limitations": [
+      "General BSC ingestion advances; pre-existing TOKEN_V2 Transfer price update conflict blocked NFT projection. PR362 fixes the duplicate update field; selective replay is a separate coordinated operation.",
+      "Admin /indexer requires a signed allowlisted wallet session; the newly opened tab returned 404, so authenticated admin validation is not claimed."
+    ]
   },
   "outstanding": [
-    "automatic web-only release",
-    "rollback and forward recovery",
+    "graceful drain deployment and continuity rehearsal",
     "documentation-only no-op",
-    "production migration"
-  ]
+    "production migration (PR361 draft; main/app12 unchanged)"
+  ],
+  "automaticDappRelease": {
+    "commit": "c7b33c12da931b027f68a49e7cd87a8cc397c248",
+    "ciRun": "https://github.com/fgomezserna/cukies-hub/actions/runs/34402346417",
+    "status": "success",
+    "jobSeconds": 471,
+    "dappValidationSeconds": 176,
+    "buildPushSeconds": 219,
+    "built": [
+      "dapp"
+    ],
+    "reused": [
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer"
+    ],
+    "workersUnchanged": 10
+  },
+  "preDrainRehearsals": [
+    {
+      "kind": "automatic-dapp",
+      "timeoutAt": "2026-09-09T20:47:05.972512+00:00",
+      "path": "/",
+      "timeoutMs": 5066
+    },
+    {
+      "kind": "rollback",
+      "deploymentUuid": "fk4koggso4ogs04880088goc",
+      "commit": "16466025030bfb9a0a3c784431988c5840430f93",
+      "durationSeconds": 21.1,
+      "probes": 44,
+      "http200": 43,
+      "timeoutAt": "2026-09-09T20:52:17.296039+00:00",
+      "path": "/",
+      "timeoutMs": 5056
+    },
+    {
+      "kind": "forward",
+      "deploymentUuid": "ccgo808og4wgc00g4k0kw48k",
+      "commit": "c7b33c12da931b027f68a49e7cd87a8cc397c248",
+      "durationSeconds": 21.3,
+      "probes": 37,
+      "http200": 36,
+      "timeoutAt": "2026-09-09T20:53:26.654309+00:00",
+      "path": "/api/health",
+      "timeoutMs": 5061
+    }
+  ],
+  "indexerFixRelease": {
+    "commit": "bdab82c715c13f62f8170b0e68d37ee32149e825",
+    "ciRun": "https://github.com/fgomezserna/cukies-hub/actions/runs/34405168825",
+    "status": "success",
+    "built": [
+      "chain-indexer"
+    ],
+    "webDigestReused": true,
+    "workersRecreated": 10,
+    "indexerContainer": "chain-indexer-u4s804o4wwcckowgk0woo4wg-211150797767",
+    "indexerDigest": "sha256:0ce94ee1b0fedfb090167b86c0c9a8cdd97443a51bbd3694bdbe8496f76eb396",
+    "sourceCommitVerified": true,
+    "oldIndexerAbsent": true,
+    "pendingJournal": false,
+    "webProbes": {
+      "from": "2026-09-09T21:10:34Z",
+      "until": "2026-09-09T21:11:02Z",
+      "statusesByTarget": {
+        "origin": {
+          "200": 44,
+          "502": 1,
+          "000": 1
+        },
+        "public": {
+          "200": 46
+        }
+      },
+      "failures": [
+        {
+          "at": "2026-09-09T21:10:56.656152+00:00",
+          "target": "origin",
+          "exitCode": 0,
+          "curl": "502 0.030566 192.168.1.201",
+          "error": ""
+        },
+        {
+          "at": "2026-09-09T21:10:57.160318+00:00",
+          "target": "origin",
+          "exitCode": 28,
+          "curl": "000 5.010133 192.168.1.201",
+          "error": "curl: (28) Operation timed out after 5010 milliseconds with 0 bytes received"
+        }
+      ]
+    },
+    "interpretation": "Origin 502 and timeout coincide with old web SIGTERM. Continuity not validated before drain patch. Selective NFT replay handled by the data task."
+  }
 }

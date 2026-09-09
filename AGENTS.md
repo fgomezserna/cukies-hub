@@ -203,6 +203,12 @@ Required environment variables in `dapp/.env.local`:
 
 Rolling delivery is active in staging (failure/rollback rehearsal remains tracked in the transition evidence): app32 (`rwwsc4kkwc0ck84cgk40s8kk`) is the dedicated Docker Image web resource; app28 retains workers. Follow [the transition procedure](docs/deployment-rolling-transition.md) and verify the live delivery mode before acting. Production is not enabled until its own resource, configuration and rehearsal are complete.
 
+The DApp image uses a PID1 drain wrapper plus Traefik active readiness checks;
+keep both together when changing routing or image startup. A successful deploy
+does not prove uninterrupted traffic: retain the measured errors and verify a
+replacement in which the retiring image also includes the wrapper. A workers
+release currently redeploys web metadata and reconciles the entire Compose.
+
 The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through Traefik/Cloudflare.
 
 - Staging/integration app:

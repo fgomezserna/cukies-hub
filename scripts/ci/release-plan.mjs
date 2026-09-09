@@ -55,6 +55,7 @@ function unique(values) {
 }
 
 export function componentForPath(path) {
+  if (path === 'scripts/docker-dapp-server.mjs') return ['dapp'];
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|\.npmrc|\.dockerignore|Dockerfile\.ci|docker-compose\.coolify\.yml|docker-compose\.images\.yml|scripts\/docker-start(?:-ci)?\.sh|scripts\/assert-.*\.mjs)$/.test(path)) return [...COMPONENTS];
   if (path.startsWith('dapp/scripts/') || path.startsWith('packages/economy-schedulers/')) return ['schedulers'];
   if (path.startsWith('dapp/')) return ['dapp'];
