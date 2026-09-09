@@ -22,16 +22,28 @@ function publicConfigHash(): string | undefined {
   return value && /^[0-9a-f]{64}$/i.test(value) ? value.toLowerCase() : undefined;
 }
 
+function publicImageSha(): string | undefined {
+  const value = process.env.CUKIES_IMAGE_REVISION;
+  return value && /^[0-9a-f]{40}$/i.test(value) ? value.toLowerCase() : undefined;
+}
+
 export async function GET() {
   const readiness = await checkDeploymentReadiness();
-  const body: { status: 'ready' | 'not_ready'; gitSha?: string; configHash?: string } = {
+  const body: {
+    status: 'ready' | 'not_ready';
+    gitSha?: string;
+    configHash?: string;
+    imageSha?: string;
+  } = {
     status: readiness.status,
   };
   const gitSha = publicGitSha();
   const configHash = publicConfigHash();
+  const imageSha = publicImageSha();
 
   if (gitSha) body.gitSha = gitSha;
   if (configHash) body.configHash = configHash;
+  if (imageSha) body.imageSha = imageSha;
 
   return NextResponse.json(body, {
     status: readiness.status === 'ready' ? 200 : 503,

@@ -1,0 +1,89 @@
+{
+  "observedAt": "2026-09-09T20:25:00Z",
+  "scope": "staging rolling handoff; production unchanged",
+  "ciRun": "https://github.com/fgomezserna/cukies-hub/actions/runs/34388372470",
+  "handoff": {
+    "status": "finished",
+    "environment": "staging",
+    "healthSha": "16466025030bfb9a0a3c784431988c5840430f93",
+    "web": {
+      "status": "finished",
+      "deploymentUuid": "ocs0ok0gowo08s0k8ck8w4w0",
+      "commit": "16466025030bfb9a0a3c784431988c5840430f93",
+      "imageRepository": "192.168.1.207:5000/cukies-hub/dapp",
+      "imageTag": "sha256-817c06818e4291967b0d4b44bc8af952273cfaa70dd6fe19e04dc44ef85452e3",
+      "healthSha": "16466025030bfb9a0a3c784431988c5840430f93",
+      "readyStatus": "ready",
+      "environment": "staging",
+      "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk"
+    },
+    "workers": {
+      "deploymentUuid": "wg400g044k8s0gwk4o444owk",
+      "status": "finished",
+      "commit": "16466025030bfb9a0a3c784431988c5840430f93"
+    },
+    "decision": {
+      "deliveryMode": "rolling",
+      "web": true,
+      "workers": true,
+      "skip": false,
+      "changed": [
+        "dapp",
+        "chain-indexer",
+        "cuki-card-worker",
+        "schedulers",
+        "cukies-bridge-relayer"
+      ],
+      "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+    }
+  },
+  "cutoverProbes": {
+    "first": "2026-09-09T20:08:53.523682+00:00",
+    "last": "2026-09-09T20:16:59.476296+00:00",
+    "count": 1117,
+    "statuses": {
+      "200": 1117
+    },
+    "paths": [
+      "/",
+      "/_next/static/chunks/main-app-29b76e25f7b81031.js",
+      "/_next/static/css/ad35fbc93e98ecca.css",
+      "/api/health",
+      "/treasurehunt-game/"
+    ]
+  },
+  "unhealthyCandidate": {
+    "startedAt": "2026-09-09T20:21:18.606Z",
+    "commit": "16466025030bfb9a0a3c784431988c5840430f93",
+    "test": "candidate-health-port-3001",
+    "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+    "error": "Coolify deployment wkkswswws0w0k4cs04k0gook termin\u00f3 en failed.",
+    "finishedAt": "2026-09-09T20:22:35.652Z",
+    "restoredHealthPort": "3000",
+    "publicProbes": {
+      "count": 173,
+      "statuses": {
+        "200": 173
+      }
+    },
+    "retainedContainer": "rwwsc4kkwc0ck84cgk40s8kk-200853851427"
+  },
+  "runtime": {
+    "webResource": 32,
+    "workersResource": 28,
+    "workers": 10,
+    "mongo": "PRIMARY cukies-staging-rs0 at 192.168.1.221:27018",
+    "cardCapacityGuards": "both PASS",
+    "indexerSafeBlocks": [
+      130085318,
+      130085703
+    ],
+    "browser": "Existing Edge tab /cukies: 12 NFTs = 2 wallet + 9 Pool + 1 Master after refresh; wallet remains recognized. Pre-existing recovery banner remains."
+  },
+  "outstanding": [
+    "automatic web-only release",
+    "rollback and forward recovery",
+    "documentation-only no-op",
+    "production migration"
+  ]
+}

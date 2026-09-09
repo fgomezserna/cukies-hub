@@ -17,11 +17,11 @@ mientras se estabiliza una release.
 
 | Scope | Recurso y rama | Ruta de despliegue | Datos y dominio |
 | --- | --- | --- | --- |
-| Stage / Hub | App 28 `game-hub-staging`, `staging`, UUID `u4s804o4wwcckowgk0woo4wg` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201` usando `docker-compose.images.yml`. Autodeploy Git de app 28: **OFF**. `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
+| Stage / Hub | Web app32 `rwwsc4kkwc0ck84cgk40s8kk`; workers app28 `u4s804o4wwcckowgk0woo4wg`; rama `staging` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201` con web Docker Image y `docker-compose.workers.yml` en app28. Autodeploy Git: **OFF**. `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
 | Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`. Este carril no consume el pipeline de imágenes de app 28. | BSC mainnet y datos de producción; `https://cukies.world`. |
 | Treasure Hunt | App 31 `game-treasurehunt-staging`, `staging`, UUID `lc04cw8gs4koo4swwws0c4ss` | Recurso independiente con Nixpacks (`build_pack=nixpacks`); no aplica `docker-compose.coolify.yml` ni `docker-compose.images.yml`. | Staging; `https://cukieshub.eurekand.com/treasurehunt-game`, con `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y origen dapp de staging. |
 
-En los hubs app 28 y app 12, solo `dapp` publica dominio mediante Traefik.
+En staging publica la web app32; en producción todavía publica `dapp` de app12.
 Workers y schedulers son internos; app 31 es un recurso independiente.
 Las tres bases de Stage (`cukies-hub-staging`, `cukies-legacy-staging` y
 `cukieshub-new-staging`) están fuera del Compose operativo y viven en el Mongo
@@ -178,26 +178,24 @@ Protecciones recomendadas para `staging`:
 
 ### Despliegue de imagenes inmutables de staging
 
-El reemplazo gradual está en validación; recursos, bootstrap y pruebas en
-[`deployment-rolling-transition.md`](deployment-rolling-transition.md). Hasta
-completar el ensayo, el modo efectivo del Environment determina el destino.
+Staging usa web Docker Image en app32 y workers Compose en app28. El procedimiento
+completo de bootstrap, readiness, drenaje, journal y rollback vive en
+[`deployment-rolling-transition.md`](deployment-rolling-transition.md).
 
-El unico flujo CI de este carril es `.github/workflows/cukies-images.yml`: acepta un
-`push` a `staging`, usa el GitHub Environment `cukies-staging` y el runner con las etiquetas
-`self-hosted`, `linux`, `x64` y `cukies-builder`. No se habilitan eventos de pull request,
-refs arbitrarios ni un disparador manual. El Environment contiene las credenciales del registry
-y Coolify para CI; `CUKIES_STAGING_BUILD_ENV_JSON` es una variable pública validada por
-allowlist, no un almacén de secretos runtime. Los secretos runtime de Mongo, OAuth, HMAC, RPC
-y S3/MinIO se configuran en Coolify.
+El workflow `.github/workflows/cukies-images.yml` recibe pushes a `staging` y
+`main`, cada uno con su GitHub Environment y estado propios. Las PR sólo ejecutan
+invariantes sin secretos; no despliegan. El runner dedicado usa las etiquetas
+`self-hosted`, `linux`, `x64`, `cukies-builder`. Los secretos runtime permanecen
+en Coolify; `CUKIES_BUILD_ENV_JSON` sólo acepta configuración pública validada.
 
-El pipeline usa Node 22, pnpm 10.19 y Nx 23.2. La primera ejecución, un estado ausente o una
-base que no sea ancestro del SHA de GitHub construye los cinco targets CI (`dapp`,
-`chain-indexer`, `cuki-card-worker`, `schedulers` y `cukies-bridge-relayer`). En ejecuciones
-posteriores Nx affected y el diff de seguridad seleccionan los targets; los demás reutilizan el
-digest guardado. Cada imagen se publica con el tag inmutable `<sha>-<configHash>` y el Compose
-usa una referencia `image` por componente con digest obligatorio. `cuki-card-worker-legacy`
-comparte la imagen del card worker; los schedulers tienen una imagen propia. El manifest del
-workflow es la fuente primaria para saber si una release construyó o reutilizó cada imagen.
+Node 22, pnpm 10.19 y Nx 23.2 seleccionan los componentes afectados desde la última
+release entregada. En staging hay cinco imágenes: dapp, chain-indexer,
+cuki-card-worker, schedulers y cukies-bridge-relayer. Cada referencia fija el
+digest y el tag `<sha>-<configHash>`; el manifest distingue commit de release de
+`sourceSha` de cada imagen. Las imágenes no afectadas se reutilizan. Cambiar sólo
+la web conserva los contenedores de workers; documentación sin cambios de imagen
+o topología no inicia ningún deployment del Hub. El juego app31 conserva su
+workflow independiente y puede desplegar por un push documental.
 
 El builder BuildKit persistente se llama `cukies-ci`, usa el driver `docker-container`, una sola
 compilación concurrente (`max-parallelism=1`) y caches de capas separados por componente y
@@ -214,57 +212,37 @@ no una política de retención del registry. Las ejecuciones posteriores solo
 inspeccionan y arrancan el builder existente. No se hace prune, SSH ni limpieza
 destructiva desde el workflow.
 
-El estado durable vive en `/srv/cukies-ci/state/staging/release.json` y contiene el ultimo SHA
-desplegado correctamente, el hash de configuracion y el digest de cada componente. Se escribe
-con rename atomico unicamente despues de que Coolify termine el deployment y la URL de health
-confirme el mismo SHA. El manifest JSON se adjunta como artefacto de cada ejecucion, tambien si
-un paso falla. Un fallo de deploy no adelanta la base de Nx ni modifica el estado durable.
+El estado durable vive en `/srv/cukies-ci/state/<entorno>/release.json`. Incluye
+SHA servido, hash público, digests y recursos web/workers. Se escribe de forma
+atómica después de verificar la entrega. `release.json.pending.json` registra
+una entrega en curso; si queda tras un fallo, CI exige reconciliar el runtime
+antes de construir otra release. Los artefactos del workflow conservan el plan
+y manifest incluso si falla la entrega.
 
-`docker-compose.images.yml` se genera de forma reproducible desde `docker-compose.coolify.yml`.
-Conserva perfiles, guards, comandos, variables, `label_file` si aparece en la fuente y la red
-externa `coolify`; elimina todos los `build`, `staging-mongo` y sus volumenes. Las BBDD y sus
-volumenes siguen fuera del Compose de la aplicacion. Las imagenes CI llevan
-`coolify.managed=true` para que la limpieza de Docker no las trate como imagenes huerfanas.
+`docker-compose.coolify.yml` sigue siendo la fuente de topología. El generador
+produce `docker-compose.images.yml` (bootstrap) y `docker-compose.workers.yml`
+(operación gradual). Elimina builds y Mongo; conserva perfiles, comandos y guards.
+El Compose de workers también elimina la web y apunta sus llamadas HMAC al
+`CUKIES_WEB_URL` canónico, con `CUKIES_WEB_RESOURCE_UUID` esperado. Los secretos y
+perfiles de staging nunca se copian a producción.
 
-Antes de iniciar Coolify, el flujo hace PATCH de `git_commit_sha`, `docker_compose_location` y
-`docker_compose_raw`, vuelve a leer la aplicación para confirmar el SHA exacto, actualiza las
-referencias de imagen mediante `PATCH /applications/{uuid}/envs/bulk` y arranca el deployment
-por API. Coolify descarga y guarda el runtime local y reinicia el Compose aunque las imágenes
-se reutilicen. La API beta ejecuta `stop_running_container(force:true)` antes de arrancar el
-Compose: la selección de qué construir permanece selectiva, pero los servicios del mismo Compose
-pueden reiniciarse juntos. El flujo no promete que los workers permanezcan levantados ni intenta
-cambiar esa política.
+`CUKIES_DELIVERY_MODE=rolling` y `CUKIES_IMAGE_DEPLOY_ENABLED=true` habilitan la
+entrega. Git autodeploy de los recursos Hub permanece desactivado. CI fija el
+digest de app32, comprueba `/api/ready` y `/api/health`, y sólo después aplica el
+Compose de app28 si cambian workers o topología. Coolify puede reiniciar juntos
+los workers de ese recurso; la web tiene su propio ciclo. En la separación inicial
+se esperan 60 segundos después de verificar la web antes de detener el Compose
+que contenía la instancia anterior.
 
-El pipeline de staging se activa con `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true` en el
-Environment `cukies-staging`; el autodeploy Git de app 28 permanece desactivado para evitar
-builds duplicados. Las cinco referencias `CUKIES_IMAGE_*`, `IMAGE_REVISION` y
-`CUKIES_BUILD_ENV_HASH` deben estar disponibles tanto en buildtime como runtime: Coolify
-interpola el Compose durante ambas fases aunque no exista ningún `build`. Son metadatos
-públicos; los secretos runtime siguen en Coolify.
+Coolify Docker Image puede devolver `commit=HEAD` incluso terminado: se comprueban
+los campos de imagen por digest y el SHA servido. El Compose de workers debe
+terminar con el SHA exacto. Health debe identificar `staging`, la release y app32;
+readiness debe confirmar Mongo. Un build verde no prueba todo el runtime.
 
-Coolify puede devolver `commit=HEAD` al crear un job. Se considera identidad pendiente
-solo en `queued`/`in_progress`; un SHA concreto diferente se rechaza y `finished` exige
-el SHA exacto. Health debe confirmar `status=ok`, `environment=staging`, el mismo SHA y
-`coolify.resourceUuid=u4s804o4wwcckowgk0woo4wg`. Un fallo no avanza el estado durable.
-Los cambios exclusivos del monitor, selector, persistencia de estado y sus tests se
-revisan desde el checkout CI y pueden reutilizar las imágenes; no alteran el runtime.
-Un cambio limitado al stage final `dapp` de `Dockerfile.ci`, acompañado solo de
-documentación/orquestación, puede reconstruir únicamente dapp. La comparación exige
-prefijo y sufijo idénticos fuera de ese stage; cualquier otro cambio conserva la
-selección conservadora. El manifest registra esta selección por componente.
-
-La prueba vigente de reutilización es el [run `34379350360`](https://github.com/fgomezserna/cukies-hub/actions/runs/34379350360): terminó `SUCCESS`,
-con `build=[]` y reutilización de las cinco imágenes. El release commit fue
-`7f56123`; las cinco imágenes conservaron `sourceSha=e6e3cbb5f8edcab77a2d13551a71ae2d23fd5a1e` y health devolvió
-HTTP 200 con el SHA exacto. El deployment Coolify `1466`
-(`vwc0soksswksoc8kw88okc8c`) terminó a las 16:56:39 UTC. Esta evidencia prueba
-reuse de imágenes y runtime identificado; la comprobación visual de la UI queda
-fuera de este runbook. El manifest del workflow es la fuente final y no se
-duplican aquí cronologías de ejecuciones.
-
-El carril de producción no cambia. Coolify conserva el despliegue de la aplicación;
-este trabajo no incorpora autoescalado. La retención y GC de versiones del registry
-requieren su propia política; el límite de 40 GB corresponde a la caché del builder.
+La evidencia vigente está en la fila INFRA de `antes-del-15-seguimiento.md`.
+Producción sigue temporalmente en app12 mientras se prepara su cambio equivalente;
+app33 está provisionada sin tráfico. Autoscalado y GC del registry requieren su
+propia implementación; el límite de 40 GB anterior corresponde al builder.
 
 El builder dedicado está instalado en VM1012 (`192.168.1.244`, 4 vCPU, 8 GiB RAM,
 120 GiB disco). El runner `cukies-builder-1012` está registrado. Mongo de staging funciona
@@ -357,7 +335,7 @@ Reglas operativas:
 
 - staging debe tener `NEXTAUTH_URL` y callbacks OAuth propios,
 - staging debe usar base de datos y secrets separados,
-- `STAGING_ONLY_GUARD=true` es obligatorio en la app Coolify `28`; el arranque de `dapp`, `chain-indexer` y `cuki-card-worker` se detiene antes de cualquier setup si el guard no valida el perimetro,
+- `STAGING_ONLY_GUARD=true` es obligatorio en app28 (workers) y app32 (sólo scope dapp); el arranque de `dapp`, `chain-indexer` y `cuki-card-worker` se detiene antes de cualquier setup si el guard no valida el perimetro,
 - `main` solo debe recibir merges promovidos tras QA y go/no-go,
 - `cukies.world` no debe recibir variables ni contratos de staging,
 - los nombres de routers Traefik deben ser unicos por entorno,

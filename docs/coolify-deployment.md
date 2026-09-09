@@ -10,11 +10,11 @@ datos de staging está en
 
 | Recurso | Ruta activa | Compose | Alcance |
 | --- | --- | --- | --- |
-| Coolify app 28, `game-hub-staging` | `staging` -> workflow `.github/workflows/cukies-images.yml` | `docker-compose.images.yml` generado | Hub de integración; CI publica imágenes inmutables y llama a Coolify. El autodeploy Git de app 28 está desactivado y `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED=true`. |
+| Coolify app32 web + app28 workers | `staging` -> workflow `.github/workflows/cukies-images.yml` | Web Docker Image; `docker-compose.workers.yml` generado | Imágenes por digest, web gradual y workers independientes. Autodeploy Git desactivado; `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. |
 | Coolify app 12, `game-hub` | `main` -> build/deploy existente | `docker-compose.coolify.yml` | Producción live; conserva la ruta legacy de Coolify. |
 | Coolify app 31, `game-treasurehunt-staging` | `staging` -> recurso independiente | No aplica; Nixpacks (`build_pack=nixpacks`, rama `staging`) | Treasure Hunt se mantiene separado del hub y sigue su build/deploy independiente. |
 
-En los recursos hub app 28 y app 12, solo `dapp` se publica mediante Traefik;
+En staging se publica app32 y en producción todavía `dapp` de app12;
 workers y schedulers son internos. App 31 es un recurso independiente y no se
 incluye en el Compose del hub. App 28 usa Mongo externo en LXC 2007
 (`192.168.1.221:27018`); el Compose de imágenes no crea ni administra Mongo.
@@ -24,7 +24,7 @@ incluye en el Compose del hub. App 28 usa Mongo externo en LXC 2007
 El pipeline recorre `staging` en el runner `cukies-builder-1012` de VM1012
 (`192.168.1.244`), reutiliza el builder/cache cuando corresponde, publica
 referencias con digest en el registry de VM1007 (`192.168.1.207:5000`) y aplica
-`docker-compose.images.yml` mediante la API de Coolify en VM1001
+el digest de la web en app32 y `docker-compose.workers.yml` en app28 mediante la API de Coolify en VM1001
 (`192.168.1.201`). La fuente de topología es
 `docker-compose.coolify.yml`; la regeneración reproducible es:
 

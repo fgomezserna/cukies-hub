@@ -1,10 +1,29 @@
-export const CI_COMPONENTS = Object.freeze([
+import { readFileSync } from 'node:fs';
+
+export const KNOWN_CI_COMPONENTS = Object.freeze([
   'dapp',
   'chain-indexer',
   'cuki-card-worker',
   'schedulers',
   'cukies-bridge-relayer',
 ]);
+
+function loadCiComponents() {
+  const declared = JSON.parse(readFileSync(new URL('../../infrastructure/ci/components.json', import.meta.url), 'utf8'));
+  if (!Array.isArray(declared) || declared.length === 0 || declared.some((value) => typeof value !== 'string')) {
+    throw new Error('infrastructure/ci/components.json debe contener un array no vacío de componentes.');
+  }
+  if (new Set(declared).size !== declared.length) {
+    throw new Error('infrastructure/ci/components.json no puede contener componentes duplicados.');
+  }
+  const unknown = declared.filter((component) => !KNOWN_CI_COMPONENTS.includes(component));
+  if (unknown.length > 0) {
+    throw new Error(`componentes CI fuera del catálogo conocido: ${unknown.join(', ')}.`);
+  }
+  return Object.freeze(declared);
+}
+
+export const CI_COMPONENTS = loadCiComponents();
 
 const IMAGE_PATTERN = /^(?<repository>.+)\/cukies-hub\/(?<component>[a-z0-9-]+):(?<sourceSha>[0-9a-f]{40})-(?<configHash>[0-9a-f]{64})@(?<digest>sha256:[0-9a-f]{64})$/i;
 

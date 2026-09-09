@@ -1,7 +1,7 @@
 # Entrega gradual de imágenes
 
-La implementación se valida primero en staging antes de habilitar el mismo
-proceso en producción. El estado live y las evidencias finales se registran en
+Staging usa la entrega gradual desde el 2026-09-09. Los ensayos de fallo y rollback
+se completan antes de habilitar el mismo proceso en producción. El estado live y las evidencias finales se registran en
 `antes-del-15-seguimiento.md`; la guía principal sigue siendo
 [`deployment-environments.md`](deployment-environments.md).
 
@@ -10,7 +10,7 @@ proceso en producción. El estado live y las evidencias finales se registran en
 | Entorno | Web Docker Image | Workers Compose | Destino público |
 | --- | --- | --- | --- |
 | Staging | App32 `rwwsc4kkwc0ck84cgk40s8kk` | App28 `u4s804o4wwcckowgk0woo4wg` | `https://cukieshub.eurekand.com` |
-| Producción | Pendiente de provisión y ensayo previo | App12 `jookw8ow8woks088s44404ok` | `https://cukies.world` |
+| Producción | App33 `uo8gswsg84c488cowko0kkkg`, provisionada sin tráfico; activación pendiente | App12 `jookw8ow8woks088s44404ok` | `https://cukies.world` |
 
 La web no publica un puerto del host ni usa un nombre fijo de contenedor.
 Coolify arranca su reemplazo, exige `/api/ready` y después termina la instancia
