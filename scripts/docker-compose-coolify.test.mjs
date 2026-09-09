@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 const compose = await readFile(
@@ -109,6 +112,32 @@ test('indexed card context is forwarded without mandatory interpolation in disab
   for (const key of ['CARD_WORKER_SOURCE_NETWORK', 'CARD_WORKER_SOURCE_CHAIN_ID', 'CARD_WORKER_SOURCE_COLLECTION']) {
     assert.ok(definition.includes(`${key}: \${${key}:-}`));
   }
+});
+
+test('legacy card Compose command starts the real non-executable entry script through sh', async (t) => {
+  const definition = serviceDefinition('cuki-card-worker-legacy');
+  const command = definition.match(/    command:\n      - sh\n      - -c\n      - ([^\n]+)/)?.[1];
+  assert.ok(command);
+  const scratch = await mkdtemp(join(tmpdir(), 'card-legacy-entry-'));
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+  await mkdir(join(scratch, 'scripts'));
+  await mkdir(join(scratch, 'bin'));
+  const entry = join(scratch, 'scripts/docker-start.sh');
+  await writeFile(entry, await readFile(new URL('./docker-start.sh', import.meta.url)), { mode: 0o644 });
+  await chmod(entry, 0o644);
+  assert.equal((await stat(entry)).mode & 0o111, 0);
+  // Stub only external processes: the actual Compose command and entry script run.
+  await writeFile(join(scratch, 'bin/node'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  await writeFile(join(scratch, 'bin/pnpm'), '#!/bin/sh\nprintf "PNPM:%s\\n" "$*"\n', { mode: 0o755 });
+  const result = spawnSync('sh', ['-c', command], {
+    cwd: scratch,
+    env: { PATH: `${join(scratch, 'bin')}:${process.env.PATH}`, APP_ENV: 'staging', STAGING_ONLY_GUARD: 'true', CUKIES_SERVICE: 'cuki-card-worker' },
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /PNPM:--filter @cukies\/cuki-card-worker run setup:prod/);
+  assert.match(result.stdout, /PNPM:--filter @cukies\/cuki-card-worker run start/);
 });
 
 test('chain-indexer reports health from its staging Mongo connection', () => {
