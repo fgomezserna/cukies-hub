@@ -46,6 +46,7 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/env-ci.test.mjs',
   'scripts/ci/worker-compose.test.mjs',
   'scripts/ci/game-lane.test.mjs',
+  'scripts/ci/game-cache-contract.test.mjs',
   'scripts/ci/image-ref.mjs',
 ]);
 
