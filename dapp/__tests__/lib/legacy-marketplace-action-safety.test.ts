@@ -8,7 +8,10 @@ import {
   reconcileConfirmedMarketplaceAction,
 } from '@/lib/legacy-marketplace/action-safety';
 import { buildLegacyMarketplaceReconciliation } from '@/lib/legacy-marketplace/reconciliation';
-import { sendLegacyTronContract } from '@/lib/legacy-marketplace/tron';
+import {
+  isLegacyTronWalletOnRpc,
+  sendLegacyTronContract,
+} from '@/lib/legacy-marketplace/tron';
 import type { LegacyTronWebLike } from '@/lib/legacy-marketplace/tron';
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
 
@@ -92,6 +95,17 @@ describe('seguridad de acciones Legacy', () => {
     expect(() => assertTronActionContext(tronWeb, context)).toThrow(
       'WALLET_CONTEXT_CHANGED',
     );
+  });
+
+  it('permite lecturas solo con TronLink en TRON Mainnet', () => {
+    const tronWeb = {
+      fullNode: { host: 'https://api.trongrid.io/' },
+      contract: jest.fn(),
+    };
+
+    expect(isLegacyTronWalletOnRpc(tronWeb, 'https://api.trongrid.io')).toBe(true);
+    tronWeb.fullNode.host = 'https://nile.trongrid.io';
+    expect(isLegacyTronWalletOnRpc(tronWeb, 'https://api.trongrid.io')).toBe(false);
   });
 
   it('revalida TRON después de esperar el contrato y justo antes de send', async () => {

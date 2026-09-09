@@ -1,6 +1,6 @@
 import { isAddress, type Address } from 'viem';
 
-export type CukiesBridgeMode = 'disabled' | 'testnet';
+export type CukiesBridgeMode = 'disabled' | 'testnet' | 'legacy-readonly';
 export type CukiesBridgeEnvironment = Partial<Record<
   | 'APP_ENV'
   | 'NEXT_PUBLIC_APP_ENV'
@@ -20,6 +20,7 @@ export type CukiesBridgeRuntimeConfig = Readonly<{
   appEnv: 'staging' | 'production' | 'unknown';
   mode: CukiesBridgeMode;
   enabled: boolean;
+  operationsEnabled: boolean;
   bsc: Readonly<{
     chainId: 56 | 97 | null;
     networkLabel: string;
@@ -103,50 +104,72 @@ export function buildCukiesBridgeRuntimeConfig(
   const appEnv = rawAppEnv === 'staging' || rawAppEnv === 'production'
     ? rawAppEnv
     : 'unknown';
-  const rawMode = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_MODE') ?? 'disabled';
-  const mode: CukiesBridgeMode = rawMode === 'testnet' ? rawMode : 'disabled';
-  if (!['disabled', 'testnet'].includes(rawMode)) {
-    issues.push('NEXT_PUBLIC_CUKIES_BRIDGE_MODE debe ser disabled o testnet');
+  const rawMode = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_MODE')
+    ?? (appEnv === 'staging' ? 'legacy-readonly' : 'disabled');
+  const mode: CukiesBridgeMode = rawMode === 'testnet' || rawMode === 'legacy-readonly'
+    ? rawMode
+    : 'disabled';
+  if (!['disabled', 'testnet', 'legacy-readonly'].includes(rawMode)) {
+    issues.push(
+      'NEXT_PUBLIC_CUKIES_BRIDGE_MODE debe ser disabled, testnet o legacy-readonly',
+    );
   }
 
   const rawChainId = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID')
-    ?? value(environment, 'NEXT_PUBLIC_UKI_CHAIN_ID');
+    ?? (mode === 'legacy-readonly'
+      ? '56'
+      : value(environment, 'NEXT_PUBLIC_UKI_CHAIN_ID'));
   const parsedChainId = rawChainId && /^\d+$/.test(rawChainId) ? Number(rawChainId) : null;
   const chainId = parsedChainId === 56 || parsedChainId === 97 ? parsedChainId : null;
-  const rawTronNetwork = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK');
+  const rawTronNetwork = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK')
+    ?? (mode === 'legacy-readonly' ? 'mainnet' : null);
   const tronNetwork = rawTronNetwork === 'nile' || rawTronNetwork === 'mainnet'
     ? rawTronNetwork
     : null;
 
-  const collectionAddress = evmAddress(
+  const configuredCollectionAddress = evmAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS',
     issues,
   );
-  const endpointAddress = evmAddress(
+  const configuredEndpointAddress = evmAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS',
     issues,
   );
-  const tronCollectionAddress = tronAddress(
+  const configuredTronCollectionAddress = tronAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS',
     issues,
   );
-  const tronEndpointAddress = tronAddress(
+  const configuredTronEndpointAddress = tronAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS',
     issues,
   );
 
   const expectedTestnet = mode === 'testnet';
-  const expectedTronOrigin = expectedTestnet ? 'https://nile.trongrid.io' : null;
-  const configuredTronRpc = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL');
+  const expectedLegacyReadonly = mode === 'legacy-readonly';
+  const collectionAddress = configuredCollectionAddress
+    ?? (expectedLegacyReadonly ? BSC_MAINNET_COLLECTION as Address : null);
+  const endpointAddress = configuredEndpointAddress
+    ?? (expectedLegacyReadonly ? BSC_MAINNET_ENDPOINT as Address : null);
+  const tronCollectionAddress = configuredTronCollectionAddress
+    ?? (expectedLegacyReadonly ? TRON_MAINNET_COLLECTION : null);
+  const tronEndpointAddress = configuredTronEndpointAddress
+    ?? (expectedLegacyReadonly ? TRON_MAINNET_ENDPOINT : null);
+  const expectedTronOrigin = expectedTestnet
+    ? 'https://nile.trongrid.io'
+    : expectedLegacyReadonly
+      ? 'https://api.trongrid.io'
+      : null;
+  const configuredTronRpc = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL')
+    ?? expectedTronOrigin;
   const tronRpcUrl = expectedTronOrigin
     ? exactHttpsOrigin(configuredTronRpc, expectedTronOrigin)
     : null;
 
-  if (mode !== 'disabled') {
+  if (expectedTestnet) {
     const expectedAppEnv = 'staging';
     const expectedChainId = 97;
     const expectedTronNetwork = 'nile';
@@ -165,17 +188,46 @@ export function buildCukiesBridgeRuntimeConfig(
         `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL debe ser ${expectedTronOrigin}`,
       );
     }
-    if (!collectionAddress) {
+    if (!configuredCollectionAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS');
     }
-    if (!endpointAddress) {
+    if (!configuredEndpointAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS');
     }
-    if (!tronCollectionAddress) {
+    if (!configuredTronCollectionAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS');
     }
-    if (!tronEndpointAddress) {
+    if (!configuredTronEndpointAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS');
+    }
+  }
+
+  if (expectedLegacyReadonly) {
+    if (appEnv !== 'staging' && appEnv !== 'production') {
+      issues.push('legacy-readonly requiere APP_ENV=staging o production');
+    }
+    if (chainId !== 56) {
+      issues.push('legacy-readonly requiere BSC chain 56');
+    }
+    if (tronNetwork !== 'mainnet') {
+      issues.push('legacy-readonly requiere TRON mainnet');
+    }
+    if (!tronRpcUrl) {
+      issues.push(
+        `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL debe ser ${expectedTronOrigin}`,
+      );
+    }
+    if (collectionAddress?.toLowerCase() !== BSC_MAINNET_COLLECTION) {
+      issues.push('legacy-readonly requiere la coleccion Legacy BSC mainnet');
+    }
+    if (endpointAddress?.toLowerCase() !== BSC_MAINNET_ENDPOINT) {
+      issues.push('legacy-readonly requiere el bridge Legacy BSC mainnet');
+    }
+    if (tronCollectionAddress !== TRON_MAINNET_COLLECTION) {
+      issues.push('legacy-readonly requiere la coleccion Legacy TRON mainnet');
+    }
+    if (tronEndpointAddress !== TRON_MAINNET_ENDPOINT) {
+      issues.push('legacy-readonly requiere el bridge Legacy TRON mainnet');
     }
   }
 
@@ -211,11 +263,13 @@ export function buildCukiesBridgeRuntimeConfig(
   }
 
   const enabled = mode !== 'disabled' && issues.length === 0;
+  const operationsEnabled = mode === 'testnet' && enabled;
 
   return Object.freeze({
     appEnv,
     mode,
     enabled,
+    operationsEnabled,
     bsc: Object.freeze({
       chainId,
       networkLabel: chainId === 97

@@ -24,14 +24,14 @@ export function BridgePageShell() {
               Cukies Bridge
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Prepara un movimiento entre TRON y BSC con origen, destino y coste
-              visibles antes de aprobar la operacion.
+              Consulta el estado de tus Cukies y la disponibilidad de un movimiento
+              entre TRON y BSC. Las operaciones estarán disponibles cuando finalice la revisión.
             </p>
             <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
               {[
                 [Network, 'Elige red origen'],
                 [Wallet, 'Confirma wallet destino'],
-                [CheckCircle2, 'Aprueba y ejecuta bridge'],
+                [CheckCircle2, 'Estado y disponibilidad'],
               ].map(([Icon, label]) => (
                 <div
                   key={String(label)}

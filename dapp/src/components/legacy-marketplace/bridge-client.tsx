@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRightLeft,
@@ -32,6 +32,9 @@ import {
   type CukiesBridgeRuntimeConfig,
 } from '@/lib/legacy-marketplace/bridge-runtime';
 import {
+  getLegacyTronWeb,
+  getLegacyTronWalletRpcOrigin,
+  isLegacyTronWalletOnRpc,
   readTronContractAt,
   sendTronContractAt,
 } from '@/lib/legacy-marketplace/tron';
@@ -58,7 +61,7 @@ type TronBridgeSnapshot = {
 };
 
 type EnabledBridgeRuntime = {
-  bscChainId: 97;
+  bscChainId: 56 | 97;
   bscNetworkLabel: string;
   bscTokenAddress: Address;
   bscBridgeAddress: Address;
@@ -66,6 +69,8 @@ type EnabledBridgeRuntime = {
   tronRpcUrl: string;
   tronTokenAddress: string;
   tronBridgeAddress: string;
+  operationsEnabled: boolean;
+  readOnly: boolean;
 };
 
 function enabledBridgeRuntime(
@@ -73,7 +78,7 @@ function enabledBridgeRuntime(
 ): EnabledBridgeRuntime | null {
   if (
     !config.enabled ||
-    config.bsc.chainId !== 97 ||
+    (config.bsc.chainId !== 56 && config.bsc.chainId !== 97) ||
     !config.bsc.collectionAddress ||
     !config.bsc.endpointAddress ||
     !config.tron.collectionAddress ||
@@ -92,22 +97,9 @@ function enabledBridgeRuntime(
     tronRpcUrl: config.tron.rpcUrl,
     tronTokenAddress: config.tron.collectionAddress,
     tronBridgeAddress: config.tron.endpointAddress,
+    operationsEnabled: config.operationsEnabled,
+    readOnly: !config.operationsEnabled,
   };
-}
-
-function tronWalletRpcOrigin() {
-  if (typeof window === 'undefined') return null;
-  const configuredHost =
-    window.tronWeb?.fullNode?.host ??
-    window.tronLink?.tronWeb?.fullNode?.host ??
-    window.tron?.tronWeb?.fullNode?.host;
-  if (typeof configuredHost !== 'string') return null;
-
-  try {
-    return new URL(configuredHost).origin;
-  } catch {
-    return null;
-  }
 }
 
 function getErrorMessage(error: unknown) {
@@ -286,6 +278,8 @@ function BridgeOperationsClient({
     tronRpcUrl,
     tronTokenAddress,
     tronBridgeAddress,
+    operationsEnabled,
+    readOnly,
   } = runtime;
   const { address, chainId, isConnected } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
@@ -313,15 +307,18 @@ function BridgeOperationsClient({
     paused: null,
     approved: null,
   });
+  const tronSnapshotRequestRef = useRef(0);
 
   const destinationNetwork = getDestinationNetwork(sourceNetwork);
   const sourceOwner = sourceNetwork === 'BSC' ? address : tronAddress;
+  const tronWeb = getLegacyTronWeb();
+  const tronWalletRpcOrigin = getLegacyTronWalletRpcOrigin(tronWeb);
   const bscReady =
     sourceNetwork === 'BSC' && isConnected && chainId === bscChainId;
   const tronReady =
     sourceNetwork === 'TRON' &&
     isTronConnected &&
-    tronWalletRpcOrigin() === tronRpcUrl;
+    isLegacyTronWalletOnRpc(tronWeb, tronRpcUrl);
   const ready = sourceNetwork === 'BSC' ? bscReady : tronReady;
   const disabled = isWriting || isSwitchingChain;
 
@@ -352,8 +349,16 @@ function BridgeOperationsClient({
     sourceNetwork === 'BSC'
       ? formatBscBridgePrice(bscBridgePrice as bigint | undefined)
       : tronSnapshot.price ?? '-';
-  const bridgePaused =
-    sourceNetwork === 'BSC' ? Boolean(bscPaused) : tronSnapshot.paused === true;
+  const bridgePaused: boolean | null =
+    sourceNetwork === 'BSC'
+      ? typeof bscPaused === 'boolean' ? bscPaused : null
+      : tronSnapshot.paused;
+  const bridgeStatusLabel =
+    bridgePaused === null
+      ? 'Sin verificar'
+      : bridgePaused
+        ? 'Pausado'
+        : 'Disponible';
   const approved =
     sourceNetwork === 'BSC'
       ? Boolean(bscApproved)
@@ -447,48 +452,83 @@ function BridgeOperationsClient({
   }, [address, tronAddress]);
 
   const refreshTronSnapshot = useCallback(async () => {
-    if (!tronAddress || !window.tronWeb) {
-      setTronSnapshot({
-        price: null,
-        rawPrice: null,
-        paused: null,
-        approved: null,
-      });
+    const requestId = tronSnapshotRequestRef.current + 1;
+    tronSnapshotRequestRef.current = requestId;
+    const currentTronWeb = getLegacyTronWeb();
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const clearSnapshot = () => setTronSnapshot({
+      price: null,
+      rawPrice: null,
+      paused: null,
+      approved: null,
+    });
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        requestId === tronSnapshotRequestRef.current
+        && latestTronWeb?.defaultAddress?.base58 === requestAddress
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, tronRpcUrl)
+      );
+    };
+    if (
+      !requestAddress
+      || !currentTronWeb
+      || !isLegacyTronWalletOnRpc(currentTronWeb, tronRpcUrl)
+    ) {
+      clearSnapshot();
+      if (tronAddress && currentTronWeb && tronWalletRpcOrigin !== tronRpcUrl) {
+        setStatus(`Cambia TronLink a ${tronNetworkLabel} para consultar el bridge.`);
+      }
       return;
     }
+    clearSnapshot();
 
     try {
       const [price, paused, approval] = await Promise.all([
         readTronContractAt<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           cukiesBridgeEndpointAbi,
           tronBridgeAddress,
           'bridgePrice',
         ),
         readTronContractAt<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           cukiesBridgeEndpointAbi,
           tronBridgeAddress,
           'paused',
         ),
         readTronContractAt<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           legacyMarketplaceTronAbis.token,
           tronTokenAddress,
           'isApprovedForAll',
-          [tronAddress, tronBridgeAddress],
+          [requestAddress, tronBridgeAddress],
         ),
       ]);
+      if (!contextIsCurrent()) {
+        return;
+      }
       setTronSnapshot({
         price: formatTronBridgePrice(price),
         rawPrice: String(price),
-        paused: Boolean(paused),
+        paused: typeof paused === 'boolean' ? paused : null,
         approved: Boolean(approval),
       });
     } catch (error) {
+      if (!contextIsCurrent()) return;
+      clearSnapshot();
       setStatus(getErrorMessage(error));
     }
-  }, [tronAddress, tronBridgeAddress, tronTokenAddress]);
+  }, [
+    tronAddress,
+    tronBridgeAddress,
+    tronTokenAddress,
+    tronNetworkLabel,
+    tronRpcUrl,
+    tronWalletRpcOrigin,
+  ]);
 
   useEffect(() => {
     void refreshCandidates();
@@ -525,11 +565,12 @@ function BridgeOperationsClient({
       await connectTron();
       return false;
     }
-    if (!window.tronWeb) {
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) {
       setStatus('TronLink no ha expuesto tronWeb todavia.');
       return false;
     }
-    if (tronWalletRpcOrigin() !== tronRpcUrl) {
+    if (!isLegacyTronWalletOnRpc(currentTronWeb, tronRpcUrl)) {
       setStatus(`Cambia TronLink a ${tronNetworkLabel} antes de continuar.`);
       return false;
     }
@@ -554,6 +595,10 @@ function BridgeOperationsClient({
   }
 
   async function approveBridge() {
+    if (!operationsEnabled) {
+      setStatus('El bridge Legacy se encuentra en modo lectura; no se solicitan approvals.');
+      return;
+    }
     if (sourceNetwork === 'BSC') {
       if (!ensureBsc()) return;
       setStatus('Enviando approval del bridge en BSC...');
@@ -586,8 +631,17 @@ function BridgeOperationsClient({
   }
 
   async function startBridge() {
+    if (!operationsEnabled) {
+      setStatus('El bridge Legacy se encuentra en modo lectura; no se envian transacciones.');
+      return;
+    }
     if (!selectedCuki) {
       setStatus('Selecciona un Cukie para enviar al bridge.');
+      return;
+    }
+
+    if (bridgePaused === null) {
+      setStatus('El estado del bridge aún no se ha podido verificar.');
       return;
     }
 
@@ -671,7 +725,7 @@ function BridgeOperationsClient({
               ['Origen', sourceNetwork, Network],
               ['Destino', destinationNetwork, Route],
               ['Coste del bridge', bridgePrice, ArrowRightLeft],
-              ['Estado', bridgePaused ? 'Pausado' : 'Disponible', ShieldAlert],
+              ['Estado', bridgeStatusLabel, ShieldAlert],
             ].map(([label, value, Icon]) => (
               <div
                 key={String(label)}
@@ -726,6 +780,17 @@ function BridgeOperationsClient({
           </Button>
         </aside>
       </section>
+
+      {readOnly && (
+        <div
+          role="status"
+          className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
+        >
+          Contratos Legacy identificados en sus redes existentes. Esta vista
+          permite consultar wallet, estado y movimientos. Las transferencias
+          estarán disponibles cuando finalice la revisión.
+        </div>
+      )}
 
       {!ready && (
         <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
@@ -784,7 +849,7 @@ function BridgeOperationsClient({
                   key={cuki.tokenId}
                   cuki={cuki}
                   selected={selectedCuki?.tokenId === cuki.tokenId}
-                  disabled={!ready}
+                  disabled={!ready || !operationsEnabled}
                   onSelect={() => setSelectedCuki(cuki)}
                 />
               ))
@@ -838,7 +903,7 @@ function BridgeOperationsClient({
           {!approved && (
             <Button
               onClick={() => void approveBridge()}
-              disabled={disabled || !ready}
+              disabled={disabled || !ready || !operationsEnabled}
               variant="outline"
               className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
@@ -852,10 +917,11 @@ function BridgeOperationsClient({
             disabled={
               disabled ||
               !ready ||
+              !operationsEnabled ||
               !selectedCuki ||
               !approved ||
               !destinationOwner ||
-              bridgePaused
+              bridgePaused !== false
             }
             className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
           >

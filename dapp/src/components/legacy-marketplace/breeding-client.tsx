@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Baby,
@@ -28,7 +28,12 @@ import {
   readLegacyBscContract,
 } from '@/lib/legacy-marketplace/bsc';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
+import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import {
+  LEGACY_TRON_MAINNET_RPC_URL,
+  getLegacyTronWeb,
+  getLegacyTronWalletRpcOrigin,
+  isLegacyTronWalletOnRpc,
   readLegacyTronContract,
   sendLegacyTronContract,
 } from '@/lib/legacy-marketplace/tron';
@@ -319,11 +324,20 @@ export function BreedingClient({
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isLoadingBreeds, setIsLoadingBreeds] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const activeBreedsRequestRef = useRef(0);
+  const tronSnapshotRequestRef = useRef(0);
 
   const owner = network === 'BSC' ? address : tronAddress;
+  const tronWeb = getLegacyTronWeb();
+  const tronWalletRpcOrigin = getLegacyTronWalletRpcOrigin(tronWeb);
   const bscReady = network === 'BSC' && isConnected && chainId === 56;
-  const tronReady = network === 'TRON' && isTronConnected;
+  const tronReady =
+    network === 'TRON'
+    && isTronConnected
+    && isLegacyTronWalletOnRpc(tronWeb, LEGACY_TRON_MAINNET_RPC_URL);
   const ready = network === 'BSC' ? bscReady : tronReady;
+  const readEnabled = legacyMarketplaceRuntime.legacyMainnetReadEnabled;
+  const operationsEnabled = legacyMarketplaceRuntime.legacyMainnetOperationsEnabled;
   const parentsSelected = Boolean(
     parent1 && parent2 && !sameToken(parent1, parent2),
   );
@@ -333,8 +347,9 @@ export function BreedingClient({
     abi: legacyMarketplaceBscAbis.breedingPoints,
     functionName: 'getMaxBreedsByCukie',
     query: {
-      enabled: network === 'BSC',
+      enabled: network === 'BSC' && readEnabled,
     },
+    chainId: 56,
   });
   const { data: bscPoints } = useReadContract({
     address: bscPointsAddress,
@@ -342,8 +357,9 @@ export function BreedingClient({
     functionName: 'getPoints',
     args: address ? [address] : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(address),
+      enabled: network === 'BSC' && readEnabled && Boolean(address),
     },
+    chainId: 56,
   });
   const { data: bscApproved } = useReadContract({
     address: bscTokenAddress,
@@ -351,8 +367,9 @@ export function BreedingClient({
     functionName: 'isApprovedForAll',
     args: address ? [address, bscBreedingAddress] : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(address),
+      enabled: network === 'BSC' && readEnabled && Boolean(address),
     },
+    chainId: 56,
   });
   const { data: bscCost } = useReadContract({
     address: bscBreedingAddress,
@@ -363,8 +380,9 @@ export function BreedingClient({
         ? [BigInt(parent1.tokenId), BigInt(parent2.tokenId)]
         : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(parent1 && parent2),
+      enabled: network === 'BSC' && readEnabled && Boolean(parent1 && parent2),
     },
+    chainId: 56,
   });
 
   const maxBreeds = useMemo(() => {
@@ -463,7 +481,7 @@ export function BreedingClient({
   }, [address, tronAddress]);
 
   const fetchBscActiveBreeds = useCallback(async () => {
-    if (!address) return [];
+    if (!address || !readEnabled) return [];
 
     const ids =
       (await readLegacyBscContract<readonly bigint[]>(
@@ -488,24 +506,44 @@ export function BreedingClient({
     );
 
     return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
-  }, [address]);
+  }, [address, readEnabled]);
 
   const fetchTronActiveBreeds = useCallback(async () => {
-    if (!tronAddress || !window.tronWeb) return [];
+    const currentTronWeb = getLegacyTronWeb();
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        latestTronWeb?.defaultAddress?.base58 === requestAddress
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+      );
+    };
+    if (!requestAddress || !currentTronWeb) return [];
+    if (tronWalletRpcOrigin !== LEGACY_TRON_MAINNET_RPC_URL) {
+      setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      return [];
+    }
+    if (!isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)) {
+      setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      return [];
+    }
 
     const ids =
       (await readLegacyTronContract<unknown[]>(
-        window.tronWeb,
+        currentTronWeb,
         'breedingPoints',
         'getAllBreedsOwner',
-        [tronAddress],
+        [requestAddress],
       )) ?? [];
+    if (!contextIsCurrent()) return [];
     const breeds = await Promise.all(
       ids.map(async (id) =>
         normalizeBreedTuple(
           id,
           await readLegacyTronContract(
-            window.tronWeb,
+            currentTronWeb,
             'breedingPoints',
             'getBreed',
             [id],
@@ -515,56 +553,105 @@ export function BreedingClient({
       ),
     );
 
+    if (!contextIsCurrent()) return [];
+
     return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
-  }, [tronAddress]);
+  }, [tronAddress, tronWalletRpcOrigin]);
 
   const refreshActiveBreeds = useCallback(async () => {
+    const requestId = activeBreedsRequestRef.current + 1;
+    activeBreedsRequestRef.current = requestId;
+    setActiveBreeds([]);
     setIsLoadingBreeds(true);
     try {
       const breeds =
         network === 'BSC'
           ? await fetchBscActiveBreeds()
           : await fetchTronActiveBreeds();
+      if (requestId !== activeBreedsRequestRef.current) return;
       setActiveBreeds(breeds.filter((breed) => !breed.completed));
     } catch (error) {
+      if (requestId !== activeBreedsRequestRef.current) return;
       setStatus(getErrorMessage(error));
       setActiveBreeds([]);
     } finally {
-      setIsLoadingBreeds(false);
+      if (requestId === activeBreedsRequestRef.current) setIsLoadingBreeds(false);
     }
   }, [fetchBscActiveBreeds, fetchTronActiveBreeds, network]);
 
   const refreshTronSnapshot = useCallback(async () => {
-    if (network !== 'TRON' || !tronAddress || !window.tronWeb) return;
+    const requestId = tronSnapshotRequestRef.current + 1;
+    tronSnapshotRequestRef.current = requestId;
+    const currentTronWeb = getLegacyTronWeb();
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const clearSnapshot = () => {
+      setTronMaxBreeds(null);
+      setTronPoints(null);
+      setTronApproved(null);
+    };
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        requestId === tronSnapshotRequestRef.current
+        && latestTronWeb?.defaultAddress?.base58 === requestAddress
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+      );
+    };
+    if (
+      network !== 'TRON'
+      || !requestAddress
+      || !currentTronWeb
+      || !isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+    ) {
+      clearSnapshot();
+      if (
+        network === 'TRON'
+        && tronAddress
+        && currentTronWeb
+        && tronWalletRpcOrigin !== LEGACY_TRON_MAINNET_RPC_URL
+      ) {
+        setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      }
+      return;
+    }
+    clearSnapshot();
 
     try {
       const [max, userPoints, approval] = await Promise.all([
         readLegacyTronContract<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           'breedingPoints',
           'getMaxBreedsByCukie',
         ),
-        readLegacyTronContract<unknown>(window.tronWeb, 'points', 'getPoints', [
-          tronAddress,
+        readLegacyTronContract<unknown>(currentTronWeb, 'points', 'getPoints', [
+          requestAddress,
         ]),
         readLegacyTronContract<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           'token',
           'isApprovedForAll',
-          [tronAddress, tronBreedingAddress],
+          [requestAddress, tronBreedingAddress],
         ),
       ]);
+      if (!contextIsCurrent()) {
+        return;
+      }
       setTronMaxBreeds(Number(max));
       setTronPoints(formatPoints(String(userPoints)));
       setTronApproved(Boolean(approval));
     } catch (error) {
+      if (!contextIsCurrent()) return;
+      clearSnapshot();
       setStatus(getErrorMessage(error));
     }
-  }, [network, tronAddress]);
+  }, [network, tronAddress, tronWalletRpcOrigin]);
 
   useEffect(() => {
     setParent1(null);
     setParent2(null);
+    setActiveBreeds([]);
     setStatus(null);
   }, [network]);
 
@@ -588,7 +675,8 @@ export function BreedingClient({
   useEffect(() => {
     if (
       network !== 'TRON' ||
-      !window.tronWeb ||
+      !tronWeb ||
+      !isLegacyTronWalletOnRpc(tronWeb, LEGACY_TRON_MAINNET_RPC_URL) ||
       !parent1 ||
       !parent2 ||
       sameToken(parent1, parent2)
@@ -599,13 +687,23 @@ export function BreedingClient({
 
     let cancelled = false;
     readLegacyTronContract<unknown>(
-      window.tronWeb,
+      tronWeb,
       'breedingPoints',
       'getCostPoints',
       [parent1.tokenId, parent2.tokenId],
     )
       .then((value) => {
-        if (!cancelled) setTronCost(formatPoints(String(value)));
+        if (
+          !cancelled
+          && isLegacyTronWalletOnRpc(
+            getLegacyTronWeb(),
+            LEGACY_TRON_MAINNET_RPC_URL,
+          )
+        ) {
+          setTronCost(formatPoints(String(value)));
+        } else if (!cancelled) {
+          setTronCost(null);
+        }
       })
       .catch((error) => {
         if (!cancelled) setStatus(getErrorMessage(error));
@@ -614,10 +712,14 @@ export function BreedingClient({
     return () => {
       cancelled = true;
     };
-  }, [network, parent1, parent2]);
+  }, [network, parent1, parent2, tronWalletRpcOrigin, tronWeb]);
 
   function ensureBsc() {
     if (network !== 'BSC') return false;
+    if (!operationsEnabled) {
+      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
+      return false;
+    }
     if (!isConnected) {
       setStatus('Conecta una wallet EVM desde el header.');
       return false;
@@ -631,6 +733,10 @@ export function BreedingClient({
 
   async function ensureTron() {
     if (network !== 'TRON') return false;
+    if (!operationsEnabled) {
+      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
+      return false;
+    }
     if (!isTronInstalled) {
       setStatus('Instala o activa TronLink para operar breeding en TRON.');
       return false;
@@ -639,8 +745,13 @@ export function BreedingClient({
       await connectTron();
       return false;
     }
-    if (!window.tronWeb) {
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) {
       setStatus('TronLink no ha expuesto tronWeb todavia.');
+      return false;
+    }
+    if (!isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)) {
+      setStatus('Cambia TronLink a TRON Mainnet antes de continuar.');
       return false;
     }
     return true;
@@ -659,11 +770,13 @@ export function BreedingClient({
       return;
     }
 
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    if (!(await ensureTron())) return;
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) return;
     setStatus('Enviando approval de breeding en TRON...');
     try {
       await sendLegacyTronContract(
-        window.tronWeb,
+        currentTronWeb,
         'token',
         'setApprovalForAll',
         [tronBreedingAddress, true],
@@ -694,11 +807,13 @@ export function BreedingClient({
       return;
     }
 
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    if (!(await ensureTron())) return;
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) return;
     setStatus('Iniciando breeding en TRON...');
     try {
       await sendLegacyTronContract(
-        window.tronWeb,
+        currentTronWeb,
         'breedingPoints',
         'start',
         [parent1.tokenId, parent2.tokenId],
@@ -726,11 +841,13 @@ export function BreedingClient({
       return;
     }
 
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    if (!(await ensureTron())) return;
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) return;
     setStatus('Abriendo Cukie en TRON...');
     try {
       await sendLegacyTronContract(
-        window.tronWeb,
+        currentTronWeb,
         'breedingPoints',
         'breed',
         [breed.id],
@@ -770,10 +887,19 @@ export function BreedingClient({
     setParent2(cuki);
   }
 
-  const disabled = isWriting || isSwitchingChain;
+  const disabled = isWriting || isSwitchingChain || !operationsEnabled;
 
   return (
     <div className="grid gap-6">
+      {readEnabled && !operationsEnabled && (
+        <div
+          role="status"
+          className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
+        >
+          Puedes consultar el estado de tus Crías Legacy. Las acciones para
+          aprobar, iniciar y abrir una cría estarán disponibles cuando finalice la revisión.
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-white/10 bg-black/30 p-3">
         <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
           {(['BSC', 'TRON'] as const).map((item) => (
@@ -851,6 +977,8 @@ export function BreedingClient({
                   ? 'TronLink no está disponible en este navegador.'
                   : !isTronConnected
                   ? 'Conecta TronLink para cargar tus padres en TRON.'
+                  : !tronWeb || !isLegacyTronWalletOnRpc(tronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+                  ? 'Cambia TronLink a TRON Mainnet para cargar tus padres.'
                   : 'La fuente de candidatos TRON no está disponible ahora.'}
               </span>
               <Button onClick={() => void ensureTron()}>
