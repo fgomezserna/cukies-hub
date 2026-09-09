@@ -62,6 +62,8 @@ const mutableVaultConfig = ukiNftVaults as unknown as {
   explorerBaseUrl: string | null;
   ready: { cukieMaster: boolean; cukiePool: boolean };
   mode: { cukieMaster: 'legacy' | 'custodial' | 'invalid'; cukiePool: 'legacy' | 'custodial' | 'invalid' };
+  poolRecoveryVaults: { chainId: 56 | 97; vaultAddress: `0x${string}` }[];
+  poolRecoveryVaultConfigInvalid: boolean;
 };
 
 function masterPosition(owner = walletAddress) {
@@ -117,17 +119,28 @@ function configureConnectedWallet(chainId = 97) {
   } as unknown as ReturnType<typeof useAccount>);
 }
 
-function openRecoveryPanel() {
-  const title = screen.getByText('Recuperación de emergencia');
-  const summary = title.closest('summary');
-  const details = title.closest('details');
+function openRecoveryPanel(kind: 'cukie_master' | 'cukie_pool' = 'cukie_master') {
+  const details = document.getElementById(kind === 'cukie_pool' ? 'pool-recovery' : 'master-recovery');
+  const summary = details?.querySelector('summary');
 
+  expect(details).not.toBeNull();
   expect(summary).not.toBeNull();
-  expect(details).not.toHaveAttribute('open');
-  fireEvent.click(summary as HTMLElement);
+  if (!details?.hasAttribute('open')) fireEvent.click(summary as HTMLElement);
   expect(details).toHaveAttribute('open');
 
   return details as HTMLDetailsElement;
+}
+
+function openPoolLink(
+  tokenId = '8',
+  collection = collectionAddress,
+  recoveryVault = poolVaultAddress,
+) {
+  window.history.replaceState(
+    {},
+    '',
+    `/cukie-hodler/recuperar?tokenId=${tokenId}&collection=${collection}&recoveryVault=${recoveryVault}`,
+  );
 }
 
 describe('NftVaultRecoveryPanel', () => {
@@ -150,6 +163,8 @@ describe('NftVaultRecoveryPanel', () => {
       collectionConfigInvalid: false,
       recoveryCollectionAddresses: [collectionAddress],
       recoveryCollectionConfigInvalid: false,
+      poolRecoveryVaults: [{ chainId: 97, vaultAddress: poolVaultAddress }],
+      poolRecoveryVaultConfigInvalid: false,
       explorerBaseUrl: 'https://testnet.bscscan.com',
       ready: { cukieMaster: true, cukiePool: true },
       mode: { cukieMaster: 'custodial', cukiePool: 'custodial' },
@@ -157,6 +172,7 @@ describe('NftVaultRecoveryPanel', () => {
     configureConnectedWallet();
     mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
     mockUsePathname.mockReturnValue('/cukie-master');
+    window.history.replaceState({}, '', '/cukie-hodler/recuperar');
     mockUseWriteContract.mockReturnValue({
       writeContractAsync,
     } as unknown as ReturnType<typeof useWriteContract>);
@@ -176,10 +192,10 @@ describe('NftVaultRecoveryPanel', () => {
 
     render(<NftVaultRecoveryPanel kind="cukie_master" />);
 
-    const title = screen.getByText('Recuperación de emergencia');
+    const title = screen.getByText('Posición existente');
     expect(title.closest('details')).not.toHaveAttribute('open');
-    expect(screen.getByText(/solo si un Cukie que ya depositaste no aparece/i)).toBeInTheDocument();
-    expect(screen.getByText(/no realizar nuevos depósitos/i)).toBeInTheDocument();
+    expect(screen.getByText(/comprueba el estado de una posición depositada/i)).toBeInTheDocument();
+    expect(screen.getByText(/solicita su salida/i)).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Colección NFT' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Colección NFT')).toHaveTextContent(collectionAddress);
 
@@ -272,11 +288,11 @@ describe('NftVaultRecoveryPanel', () => {
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
     writeContractAsync.mockResolvedValue(transactionHash);
 
+    openPoolLink('8');
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
-    openRecoveryPanel();
-    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '8' } });
+    openRecoveryPanel('cukie_pool');
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar salida' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar retirada' }));
 
     await waitFor(() => expect(screen.getByText(/Salida confirmada en BSC/i)).toBeInTheDocument());
     expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -284,8 +300,95 @@ describe('NftVaultRecoveryPanel', () => {
       functionName: 'requestExit',
       args: [collectionAddress, BigInt(8)],
     }));
-    expect(screen.queryByRole('button', { name: 'Solicitar salida' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Solicitar retirada' })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('falla cerrado en el Pool sin un enlace de posición válido', () => {
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn(),
+      getBlock: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+
+    render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    openRecoveryPanel('cukie_pool');
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/abre esta pantalla desde la ficha del Cukie/i);
+    expect(screen.queryByRole('button', { name: 'Comprobar posición' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Colección NFT' })).not.toBeInTheDocument();
+  });
+
+  it('falla cerrado si el enlace del Pool contiene una colección o vault no permitidos', () => {
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn(),
+      getBlock: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    openPoolLink('13', historicalCollectionAddress, masterVaultAddress);
+
+    render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    openRecoveryPanel('cukie_pool');
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/abre esta pantalla desde la ficha del Cukie/i);
+    expect(screen.queryByRole('button', { name: 'Comprobar posición' })).not.toBeInTheDocument();
+    expect(screen.queryByText(historicalCollectionAddress)).not.toBeInTheDocument();
+  });
+
+  it('consume la colección válida del enlace aunque no sea la primera configurada', async () => {
+    mutableVaultConfig.recoveryCollectionAddresses = [
+      collectionAddress,
+      historicalCollectionAddress,
+    ];
+    const readContract = jest.fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(poolPosition());
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
+      readContract,
+      getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    openPoolLink('14', historicalCollectionAddress, poolVaultAddress);
+
+    render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    openRecoveryPanel('cukie_pool');
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
+
+    expect(await screen.findByText(/Propietario verificado/i)).toBeInTheDocument();
+    expect(readContract).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      functionName: 'collectionAllowed',
+      args: [historicalCollectionAddress],
+    }));
+    expect(readContract).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      functionName: 'positionOf',
+      args: [historicalCollectionAddress, BigInt(14)],
+    }));
+  });
+
+  it('valida un enlace explícito al Pool activo aunque no haya vaults previos configurados', async () => {
+    mutableVaultConfig.poolRecoveryVaults = [];
+    const readContract = jest.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(poolPosition());
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
+      readContract,
+      getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    openPoolLink('15', collectionAddress, poolVaultAddress);
+
+    render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    openRecoveryPanel('cukie_pool');
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
+
+    expect(await screen.findByText(/Propietario verificado/i)).toBeInTheDocument();
+    expect(readContract).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      address: poolVaultAddress,
+      functionName: 'collectionAllowed',
+      args: [collectionAddress],
+    }));
   });
 
   it('retira del Pool solo después de revalidar la madurez contra el último bloque', async () => {
@@ -306,9 +409,9 @@ describe('NftVaultRecoveryPanel', () => {
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
     writeContractAsync.mockResolvedValue(transactionHash);
 
+    openPoolLink('9');
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
-    openRecoveryPanel();
-    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '9' } });
+    openRecoveryPanel('cukie_pool');
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Retirar Cukie' }));
 
@@ -334,9 +437,9 @@ describe('NftVaultRecoveryPanel', () => {
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
 
+    openPoolLink('10');
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
-    openRecoveryPanel();
-    fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '10' } });
+    openRecoveryPanel('cukie_pool');
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
     await screen.findByText(/Retirable desde/i);
@@ -376,7 +479,7 @@ describe('NftVaultRecoveryPanel', () => {
     render(<NftVaultRecoveryPanel kind="cukie_master" />);
     openRecoveryPanel();
 
-    expect(screen.getByText(/identidad pública del vault/i)).toBeInTheDocument();
+    expect(screen.getByText(/no podemos verificar esta posición/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Comprobar posición' })).toBeDisabled();
     expect(writeContractAsync).not.toHaveBeenCalled();
   });

@@ -174,7 +174,7 @@ function dailyGamesCapacity(generation: PoolGeneration, rarity: PoolRarity) {
 function statusLabel(value: PoolPositionStatus) {
   if (value === 'pending') return 'Activándose';
   if (value === 'active') return 'Disponible para partidas';
-  if (value === 'exit_requested') return 'Salida programada';
+  if (value === 'exit_requested') return 'Salida solicitada';
   if (value === 'withdrawable') return 'Listo para retirar';
   return 'Retirado';
 }
@@ -336,7 +336,7 @@ function scheduleSummary(position: CustodialPosition) {
     return {
       label: 'Retirada disponible desde',
       timestamp: position.withdrawableAt,
-      detail: 'El corte ya terminó y puedes recuperar el NFT ahora.',
+      detail: 'El corte ya terminó y puedes retirar el NFT ahora.',
     };
   }
   return {
@@ -351,6 +351,12 @@ function PositionSchedule({ position }: { position: CustodialPosition }) {
   return (
     <div className="mt-4 border-t border-white/10 pt-3">
       <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
+        Depósito registrado
+      </p>
+      <p className="mt-1 text-sm font-bold text-[var(--uki-text)]">
+        {utcLabel(position.depositedAt)} UTC
+      </p>
+      <p className="mt-3 text-[11px] font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
         {schedule.label}
       </p>
       <p className="mt-1 font-headline text-base font-black text-[var(--uki-cream)]">
@@ -1209,7 +1215,7 @@ export function CukiePoolStatusPanel() {
                     Tus Cukies en el pool
                   </h3>
                   <p className="mt-1 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                    Cada estado te indica si el Cukie puede entrar en partidas y cuándo puedes recuperarlo.
+                    Cada estado te indica si el Cukie puede entrar en partidas y cuándo puedes retirarlo.
                   </p>
                 </div>
                 <span className="shrink-0 text-xs font-bold text-[var(--uki-muted)]">
@@ -1336,20 +1342,6 @@ export function CukiePoolStatusPanel() {
                 </div>
               )}
             </div>
-
-            {(ukiNftVaults.poolRecoveryVaults?.length ?? 0) > 0 ? (
-              <div className="border-t border-white/10 pt-5 text-sm font-semibold text-[var(--uki-muted)]">
-                Los Cukies que siguen en un vault Pool anterior no se cuentan como disponibles.{' '}
-                <Link href="/cukies" className="font-black text-[var(--uki-lilac)] hover:underline">
-                  Verlos en Mis Cukies
-                </Link>{' '}
-                o{' '}
-                <Link href="/cukie-hodler/recuperar#pool-recovery" className="font-black text-[var(--uki-lilac)] hover:underline">
-                  abrir la herramienta de recuperación
-                </Link>
-                {' '}para consultar sus fechas de salida.
-              </div>
-            ) : null}
 
           </div>
         ) : null}

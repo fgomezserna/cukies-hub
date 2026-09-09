@@ -175,10 +175,66 @@ describe('MyCukiesPanel', () => {
     render(<MyCukiesPanel />);
 
     expect(await screen.findByRole('heading', { name: 'Cukie #98000001' })).toBeInTheDocument();
-    expect(screen.getAllByText('Vault anterior · salida pendiente')).not.toHaveLength(0);
-    expect(screen.getByRole('link', { name: /Gestionar recuperación/i })).toHaveAttribute(
+    expect(screen.getAllByText('Estado pendiente de confirmar')).not.toHaveLength(0);
+    expect(screen.queryByText('Retirada disponible')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Consultar posición/i })).toHaveAttribute(
       'href',
       '/cukie-hodler/recuperar?tokenId=98000001&recoveryVault=0x4444444444444444444444444444444444444444&collection=0x3333333333333333333333333333333333333333#pool-recovery',
     );
+  });
+
+  it('muestra un depósito previo sin solicitud como posición en el Pool', async () => {
+    fetchMock.mockResolvedValue(response([item({
+      tokenId: '98000004',
+      assetId: '97:0x3333333333333333333333333333333333333333:98000004',
+      state: 'in_pool',
+      custody: 'cukie_pool_recovery',
+      recoveryExitRequestedAt: '0',
+      recoveryWithdrawableAt: '0',
+      availableActions: [],
+    })]));
+
+    render(<MyCukiesPanel />);
+
+    expect((await screen.findAllByText('En el Pool')).length).toBeGreaterThan(0);
+    expect(screen.getByText('Puedes solicitar la retirada de este Cukie cuando quieras.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Solicitar retirada' })).toBeInTheDocument();
+  });
+
+  it('distingue una salida solicitada y muestra la fecha verificable', async () => {
+    const withdrawableAt = String(Math.floor(Date.now() / 1_000) + 86_400);
+    fetchMock.mockResolvedValue(response([item({
+      tokenId: '98000002',
+      assetId: '97:0x3333333333333333333333333333333333333333:98000002',
+      state: 'in_pool',
+      custody: 'cukie_pool_recovery',
+      recoveryExitRequestedAt: String(Math.floor(Date.now() / 1_000) - 120),
+      recoveryWithdrawableAt: withdrawableAt,
+      availableActions: [],
+    })]));
+
+    render(<MyCukiesPanel />);
+
+    expect((await screen.findAllByText('Salida solicitada')).length).toBeGreaterThan(0);
+    expect(screen.getByText(/La retirada estará disponible desde/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver retirada' })).toBeInTheDocument();
+  });
+
+  it('solo marca la retirada disponible cuando hay solicitud y fecha ya vencida', async () => {
+    fetchMock.mockResolvedValue(response([item({
+      tokenId: '98000003',
+      assetId: '97:0x3333333333333333333333333333333333333333:98000003',
+      state: 'in_pool',
+      custody: 'cukie_pool_recovery',
+      recoveryExitRequestedAt: String(Math.floor(Date.now() / 1_000) - 86_400),
+      recoveryWithdrawableAt: String(Math.floor(Date.now() / 1_000) - 3_600),
+      availableActions: [],
+    })]));
+
+    render(<MyCukiesPanel />);
+
+    expect((await screen.findAllByText('Retirada disponible')).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Puedes retirarlo desde/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Retirar Cukie' })).toBeInTheDocument();
   });
 });
