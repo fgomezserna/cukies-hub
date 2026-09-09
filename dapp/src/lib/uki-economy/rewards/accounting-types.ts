@@ -43,10 +43,19 @@ export type DailyRewardAccounting = {
   priorReservedUndistributed: UndistributedSplit;
   destinations: UndistributedDestinations;
   allocations: RewardAccountingAllocation[];
+  ambassadorSnapshots?: RewardAccountingAmbassadorSnapshot[];
   conservationRaw: string;
   payloadHash: string;
   status: "sealed";
   sealedAt: Date;
+};
+
+export type RewardAccountingAmbassadorSnapshot = {
+  participantWallet: string;
+  ambassadorWallet: string | null;
+  commissionEligible: boolean;
+  capturedAt: Date;
+  evidenceHash: string | null;
 };
 
 export type RewardDailyCapacityMaterialization = {
@@ -105,6 +114,9 @@ export type RewardAccountingParticipant = {
   walletNormalized: string;
   units: number;
   ambassadorWalletNormalized: string | null;
+  ambassadorCommissionEligible?: boolean;
+  ambassadorCapturedAt?: Date;
+  ambassadorEvidenceHash?: string | null;
 };
 
 export type CukieRewardAccountingParticipant = RewardAccountingParticipant & {
@@ -163,6 +175,7 @@ export type WeeklyGameResult = {
     source: "own" | "pool";
     reservationId: string;
     evidenceHash: string;
+    policyVersion?: "ambassador-lifecycle-v2";
   };
   cukieSnapshot: {
     source: "own" | "pool_original" | "pool_second_plus" | "seiku";
@@ -174,6 +187,11 @@ export type WeeklyGameResult = {
     walletNormalized: string | null;
     capturedAt: Date;
     evidenceHash: string;
+    policyVersion?: "ambassador-lifecycle-v2";
+    isCukieMaster?: boolean | null;
+    commissionEligible?: boolean;
+    eligibilityCapturedAt?: Date;
+    eligibilityEvidenceHash?: string;
   };
   arenaRankingSnapshot: {
     rank: number | null;
@@ -295,6 +313,9 @@ export type PoolTrancheAccounting = {
   paymentRaw: string;
   topupRaw: string;
   ambassadorWallet?: string;
+  ambassadorCommissionEligible?: boolean;
+  ambassadorEligibilityCapturedAt?: Date;
+  ambassadorEligibilityEvidenceHash?: string;
   ambassadorCommissionRaw: string;
   ambassadorCommissionSource: "pool_payment_non_recursive";
   fundingRaw: string;

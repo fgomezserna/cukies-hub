@@ -476,17 +476,25 @@ La recompensa por ranking se aplica sobre la parte del jugador que queda despues
 
 ## Embajadores
 
-- Las wallets que compraron en preventa conservan su enlace y su patrocinador
-  historico. Si compraron sin patrocinador, ya no pueden elegir uno, tampoco
-  Cukies World: no se crean relaciones retroactivas.
-- Las demas wallets activan su enlace propio solo despues de confirmar su
-  patrocinador. Los enlaces antiguos emitidos sin compra ni confirmacion dejan
-  de ser visibles y de aceptar invitados; se conservan perfiles e historial.
+- Decision de producto del 2026-09-09: para invitar y generar nuevas comisiones
+  es necesario ser Cukie Master y tener patrocinador asignado. Perder el rol
+  desactiva el enlace y las nuevas comisiones, pero conserva codigo, referidos
+  e historial. Recuperarlo reactiva el mismo enlace; no recupera comisiones
+  correspondientes al tiempo sin el rol.
+- Las wallets de preventa conservan sus referidos y su patrocinador historico.
+  Sin Cukie Master pueden consultar sus referidos, pero no invitar ni generar
+  nuevas comisiones. Haber comprado en preventa no sustituye ese requisito.
+- Los participantes de preventa sin patrocinador quedan asignados a Cukies
+  World y no pueden elegir otro por autoservicio. Esta asignacion no recalcula
+  premios historicos ni crea comisiones retroactivas.
 - Conectar, firmar el login o navegar no confirma ni descarta un patrocinador.
   La invitacion pendiente se conserva en la pestaña hasta la confirmacion.
 - En `/embajadores/[codigo]` se propone la wallet invitadora; sin invitacion se
   propone Cukies World. Una invitacion invalida no se sustituye silenciosamente
   por Cukies World.
+- Un usuario nuevo sin patrocinador solo ve la confirmacion al entrar en
+  Embajadores. Tras confirmarla accede a estadisticas y referidos; su enlace
+  aparece solo si cumple el requisito Cukie Master.
 - Confirmar requiere consentimiento y una firma especifica de la wallet, sin
   transaccion ni gas. La firma vincula wallet, patrocinador, sesion, dominio,
   red y un reto de cinco minutos. La sesion firmada de login no la sustituye.
@@ -494,12 +502,45 @@ La recompensa por ranking se aplica sobre la parte del jugador que queda despues
   `AMBASSADOR_DEFAULT_WALLET_ADDRESS`. Su wallet raiz puede invitar sin
   patrocinador propio y no puede elegir uno. Staging usa una wallet de pruebas;
   produccion debe configurar expresamente tesoreria, sin fallback testnet.
-- La atribucion es directa, de un solo nivel e inmutable. No se permiten
+- La atribucion es directa, de un solo nivel e inmutable por autoservicio.
+  Administracion puede asignar o corregir patrocinadores con identidad
+  autorizada, motivo y trazabilidad; las correcciones no recalculan pagos
+  historicos. No se permiten
   autorreferencias ni ciclos de ninguna longitud, ni siquiera al recorrer una
   wallet raiz con historial previo. Las escrituras se serializan en Mongo.
 - La fecha `acceptedAt` delimita la atribucion economica: solo genera comisiones
   por premios elegibles posteriores. El 5% corresponde al patrocinador confirmado,
-  incluida la wallet configurada de Cukies World en las altas directas.
+  si mantiene el requisito Cukie Master, o a la wallet institucional configurada
+  de Cukies World en las altas directas y preventa sin patrocinador.
+- Cada fuente de premio conserva su patrocinador y su evidencia de elegibilidad.
+  Cambiar de rol o corregir el patrocinador durante un dia no permite aplicar
+  el ultimo estado a todos los premios de ese dia. Las capturas anteriores al
+  hotfix conservan su politica original y los pagos ya generados no se rehacen.
+  En los pools, la elegibilidad se fija al crear la asignacion de su pago;
+  no exige que el beneficiario haya jugado. Una fuente desconocida bloquea
+  la nueva captura o asignacion con un error recuperable, no equivale a una
+  comision cero definitiva.
+  En el cierre de una competicion legacy de preventa, las nuevas asignaciones
+  comprueban el patrocinador y su elegibilidad al crear el primer manifiesto.
+  Los manifiestos ya sellados conservan sus importes y no vuelven a consultar
+  el rol actual para reproducir su resultado.
+- Evolucion posible, fuera de este hotfix: requisitos y porcentajes distintos
+  por rol (por ejemplo 5%/2%) y niveles adicionales sujetos a requisitos
+  (por ejemplo 3% de segundo nivel con cinco Cukie Master directos). Requiere
+  una regla versionada, fecha de vigencia y validacion del presupuesto; los
+  ejemplos no activan porcentajes ni niveles nuevos.
+
+La correccion operativa usa
+`POST /api/economy/v1/internal/ambassadors/sponsor` con HMAC dedicado
+(`AMBASSADOR_ADMIN_HMAC_KEY_ID` y `AMBASSADOR_ADMIN_HMAC_SECRET`, distintos por
+entorno y solo en runtime de `dapp`). El operador usa
+`pnpm --filter dapp exec tsx scripts/ambassadors-admin.ts --help` para consultar
+el comando. Debe indicar wallet referida, nuevo sponsor, sponsor actual esperado
+(`none` solo cuando no existe), motivo e identificador idempotente. La fecha y
+la identidad del operador se fijan en servidor; no se admite backdating. El
+historial se conserva en `ambassador_attribution_overrides` y la atribucion base
+no se sobrescribe. La operacion tambien permite corregir una relacion de
+preventa, sin modificar sus compras ni sus pagos pasados.
 
 ## Treasure Hunt
 

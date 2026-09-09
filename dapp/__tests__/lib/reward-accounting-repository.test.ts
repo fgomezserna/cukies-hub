@@ -103,6 +103,7 @@ describe("Mongo reward accounting repository", () => {
 
   it("conserva al aportante del periodo sin revalidar su estado actual de Cukie Master", async () => {
     const contributor = "0x1111111111111111111111111111111111111111";
+    const observedAt = new Date("2026-08-21T16:00:00.000Z");
     const aggregate = jest.fn((_pipeline: unknown[]) => ({
       toArray: jest.fn(async () => [{ _id: contributor, units: 20 }]),
     }));
@@ -122,10 +123,14 @@ describe("Mongo reward accounting repository", () => {
 
     await expect(repository.listCreditContributors(
       new Date("2026-08-20T14:00:00.000Z"),
+      observedAt,
     )).resolves.toEqual([{
       walletNormalized: contributor,
       units: 20,
       ambassadorWalletNormalized: null,
+      ambassadorCommissionEligible: false,
+      ambassadorCapturedAt: observedAt,
+      ambassadorEvidenceHash: null,
     }]);
 
     const pipeline = aggregate.mock.calls[0]?.[0] as Array<Record<string, unknown>>;
@@ -163,6 +168,15 @@ describe("Mongo reward accounting repository", () => {
         wallet: player,
         ambassadorSnapshot: { walletNormalized: ambassador },
       },
+      {
+        sessionId: "incomplete-v2",
+        wallet: player,
+        ambassadorSnapshot: {
+          walletNormalized: ambassador,
+          policyVersion: "ambassador-lifecycle-v2",
+          commissionEligible: true,
+        },
+      },
     ]);
     const project = jest.fn(() => ({ toArray }));
     const find = jest.fn(() => ({ project }));
@@ -185,7 +199,13 @@ describe("Mongo reward accounting repository", () => {
           walletNormalized: player,
           ambassadorWalletNormalized: ambassador,
         },
+        "game-session:incomplete-v2": {
+          walletNormalized: player,
+          ambassadorWalletNormalized: null,
+        },
       });
+    expect(await repository.listDailyAmbassadorSnapshots(startsAt, endsAt))
+      .not.toHaveProperty("game-session:missing-source");
     expect(find).toHaveBeenCalledWith({
       status: "settled",
       outcome: "completed",

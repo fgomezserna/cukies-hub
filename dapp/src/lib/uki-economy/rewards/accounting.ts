@@ -165,6 +165,7 @@ export function sealDailyRewardAccounting(input: {
   topupRaw?: string;
   priorReservedUndistributedRaw?: string;
   allocations?: RewardAccountingAllocation[];
+  ambassadorSnapshots?: DailyRewardAccounting["ambassadorSnapshots"];
   destinations: UndistributedDestinations;
   sealedAt: Date;
 }): DailyRewardAccounting {
@@ -245,6 +246,9 @@ export function sealDailyRewardAccounting(input: {
     capacityMaterializedRaw, priorReservedInflowRaw, topupRaw,
     emissionRaw, buckets, undistributed, priorReservedUndistributed,
     destinations, allocations, conservationRaw: emissionRaw,
+    ...(input.ambassadorSnapshots && input.ambassadorSnapshots.length > 0
+      ? { ambassadorSnapshots: input.ambassadorSnapshots }
+      : {}),
   };
   return {
     _id: `reward-daily:${dayId}`,
@@ -348,7 +352,7 @@ export function calculateDailyRewardSettlement(input: {
   creditContributors: readonly RewardAccountingParticipant[];
   cukieOriginalParticipants: readonly CukieRewardAccountingParticipant[];
   cukieSecondPlusParticipants: readonly CukieRewardAccountingParticipant[];
-  ambassadorBySource?: Readonly<Record<string, DailyAmbassadorSourceSnapshot>>;
+  ambassadorBySource?: Readonly<Record<string, DailyAmbassadorSourceSnapshot | null>>;
   priorWeekly?: PriorWeeklyPoolTranche;
   sealedAt: Date;
 }) {
@@ -401,6 +405,7 @@ export function calculateDailyRewardSettlement(input: {
   );
 
   const ambassadorByParticipantWallet = new Map<string, string | null>();
+  const ambassadorCommissionEligibleByParticipantWallet = new Map<string, boolean>();
   const addAmbassador = (walletInput: string, ambassadorInput: string | null) => {
     const wallet = validRewardWallet(walletInput);
     const ambassador = ambassadorInput ? validRewardWallet(ambassadorInput) : null;
@@ -415,7 +420,19 @@ export function calculateDailyRewardSettlement(input: {
     ...input.creditContributors,
     ...input.cukieOriginalParticipants,
     ...input.cukieSecondPlusParticipants,
-  ]) addAmbassador(participant.walletNormalized, participant.ambassadorWalletNormalized);
+  ]) {
+    addAmbassador(participant.walletNormalized, participant.ambassadorWalletNormalized);
+    if (participant.ambassadorCommissionEligible !== undefined) {
+      const current = ambassadorCommissionEligibleByParticipantWallet.get(participant.walletNormalized);
+      if (current !== undefined && current !== participant.ambassadorCommissionEligible) {
+        throw new DomainConflictError(`Snapshot de elegibilidad ambassador contradictorio para ${participant.walletNormalized}.`);
+      }
+      ambassadorCommissionEligibleByParticipantWallet.set(
+        participant.walletNormalized,
+        participant.ambassadorCommissionEligible,
+      );
+    }
+  }
 
   const ordinaryCreditByWallet = apportionedByUnits(ordinaryCredit, input.creditContributors);
   const priorCreditByWallet = apportionedByUnits(priorCredit, input.creditContributors);
@@ -516,13 +533,23 @@ export function calculateDailyRewardSettlement(input: {
   let ordinaryCommission = BigInt(0);
   for (const line of input.sourceLines) {
     for (const allocation of line.allocations.filter((entry) => entry.category === "player")) {
-      const snapshot = input.ambassadorBySource?.[line.sourceId];
-      if (!snapshot) {
+      const hasSnapshot = input.ambassadorBySource
+        && Object.prototype.hasOwnProperty.call(input.ambassadorBySource, line.sourceId);
+      const snapshot = hasSnapshot ? input.ambassadorBySource![line.sourceId] : undefined;
+      if (!hasSnapshot) {
         throw new DomainConflictError(
           `Falta el snapshot ambassador de la fuente ${line.sourceId}.`,
         );
       }
       const playerWallet = validRewardWallet(allocation.walletNormalized);
+      append({
+        walletNormalized: playerWallet,
+        category: "player",
+        amountRaw: allocation.amountRaw,
+        fundingMode: "daily_emission",
+        sourceIds: [line.sourceId],
+      });
+      if (!snapshot) continue;
       const snapshotWallet = validRewardWallet(
         snapshot.walletNormalized,
         "ambassadorBySource.walletNormalized",
@@ -541,13 +568,6 @@ export function calculateDailyRewardSettlement(input: {
       if (ambassador === playerWallet) {
         throw new DomainConflictError("La autorreferencia no genera comision.");
       }
-      append({
-        walletNormalized: playerWallet,
-        category: "player",
-        amountRaw: allocation.amountRaw,
-        fundingMode: "daily_emission",
-        sourceIds: [line.sourceId],
-      });
       if (ambassador) {
         const commission = mulDiv(
           canonicalRaw(allocation.amountRaw, "player.amountRaw"),
@@ -585,22 +605,22 @@ export function calculateDailyRewardSettlement(input: {
   appendMap(priorOriginal.byWallet, "cukie_pool_original", "reserved_no_mint", [prior.weeklyAccountingId]);
   appendMap(priorSecond.byWallet, "cukie_pool_second_plus", "reserved_no_mint", [prior.weeklyAccountingId]);
 
-  const ordinaryBeneficiary = new Map<string, bigint>();
+  const ordinaryPoolBeneficiary = new Map<string, bigint>();
   const priorBeneficiary = new Map<string, bigint>();
   const addBeneficiary = (target: Map<string, bigint>, wallet: string, amount: bigint) =>
     target.set(wallet, (target.get(wallet) ?? BigInt(0)) + amount);
   for (const draft of drafts.values()) {
     if (!["credit_pool", "cukie_pool_original", "cukie_pool_second_plus"].includes(draft.category)) continue;
     addBeneficiary(
-      draft.fundingMode === "daily_emission" ? ordinaryBeneficiary : priorBeneficiary,
+      draft.fundingMode === "daily_emission" ? ordinaryPoolBeneficiary : priorBeneficiary,
       draft.walletNormalized,
       parseRawAmount(draft.amountRaw),
     );
   }
   let weeklyCommission = BigInt(0);
-  for (const [wallet, amount] of ordinaryBeneficiary) {
+  for (const [wallet, amount] of ordinaryPoolBeneficiary) {
     const ambassador = ambassadorByParticipantWallet.get(wallet);
-    if (!ambassador) continue;
+    if (!ambassador || ambassadorCommissionEligibleByParticipantWallet.get(wallet) === false) continue;
     const commission = mulDiv(amount, AMBASSADOR_COMMISSION_BPS, BPS);
     ordinaryCommission += commission;
     append({
@@ -613,7 +633,7 @@ export function calculateDailyRewardSettlement(input: {
   }
   for (const [wallet, amount] of priorBeneficiary) {
     const ambassador = ambassadorByParticipantWallet.get(wallet);
-    if (!ambassador) continue;
+    if (!ambassador || ambassadorCommissionEligibleByParticipantWallet.get(wallet) === false) continue;
     const commission = mulDiv(amount, AMBASSADOR_COMMISSION_BPS, BPS);
     weeklyCommission += commission;
     append({
@@ -688,6 +708,20 @@ export function calculateDailyRewardSettlement(input: {
   })).sort((left, right) => compareRewardText(left.allocationId, right.allocationId));
   const priorReservedInflow = priorCredit + priorCukieOriginal + priorCukieSecond
     + priorAmbassadorReserved;
+  const ambassadorSnapshots = [...new Map([
+    ...input.creditContributors,
+    ...input.cukieOriginalParticipants,
+    ...input.cukieSecondPlusParticipants,
+  ].filter((participant) => participant.ambassadorCapturedAt instanceof Date).map((participant) => [
+    participant.walletNormalized,
+    {
+      participantWallet: participant.walletNormalized,
+      ambassadorWallet: participant.ambassadorWalletNormalized,
+      commissionEligible: participant.ambassadorCommissionEligible === true,
+      capturedAt: participant.ambassadorCapturedAt!,
+      evidenceHash: participant.ambassadorEvidenceHash ?? null,
+    },
+  ] as const))].map(([, snapshot]) => snapshot);
   return sealDailyRewardAccounting({
     ...(input.rule.emissionBudget.calendar ? { calendar: input.rule.emissionBudget.calendar } : {}),
     dayId: input.dayId,
@@ -702,6 +736,7 @@ export function calculateDailyRewardSettlement(input: {
     topupRaw: formatRawAmount(topup),
     priorReservedUndistributedRaw: formatRawAmount(priorUndistributed),
     allocations,
+    ambassadorSnapshots,
     destinations: policy.destinations,
     sealedAt: input.sealedAt,
   });
@@ -747,6 +782,25 @@ function canonicalWeeklyResult(source: WeeklyGameResult): WeeklyGameResult | nul
     source.ambassadorSnapshot.capturedAt,
     "ambassadorSnapshot.capturedAt",
   );
+  const ambassadorEligibilityCapturedAt = source.ambassadorSnapshot.eligibilityCapturedAt
+    ? validRewardDate(
+      source.ambassadorSnapshot.eligibilityCapturedAt,
+      "ambassadorSnapshot.eligibilityCapturedAt",
+    )
+    : null;
+  const ambassadorEligibilityEvidenceHash = source.ambassadorSnapshot.eligibilityEvidenceHash
+    ? canonicalEvidenceHash(
+      source.ambassadorSnapshot.eligibilityEvidenceHash,
+      "ambassadorSnapshot.eligibilityEvidenceHash",
+    )
+    : null;
+  if (
+    ambassadorEligibilityCapturedAt
+    && source.ambassadorSnapshot.policyVersion === "ambassador-lifecycle-v2"
+    && ambassadorEligibilityCapturedAt.getTime() > settledAt.getTime()
+  ) {
+    throw new DomainConflictError("La evidencia de elegibilidad ambassador es posterior al settlement.");
+  }
   const arenaRank = source.arenaRankingSnapshot.rank;
   const arenaRewardBps = source.arenaRankingSnapshot.rewardBps;
   const sourceRankingId = source.arenaRankingSnapshot.sourceRankingId;
@@ -763,7 +817,10 @@ function canonicalWeeklyResult(source: WeeklyGameResult): WeeklyGameResult | nul
   }
   if (
     ambassadorWallet === wallet ||
-    ambassadorCapturedAt.getTime() > periodAnchorAt.getTime() ||
+    (source.ambassadorSnapshot.policyVersion !== "ambassador-lifecycle-v2"
+      && ambassadorCapturedAt.getTime() > periodAnchorAt.getTime()) ||
+    (source.ambassadorSnapshot.policyVersion === "ambassador-lifecycle-v2"
+      && ambassadorCapturedAt.getTime() > settledAt.getTime()) ||
     playedAt.getTime() < periodAnchorAt.getTime() ||
     settledAt.getTime() < playedAt.getTime()
   ) {
@@ -796,6 +853,21 @@ function canonicalWeeklyResult(source: WeeklyGameResult): WeeklyGameResult | nul
       walletNormalized: ambassadorWallet,
       capturedAt: ambassadorCapturedAt,
       evidenceHash: canonicalEvidenceHash(source.ambassadorSnapshot.evidenceHash, "ambassadorSnapshot.evidenceHash"),
+      ...(source.ambassadorSnapshot.isCukieMaster === undefined
+        ? {}
+        : { isCukieMaster: source.ambassadorSnapshot.isCukieMaster }),
+      ...(source.ambassadorSnapshot.commissionEligible === undefined
+        ? {}
+        : { commissionEligible: source.ambassadorSnapshot.commissionEligible }),
+      ...(source.ambassadorSnapshot.policyVersion
+        ? { policyVersion: source.ambassadorSnapshot.policyVersion }
+        : {}),
+      ...(ambassadorEligibilityCapturedAt
+        ? { eligibilityCapturedAt: ambassadorEligibilityCapturedAt }
+        : {}),
+      ...(ambassadorEligibilityEvidenceHash
+        ? { eligibilityEvidenceHash: ambassadorEligibilityEvidenceHash }
+        : {}),
     },
     arenaRankingSnapshot: {
       rank: arenaRank,
@@ -1094,7 +1166,18 @@ export function calculateWeeklyPrize(input: {
     });
   const ambassadorPayouts = winners.flatMap((winner) => {
     const ambassadorWallet = winner.sourceSnapshot.ambassadorSnapshot.walletNormalized;
-    if (!ambassadorWallet || ambassadorWallet === winner.walletNormalized) return [];
+    if (
+      !ambassadorWallet
+      || ambassadorWallet === winner.walletNormalized
+      || (
+        winner.sourceSnapshot.ambassadorSnapshot.policyVersion === "ambassador-lifecycle-v2"
+        && (
+          (winner.sourceSnapshot.ambassadorSnapshot.commissionEligible !== true
+            && winner.sourceSnapshot.ambassadorSnapshot.isCukieMaster !== true)
+          || !winner.sourceSnapshot.ambassadorSnapshot.eligibilityEvidenceHash
+        )
+      )
+    ) return [];
     return [{
       ambassadorWallet,
       playerWallet: winner.walletNormalized,
@@ -1399,6 +1482,9 @@ export function calculatePoolTranche(input: {
   tranche: number;
   participantWallet: string;
   ambassadorWallet?: string;
+  ambassadorCommissionEligible?: boolean;
+  ambassadorEligibilityCapturedAt?: Date;
+  ambassadorEligibilityEvidenceHash?: string;
   credits: number;
   ordinaryRaw: string;
   priorPeriodRaw: string;
@@ -1435,7 +1521,9 @@ export function calculatePoolTranche(input: {
     : BigInt(0);
   const payment = base > guaranteed ? base : guaranteed;
   const topup = payment - base;
-  const commission = ambassadorWallet ? mulDiv(payment, AMBASSADOR_COMMISSION_BPS, BPS) : BigInt(0);
+  const commission = ambassadorWallet && input.ambassadorCommissionEligible !== false
+    ? mulDiv(payment, AMBASSADOR_COMMISSION_BPS, BPS)
+    : BigInt(0);
   const payload = {
     periodId: validRewardText(input.periodId, "periodId"),
     ruleVersion: input.rule.version,
@@ -1452,6 +1540,15 @@ export function calculatePoolTranche(input: {
     paymentRaw: formatRawAmount(payment),
     topupRaw: formatRawAmount(topup),
     ...(ambassadorWallet ? { ambassadorWallet } : {}),
+    ...(ambassadorWallet && input.ambassadorCommissionEligible !== undefined
+      ? { ambassadorCommissionEligible: input.ambassadorCommissionEligible }
+      : {}),
+    ...(input.ambassadorEligibilityCapturedAt
+      ? { ambassadorEligibilityCapturedAt: validRewardDate(input.ambassadorEligibilityCapturedAt, "ambassadorEligibilityCapturedAt") }
+      : {}),
+    ...(input.ambassadorEligibilityEvidenceHash
+      ? { ambassadorEligibilityEvidenceHash: canonicalEvidenceHash(input.ambassadorEligibilityEvidenceHash, "ambassadorEligibilityEvidenceHash") }
+      : {}),
     ambassadorCommissionRaw: formatRawAmount(commission),
     ambassadorCommissionSource: "pool_payment_non_recursive" as const,
     fundingRaw: formatRawAmount(payment + commission),

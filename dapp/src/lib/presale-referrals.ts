@@ -80,6 +80,21 @@ function hasPurchasedEnoughToUnlockReferralLink(totalUkiPurchased: number, minim
   return totalUkiPurchased > 0;
 }
 
+/**
+ * Legacy presale rows remain readable, but a current link requires the same
+ * Cukie Master and confirmed-sponsor gate as the canonical ambassador flow.
+ * Keep this import dynamic: the enrollment service itself resolves eligibility.
+ */
+async function canIssuePresaleReferralLink(db: Db, walletNormalized: string, now = new Date()) {
+  try {
+    const { getMongoAmbassadorEnrollment } = await import('./uki-economy/ambassadors/repository');
+    const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, now);
+    return enrollment.canInvite;
+  } catch {
+    return false;
+  }
+}
+
 async function readOnChainPresalePurchaseTotalsSafely(walletAddress: string) {
   try {
     return await readOnChainPresalePurchaseTotals(walletAddress);
@@ -128,6 +143,7 @@ export function toPublicPresaleParticipantStatus(
   campaignConfig: Awaited<ReturnType<typeof getCampaignConfig>>,
   referralLevelCounts: ReferralLevelCounts,
   origin?: string | null,
+  canInvite = false,
 ) {
   const normalizedWalletAddress = String(participant.normalizedWalletAddress);
   const referralCode =
@@ -154,7 +170,10 @@ export function toPublicPresaleParticipantStatus(
     referralUnlockedAt: participant.referralUnlockedAt ?? null,
     referralMinimumUkiSnapshot: participant.referralMinimumUkiSnapshot ?? null,
     referralCode: isUnlocked ? referralCode : null,
-    referralLink: isUnlocked && origin ? `${origin}/ref/${referralCode}` : null,
+    // Keep the stable code and historical score available for recovery. A
+    // link is a new capability and is emitted only while the current gate is
+    // satisfied.
+    referralLink: isUnlocked && canInvite && origin ? `${origin}/ref/${referralCode}` : null,
     pendingSponsorCode: participant.pendingSponsorCode ?? null,
     pendingSponsorWalletAddress: participant.pendingSponsorWalletAddress ?? null,
     lockedSponsorWalletAddress: participant.lockedSponsorWalletAddress ?? null,
@@ -268,7 +287,21 @@ export async function getPresaleReferralStatus(walletAddress: string, origin?: s
     participant.normalizedWalletAddress,
   );
 
-  return toPublicPresaleParticipantStatus(participant, campaignConfig, referralLevelCounts, origin);
+  const canInvite = await canIssuePresaleReferralLink(
+    db,
+    participant.normalizedWalletAddress,
+  );
+
+  return {
+    ...toPublicPresaleParticipantStatus(
+      participant,
+      campaignConfig,
+      referralLevelCounts,
+      origin,
+      canInvite,
+    ),
+    canInvite,
+  };
 }
 
 export async function applyPresaleReferralCode(walletAddress: string, referralCode: string) {
@@ -292,6 +325,14 @@ export async function applyPresaleReferralCode(walletAddress: string, referralCo
     );
 
   if (!sponsor || !sponsorCanRefer) {
+    return { applied: false, reason: 'invalid_or_locked_code' as const };
+  }
+
+  const sponsorCanIssueNewLinks = await canIssuePresaleReferralLink(
+    db,
+    sponsor.normalizedWalletAddress,
+  );
+  if (!sponsorCanIssueNewLinks) {
     return { applied: false, reason: 'invalid_or_locked_code' as const };
   }
 

@@ -37,20 +37,54 @@ function authValue(overrides: Partial<ReturnType<typeof useAuth>> = {}) {
   };
 }
 
-function dashboardPayload({ presale = true, confirmed = false, configuredDefault = true, legacyProfile = false, walletAddress = wallet, isCukiesWorld = false } = {}) {
+type DashboardPayloadOptions = {
+  presale?: boolean;
+  confirmed?: boolean;
+  configuredDefault?: boolean;
+  legacyProfile?: boolean;
+  walletAddress?: string;
+  isCukiesWorld?: boolean;
+  attributionSource?: 'presale_locked' | 'presale_default' | 'signed_wallet_session' | 'admin_override';
+  isCukieMaster?: boolean | null;
+  hasConfirmedSponsor?: boolean;
+  canInvite?: boolean;
+  eligibilityReason?: string | null;
+};
+
+function dashboardPayload(options: DashboardPayloadOptions = {}) {
+  const {
+    presale = true,
+    confirmed = false,
+    configuredDefault = true,
+    legacyProfile = false,
+    walletAddress = wallet,
+    isCukiesWorld = false,
+    attributionSource = 'signed_wallet_session',
+    isCukieMaster = null,
+    hasConfirmedSponsor = confirmed || presale,
+    canInvite = presale || confirmed,
+    eligibilityReason = null,
+  } = options;
   return {
     status: 'ok',
     policy: { version: 'ambassador-direct-v1', commissionBps: 500, levels: 1 },
     dashboard: {
       walletNormalized: walletAddress,
       profile: presale || confirmed || legacyProfile ? { invitationCode: 'cw-123456789abc' } : null,
-      enrollment: { isPresaleParticipant: presale, canChooseSponsor: !presale && !confirmed, canInvite: presale || confirmed },
+      enrollment: {
+        isPresaleParticipant: presale,
+        isCukieMaster,
+        hasConfirmedSponsor,
+        eligibilityReason,
+        canChooseSponsor: !presale && !confirmed,
+        canInvite,
+      },
       defaultAmbassador: configuredDefault ? { ambassadorWalletMasked: '0x5555…5555' } : null,
       ownAttribution: confirmed ? {
         attributionId: 'ambassador-attribution:confirmed-wallet',
         ambassadorWalletMasked: isCukiesWorld ? '0x5555…5555' : '0x2222…2222',
         isCukiesWorld,
-        source: 'signed_wallet_session',
+        source: attributionSource,
         acceptedAt: '2026-09-07T12:00:00.000Z',
         commissionBps: 500,
         levels: 1,
@@ -178,6 +212,8 @@ describe('AmbassadorProgram', () => {
     expect(screen.queryByRole('button', { name: 'Copiar enlace' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Compartir' })).not.toBeInTheDocument();
     expect(screen.queryByText(/localhost\/embajadores/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Lo que ya has generado')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cómo funciona')).not.toBeInTheDocument();
     expect(attributionCalls()).toHaveLength(0);
   });
 
@@ -211,6 +247,46 @@ describe('AmbassadorProgram', () => {
     render(<AmbassadorProgram />);
     expect(await screen.findByText('Ahora no podemos ofrecerte un embajador. Puedes seguir navegando y volver a intentarlo más adelante.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar embajador' })).not.toBeInTheDocument();
+  });
+
+  it('mantiene el gate aunque la wallet sea Cukie Master sin sponsor confirmado', async () => {
+    payload = dashboardPayload({ presale: false, configuredDefault: true, isCukieMaster: true, hasConfirmedSponsor: false });
+    render(<AmbassadorProgram />);
+    expect(await screen.findByText('Confirmación de embajador pendiente')).toBeInTheDocument();
+    expect(screen.queryByText('Lo que ya has generado')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copiar enlace' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Cómo funciona')).not.toBeInTheDocument();
+  });
+
+  it('conserva referidos e historial al perder Cukie Master y ofrece reactivar el mismo enlace', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: true, isCukieMaster: false, canInvite: false });
+    render(<AmbassadorProgram />);
+    expect(await screen.findByText('Tus invitados')).toBeInTheDocument();
+    expect(screen.getByText('0x3333…3333')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copiar enlace' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/localhost\/embajadores/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Activar Cukie Master/ })).toHaveAttribute('href', '/cukie-master');
+    expect(screen.getByText(/Tus referidos, tu código y el historial de comisiones se conservan/)).toBeInTheDocument();
+    expect(screen.queryByText('Confirmación de embajador pendiente')).not.toBeInTheDocument();
+  });
+
+  it('trata la elegibilidad desconocida como estado recuperable y no como pérdida del rol', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: true, isCukieMaster: null, hasConfirmedSponsor: true, canInvite: false, eligibilityReason: 'UNKNOWN' });
+    render(<AmbassadorProgram />);
+    expect(await screen.findByText('Tus invitados')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copiar enlace' })).not.toBeInTheDocument();
+    expect(screen.getByText(/No se puede comprobar ahora si cumples el requisito Cukie Master/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reintentar/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Activa Cukie Master para volver/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/5%/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Confirmación de embajador pendiente')).not.toBeInTheDocument();
+  });
+
+  it('etiqueta un override administrativo sin presentarlo como firma de wallet', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: true, attributionSource: 'admin_override' });
+    render(<AmbassadorProgram />);
+    expect(await screen.findByText('Asignado por administración')).toBeInTheDocument();
+    expect(screen.queryByText('Confirmado con tu wallet')).not.toBeInTheDocument();
   });
 
   it('conserva la invitación al conectar la wallet y al volver después de navegar', async () => {
