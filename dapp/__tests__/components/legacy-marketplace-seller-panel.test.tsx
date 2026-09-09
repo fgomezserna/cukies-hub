@@ -1,10 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { LegacyMarketplaceSellerPanel } from '@/components/legacy-marketplace/seller-panel';
-import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
+import type {
+  LegacyMarketplaceCukiItem,
+  LegacyMarketplaceListResponse,
+} from '@/lib/legacy-marketplace/types';
 
+let mockBscAddress = '0x00000000000000000000000000000000000000aa';
 jest.mock('wagmi', () => ({
-  useAccount: () => ({ address: '0x00000000000000000000000000000000000000aa' }),
+  useAccount: () => ({ address: mockBscAddress }),
 }));
 jest.mock('@/hooks/use-tronlink', () => ({
   useTronLink: () => ({ address: null, connect: jest.fn(), isInstalled: false }),
@@ -50,7 +54,11 @@ function item(tokenId: string): LegacyMarketplaceCukiItem {
   };
 }
 
-function response(items: LegacyMarketplaceCukiItem[], offset: number, total: number) {
+function response(
+  items: LegacyMarketplaceCukiItem[],
+  offset: number,
+  total: number,
+): LegacyMarketplaceListResponse {
   return {
     source: 'mongo',
     items,
@@ -65,6 +73,7 @@ describe('inventario de venta Legacy', () => {
   const fetchMock = jest.fn();
 
   beforeEach(() => {
+    mockBscAddress = '0x00000000000000000000000000000000000000aa';
     global.fetch = fetchMock as never;
   });
 
@@ -105,5 +114,41 @@ describe('inventario de venta Legacy', () => {
       'No se pudo consultar tu inventario Legacy',
     );
     expect(screen.queryByText(/No hay Cukies Legacy disponibles/)).not.toBeInTheDocument();
+  });
+
+  it('descarta una página tardía si la wallet cambia durante cargar más', async () => {
+    let releaseOldPage: ((value: { ok: true; json: () => Promise<LegacyMarketplaceListResponse> }) => void) | undefined;
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => response(
+          Array.from({ length: 60 }, (_, index) => item(String(index + 1))),
+          0,
+          61,
+        ),
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        releaseOldPage = resolve;
+      }))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => response([item('101')], 0, 1),
+      });
+
+    const { rerender } = render(<LegacyMarketplaceSellerPanel />);
+    expect(await screen.findAllByTestId('seller-cuki')).toHaveLength(60);
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más Cukies' }));
+
+    mockBscAddress = '0x00000000000000000000000000000000000000bb';
+    rerender(<LegacyMarketplaceSellerPanel />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(await screen.findByText('101')).toBeInTheDocument();
+
+    releaseOldPage?.({
+      ok: true,
+      json: async () => response([item('61')], 60, 61),
+    });
+    await waitFor(() => expect(screen.queryByText('61')).not.toBeInTheDocument());
+    expect(screen.getAllByTestId('seller-cuki')).toHaveLength(1);
   });
 });

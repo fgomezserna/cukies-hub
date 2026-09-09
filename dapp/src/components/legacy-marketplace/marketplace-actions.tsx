@@ -26,9 +26,12 @@ import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import {
   assertDisplayedPriceUnchanged,
   assertEvmActionContext,
+  assertTronActionContext,
+  captureTronActionContext,
   isSameEvmWallet,
   isSameTronWallet,
   reconcileConfirmedMarketplaceAction,
+  type LegacyTronActionContext,
 } from '@/lib/legacy-marketplace/action-safety';
 import { getLegacyMarketplaceCollection } from '@/lib/legacy-marketplace/identity';
 import {
@@ -460,38 +463,37 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     return true;
   }
 
-  async function inspectTron() {
-    if (!window.tronWeb || !tronAddress) throw new Error('TRON_NOT_READY');
+  async function inspectTron(actionAddress: string) {
+    if (!window.tronWeb) throw new Error('TRON_NOT_READY');
     const [paused, owner, listing, approved] = await Promise.all([
       readLegacyTronContract(window.tronWeb, 'marketplace', 'paused'),
       readLegacyTronContract(window.tronWeb, 'token', 'ownerOf', [cuki.tokenId]),
       readLegacyTronContract(window.tronWeb, 'marketplace', 'marketTokens', [cuki.tokenId]),
       readLegacyTronContract(window.tronWeb, 'token', 'isApprovedForAll', [
-        tronAddress,
+        actionAddress,
         tronMarketplaceAddress,
       ]),
     ]);
-    const currentAddress = window.tronWeb.defaultAddress?.base58
-      ?? window.tronWeb.defaultAddress?.hex
-      ?? '';
     return {
       paused: contractBoolean(paused),
       owner: String(owner),
       approved: contractBoolean(approved),
       listingOwner: String(contractField(listing, 'owner', 0) ?? ''),
-      connectedOwner: currentAddress,
       price: contractInteger(contractField(listing, 'price', 1)),
       isOnSale: contractBoolean(contractField(listing, 'isOnSale', 3)),
     };
   }
 
-  function assertCurrentTronContext(expectedAddress: string) {
-    if (!window.tronWeb) throw new Error('WALLET_CONTEXT_CHANGED');
-    const currentAddress = window.tronWeb.defaultAddress?.base58
-      ?? window.tronWeb.defaultAddress?.hex
-      ?? null;
-    if (!isSameTronWallet(window.tronWeb, expectedAddress, currentAddress)) {
-      throw new Error('WALLET_CONTEXT_CHANGED');
+  function captureCurrentTronContext(): LegacyTronActionContext | null {
+    if (!window.tronWeb) return null;
+    try {
+      return captureTronActionContext(
+        window.tronWeb,
+        legacyMarketplaceContracts.tron.rpcUrl,
+      );
+    } catch (error) {
+      setStatus(getErrorMessage(error));
+      return null;
     }
   }
 
@@ -524,21 +526,22 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   async function approveTron() {
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    const actionContext = captureCurrentTronContext();
+    if (!(await ensureTron()) || !window.tronWeb || !actionContext) return;
     await runTronAction(
       async () => {
-        const live = await inspectTron();
-        if (!window.tronWeb || !isSameTronWallet(window.tronWeb, live.owner, live.connectedOwner)) {
+        const live = await inspectTron(actionContext.address);
+        if (!window.tronWeb || !isSameTronWallet(window.tronWeb, live.owner, actionContext.address)) {
           throw new Error('NOT_OWNER');
         }
         if (live.approved) throw new Error('ALREADY_APPROVED');
-        assertCurrentTronContext(live.connectedOwner);
         return sendLegacyTronContract(
           window.tronWeb,
           'token',
           'setApprovalForAll',
           [tronMarketplaceAddress, true],
           { feeLimit: 800_000_000, shouldPollResponse: true },
+          () => assertTronActionContext(window.tronWeb!, actionContext),
         );
       },
       'Validando propiedad y permiso en TRON Mainnet…',
@@ -546,19 +549,19 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   async function buyTron() {
-    if (!(await ensureTron()) || !window.tronWeb || !cuki.priceOriginal) return;
+    const actionContext = captureCurrentTronContext();
+    if (!(await ensureTron()) || !window.tronWeb || !cuki.priceOriginal || !actionContext) return;
     await runTronAction(
       async () => {
-        const live = await inspectTron();
+        const live = await inspectTron(actionContext.address);
         if (live.paused || !live.isOnSale || live.price <= BigInt(0)) {
           throw new Error('LISTING_NOT_ACTIVE');
         }
         if (!window.tronWeb) throw new Error('TRON_NOT_READY');
-        if (isSameTronWallet(window.tronWeb, live.listingOwner, live.connectedOwner)) {
+        if (isSameTronWallet(window.tronWeb, live.listingOwner, actionContext.address)) {
           throw new Error('OWNER_CANNOT_BUY');
         }
         assertDisplayedPriceUnchanged(cuki.priceOriginal, live.price);
-        assertCurrentTronContext(live.connectedOwner);
         return sendLegacyTronContract(
           window.tronWeb,
           'marketplace',
@@ -569,6 +572,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             feeLimit: 800_000_000,
             shouldPollResponse: true,
           },
+          () => assertTronActionContext(window.tronWeb!, actionContext),
         );
       },
       'Validando anuncio, propietario y precio en TRON Mainnet…',
@@ -576,26 +580,27 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   async function sellTron() {
-    if (!(await ensureTron()) || !window.tronWeb || !sellPrice) return;
+    const actionContext = captureCurrentTronContext();
+    if (!(await ensureTron()) || !window.tronWeb || !sellPrice || !actionContext) return;
     await runTronAction(
       async () => {
-        const live = await inspectTron();
+        const live = await inspectTron(actionContext.address);
         if (
           !window.tronWeb
           || live.paused
           || live.isOnSale
-          || !isSameTronWallet(window.tronWeb, live.owner, live.connectedOwner)
+          || !isSameTronWallet(window.tronWeb, live.owner, actionContext.address)
         ) {
           throw new Error('TOKEN_NOT_SELLABLE');
         }
         if (!live.approved) throw new Error('APPROVAL_REQUIRED');
-        assertCurrentTronContext(live.connectedOwner);
         return sendLegacyTronContract(
           window.tronWeb,
           'marketplace',
           'putTokenOnSale',
           [cuki.tokenId, parsedTronPrice()],
           { feeLimit: 800_000_000, shouldPollResponse: true },
+          () => assertTronActionContext(window.tronWeb!, actionContext),
         );
       },
       'Validando propiedad, permiso y estado en TRON Mainnet…',
@@ -603,18 +608,18 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   async function cancelTronSale() {
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    const actionContext = captureCurrentTronContext();
+    if (!(await ensureTron()) || !window.tronWeb || !actionContext) return;
     await runTronAction(async () => {
-      const live = await inspectTron();
+      const live = await inspectTron(actionContext.address);
       if (
         !window.tronWeb
         || live.paused
         || !live.isOnSale
-        || !isSameTronWallet(window.tronWeb, live.listingOwner, live.connectedOwner)
+        || !isSameTronWallet(window.tronWeb, live.listingOwner, actionContext.address)
       ) {
         throw new Error('LISTING_NOT_OWNED');
       }
-      assertCurrentTronContext(live.connectedOwner);
       const fee = await readLegacyTronContract<unknown>(
         window.tronWeb,
         'marketplace',
@@ -630,23 +635,24 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           feeLimit: 800_000_000,
           shouldPollResponse: true,
         },
+        () => assertTronActionContext(window.tronWeb!, actionContext),
       );
     }, 'Retirando el anuncio...');
   }
 
   async function changeTronPrice() {
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    const actionContext = captureCurrentTronContext();
+    if (!(await ensureTron()) || !window.tronWeb || !actionContext) return;
     await runTronAction(async () => {
-      const live = await inspectTron();
+      const live = await inspectTron(actionContext.address);
       if (
         !window.tronWeb
         || live.paused
         || !live.isOnSale
-        || !isSameTronWallet(window.tronWeb, live.listingOwner, live.connectedOwner)
+        || !isSameTronWallet(window.tronWeb, live.listingOwner, actionContext.address)
       ) {
         throw new Error('LISTING_NOT_OWNED');
       }
-      assertCurrentTronContext(live.connectedOwner);
       const fee = await readLegacyTronContract<unknown>(
         window.tronWeb,
         'marketplace',
@@ -662,6 +668,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           feeLimit: 800_000_000,
           shouldPollResponse: true,
         },
+        () => assertTronActionContext(window.tronWeb!, actionContext),
       );
     }, 'Validando el anuncio antes de cambiar el precio…');
   }

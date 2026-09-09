@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, RefreshCw, Wallet } from 'lucide-react';
 import { useAccount } from 'wagmi';
 
@@ -64,6 +64,8 @@ export function LegacyMarketplaceSellerPanel() {
   const [items, setItems] = useState<LegacyMarketplaceCukiItem[]>([]);
   const [nextPages, setNextPages] = useState<WalletPage[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
+  const loadGenerationRef = useRef(0);
+  const loadMoreControllerRef = useRef<AbortController | null>(null);
   const wallets = useMemo(
     () => [
       ...(address ? [{ address, network: 'BSC' }] : []),
@@ -73,6 +75,10 @@ export function LegacyMarketplaceSellerPanel() {
   );
 
   useEffect(() => {
+    loadGenerationRef.current += 1;
+    const generation = loadGenerationRef.current;
+    loadMoreControllerRef.current?.abort();
+    loadMoreControllerRef.current = null;
     if (wallets.length === 0) {
       setItems([]);
       setNextPages([]);
@@ -88,24 +94,32 @@ export function LegacyMarketplaceSellerPanel() {
       controller.signal,
     )
       .then((result) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
         setItems(result.items);
         setNextPages(result.nextPages);
         setState('ready');
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
         setItems([]);
         setState('unavailable');
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      loadMoreControllerRef.current?.abort();
+    };
   }, [reloadKey, wallets]);
 
   async function loadMore() {
     if (nextPages.length === 0 || state === 'loading') return;
+    const generation = loadGenerationRef.current;
+    loadMoreControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadMoreControllerRef.current = controller;
     setState('loading');
     try {
-      const result = await fetchWalletPages(nextPages);
+      const result = await fetchWalletPages(nextPages, controller.signal);
+      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
       setItems((current) => {
         const byIdentity = new Map(
           [...current, ...result.items].map((item) => [
@@ -118,7 +132,12 @@ export function LegacyMarketplaceSellerPanel() {
       setNextPages(result.nextPages);
       setState('ready');
     } catch {
+      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
       setState('unavailable');
+    } finally {
+      if (loadMoreControllerRef.current === controller) {
+        loadMoreControllerRef.current = null;
+      }
     }
   }
 

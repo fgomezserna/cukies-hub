@@ -1,11 +1,14 @@
 import {
   assertDisplayedPriceUnchanged,
   assertEvmActionContext,
+  assertTronActionContext,
+  captureTronActionContext,
   isSameEvmWallet,
   isSameTronWallet,
   reconcileConfirmedMarketplaceAction,
 } from '@/lib/legacy-marketplace/action-safety';
 import { buildLegacyMarketplaceReconciliation } from '@/lib/legacy-marketplace/reconciliation';
+import { sendLegacyTronContract } from '@/lib/legacy-marketplace/tron';
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
 
 const baseItem: LegacyMarketplaceCukiItem = {
@@ -67,6 +70,55 @@ describe('seguridad de acciones Legacy', () => {
     };
     expect(isSameTronWallet(tronWeb, 'TAbCdEf', 'TAbCdEf')).toBe(true);
     expect(isSameTronWallet(tronWeb, 'TAbCdEf', 'Tabcdef')).toBe(false);
+  });
+
+  it('captura cuenta y red TRON antes de leer y rechaza cualquier cambio posterior', () => {
+    const tronWeb = {
+      address: { toHex: (value: string) => value === 'TOWNER' ? `41${'a'.repeat(40)}` : `41${'b'.repeat(40)}` },
+      contract: jest.fn(),
+      defaultAddress: { base58: 'TOWNER' },
+      fullNode: { host: 'https://api.trongrid.io/' },
+    };
+    const context = captureTronActionContext(tronWeb, 'https://api.trongrid.io');
+    expect(() => assertTronActionContext(tronWeb, context)).not.toThrow();
+
+    tronWeb.defaultAddress.base58 = 'TOTHER';
+    expect(() => assertTronActionContext(tronWeb, context)).toThrow(
+      'WALLET_CONTEXT_CHANGED',
+    );
+    tronWeb.defaultAddress.base58 = 'TOWNER';
+    tronWeb.fullNode.host = 'https://nile.trongrid.io';
+    expect(() => assertTronActionContext(tronWeb, context)).toThrow(
+      'WALLET_CONTEXT_CHANGED',
+    );
+  });
+
+  it('revalida TRON después de esperar el contrato y justo antes de send', async () => {
+    const send = jest.fn().mockResolvedValue('txid');
+    let releaseContract: ((value: Record<string, unknown>) => void) | undefined;
+    const tronWeb = {
+      address: { toHex: () => `41${'a'.repeat(40)}` },
+      defaultAddress: { base58: 'TOWNER' },
+      fullNode: { host: 'https://api.trongrid.io' },
+      contract: jest.fn(() => new Promise<Record<string, unknown>>((resolve) => {
+        releaseContract = resolve;
+      })),
+    };
+    const context = captureTronActionContext(tronWeb, 'https://api.trongrid.io');
+    const action = sendLegacyTronContract(
+      tronWeb,
+      'marketplace',
+      'buyToken',
+      ['1'],
+      { callValue: 1 },
+      () => assertTronActionContext(tronWeb, context),
+    );
+
+    tronWeb.fullNode.host = 'https://nile.trongrid.io';
+    releaseContract?.({ buyToken: () => ({ send }) });
+
+    await expect(action).rejects.toThrow('WALLET_CONTEXT_CHANGED');
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('genera una reconciliación determinista e idempotente para alta y baja', () => {

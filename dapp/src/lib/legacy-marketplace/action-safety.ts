@@ -28,6 +28,51 @@ export function isSameTronWallet(
   return Boolean(canonicalLeft && canonicalRight && canonicalLeft === canonicalRight);
 }
 
+function canonicalTronNodeHost(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export type LegacyTronActionContext = {
+  address: string;
+  nodeHost: string;
+};
+
+export function captureTronActionContext(
+  tronWeb: LegacyTronWebLike,
+  expectedMainnetRpcUrl: string,
+): LegacyTronActionContext {
+  const address = tronWeb.defaultAddress?.base58
+    ?? tronWeb.defaultAddress?.hex
+    ?? '';
+  const nodeHost = canonicalTronNodeHost(tronWeb.fullNode?.host);
+  const expectedHost = canonicalTronNodeHost(expectedMainnetRpcUrl);
+  if (!address || !nodeHost || !expectedHost || nodeHost !== expectedHost) {
+    throw new Error('WALLET_CONTEXT_CHANGED');
+  }
+  return { address, nodeHost };
+}
+
+export function assertTronActionContext(
+  tronWeb: LegacyTronWebLike,
+  expected: LegacyTronActionContext,
+) {
+  const currentAddress = tronWeb.defaultAddress?.base58
+    ?? tronWeb.defaultAddress?.hex
+    ?? null;
+  const currentNodeHost = canonicalTronNodeHost(tronWeb.fullNode?.host);
+  if (
+    !isSameTronWallet(tronWeb, expected.address, currentAddress)
+    || currentNodeHost !== expected.nodeHost
+  ) {
+    throw new Error('WALLET_CONTEXT_CHANGED');
+  }
+}
+
 export function assertDisplayedPriceUnchanged(
   displayedPriceRaw: string | null,
   livePriceRaw: bigint,

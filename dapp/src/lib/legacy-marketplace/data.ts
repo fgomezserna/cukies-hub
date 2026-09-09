@@ -36,8 +36,10 @@ import {
   readLegacyMarketplaceLiveState,
 } from './live-marketplace';
 import {
+  buildLegacyMarketplaceReconciliationCasFilter,
   buildLegacyMarketplaceReconciliation,
   type LegacyMarketplaceReconciliation,
+  type LegacyMarketplaceReconciliationSnapshot,
 } from './reconciliation';
 
 type LegacyCukiDocument = {
@@ -420,12 +422,19 @@ function normalizeCuki(document: LegacyCukiDocument): LegacyMarketplaceCukiItem 
 async function persistLegacyMarketplaceReconciliation(
   collection: Collection<LegacyCukiDocument>,
   reconciliation: LegacyMarketplaceReconciliation,
+  snapshot: LegacyMarketplaceReconciliationSnapshot,
 ) {
   const result = await collection.updateOne(
     {
-      _id: reconciliation.item.tokenId,
-      marketplaceReconciliationFingerprint: { $ne: reconciliation.fingerprint },
-    },
+      $and: [
+        buildLegacyMarketplaceReconciliationCasFilter(snapshot),
+        {
+          marketplaceReconciliationFingerprint: {
+            $ne: reconciliation.fingerprint,
+          },
+        },
+      ],
+    } as Filter<LegacyCukiDocument>,
     {
       $set: {
         user: reconciliation.item.owner,
@@ -459,51 +468,16 @@ export async function reconcileLegacyMarketplaceCuki(
   const changed = await persistLegacyMarketplaceReconciliation(
     collection,
     reconciliation,
+    {
+      tokenId,
+      network: document.network,
+      owner: document.user,
+      state: document.state,
+      priceOriginal: document.priceOriginal,
+      fingerprint: document.marketplaceReconciliationFingerprint,
+    },
   );
   return { ...reconciliation, changed, paused: live.paused };
-}
-
-export async function reconcileLegacyMarketplaceCatalogCandidates(
-  candidates: LegacyMarketplaceCukiItem[],
-  activeItems: LegacyMarketplaceCukiItem[],
-) {
-  if (candidates.length === 0) return;
-  const activeByIdentity = new Map(
-    activeItems.map((item) => [`${item.network}:${item.tokenId}`, item]),
-  );
-  const collection = await getCukiesCollection();
-  const reconciliations = candidates.map((candidate) => {
-    const active = activeByIdentity.get(`${candidate.network}:${candidate.tokenId}`);
-    return buildLegacyMarketplaceReconciliation(candidate, {
-      owner: active?.owner ?? candidate.owner ?? '',
-      isOnSale: Boolean(active),
-      price: active?.price ?? 0,
-      priceOriginal: active?.priceOriginal ?? '0',
-    });
-  });
-  await collection.bulkWrite(
-    reconciliations.map((reconciliation) => ({
-      updateOne: {
-        filter: {
-          _id: reconciliation.item.tokenId,
-          marketplaceReconciliationFingerprint: { $ne: reconciliation.fingerprint },
-        },
-        update: {
-          $set: {
-            user: reconciliation.item.owner,
-            state: reconciliation.item.state,
-            price: reconciliation.item.price,
-            priceOriginal: reconciliation.item.priceOriginal,
-            marketplaceListingStatus: reconciliation.marketplaceListingStatus,
-            marketplaceReconciliationFingerprint: reconciliation.fingerprint,
-            marketplaceReconciledAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-      },
-    })),
-    { ordered: false },
-  );
 }
 
 async function hydrateCukiRelations(

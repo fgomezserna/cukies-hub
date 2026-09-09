@@ -36,7 +36,10 @@ type CatalogResponse = {
       generations: { value: string; count: number }[];
     };
     sources: { legacy: 'ready' | 'unavailable'; uki: 'ready' | 'unavailable' };
-    legacyNetworks: { BSC: 'ready' | 'unavailable'; TRON: 'ready' | 'unavailable' };
+    legacyNetworks: {
+      BSC: 'ready' | 'unavailable' | 'paused';
+      TRON: 'ready' | 'unavailable' | 'paused';
+    };
   };
   code?: string;
 };
@@ -430,6 +433,17 @@ export function MarketplaceClient({
         network !== 'BSC' && (
           <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
             TRON no ha podido verificarse ahora. Se conservan únicamente los anuncios BSC comprobados; no se interpreta como cero anuncios TRON.
+          </div>
+        )}
+      {catalog?.sources.legacy === 'ready' &&
+        (catalog.legacyNetworks?.BSC === 'paused' ||
+          catalog.legacyNetworks?.TRON === 'paused') &&
+        scope !== 'uki' && (
+          <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+            {catalog.legacyNetworks.BSC === 'paused' ? 'BSC' : 'TRON'} está en
+            pausa contractual. Sus anuncios se conservan y no se interpretan
+            como cancelados, pero no se muestran como comprables mientras dure
+            la pausa.
           </div>
         )}
       {isLoading ? (
