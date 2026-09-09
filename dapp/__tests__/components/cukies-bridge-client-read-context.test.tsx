@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(() => ({
@@ -154,6 +154,38 @@ describe('Bridge Legacy: estado y contexto de lecturas', () => {
     expect(screen.getAllByText('1 TRX').length).toBeGreaterThan(0);
   });
 
+  it('limpia el snapshot cargado de A al entrar en B y muestra solo el de B', async () => {
+    let deferB = false;
+    const pending: Array<{ address: string; name: string; resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
+    mockReadTronContractAt.mockImplementation((_web: unknown, _abi: unknown, _address: string, name: string) => {
+      if (!deferB || walletAddress !== 'TB') {
+        return Promise.resolve(
+          name === 'bridgePrice' ? (walletAddress === 'TA' ? '111' : '222') : false,
+        );
+      }
+      return new Promise((resolve, reject) => pending.push({ address: walletAddress, name, resolve, reject }));
+    });
+
+    const view = render(<BridgeClient />);
+    await waitFor(() => expect(screen.getAllByText('0.000111 TRX').length).toBeGreaterThan(0));
+
+    deferB = true;
+    walletAddress = 'TB';
+    setTronWallet(walletAddress);
+    view.rerender(<BridgeClient />);
+    await waitFor(() => expect(pending.filter(({ address }) => address === 'TB')).toHaveLength(3));
+    expect(screen.getAllByText('Sin verificar').length).toBeGreaterThan(0);
+    expect(screen.queryByText('0.000111 TRX')).not.toBeInTheDocument();
+
+    await act(async () => {
+      for (const request of pending.filter(({ address }) => address === 'TB')) {
+        request.resolve(request.name === 'bridgePrice' ? '222' : false);
+      }
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0));
+  });
+
   it('mantiene sin verificar mientras carga B y descarta la respuesta tardía de A', async () => {
     const pending: Array<{ address: string; name: string; resolve: (value: unknown) => void; reject: (error: unknown) => void }> = [];
     mockReadTronContractAt.mockImplementation((_web: unknown, _abi: unknown, _address: string, name: string) => (
@@ -173,9 +205,12 @@ describe('Bridge Legacy: estado y contexto de lecturas', () => {
       request.resolve(request.name === 'bridgePrice' ? '222' : request.name === 'paused' ? false : false);
     }
     await waitFor(() => expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0));
-    for (const request of pending.filter(({ address }) => address === 'TA')) {
-      request.resolve(request.name === 'bridgePrice' ? '111' : request.name === 'paused' ? false : false);
-    }
+    await act(async () => {
+      for (const request of pending.filter(({ address }) => address === 'TA')) {
+        request.resolve(request.name === 'bridgePrice' ? '111' : request.name === 'paused' ? false : false);
+      }
+      await Promise.resolve();
+    });
 
     expect(screen.getAllByText('Disponible').length).toBeGreaterThan(0);
     expect(screen.queryByText('0.000111 TRX')).not.toBeInTheDocument();
@@ -198,11 +233,14 @@ describe('Bridge Legacy: estado y contexto de lecturas', () => {
       request.resolve(request.name === 'bridgePrice' ? '222' : false);
     }
     await waitFor(() => expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0));
-    for (const request of pending.filter(({ address }) => address === 'TA')) {
-      request.reject(new Error('respuesta antigua'));
-    }
+    await act(async () => {
+      for (const request of pending.filter(({ address }) => address === 'TA')) {
+        request.reject(new Error('respuesta antigua'));
+      }
+      await Promise.resolve();
+    });
 
-    await waitFor(() => expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('0.000222 TRX').length).toBeGreaterThan(0);
     expect(screen.queryByText('respuesta antigua')).not.toBeInTheDocument();
   });
 });

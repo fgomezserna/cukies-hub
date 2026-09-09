@@ -30,7 +30,9 @@ de Coolify.
 
 - `pnpm --dir dapp test -- --runInBand __tests__/lib/legacy-marketplace-runtime.test.ts __tests__/lib/cukies-bridge-runtime.test.ts __tests__/components/cukiepoints-client.test.tsx` — 3 suites, 15 tests OK.
 - `pnpm --dir dapp exec jest --runInBand` — suite completa: 236 suites, 1.893 tests OK.
-- Suites focales Legacy/UI: 7 suites, 35 tests OK, incluyendo wallet desconectada/Nile sin estado verificado, mainnet válida y respuestas tardías de cuenta A descartadas tras cambiar a B (resolve/reject).
+- Validación previa en `061adcb`: suites focales Legacy/UI, 7 suites y 35 tests OK, incluyendo wallet desconectada/Nile sin estado verificado, mainnet válida y respuestas tardías de cuenta A descartadas tras cambiar a B (resolve/reject).
+- Verificación adicional del 2026-09-10 sobre el seguimiento de ownership: 7 suites, 33 tests OK; los `resolve/reject` de A se descargan dentro de `act` y se comprueba que una lectura A ya cargada se limpia al entrar en B en Bridge y Crías.
+- Mutación aislada en `/tmp/cukies-pr358-mutation`: al restaurar `clearSnapshot()` en la rama de respuesta tardía de Bridge, la regresión A→B falla (`Disponible` ausente; `MUTATION_EXIT=1`). El worktree temporal se eliminó tras la prueba.
 - Compilación focal de `runtime.ts` y `bridge-runtime.ts` con TypeScript — OK.
 - `pnpm --dir dapp lint` — OK, sin warnings ni errores.
 - `pnpm --dir dapp typecheck` — OK después de ejecutar `pnpm --dir dapp exec prisma generate` (necesario porque la instalación inicial usó `--ignore-scripts`).

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(() => ({ address: undefined, chainId: 56, isConnected: false })),
@@ -119,36 +119,91 @@ describe('Crías Legacy: ownership de lecturas activas', () => {
     fireEvent.click(button);
   }
 
-  function resolveSnapshotAndIds(address: string) {
+  function resolveSnapshotAndIds(address: string, breedId = 'B') {
     for (const request of pending.filter(({ address: owner }) => owner === address)) {
-      request.resolve(request.name === 'getAllBreedsOwner' ? ['B'] : 1);
+      request.resolve(request.name === 'getAllBreedsOwner' ? [breedId] : 1);
     }
   }
 
-  it('muestra B al resolver B primero y descarta la respuesta tardía de A', async () => {
-    await renderAccountB();
-    resolveSnapshotAndIds('TB');
-    await waitFor(() => expect(pending.some(({ address, name }) => address === 'TB' && name === 'getBreed')).toBe(true));
-    for (const request of pending.filter(({ address, name }) => address === 'TB' && name === 'getBreed')) {
+  function resolveBreedDetails(address: string) {
+    for (const request of pending.filter(({ address: owner, name }) => owner === address && name === 'getBreed')) {
       request.resolve(['10', '11', 0, 999999999999, 0, false, '0']);
     }
+  }
+
+  it('limpia la cría cargada de A al entrar en B y muestra solo la de B', async () => {
+    let deferB = false;
+    mockReadLegacyTronContract.mockImplementation((_web: unknown, _contract: string, name: string) => {
+      if (!deferB || walletAddress !== 'TB') {
+        if (name === 'getAllBreedsOwner') return Promise.resolve(['A']);
+        if (name === 'getBreed') return Promise.resolve(['10', '11', 0, 999999999999, 0, false, '0']);
+        return Promise.resolve(1);
+      }
+      return new Promise((resolve, reject) => pending.push({ address: walletAddress, name, resolve, reject }));
+    });
+
+    const view = render(<BreedingClient initialTab="active" />);
+    fireClickTron();
+    await waitFor(() => expect(screen.getByText('Breed #A')).toBeInTheDocument());
+
+    deferB = true;
+    walletAddress = 'TB';
+    setTronWallet(walletAddress);
+    view.rerender(<BreedingClient initialTab="active" />);
+    await waitFor(() => expect(screen.queryByText('Breed #A')).not.toBeInTheDocument());
+    await waitFor(() => expect(pending.filter(({ address }) => address === 'TB')).toHaveLength(4));
+    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeDisabled();
+
+    await act(async () => {
+      resolveSnapshotAndIds('TB');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(pending.some(({ address, name }) => address === 'TB' && name === 'getBreed')).toBe(true));
+    await act(async () => {
+      resolveBreedDetails('TB');
+      await Promise.resolve();
+    });
     await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
-    resolveSnapshotAndIds('TA');
+  });
+
+  it('muestra B al resolver B primero y descarta la respuesta tardía de A', async () => {
+    await renderAccountB();
+    await act(async () => {
+      resolveSnapshotAndIds('TB');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(pending.some(({ address, name }) => address === 'TB' && name === 'getBreed')).toBe(true));
+    await act(async () => {
+      resolveBreedDetails('TB');
+      await Promise.resolve();
+    });
     await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
+    await act(async () => {
+      resolveSnapshotAndIds('TA');
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Breed #B')).toBeInTheDocument();
   });
 
   it('mantiene B si la respuesta A termina con error después', async () => {
     await renderAccountB();
-    resolveSnapshotAndIds('TB');
+    await act(async () => {
+      resolveSnapshotAndIds('TB');
+      await Promise.resolve();
+    });
     await waitFor(() => expect(pending.some(({ address, name }) => address === 'TB' && name === 'getBreed')).toBe(true));
-    for (const request of pending.filter(({ address, name }) => address === 'TB' && name === 'getBreed')) {
-      request.resolve(['10', '11', 0, 999999999999, 0, false, '0']);
-    }
+    await act(async () => {
+      resolveBreedDetails('TB');
+      await Promise.resolve();
+    });
     await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
-    for (const request of pending.filter(({ address }) => address === 'TA')) {
-      request.reject(new Error('respuesta antigua'));
-    }
-    await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
+    await act(async () => {
+      for (const request of pending.filter(({ address }) => address === 'TA')) {
+        request.reject(new Error('respuesta antigua'));
+      }
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Breed #B')).toBeInTheDocument();
     expect(screen.queryByText('respuesta antigua')).not.toBeInTheDocument();
   });
 });
