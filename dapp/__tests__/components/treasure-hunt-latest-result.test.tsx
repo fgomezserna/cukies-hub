@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import TreasureHuntLatestResult from '@/components/games/treasure-hunt-latest-result';
 
 let rewardStatus: 'processing' | 'allocated' = 'allocated';
+let leaderboardRecorded = true;
+let leaderboardStatus: 'recorded' | 'covered_by_better' | 'pending' | 'ineligible' = 'recorded';
 
 jest.mock('lucide-react', () => ({
   ArrowRight: () => null,
@@ -27,9 +29,11 @@ jest.mock('@/hooks/use-treasure-hunt-weekly-overview', () => ({
         cukieTokenId: '98000003',
         cukieGeneration: 'Original',
         cukieRarity: 'Legendario',
-        leaderboardEligible: false,
+        leaderboardEligible: true,
+        leaderboardStatus,
+        leaderboardRecorded,
         rewardEligible: true,
-        jackpotEligible: false,
+        jackpotEligible: true,
         reward: {
           status: rewardStatus,
           amountRaw: rewardStatus === 'allocated' ? '218750000000000000' : null,
@@ -43,6 +47,8 @@ jest.mock('@/hooks/use-treasure-hunt-weekly-overview', () => ({
 describe('resultado económico de Treasure Hunt', () => {
   beforeEach(() => {
     rewardStatus = 'allocated';
+    leaderboardRecorded = true;
+    leaderboardStatus = 'recorded';
   });
 
   it('explica el score, los recursos, el ranking y la recompensa asignada', () => {
@@ -52,10 +58,28 @@ describe('resultado económico de Treasure Hunt', () => {
     expect(screen.getByText('175')).toBeInTheDocument();
     expect(screen.getByText('10 personales')).toBeInTheDocument();
     expect(screen.getByText('Cargo confirmado')).toBeInTheDocument();
-    expect(screen.getByText('Fuera del ranking')).toBeInTheDocument();
+    expect(screen.getByText('Sí, esta partida cuenta')).toBeInTheDocument();
+    expect(screen.getByText('Pagada con saldo personal')).toBeInTheDocument();
     expect(screen.getByText('Del pool')).toBeInTheDocument();
     expect(screen.getByText('0,21875 UKI')).toBeInTheDocument();
-    expect(screen.getByText(/ranking semanal sí está activo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/solo admite partidas financiadas por el pool/i)).not.toBeInTheDocument();
+  });
+
+  it('separa la elegibilidad de la presencia ya registrada cuando falta el weekly best', () => {
+    leaderboardRecorded = false;
+    leaderboardStatus = 'pending';
+    render(<TreasureHuntLatestResult />);
+
+    expect(screen.getByText('Elegible · pendiente de reflejarse')).toBeInTheDocument();
+    expect(screen.getByText(/aún no aparece en la clasificación semanal/i)).toBeInTheDocument();
+  });
+
+  it('explica que una partida menor conserva la mejor puntuación del periodo', () => {
+    leaderboardStatus = 'covered_by_better';
+    render(<TreasureHuntLatestResult />);
+
+    expect(screen.getByText('Se conserva tu mejor puntuación')).toBeInTheDocument();
+    expect(screen.queryByText(/aún no aparece en la clasificación semanal/i)).not.toBeInTheDocument();
   });
 
   it('indica que el cálculo sigue en curso sin inventar un premio', () => {

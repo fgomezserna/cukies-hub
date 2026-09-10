@@ -151,7 +151,10 @@ export function treasureHuntResultEligibility(input: {
   creditSource: "own" | "pool";
 }) {
   const rewardEligible = input.status === "settled";
-  const weeklyEligible = rewardEligible && input.creditSource === "pool";
+  // El leaderboard y el bote semanal comparten las reglas de validez de una
+  // partida liquidada. El origen del crédito solo afecta al reparto de la
+  // recompensa y al ranking Arena (#1-#9), que se captura aparte.
+  const weeklyEligible = rewardEligible;
   return {
     leaderboardEligible: weeklyEligible,
     rewardEligible,

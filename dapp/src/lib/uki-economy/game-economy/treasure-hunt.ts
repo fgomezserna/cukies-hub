@@ -920,7 +920,7 @@ async function finalizeTreasureHuntRun(input: {
       scoreRaw: current.scoreRaw ?? "0",
       now: input.now,
     });
-    if (input.terminalStatus === "settled" && current.creditSource === "pool") {
+    if (input.terminalStatus === "settled") {
       const key = treasureHuntScoreOrderKey(current.scoreRaw ?? "0");
       const weekly = db.collection<TreasureHuntWeeklyBest>("treasure_hunt_weekly_bests");
       const currentBest = await weekly.findOne({
@@ -929,7 +929,7 @@ async function finalizeTreasureHuntRun(input: {
         gameId: "treasure-hunt",
       }, { session: mongoSession });
       const achievedAt = current.achievedAt ?? input.now;
-      if (!currentBest || currentBest.creditSource !== "pool" || shouldReplaceTreasureHuntWeeklyBest({
+      if (!currentBest || shouldReplaceTreasureHuntWeeklyBest({
         currentScoreRaw: currentBest.scoreRaw,
         currentAchievedAt: currentBest.achievedAt,
         candidateScoreRaw: key.scoreRaw,

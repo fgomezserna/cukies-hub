@@ -128,7 +128,7 @@ describe('TreasureHuntCompetitionBanner', () => {
     expect(screen.getByText('10 créditos')).toBeInTheDocument();
     expect(screen.getByText('480 personales')).toBeInTheDocument();
     expect(screen.getByText('20 aportados al pool este periodo')).toBeInTheDocument();
-    expect(screen.getByText('Premio directo · no clasifica')).toBeInTheDocument();
+    expect(screen.getByText('Premio directo · cuenta en la semana')).toBeInTheDocument();
     expect(screen.queryByText('Torneo Lanzamiento UKI')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver semana actual/ })).toHaveAttribute(
       'href',

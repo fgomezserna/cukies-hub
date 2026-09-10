@@ -773,6 +773,81 @@ describe("weekly prize", () => {
       .toBe("session-a");
   });
 
+  it("incluye una mejor partida OWN junto a una de POOL y conserva el snapshot Arena propio", () => {
+    const own = settledResult({
+      wallet: wallet(1),
+      gameId: "own-credit",
+      scoreRaw: "900",
+      playedAt: new Date("2026-08-20T10:00:00Z"),
+    });
+    own.creditSnapshot = { ...own.creditSnapshot, source: "own" };
+    own.arenaRankingSnapshot = {
+      ...own.arenaRankingSnapshot,
+      rank: null,
+      rewardBps: 10_000,
+      sourceRankingId: null,
+    };
+    const pool = settledResult({
+      wallet: wallet(2),
+      gameId: "pool-credit",
+      scoreRaw: "800",
+      playedAt: new Date("2026-08-20T11:00:00Z"),
+    });
+    const lowerPool = settledResult({
+      wallet: wallet(3),
+      gameId: "pool-lower",
+      scoreRaw: "800",
+      playedAt: new Date("2026-08-20T09:00:00Z"),
+    });
+    const higherOwn = settledResult({
+      wallet: wallet(3),
+      gameId: "own-higher",
+      scoreRaw: "900",
+      playedAt: new Date("2026-08-20T10:00:00Z"),
+    });
+    higherOwn.creditSnapshot = { ...higherOwn.creditSnapshot, source: "own" };
+    higherOwn.arenaRankingSnapshot = {
+      ...higherOwn.arenaRankingSnapshot,
+      rank: null,
+      rewardBps: 10_000,
+      sourceRankingId: null,
+    };
+
+    const ranked = selectWeeklyBestResults([own, pool]);
+    expect(ranked).toHaveLength(2);
+    expect(ranked.map((participant) => participant.best.sessionId)).toEqual([
+      own.sessionId,
+      pool.sessionId,
+    ]);
+    expect(selectWeeklyBestResults([lowerPool, higherOwn])).toMatchObject([{
+      walletNormalized: wallet(3),
+      best: { sessionId: higherOwn.sessionId, scoreRaw: "900" },
+      gamesPlayed: 2,
+    }]);
+
+    const accounting = calculateWeeklyPrize({
+      periodId: "2026-W34",
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      ruleConfigHash: CURRENT_REWARD_RULE.configHash,
+      potRaw: "10000",
+      ambassadorReserveRaw: "500",
+      sourceDailyAccountingIds: DAILY_ACCOUNTING_IDS,
+      results: [own, pool],
+      lotteryEntropy: ENTROPY,
+      destinations: DESTINATIONS,
+      payoutAt: PAYOUT_AT,
+      sealedAt: ENTROPY.confirmedAt,
+    });
+    expect(accounting.winners.map((winner) => winner.winningGameId)).toEqual([
+      own.sessionId,
+      pool.sessionId,
+    ]);
+    expect(accounting.winners[0].sourceSnapshot).toMatchObject({
+      creditSnapshot: { source: "own" },
+      arenaRankingSnapshot: { rank: null, rewardBps: 10_000, sourceRankingId: null },
+    });
+  });
+
   it("reparte 60/30/10, 10 loterias auditables y conserva el bote", () => {
     const result = calculateWeeklyPrize({
       periodId: "2026-W34",

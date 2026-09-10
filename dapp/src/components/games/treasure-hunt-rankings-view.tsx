@@ -68,7 +68,7 @@ function ActiveTreasureHuntRankingsView() {
         <div className="grid gap-5 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="border-l-2 border-[var(--uki-lilac)] pl-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--uki-lilac)]">Competición semanal automática</p>
-            <h3 className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]">Tu mejor partida con créditos del pool</h3>
+            <h3 className="mt-1.5 font-headline text-2xl font-black text-[#f2eee7]">Tu mejor partida de la semana</h3>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[#aaa8a2]">
               Al terminar el periodo se guarda la clasificación y empieza el siguiente automáticamente. Aquí puedes consultar las fechas de la competición actual.
             </p>
@@ -100,7 +100,7 @@ function ActiveTreasureHuntRankingsView() {
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[var(--uki-lilac)]">Tu semana</p>
               <p className="mt-1 text-sm font-bold text-[#f2eee7]">
-                {data.participation.bestPoolScoreRaw ? `Mejor puntuación clasificada: ${Number(data.participation.bestPoolScoreRaw).toLocaleString('es-ES')}` : 'Aún no tienes una partida clasificada esta semana'}
+                {data.participation.bestScoreRaw ? `Mejor puntuación clasificada: ${Number(data.participation.bestScoreRaw).toLocaleString('es-ES')}` : 'Aún no tienes una partida clasificada esta semana'}
               </p>
             </div>
             <div className="flex gap-2 text-xs font-bold">
@@ -108,7 +108,7 @@ function ActiveTreasureHuntRankingsView() {
               <span className="rounded-full border border-white/15 px-3 py-1.5 text-[#aaa8a2]">{data.participation.ownCreditRuns} con créditos propios</span>
             </div>
           </div>
-          <p className="mt-2 text-xs text-[#969994]">Las partidas con créditos propios generan su recompensa directa, pero no alteran este ranking.</p>
+          <p className="mt-2 text-xs text-[#969994]">Las partidas válidas con créditos personales o del pool pueden entrar en esta clasificación; se conserva la mejor puntuación de cada wallet.</p>
         </section>
       ) : null}
 
@@ -128,7 +128,7 @@ function ActiveTreasureHuntRankingsView() {
           <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
             <Medal className="h-8 w-8 text-[var(--uki-lilac)]" aria-hidden="true" />
             <h3 className="mt-4 font-headline text-lg font-black text-[#f2eee7]">{filter === 'mine' ? 'Aún no tienes posición semanal' : 'Todavía no hay puntuaciones semanales'}</h3>
-            <p className="mt-2 max-w-md text-sm text-[#969994]">Completa una partida usando créditos del pool para entrar en esta clasificación.</p>
+            <p className="mt-2 max-w-md text-sm text-[#969994]">Completa una partida válida con créditos personales o del pool para entrar en esta clasificación.</p>
           </div>
         ) : (
           <>
