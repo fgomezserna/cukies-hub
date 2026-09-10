@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { ArrowRight, Cookie, Layers3, Loader2, RefreshCw, Store } from 'lucide-react';
 
@@ -16,6 +17,11 @@ import { getLegacyMarketplaceDetailHref } from '@/lib/legacy-marketplace/identit
 import { useAuth } from '@/providers/auth-provider';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
+
+const CukieSaleDialog = dynamic(
+  () => import('@/components/cukies/cukie-sale-dialog').then((module) => module.CukieSaleDialog),
+  { ssr: false },
+);
 
 function generationLabel(cukie: MyCukieCollectionItem) {
   if (cukie.generation === 'original') return 'Original';
@@ -249,6 +255,10 @@ export function MyCukiesPanel() {
   const [state, setState] = useState<LoadState>('idle');
   const [collection, setCollection] = useState<MyCukieCollectionData | null>(null);
   const [filter, setFilter] = useState<CollectionFilter>('all');
+  const [saleSelection, setSaleSelection] = useState<{
+    cuki: MyCukieCollectionItem;
+    preferredSurface?: 'uki';
+  } | null>(null);
   const requestIdRef = useRef(0);
   const items = useMemo(() => collection?.items ?? [], [collection]);
   const visibleItems = useMemo(() => items
@@ -279,6 +289,13 @@ export function MyCukiesPanel() {
     setCollection(body.data);
     setState('ready');
   }, [walletAddress]);
+
+  const refreshAfterSale = useCallback(() => {
+    const requestId = requestIdRef.current;
+    void load(undefined, requestId).catch(() => {
+      if (requestIdRef.current === requestId) setState('unavailable');
+    });
+  }, [load]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -439,17 +456,38 @@ export function MyCukiesPanel() {
                         Ficha no disponible
                       </span>
                     )}
-                    {actionsFor(cukie).length > 0 ? actionsFor(cukie).map((action) => (
-                      actionHref(cukie, action) ? (
-                        <Link key={action} href={actionHref(cukie, action) as string} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                    {actionsFor(cukie).length > 0 ? actionsFor(cukie).map((action) => {
+                      const href = actionHref(cukie, action);
+                      if (!href) {
+                        return (
+                          <span key={action} className="inline-flex min-h-11 items-center justify-center rounded-[9px] border border-white/10 px-3 text-center text-xs font-black uppercase text-[var(--uki-muted)]">
+                            Acción no disponible
+                          </span>
+                        );
+                      }
+                      const className = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18';
+                      if (action === 'sell') {
+                        return (
+                          <a
+                            key={action}
+                            href={href}
+                            aria-haspopup="dialog"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setSaleSelection({ cuki: cukie });
+                            }}
+                            className={className}
+                          >
+                            {actionLabel(action)} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
+                          </a>
+                        );
+                      }
+                      return (
+                        <Link key={action} href={href} className={className}>
                           {actionLabel(action)} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
                         </Link>
-                      ) : (
-                        <span key={action} className="inline-flex min-h-11 items-center justify-center rounded-[9px] border border-white/10 px-3 text-center text-xs font-black uppercase text-[var(--uki-muted)]">
-                          Acción no disponible
-                        </span>
-                      )
-                    )) : cukie.custody === 'cukie_pool_recovery' ? (
+                      );
+                    }) : cukie.custody === 'cukie_pool_recovery' ? (
                       <Link href={itemAction(cukie).href} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
                         {itemAction(cukie).label} <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
                       </Link>
@@ -465,9 +503,17 @@ export function MyCukiesPanel() {
                     {cukie.state === 'available'
                       && cukie.marketplaceSurface === 'legacy'
                       && cukie.sellSurfaces?.includes('uki') ? (
-                      <Link href={ukiMarketplaceHref(cukie) ?? '/marketplace'} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+                      <a
+                        href={ukiMarketplaceHref(cukie) ?? '/marketplace'}
+                        aria-haspopup="dialog"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          setSaleSelection({ cuki: cukie, preferredSurface: 'uki' });
+                        }}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18"
+                      >
                         Vender en UKI <ArrowRight className="h-4 w-4 text-[var(--uki-lilac)]" />
-                      </Link>
+                      </a>
                     ) : null}
                   </div>
                 </div>
@@ -498,6 +544,18 @@ export function MyCukiesPanel() {
           </Link>
         ))}
       </section>
+
+      {saleSelection ? (
+        <CukieSaleDialog
+          cuki={saleSelection.cuki}
+          preferredSurface={saleSelection.preferredSurface}
+          open
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setSaleSelection(null);
+          }}
+          onCompleted={refreshAfterSale}
+        />
+      ) : null}
     </div>
   );
 }
