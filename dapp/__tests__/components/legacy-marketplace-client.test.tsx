@@ -87,8 +87,81 @@ describe('marketplace publico', () => {
 
     render(<MarketplaceClient />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Comprar' })).toBeInTheDocument());
+    expect(screen.getByText('V2 · UKI')).toBeInTheDocument();
+    expect(screen.getByText('Red BSC · Colección 0x000000…001002')).toBeInTheDocument();
+    expect(screen.getByText('Precio fijado en UKI')).toBeInTheDocument();
+    expect(screen.queryByText(/BSC Testnet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pago: UKI, BNB o USDT/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Comprar' }));
     expect(await screen.findByTestId('uki-checkout')).toHaveTextContent('Checkout UKI disponible');
+  });
+
+  it('cambia a Solo Legacy antes de aplicar tipo y generación sin metadatos V2', async () => {
+    fetchMock.mockResolvedValue({
+      json: async () => ({
+        status: 'ok',
+        data: {
+          items: [],
+          cursors: { legacyOffset: 0, ukiCursor: null },
+          hasMore: false,
+          legacyFacets: {
+            states: [],
+            networks: [],
+            types: [{ value: '3', count: 1 }],
+            generations: [{ value: '2', count: 1 }],
+          },
+          sources: { legacy: 'ready', uki: 'ready' },
+        },
+      }),
+    });
+
+    render(<MarketplaceClient />);
+    await screen.findByRole('option', { name: 'Tipo 3' });
+    expect(screen.getByText(/al elegir uno se mostrará solo ese catálogo/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Tipo de Cukie' }), {
+      target: { value: '3' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Generación' }), {
+      target: { value: '2' },
+    });
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(2));
+    const requestUrl = String(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0]);
+    const query = new URL(requestUrl, 'https://stage.local').searchParams;
+    expect(query.get('scope')).toBe('legacy');
+    expect(query.get('type')).toBe('3');
+    expect(query.get('generation')).toBe('2');
+    expect(screen.getByRole('combobox', { name: 'Origen del anuncio' })).toHaveValue('legacy');
+  });
+
+  it('evita combinar la red TRON con el catálogo V2 · UKI', async () => {
+    fetchMock.mockResolvedValue({
+      json: async () => ({
+        status: 'ok',
+        data: {
+          items: [],
+          cursors: { legacyOffset: 0, ukiCursor: null },
+          hasMore: false,
+          legacyFacets: { states: [], networks: [], types: [], generations: [] },
+          sources: { legacy: 'ready', uki: 'ready' },
+        },
+      }),
+    });
+
+    render(<MarketplaceClient />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    fireEvent.change(screen.getByRole('combobox', { name: 'Red' }), {
+      target: { value: 'TRON' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Origen del anuncio' }), {
+      target: { value: 'uki' },
+    });
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Red' })).toHaveValue('all'));
+    expect(screen.queryByRole('option', { name: 'TRON' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Tipo de Cukie' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Generación' })).not.toBeInTheDocument();
   });
 
   it('distingue catálogo no disponible de catálogo vacío', async () => {

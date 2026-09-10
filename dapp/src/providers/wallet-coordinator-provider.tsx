@@ -16,7 +16,12 @@ import {
 } from 'wagmi';
 
 import { WalletConnectorDialog } from '@/components/landing/wallet-connector-dialog';
-import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
+import {
+  getMobileWalletConnector,
+  getMobileWalletLaunchUrl,
+  getVisibleWalletConnectors,
+  type MobileWalletId,
+} from '@/lib/wallet-connectors';
 import {
   TRON_MAINNET_CHAIN_ID,
   resolveTronProvider,
@@ -24,6 +29,8 @@ import {
   tronNetworkFromChainId,
 } from '@/lib/tronlink-provider';
 import { useTronLink } from '@/hooks/use-tronlink';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useOptionalAuth } from '@/providers/auth-provider';
 import {
   WalletCoordinatorContext,
   type Connector,
@@ -76,6 +83,8 @@ function sameRequest(left: WalletRequest, right: WalletRequest) {
 }
 
 export function WalletCoordinatorProvider({ children }: { children: ReactNode }) {
+  const { user, fetchUser } = useOptionalAuth();
+  const isMobile = useIsMobile();
   const { address, chainId, isConnected, connector } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
@@ -304,11 +313,19 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
         if (isCurrentPending(pending)) finishPendingIfReady(pending);
       } else {
         setWalletDialogOpen(false);
+        const connectedAddress = result.accounts?.[0] ?? address;
+        if (connectedAddress && !user) {
+          await fetchUser(connectedAddress, {
+            evmConnector: selectedConnector,
+            promptForSignature: true,
+            walletType: 'evm',
+          });
+        }
       }
     } catch (error) {
       rejectPending(pending, new Error(isRejected(error) ? 'Conexión o cambio de red cancelado en la wallet.' : errorMessage(error)));
     }
-  }, [connectAsync, finishPendingIfReady, isCurrentPending, rejectPending, switchChainAsync]);
+  }, [address, connectAsync, fetchUser, finishPendingIfReady, isCurrentPending, rejectPending, switchChainAsync, user]);
 
   const selectTronLink = useCallback(async () => {
     const pending = pendingRequestRef.current;
@@ -329,11 +346,36 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
         if (isCurrentPending(pending)) finishPendingIfReady(pending);
       } else {
         setWalletDialogOpen(false);
+        if (connectedAddress && !user) {
+          await fetchUser(connectedAddress, {
+            promptForSignature: true,
+            walletType: 'tron',
+          });
+        }
       }
     } catch (error) {
       rejectPending(pending, new Error(isRejected(error) ? 'Conexión o cambio a TRON Mainnet cancelado en TronLink.' : errorMessage(error)));
     }
-  }, [connectTronLink, finishPendingIfReady, isCurrentPending, rejectPending, switchTronToMainnet, tronAddress, tronChainId, tronError, tronIsConnected]);
+  }, [connectTronLink, fetchUser, finishPendingIfReady, isCurrentPending, rejectPending, switchTronToMainnet, tronAddress, tronChainId, tronError, tronIsConnected, user]);
+
+  const selectMobileWallet = useCallback(async (walletId: MobileWalletId) => {
+    const connector = getMobileWalletConnector(evmConnectors, walletId);
+    if (connector) {
+      await selectEvmConnector(connector);
+      return;
+    }
+
+    const launchUrl = getMobileWalletLaunchUrl(walletId, window.location.href);
+    if (walletId === 'safepal' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+      } catch {
+        // SafePal still opens its official install page if clipboard is unavailable.
+      }
+    }
+    setWalletDialogOpen(false);
+    window.location.assign(launchUrl);
+  }, [evmConnectors, selectEvmConnector]);
 
   const openWalletSelector = useCallback((kind: WalletDialogKind = 'any', reason?: string) => {
     setWalletDialogKind(kind);
@@ -378,6 +420,8 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
         }}
         connectors={walletDialogKind === 'tron' ? [] : evmConnectors}
         onSelectConnector={selectEvmConnector}
+        isMobile={isMobile && walletDialogKind !== 'tron'}
+        onSelectMobileWallet={selectMobileWallet}
         isConnecting={isConnecting || isSwitching}
         title={walletDialogKind === 'tron' ? 'Conectar wallet TRON' : 'Conectar wallet'}
         description={walletDialogReason ?? 'Elige la wallet que quieres usar para continuar.'}

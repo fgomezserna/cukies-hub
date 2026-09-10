@@ -199,6 +199,7 @@ describe('zona vendedor marketplace UKI', () => {
     render(<UkiMarketplaceSellerPanel />);
 
     const cancelButton = await screen.findByRole('button', { name: 'Cancelar anuncio' });
+    expect(screen.getByText('Para cambiar el precio, cancela y vuelve a publicar.')).toBeInTheDocument();
     fireEvent.click(cancelButton);
 
     await waitFor(() => {

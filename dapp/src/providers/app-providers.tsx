@@ -10,11 +10,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <Web3Provider>
       <PublicLocaleProvider>
-        <WalletCoordinatorProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <WalletCoordinatorProvider>
             <AppRuntimeProvider>{children}</AppRuntimeProvider>
-          </AuthProvider>
-        </WalletCoordinatorProvider>
+          </WalletCoordinatorProvider>
+        </AuthProvider>
       </PublicLocaleProvider>
     </Web3Provider>
   );

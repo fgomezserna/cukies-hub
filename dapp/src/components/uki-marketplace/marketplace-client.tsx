@@ -130,7 +130,7 @@ function OrderRow({
           <p className="mt-1 font-mono text-xl font-bold tabular-nums text-white">
             {formatUkiAmount(order.ukiPriceRaw)} <span className="text-sm text-lilac-100">UKI</span>
           </p>
-          <p className="mt-1 text-xs text-slate-500">Pago: UKI, BNB o USDT</p>
+          <p className="mt-1 text-xs text-slate-500">Precio fijado en UKI</p>
           <Button
             type="button"
             size="sm"

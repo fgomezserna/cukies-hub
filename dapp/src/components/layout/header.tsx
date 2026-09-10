@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,33 +16,9 @@ import { useSidebar } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/providers/auth-provider';
-import { useHasMounted } from '@/hooks/use-has-mounted';
-import { useAccount, useConnect, useDisconnect, type Connector } from 'wagmi';
-import { useTronLink } from '@/hooks/use-tronlink';
-import {
-  getMobileWalletConnector,
-  getMobileWalletLaunchUrl,
-  getVisibleWalletConnectors,
-  type MobileWalletId,
-} from '@/lib/wallet-connectors';
-import { HeaderWalletDialog } from '@/components/layout/header-wallet-dialog';
 import { cn } from '@/lib/utils';
 import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
-
-
-
-const ranks = [
-  { xp: 50000, name: 'Hyppie Master' },
-  { xp: 20000, name: 'Hyperliquid Veteran' },
-  { xp: 10000, name: 'Treasure Hunter' },
-  { xp: 5000, name: 'Experimented Hyppie' },
-  { xp: 2500, name: 'Explorer' },
-];
-
-const getRank = (xp: number): string => {
-  const userRank = ranks.find(rank => xp >= rank.xp);
-  return userRank ? userRank.name : 'Sin rango';
-};
+import { useOptionalAppRuntime } from '@/providers/app-runtime-provider';
 
 export function getAvatarFallback(username: string | null | undefined, walletAddress: string | null | undefined) {
   const usernameValue = username?.trim();
@@ -52,6 +28,30 @@ export function getAvatarFallback(username: string | null | undefined, walletAdd
 
   const walletValue = walletAddress?.trim();
   return walletValue ? walletValue.slice(-2).toUpperCase() : 'CW';
+}
+
+type UkiBalanceView = {
+  balance: string;
+  balanceRaw: string;
+};
+
+function formatUkiBalance(value: UkiBalanceView | null | undefined) {
+  if (!value || !/^(0|[1-9][0-9]*)$/.test(value.balanceRaw)) return null;
+
+  try {
+    const raw = BigInt(value.balanceRaw);
+    const decimals = BigInt(10) ** BigInt(18);
+    const integer = raw / decimals;
+    const fraction = (raw % decimals).toString().padStart(18, '0');
+    const visibleFraction = fraction.slice(0, 4).replace(/0+$/, '');
+    const groupedInteger = integer.toLocaleString('es-ES');
+
+    if (visibleFraction) return `${groupedInteger},${visibleFraction}`;
+    if (raw > BigInt(0) && integer === BigInt(0)) return '<0,0001';
+    return groupedInteger;
+  } catch {
+    return null;
+  }
 }
 
 interface HeaderProps {
@@ -65,90 +65,32 @@ export default function Header({
 }: HeaderProps) {
   const isGameOverlay = variant === 'game-overlay';
   const { toggleSidebar, state, isMobile } = useSidebar();
-  const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
-  const { requestWallet, disconnectWallet } = useWalletCoordinator();
-  const { address: evmAddress, isConnected: isEvmConnected } = useAccount();
-  const { connectAsync, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
-  const {
-    address: tronAddress,
-    error: tronError,
-    isConnected: isTronConnected,
-    isInstalled: isTronInstalled,
-    isLoading: isTronLoading,
-  } = useTronLink();
-  const [isWalletDialogOpen, setIsWalletDialogOpen] = useState(false);
-  const hasMounted = useHasMounted();
-  const evmConnectors = useMemo(
-    () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
-    [connectors, hasMounted],
+  const { user, isLoading: isAuthLoading, isWaitingForApproval, walletType } = useAuth();
+  const { evm, tron, openWalletSelector, disconnectWallet } = useWalletCoordinator();
+  const runtime = useOptionalAppRuntime();
+  const accountSummary = runtime?.accountSummary ?? {
+    data: undefined,
+    state: 'idle' as const,
+    error: null,
+  };
+
+  const formatWalletAddress = (address: string | null | undefined) => (
+    address ? `${address.slice(0, 8)}…${address.slice(-6)}` : 'No conectada'
   );
-
-  useEffect(() => {
-    const openWalletDialog = () => setIsWalletDialogOpen(true);
-    window.addEventListener('cukies:open-wallet-dialog', openWalletDialog);
-    return () => window.removeEventListener('cukies:open-wallet-dialog', openWalletDialog);
-  }, []);
-  
-  // This would come from user data in a real app
-  const userXP = user?.xp ?? 0;
-  const userRank = getRank(userXP);
-
-  const handleConnectEVM = async (connector: Connector) => {
-    try {
-      setIsWalletDialogOpen(false);
-
-      if (isEvmConnected) {
-        disconnect();
-      }
-
-      const result = await connectAsync({ connector });
-      const connectedAddress = result.accounts?.[0] || evmAddress;
-
-      if (connectedAddress && !user) {
-        await fetchUser(connectedAddress, { evmConnector: connector, promptForSignature: true, walletType: 'evm' });
-      }
-    } catch (error) {
-      console.error('Failed to connect EVM wallet:', error);
-    }
-  };
-
-  const handleConnectTron = async () => {
-    try {
-      const ready = await requestWallet({
-        kind: 'tron',
-        targetTronNetwork: 'mainnet',
-        reason: 'Conecta TronLink en TRON Mainnet para operar con tu wallet TRON.',
-      });
-      if (ready.address && !user) {
-        setIsWalletDialogOpen(false);
-        await fetchUser(ready.address, { promptForSignature: true, walletType: 'tron' });
-      }
-    } catch (error) {
-      console.error('Failed to connect TronLink:', error);
-    }
-  };
-
-  const handleMobileWallet = async (walletId: MobileWalletId) => {
-    const connector = getMobileWalletConnector(evmConnectors, walletId);
-    if (connector) {
-      await handleConnectEVM(connector);
-      return;
-    }
-
-    const launchUrl = getMobileWalletLaunchUrl(walletId, window.location.href);
-    setIsWalletDialogOpen(false);
-
-    if (walletId === 'safepal' && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-      } catch {
-        // SafePal still opens its official install page when clipboard access is unavailable.
-      }
-    }
-
-    window.location.assign(launchUrl);
-  };
+  const formatResource = (value: string | number | null | undefined, suffix = '') => (
+    value === null || value === undefined ? 'No disponible' : `${typeof value === 'number' ? value.toLocaleString('es-ES') : value}${suffix}`
+  );
+  const summary = accountSummary.data;
+  const accountSummaryLoading = accountSummary.state === 'loading';
+  const accountSummaryRefreshing = accountSummary.state === 'stale';
+  const accountSummaryReady = accountSummary.state === 'ready';
+  const cukiesSummaryReady = accountSummaryReady && summary?.cukies?.coverage === 'complete';
+  const ukiBalanceLabel = formatUkiBalance(summary?.uki);
+  const accountSummaryPendingLabel = accountSummaryLoading
+    ? 'Cargando…'
+    : accountSummaryRefreshing
+      ? 'Actualizando…'
+      : 'No disponible';
 
   return (
     <header
@@ -193,7 +135,7 @@ export default function Header({
         )}
       >
         {user ? (
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={(open) => { if (open) runtime?.requestAccountSummary(); }}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -219,7 +161,7 @@ export default function Header({
                 ) : null}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 border-2 border-lilac-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-lilac-400/10">
+            <DropdownMenuContent align="end" className="w-[min(22rem,calc(100vw-1rem))] border-2 border-lilac-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-lilac-400/10">
               <DropdownMenuLabel className="text-base font-bold text-foreground">
                 {user.username 
                   ? user.username.length > 15 
@@ -227,47 +169,100 @@ export default function Header({
                     : user.username
                   : "Mi cuenta"}
               </DropdownMenuLabel>
-              <div className="px-3 pt-2 pb-3 space-y-3">
-                <div className="p-3 rounded-lg bg-gradient-to-r from-lilac-400/10 to-lilac-400/10 border border-lilac-300/20">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Rango</p>
-                  <p className="font-bold text-lilac-300 text-sm">{userRank}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-gradient-to-r from-lilac-400/10 to-lilac-400/10 border border-lilac-300/20">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">XP</p>
-                  <p className="font-bold font-mono text-lilac-300 text-lg">{userXP.toLocaleString()}</p>
-                </div>
-              </div>
-              <DropdownMenuSeparator className="bg-lilac-400/20" />
-              <div className="flex items-start gap-3 px-3 py-2 text-sm text-muted-foreground">
-                <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-lilac-300" aria-hidden="true" />
-                <span className="min-w-0">
-                  <span className="block font-medium text-foreground">Wallet conectada</span>
-                  <span className="block truncate font-mono text-xs" title={user.walletAddress}>
-                    {user.walletAddress.slice(0, 8)}…{user.walletAddress.slice(-6)}
-                  </span>
-                </span>
-              </div>
               <div className="grid gap-2 px-3 py-2">
+                <div
+                  className="grid gap-2 rounded-lg border border-lilac-300/15 bg-black/15 p-3"
+                  aria-busy={!accountSummaryReady}
+                  data-testid="account-resources"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black uppercase tracking-[0.1em] text-muted-foreground">
+                      Recursos de la cuenta
+                    </span>
+                    <span className="text-[10px] font-semibold text-muted-foreground">BSC</span>
+                  </div>
+                  {walletType === 'evm' ? (
+                    <div className="grid gap-1.5 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="whitespace-nowrap text-muted-foreground">UKI disponible</span>
+                        <span
+                          className="min-w-0 whitespace-nowrap text-right font-mono font-bold tabular-nums text-lilac-200"
+                          title={accountSummaryReady && summary?.uki ? `${summary.uki.balance} UKI` : undefined}
+                        >
+                          {accountSummaryReady ? (ukiBalanceLabel ? <>{ukiBalanceLabel}&nbsp;UKI</> : 'No disponible') : accountSummaryPendingLabel}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">Créditos propios</span>
+                        <span className="font-mono font-bold text-lilac-200">
+                          {accountSummaryReady ? formatResource(summary?.credits?.availableCredits) : accountSummaryPendingLabel}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">Cukies totales</span>
+                        <span className="font-mono font-bold text-lilac-200">
+                          {cukiesSummaryReady ? (
+                            summary?.cukies ? (
+                              <>
+                                {formatResource(summary.cukies.total)}
+                                <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
+                                  ({formatResource(summary.cukies.inWallet)} en wallet)
+                                </span>
+                              </>
+                            ) : 'No disponible'
+                          ) : accountSummaryReady ? 'No disponible' : accountSummaryPendingLabel}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-semibold leading-relaxed text-muted-foreground">
+                      Conecta una wallet EVM para consultar UKI, créditos y Cukies de esa cuenta.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1 text-[11px] font-bold">
+                    <Link href="/cukie-master" className="text-lilac-200 hover:text-lilac-100">Gestionar UKI</Link>
+                    <Link href="/credits" className="text-lilac-200 hover:text-lilac-100">Gestionar créditos</Link>
+                    <Link href="/cukies" className="text-lilac-200 hover:text-lilac-100">Ver Cukies</Link>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-1 pt-1 text-sm text-muted-foreground">
+                  <Wallet className="h-4 w-4 shrink-0 text-lilac-300" aria-hidden="true" />
+                  <span className="font-medium text-foreground">Wallet conectada</span>
+                </div>
                 <div className="flex items-center justify-between gap-3 rounded-md border border-lilac-300/15 bg-lilac-400/5 px-2.5 py-2 text-xs">
                   <span className="min-w-0">
-                    <span className="block font-semibold text-foreground">EVM / BSC</span>
+                    <span className="flex items-center gap-2 font-semibold text-foreground">
+                      EVM / BSC
+                      {walletType === 'evm' ? <span className="rounded-full border border-lilac-300/30 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-lilac-200">Tu cuenta</span> : null}
+                    </span>
                     <span className="block truncate font-mono text-[11px] text-muted-foreground">
-                      {isEvmConnected && evmAddress ? `${evmAddress.slice(0, 6)}…${evmAddress.slice(-4)}` : 'No conectada'}
+                      {evm.isConnected && evm.address ? formatWalletAddress(evm.address) : 'No conectada'}
                     </span>
                   </span>
-                  <button type="button" className="shrink-0 text-[11px] font-bold text-lilac-200" onClick={() => (isEvmConnected ? disconnect() : setIsWalletDialogOpen(true))}>
-                    {isEvmConnected ? 'Desconectar' : 'Conectar'}
+                  <button
+                    type="button"
+                    className="shrink-0 text-[11px] font-bold text-lilac-200"
+                    onClick={() => (evm.isConnected ? disconnectWallet('evm') : openWalletSelector('evm', 'Conecta una wallet EVM para gestionar UKI, créditos y Cukies.'))}
+                  >
+                    {evm.isConnected ? 'Desconectar' : 'Conectar'}
                   </button>
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-md border border-emerald-300/15 bg-emerald-400/5 px-2.5 py-2 text-xs">
                   <span className="min-w-0">
-                    <span className="block font-semibold text-foreground">TRON / TronLink</span>
+                    <span className="flex items-center gap-2 font-semibold text-foreground">
+                      TRON / TronLink
+                      {walletType === 'tron' ? <span className="rounded-full border border-emerald-300/30 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-200">Tu cuenta</span> : null}
+                    </span>
                     <span className="block truncate font-mono text-[11px] text-muted-foreground">
-                      {isTronConnected && tronAddress ? `${tronAddress.slice(0, 6)}…${tronAddress.slice(-4)}` : 'No conectada'}
+                      {tron.isConnected && tron.address ? formatWalletAddress(tron.address) : 'No conectada'}
                     </span>
                   </span>
-                  <button type="button" className="shrink-0 text-[11px] font-bold text-emerald-200" onClick={() => (isTronConnected ? disconnectWallet('tron') : setIsWalletDialogOpen(true))}>
-                    {isTronConnected ? 'Desconectar' : 'Conectar'}
+                  <button
+                    type="button"
+                    className="shrink-0 text-[11px] font-bold text-emerald-200"
+                    onClick={() => (tron.isConnected ? disconnectWallet('tron') : openWalletSelector('tron', 'Conecta TronLink en TRON Mainnet para usar tu wallet TRON.'))}
+                  >
+                    {tron.isConnected ? 'Desconectar' : 'Conectar'}
                   </button>
                 </div>
               </div>
@@ -287,7 +282,7 @@ export default function Header({
               )}
               <DropdownMenuSeparator className="bg-lilac-400/20" />
               <DropdownMenuItem 
-                onClick={() => disconnect()} 
+                onClick={() => disconnectWallet(walletType === 'tron' ? 'tron' : 'evm')}
                 className="hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors"
               >
                 <LogOut className="mr-3 h-4 w-4" />
@@ -298,7 +293,7 @@ export default function Header({
         ) : hideDisconnectedWalletTrigger ? null : (
           <>
             <Button 
-              onClick={() => !isWaitingForApproval && setIsWalletDialogOpen(true)} 
+              onClick={() => !isWaitingForApproval && openWalletSelector('any', 'Elige la wallet que quieres usar para continuar.')}
               disabled={isWaitingForApproval || isAuthLoading}
               className={cn(
                 isWaitingForApproval
@@ -327,19 +322,6 @@ export default function Header({
 
           </>
         )}
-        <HeaderWalletDialog
-          open={isWalletDialogOpen}
-          onOpenChange={setIsWalletDialogOpen}
-          connectors={evmConnectors}
-          onSelectMobileWallet={(walletId) => void handleMobileWallet(walletId)}
-          onSelectConnector={(connector) => void handleConnectEVM(connector)}
-          tronLink={{
-            error: tronError,
-            isInstalled: isTronInstalled,
-            isLoading: isTronLoading,
-            onSelect: () => void handleConnectTron(),
-          }}
-        />
       </div>
     </header>
   );

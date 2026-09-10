@@ -75,7 +75,7 @@ function UkiMarketplaceCard({
       <div className="relative grid aspect-[4/5] min-h-[22rem] place-items-center bg-[radial-gradient(circle_at_center,rgba(228,92,255,0.2),transparent_65%)]">
         <ShieldCheck aria-hidden className="h-14 w-14 text-lilac-100/70" />
         <div className="absolute left-3 top-3 rounded-full border border-lilac-200/30 bg-lilac-200/15 px-2.5 py-1 text-xs font-bold text-lilac-100 backdrop-blur">
-          V2 · UKI · BSC {order.chainId === 97 ? 'Testnet' : 'Mainnet'}
+          V2 · UKI
         </div>
         <div className="absolute right-3 top-3 rounded-full border border-emerald-200/30 bg-emerald-200/15 px-2.5 py-1 text-xs font-bold text-emerald-100 backdrop-blur">
           Anuncio validado
@@ -87,12 +87,11 @@ function UkiMarketplaceCard({
             Cukie #{order.tokenId}
           </h3>
           <p className="mt-1 text-xs text-slate-400">
-            Tipo no disponible en el catálogo UKI · Red BSC
+            Red BSC · Colección {order.collectionAddress.slice(0, 8)}…
+            {order.collectionAddress.slice(-6)}
           </p>
           <p className="mt-1 truncate font-mono text-[11px] text-slate-500">
-            Colección {order.collectionAddress.slice(0, 8)}…
-            {order.collectionAddress.slice(-6)} · Orden{' '}
-            {order.orderId.slice(0, 8)}…
+            Orden {order.orderId.slice(0, 8)}…
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -109,6 +108,7 @@ function UkiMarketplaceCard({
             </p>
           </div>
         </div>
+        <p className="text-xs text-slate-400">Precio fijado en UKI</p>
         <Button
           type="button"
           onClick={onToggle}
@@ -176,8 +176,8 @@ export function MarketplaceClient({
     if (cursor.ukiCursor) params.set('ukiCursor', cursor.ukiCursor);
     if (search.trim()) params.set('search', search.trim());
     if (network !== 'all') params.set('network', network);
-    if (scope === 'legacy' && type !== 'all') params.set('type', type);
-    if (scope === 'legacy' && generation !== 'all')
+    if (scope !== 'uki' && type !== 'all') params.set('type', type);
+    if (scope !== 'uki' && generation !== 'all')
       params.set('generation', generation);
     return params.toString();
   }, [
@@ -240,6 +240,17 @@ export function MarketplaceClient({
     setSelectedUkiOrderId(null);
     resetPagination();
   }
+  function applyLegacyFacet(
+    setter: (value: string) => void,
+    value: string,
+  ) {
+    if (scope === 'all' && value !== 'all') {
+      setScope('legacy');
+      setSelectedUkiOrderId(null);
+    }
+    setter(value);
+    resetPagination();
+  }
   function nextPage() {
     if (!catalog?.hasMore) return;
     setHistory((current) => [...current.slice(0, page + 1), catalog.cursors]);
@@ -250,115 +261,138 @@ export function MarketplaceClient({
     <section className="grid gap-5">
       <div className="rounded-[8px] border border-white/10 bg-black/30 p-4 backdrop-blur">
         <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-[minmax(18rem,1fr)_repeat(5,minmax(9rem,auto))]">
-          <div className="relative min-w-0">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <Input
-              value={search}
+          <label className="grid min-w-0 gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Buscar</span>
+            <span className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                aria-label="Buscar en el catálogo"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  resetPagination();
+                }}
+                placeholder="Número o wallet"
+                className="pl-9"
+              />
+            </span>
+          </label>
+          <label className="grid min-w-0 gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Catálogo</span>
+            <select
+              aria-label="Origen del anuncio"
+              value={scope}
               onChange={(event) => {
-                setSearch(event.target.value);
+                const nextScope = event.target.value as MarketplaceScope;
+                setScope(nextScope);
+                if (nextScope === 'uki' && network === 'TRON') setNetwork('all');
+                setType('all');
+                setGeneration('all');
+                if (nextScope !== 'legacy') setSort('newest');
+                setSelectedUkiOrderId(null);
                 resetPagination();
               }}
-              placeholder="Busca un Cukie"
-              className="pl-9"
-            />
-          </div>
-          <select
-            aria-label="Origen del anuncio"
-            value={scope}
-            onChange={(event) => {
-              const nextScope = event.target.value as MarketplaceScope;
-              setScope(nextScope);
-              if (nextScope !== 'legacy') setSort('newest');
-              setSelectedUkiOrderId(null);
-              resetPagination();
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">Todos los catálogos</option>
-            <option value="legacy">Solo Legacy</option>
-            <option value="uki">Solo UKI</option>
-          </select>
-          <select
-            value={network}
-            onChange={(event) => {
-              const nextNetwork = event.target.value;
-              setNetwork(nextNetwork);
-              if (nextNetwork === 'all' && sort.startsWith('price-')) {
-                setSort('newest');
-              }
-              resetPagination();
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">Todas las redes</option>
-            <option value="BSC">BSC</option>
-            <option value="TRON">TRON</option>
-          </select>
-          <select
-            aria-label="Tipo (solo Legacy)"
-            disabled={scope !== 'legacy'}
-            value={type}
-            onChange={(event) => {
-              setType(event.target.value);
-              resetPagination();
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">
-              Todos los tipos {scope !== 'legacy' ? '(solo Legacy)' : ''}
-            </option>
-            {typeOptions.map((value) => (
-              <option key={value} value={String(value)}>
-                Tipo {value}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Generación (solo Legacy)"
-            disabled={scope !== 'legacy'}
-            value={generation}
-            onChange={(event) => {
-              setGeneration(event.target.value);
-              resetPagination();
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">
-              Todas las generaciones {scope !== 'legacy' ? '(solo Legacy)' : ''}
-            </option>
-            {generationOptions.map((value) => (
-              <option key={value} value={String(value)}>
-                Generación {value}
-              </option>
-            ))}
-          </select>
-          <select
-            value={sort}
-            onChange={(event) => {
-              setSort(event.target.value);
-              resetPagination();
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="newest">Más recientes</option>
-            <option value="number-asc" disabled={scope !== 'legacy'}>
-              Número: menor a mayor (Legacy)
-            </option>
-            <option value="number-desc" disabled={scope !== 'legacy'}>
-              Número: mayor a menor (Legacy)
-            </option>
-            <option value="price-asc" disabled={!priceSortAllowed}>
-              Precio: menor a mayor (Legacy + red)
-            </option>
-            <option value="price-desc" disabled={!priceSortAllowed}>
-              Precio: mayor a menor (Legacy + red)
-            </option>
-          </select>
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="all">Todos los catálogos</option>
+              <option value="legacy">Solo Legacy</option>
+              <option value="uki">Solo V2 · UKI</option>
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Red</span>
+            <select
+              aria-label="Red"
+              value={network}
+              onChange={(event) => {
+                const nextNetwork = event.target.value;
+                setNetwork(nextNetwork);
+                if (nextNetwork === 'all' && sort.startsWith('price-')) {
+                  setSort('newest');
+                }
+                resetPagination();
+              }}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="all">Todas las redes</option>
+              <option value="BSC">BSC</option>
+              {scope !== 'uki' && <option value="TRON">TRON</option>}
+            </select>
+          </label>
+          {scope !== 'uki' && (
+            <>
+              <label className="grid min-w-0 gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tipo</span>
+                <select
+                  aria-label="Tipo de Cukie"
+                  value={type}
+                  onChange={(event) => {
+                    applyLegacyFacet(setType, event.target.value);
+                  }}
+                  className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="all">Todos los tipos</option>
+                  {typeOptions.map((value) => (
+                    <option key={value} value={String(value)}>
+                      Tipo {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid min-w-0 gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Generación</span>
+                <select
+                  aria-label="Generación"
+                  value={generation}
+                  onChange={(event) => {
+                    applyLegacyFacet(setGeneration, event.target.value);
+                  }}
+                  className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  <option value="all">Todas las generaciones</option>
+                  {generationOptions.map((value) => (
+                    <option key={value} value={String(value)}>
+                      Generación {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <label className="grid min-w-0 gap-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ordenar por</span>
+            <select
+              aria-label="Ordenar resultados"
+              value={sort}
+              onChange={(event) => {
+                setSort(event.target.value);
+                resetPagination();
+              }}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="newest">Más recientes</option>
+              {scope === 'legacy' && (
+                <>
+                  <option value="number-asc">Número ascendente</option>
+                  <option value="number-desc">Número descendente</option>
+                </>
+              )}
+              {priceSortAllowed && (
+                <>
+                  <option value="price-asc">Precio más bajo</option>
+                  <option value="price-desc">Precio más alto</option>
+                </>
+              )}
+            </select>
+          </label>
           {!priceSortAllowed && (
             <p className="col-span-full text-xs text-amber-100">
-              Los filtros avanzados y el precio solo están disponibles en
-              Legacy; Todos/UKI mantienen búsqueda global por ID/wallet y orden
-              reciente.
+              El precio se puede ordenar cuando muestras solo Legacy y una red.
+            </p>
+          )}
+          {scope === 'all' && (
+            <p className="col-span-full text-xs text-slate-400">
+              Tipo y generación pertenecen al catálogo Legacy; al elegir uno se mostrará solo ese catálogo.
             </p>
           )}
           <Button

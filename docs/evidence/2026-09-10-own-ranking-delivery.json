@@ -1,0 +1,262 @@
+{
+  "observedAt": "2026-09-10T17:20:00Z",
+  "environment": "staging",
+  "pullRequests": [
+    391,
+    392,
+    393
+  ],
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34502941058",
+  "workflowConclusion": "success",
+  "release": {
+    "schemaVersion": 1,
+    "environment": "staging",
+    "chainId": "97",
+    "commit": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+    "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+    "deploymentUuid": "xsks80w8c4sw8wog8w4cgwgg",
+    "deliveryMode": "rolling",
+    "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+    "webResourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+    "workersResourceUuid": "u4s804o4wwcckowgk0woo4wg",
+    "gameResourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+    "gameDeploymentUuid": "koccwkw8o8kk8sw08ksw8ow0",
+    "components": {
+      "dapp": {
+        "image": "192.168.1.207:5000/cukies-hub/dapp:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:a63678c94a10c36b519c52145bdac75bd1e8594c6c1d5f6db86eb3133894f721",
+        "digest": "sha256:a63678c94a10c36b519c52145bdac75bd1e8594c6c1d5f6db86eb3133894f721",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "chain-indexer": {
+        "image": "192.168.1.207:5000/cukies-hub/chain-indexer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "digest": "sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cuki-card-worker": {
+        "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "digest": "sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "schedulers": {
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "digest": "sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cukies-bridge-relayer": {
+        "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "digest": "sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "treasure-hunt": {
+        "image": "192.168.1.207:5000/cukies-hub/treasure-hunt:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "digest": "sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-api": {
+        "image": "192.168.1.207:5000/cukies-hub/world-api:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "digest": "sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-matchmaking": {
+        "image": "192.168.1.207:5000/cukies-hub/world-matchmaking:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "digest": "sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      }
+    },
+    "webCommit": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+    "gameCommit": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+    "previousCommit": "070cb3736c14dae1156afaf432ee3dc9c9042d4b",
+    "updatedAt": "2026-09-10T17:11:12.724Z"
+  },
+  "publicHealth": {
+    "status": "ok",
+    "gitSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44"
+  },
+  "workers": [
+    {
+      "id": "2c895ddfe6ff7c8dd5ed53b7644cb55de94e72f3c8911494679b9c820999981a",
+      "name": "u4s804o4wwcckowgk0woo4wg-reward-batch-publisher-1",
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "APP_ENV": "staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+      }
+    },
+    {
+      "id": "b05ce9abe149e049d908ac3eb32ab5daf701d097cfd1494003b4f6f95a8783e3",
+      "name": "u4s804o4wwcckowgk0woo4wg-cukie-master-scheduler-1",
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "APP_ENV": "staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "DATABASE_URL database": "cukies-hub-staging"
+      }
+    },
+    {
+      "id": "550ba10165e4a2173ea3012fe800b4b0981184d4a500120861c98e7e6300d728",
+      "name": "u4s804o4wwcckowgk0woo4wg-competition-credit-scheduler-1",
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "APP_ENV": "staging",
+        "COMPETITION_CREDITS_SCHEDULER_ENABLED": "true",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+      }
+    },
+    {
+      "id": "320c2fa7bd56c083bf7672458945137a23b488e4fcf84d7d49b6bd2c44a67ad7",
+      "name": "u4s804o4wwcckowgk0woo4wg-weekly-ranking-scheduler-1",
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+        "APP_ENV": "staging"
+      }
+    },
+    {
+      "id": "8e67016379b87348ccd5028b05ca722c94199a854e623d057817ef17554f1097",
+      "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-1",
+      "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+      "state": "running",
+      "health": null,
+      "restarts": 0,
+      "runtime": {
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CARD_WORKER_LEGACY_STAGING_ENABLED": "false",
+        "APP_ENV": "staging"
+      }
+    },
+    {
+      "id": "7aa47783a19576211af01e8d6d41ea2fc511be8b065dc4ed6b10eb8ac1403342",
+      "name": "u4s804o4wwcckowgk0woo4wg-game-economy-scheduler-1",
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "APP_ENV": "staging"
+      }
+    },
+    {
+      "id": "2e4739645d1028e94da28b4a299c8de8d3918afcf3f68ff1ed6e21ea2298fb4e",
+      "name": "u4s804o4wwcckowgk0woo4wg-cukie-pool-scheduler-1",
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "DATABASE_URL database": "cukies-hub-staging",
+        "APP_ENV": "staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false"
+      }
+    },
+    {
+      "id": "12120a332a42f3f2cd738e03b62cfd1ba36a8b8662177c9a42d3e0330bfc135c",
+      "name": "u4s804o4wwcckowgk0woo4wg-chain-indexer-1",
+      "image": "192.168.1.207:5000/cukies-hub/chain-indexer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CUKIES_DATABASE_URL database": "cukies-legacy-staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "APP_ENV": "staging"
+      }
+    },
+    {
+      "id": "91acd499cdfd8537678985a51f9ab9bd0145817d4ddffadff1934e26f2afa129",
+      "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-legacy-1",
+      "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+      "state": "running",
+      "health": null,
+      "restarts": 0,
+      "runtime": {
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CARD_WORKER_DB_NAME": "cukies-legacy-staging",
+        "APP_ENV": "staging",
+        "CARD_WORKER_LEGACY_STAGING_ENABLED": "true"
+      }
+    },
+    {
+      "id": "22044a7388672fdf838036bd9101ae8355f40a0f607cc8961c23c249baf61d7a",
+      "name": "u4s804o4wwcckowgk0woo4wg-reward-accounting-scheduler-1",
+      "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "runtime": {
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "APP_ENV": "staging",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false"
+      }
+    }
+  ],
+  "protectedContainers": {
+    "compared": 15,
+    "unchangedIds": 15
+  },
+  "limitations": [
+    "No historical game reconciliation",
+    "Game economy, ranking, accounting and reward publisher gates remain disabled",
+    "No signed marketplace purchase or reward claim in this verification"
+  ]
+}

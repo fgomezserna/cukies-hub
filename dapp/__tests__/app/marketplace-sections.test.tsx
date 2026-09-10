@@ -31,7 +31,7 @@ describe('marketplace orientado al cliente', () => {
     mockMarketplacePublicConfig.ready = false;
   });
 
-  it('muestra compra y venta Legacy y explica que V2 no está configurado', () => {
+  it('muestra compra y venta Legacy y mantiene un estado público cuando UKI no está disponible', () => {
     render(<MarketplacePage />);
 
     expect(screen.getByTestId('legacy-marketplace')).toBeInTheDocument();
@@ -40,7 +40,8 @@ describe('marketplace orientado al cliente', () => {
     expect(screen.getByTestId('uki-marketplace-seller')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Comprar Cukies' })).toHaveAttribute('href', '#cukies-disponibles');
     expect(screen.getByRole('link', { name: 'Vender / mis anuncios' })).toHaveAttribute('href', '#mis-anuncios');
-    expect(screen.getByText(/contrato Marketplace V2\/UKI no está configurado/i)).toBeInTheDocument();
+    expect(screen.getByText(/La venta directa en UKI todavía no está disponible/i)).toBeInTheDocument();
+    expect(screen.queryByText(/controles ficticios/i)).not.toBeInTheDocument();
   });
 
   it('activa compra y anuncios únicamente mediante configuración de entorno', () => {

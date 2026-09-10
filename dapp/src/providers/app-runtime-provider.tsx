@@ -21,6 +21,7 @@ import {
 import type { AppRuntimeServiceStatus, AppRuntimeStatus } from '@/lib/app-runtime/types';
 import { UKI_PRESALE_CHAIN_ID } from '@/components/landing/sale-config';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
+import type { AccountSummary } from '@/lib/account-summary-types';
 
 export type AppRuntimeResource =
   | 'runtime-status'
@@ -29,6 +30,7 @@ export type AppRuntimeResource =
   | 'master-nft'
   | 'credits'
   | 'pool'
+  | 'account-summary'
   | (string & {});
 
 export type AppRuntimeOperation =
@@ -82,6 +84,13 @@ type RuntimeContextValue = {
   status: AppRuntimeStatus | null;
   statusState: 'idle' | 'loading' | 'ready' | 'stale' | 'syncing' | 'unavailable';
   isRefreshing: boolean;
+  accountSummary: {
+    data: AccountSummary | undefined;
+    state: 'idle' | 'loading' | 'ready' | 'stale' | 'unavailable';
+    error: Error | null;
+    refresh: () => Promise<unknown>;
+  };
+  requestAccountSummary: () => void;
   projectionSync: AppRuntimeProjectionSync;
   registerStakingExpectation: (expectation: AppRuntimeStakingExpectation) => void;
   refresh: () => Promise<unknown>;
@@ -101,6 +110,7 @@ const RESOURCE_ENDPOINTS: Record<string, string> = {
   'master-nft': '/api/economy/v1/cukie-master',
   credits: '/api/economy/v1/credits',
   pool: '/api/economy/v1/cukie-pool',
+  'account-summary': '/api/account/v1/summary',
 };
 
 function configuredBscChain(): 56 | 97 | null {
@@ -115,7 +125,7 @@ function canonicalResource(resource: AppRuntimeResource) {
 
 function sourceChainForResource(resource: AppRuntimeResource): 56 | 97 | null {
   if (resource === 'pool') return ukiNftVaults.chainId;
-  if (resource === 'master' || resource === 'master-nft' || resource === 'credits' || resource === 'runtime-status') {
+  if (resource === 'master' || resource === 'master-nft' || resource === 'credits' || resource === 'runtime-status' || resource === 'account-summary') {
     return configuredBscChain();
   }
   return null;
@@ -130,7 +140,7 @@ function isRuntimeStatusQuery(queryKey: readonly unknown[]) {
 }
 
 function transactionResources(resource?: AppRuntimeResource) {
-  const resources = new Set<string>(['master', 'credits', 'dashboard']);
+  const resources = new Set<string>(['master', 'credits', 'dashboard', 'account-summary']);
   const canonical = resource ? canonicalResource(resource) : null;
   if (canonical === 'pool' || canonical === 'pool-write') resources.add('pool');
   if (canonical === 'nft' || canonical === 'nft-write' || canonical === 'recovery' || canonical === 'recovery-write') resources.add('master');
@@ -149,6 +159,7 @@ function statusStateFor(status: AppRuntimeStatus | null): 'ready' | 'syncing' | 
 // bounded so a receipt never turns into a burst of requests or a false success.
 const PROJECTION_SYNC_BACKOFF_MS = [2_000, 5_000, 10_000, 15_000, 30_000, 50_000] as const;
 const PROJECTION_SYNC_DEADLINE_MS = 120_000;
+const ACCOUNT_SUMMARY_STALE_TIME = 15_000;
 
 function waitForProjectionRetry(delayMs: number, signal: AbortSignal) {
   if (signal.aborted) return Promise.resolve(false);
@@ -163,6 +174,43 @@ function waitForProjectionRetry(delayMs: number, signal: AbortSignal) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isAccountSummaryPayload(value: unknown): value is AccountSummary {
+  if (!isRecord(value) || typeof value.walletNormalized !== 'string') return false;
+  if (value.chainId !== null && value.chainId !== 56 && value.chainId !== 97) return false;
+  if (!isRecord(value.network)
+    || (value.network.chainId !== null && value.network.chainId !== 56 && value.network.chainId !== 97)
+    || value.network.chainId !== value.chainId) return false;
+  if (value.uki !== null && (!isRecord(value.uki)
+    || typeof value.uki.balance !== 'string'
+    || typeof value.uki.balanceRaw !== 'string'
+    || value.uki.decimals !== 18
+    || value.uki.symbol !== 'UKI'
+    || value.uki.source !== 'wallet')) return false;
+  const nullableNonNegativeInteger = (candidate: unknown) => (
+    candidate === null || (Number.isSafeInteger(candidate) && (candidate as number) >= 0)
+  );
+  if (value.credits !== null) {
+    const materializationStates = new Set(['ready', 'blocked', 'unknown', 'too_large', 'stale']);
+    const credits = value.credits;
+    if (!isRecord(credits)
+      || !nullableNonNegativeInteger(credits.availableCredits)
+      || !nullableNonNegativeInteger(credits.reservedCredits)
+      || !nullableNonNegativeInteger(credits.spentCredits)
+      || typeof credits.blocked !== 'boolean'
+      || !materializationStates.has(String(credits.materialization))
+      || credits.source !== 'account') return false;
+  }
+  if (value.cukies !== null) {
+    const countFields = ['total', 'inWallet', 'available', 'onSale', 'inPool', 'inCukieMaster', 'otherInUse'] as const;
+    const cukies = value.cukies;
+    if (!isRecord(cukies)
+      || countFields.some((field) => !nullableNonNegativeInteger(cukies[field]))
+      || cukies.coverage !== 'complete'
+      || cukies.source !== 'collection') return false;
+  }
+  return true;
 }
 
 function canonicalRaw(value: unknown): value is string {
@@ -316,6 +364,60 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     attempt: 0,
     error: null,
   });
+  const accountSummaryChainId = configuredBscChain();
+  const accountSummaryIdentity = address && sessionReady
+    ? `${address}:${accountSummaryChainId ?? ''}`
+    : null;
+  const [accountSummaryRequestedFor, setAccountSummaryRequestedFor] = useState<string | null>(null);
+  const accountSummaryRequested = accountSummaryIdentity !== null
+    && accountSummaryRequestedFor === accountSummaryIdentity;
+  const accountSummaryEndpoint = appRuntimeEndpoint('account-summary', address);
+  const accountSummaryQueryKey = useMemo(
+    () => [
+      ...appRuntimeQueryKey('account-summary', address, accountSummaryChainId),
+      accountSummaryEndpoint,
+      '',
+    ] as const,
+    [accountSummaryChainId, accountSummaryEndpoint, address],
+  );
+  const requestAccountSummary = useCallback(() => {
+    if (!accountSummaryIdentity) return;
+
+    // The menu stays mounted across routes, so opening it again does not
+    // remount the query. Revalidate only this wallet/chain key when its
+    // cached result is stale, invalidated, or errored; the first request is
+    // enabled by the state transition below and is therefore fetched once.
+    if (accountSummaryRequested) {
+      const queryState = queryClient.getQueryState(accountSummaryQueryKey);
+      const isFetching = queryState?.fetchStatus === 'fetching';
+      const hasExpired = Boolean(
+        queryState
+        && queryState.dataUpdatedAt > 0
+        && Date.now() - queryState.dataUpdatedAt >= ACCOUNT_SUMMARY_STALE_TIME,
+      );
+      const needsRefresh = Boolean(
+        queryState
+        && !isFetching
+        && (
+          queryState.isInvalidated
+          || queryState.status === 'error'
+          || Boolean(queryState.error)
+          || hasExpired
+        ),
+      );
+      if (needsRefresh) {
+        void queryClient.invalidateQueries({
+          queryKey: accountSummaryQueryKey,
+          exact: true,
+          refetchType: 'active',
+        });
+      }
+    }
+
+    setAccountSummaryRequestedFor((current) => (
+      current === accountSummaryIdentity ? current : accountSummaryIdentity
+    ));
+  }, [accountSummaryIdentity, accountSummaryQueryKey, accountSummaryRequested, queryClient]);
 
   useEffect(() => {
     const onlineHandler = () => setOnline(true);
@@ -375,10 +477,58 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     refetchInterval: runtimeRouteActive ? 60_000 : false,
   });
 
+  const accountSummaryQuery = useQuery<AccountSummary>({
+    queryKey: accountSummaryQueryKey,
+    queryFn: async ({ signal }) => {
+      if (!address) throw new Error('ACCOUNT_SUMMARY_WALLET_REQUIRED');
+      const { response, body } = await fetchRuntime<{ status?: string; data?: unknown }>(accountSummaryEndpoint, signal);
+      if (
+        !response.ok
+        || body.status !== 'ok'
+        || !isAccountSummaryPayload(body.data)
+        || body.data.walletNormalized.toLowerCase() !== address
+        || !payloadMatchesIdentity('account-summary', body.data, address, accountSummaryChainId ?? 0)
+      ) {
+        throw new Error('ACCOUNT_SUMMARY_UNAVAILABLE');
+      }
+      return body.data;
+    },
+    enabled: accountSummaryRequested && !authLoading && online,
+    staleTime: ACCOUNT_SUMMARY_STALE_TIME,
+    gcTime: 5 * 60_000,
+    retry: (failureCount: number) => failureCount < 1,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchOnMount: 'always',
+    refetchInterval: false,
+  });
+
   useEffect(() => {
-    if (!runtimeRouteActive || !address || !sessionReady) {
-      void queryClient.cancelQueries({ queryKey: ['app-runtime'] });
-      void queryClient.removeQueries({ queryKey: ['app-runtime'] });
+    void queryClient.removeQueries({
+      predicate: ({ queryKey }: { queryKey: readonly unknown[] }) => (
+        isRuntimeResourceQuery(queryKey)
+        && queryKey[4] === 'account-summary'
+        && (queryKey[2] !== address || queryKey[3] !== accountSummaryChainId)
+      ),
+    });
+  }, [accountSummaryChainId, address, queryClient]);
+
+  useEffect(() => {
+    if (address && sessionReady && runtimeRouteActive) return;
+    const predicate = ({ queryKey }: { queryKey: readonly unknown[] }) => {
+      if (!isRuntimeResourceQuery(queryKey)) return false;
+      // The account menu stays mounted on public routes. Preserve its scoped
+      // summary while the authenticated EVM identity remains unchanged.
+      return queryKey[4] !== 'account-summary' || !address || !sessionReady;
+    };
+    void queryClient.cancelQueries({ predicate });
+    void queryClient.removeQueries({ predicate });
+    if (!address || !sessionReady) {
+      void queryClient.removeQueries({
+        predicate: ({ queryKey }: { queryKey: readonly unknown[] }) => (
+          isRuntimeResourceQuery(queryKey) && queryKey[4] === 'account-summary'
+        ),
+      });
     }
   }, [address, queryClient, runtimeRouteActive, sessionReady]);
 
@@ -651,6 +801,19 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
           ? runtimeQuery.data ? 'stale' : 'unavailable'
           : statusStateFor(runtimeQuery.data ?? null),
     isRefreshing: runtimeQuery.isFetching,
+    accountSummary: {
+      data: accountSummaryRequested && !authLoading && online ? accountSummaryQuery.data : undefined,
+      state: !accountSummaryRequested || !address || !sessionReady || authLoading
+        ? 'idle'
+        : accountSummaryQuery.isPending
+          ? 'loading'
+          : accountSummaryQuery.isError || accountSummaryQuery.isRefetchError || Boolean(accountSummaryQuery.error)
+            ? accountSummaryQuery.data ? 'stale' : 'unavailable'
+            : accountSummaryQuery.data ? 'ready' : 'idle',
+      error: accountSummaryQuery.error instanceof Error ? accountSummaryQuery.error : null,
+      refresh: accountSummaryQuery.refetch,
+    },
+    requestAccountSummary,
     projectionSync,
     registerStakingExpectation,
     refresh,
@@ -660,7 +823,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     readiness,
     switchTo,
     queryKey: (resource, wallet = address, targetChainId = expectedChainId('dashboard')) => appRuntimeQueryKey(resource, wallet?.toLowerCase() ?? null, targetChainId ?? null),
-  }), [address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, online, projectionSync, readiness, refresh, refreshAfterTransaction, registerStakingExpectation, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
+  }), [accountSummaryQuery.data, accountSummaryQuery.error, accountSummaryQuery.isError, accountSummaryQuery.isPending, accountSummaryQuery.isRefetchError, accountSummaryQuery.refetch, accountSummaryRequested, address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, online, projectionSync, readiness, refresh, refreshAfterTransaction, registerStakingExpectation, requestAccountSummary, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
 
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
 }
@@ -669,6 +832,10 @@ export function useAppRuntime() {
   const context = useContext(RuntimeContext);
   if (!context) throw new Error('useAppRuntime must be used within AppRuntimeProvider');
   return context;
+}
+
+export function useOptionalAppRuntime() {
+  return useContext(RuntimeContext);
 }
 
 export function useAppRuntimeResource<T>(resource: AppRuntimeResource, options: {

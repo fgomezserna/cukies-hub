@@ -21,14 +21,14 @@ export function formatLegacyPrice(cuki: LegacyMarketplaceCukiItem) {
     try {
       if (cuki.network === 'BSC') {
         return `${Number(formatEther(BigInt(cuki.priceOriginal))).toLocaleString(
-          'en-US',
+          'es-ES',
           { maximumFractionDigits: 4 },
         )} BNB`;
       }
 
       if (cuki.network === 'TRON') {
         return `${(Number(cuki.priceOriginal) / 1_000_000).toLocaleString(
-          'en-US',
+          'es-ES',
           { maximumFractionDigits: 2 },
         )} TRX`;
       }

@@ -10,6 +10,7 @@ import {
 import { buildLegacyMarketplaceReconciliation } from '@/lib/legacy-marketplace/reconciliation';
 import {
   isLegacyTronWalletOnRpc,
+  isLegacyTronWalletSignerReady,
   sendLegacyTronContract,
 } from '@/lib/legacy-marketplace/tron';
 import type { LegacyTronWebLike } from '@/lib/legacy-marketplace/tron';
@@ -134,6 +135,25 @@ describe('seguridad de acciones Legacy', () => {
     releaseContract?.({ buyToken: () => ({ send }) });
 
     await expect(action).rejects.toThrow('WALLET_CONTEXT_CHANGED');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('falla de forma explícita antes de send si TronLink no expone signer', async () => {
+    const send = jest.fn().mockResolvedValue('txid');
+    const tronClient = {
+      defaultAddress: { base58: 'TOWNER' },
+      fullNode: { host: 'https://api.trongrid.io' },
+      contract: jest.fn().mockResolvedValue({ buyToken: () => ({ send }) }),
+    } as unknown as LegacyTronWebLike;
+
+    expect(isLegacyTronWalletSignerReady(tronClient)).toBe(false);
+    await expect(sendLegacyTronContract(
+      tronClient,
+      'marketplace',
+      'buyToken',
+      ['2000000004314'],
+      { callValue: 3_333_000_000 },
+    )).rejects.toThrow('TRON_SIGNER_UNAVAILABLE');
     expect(send).not.toHaveBeenCalled();
   });
 

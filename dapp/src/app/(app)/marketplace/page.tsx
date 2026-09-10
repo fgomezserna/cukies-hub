@@ -22,7 +22,7 @@ export default function MarketplacePage() {
           <div className="max-w-3xl">
             <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]"><Store className="h-4 w-4" /> Marketplace</p>
             <h1 className="mt-2 text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">Encuentra tu próximo Cukie</h1>
-            <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">Busca por número, rareza o generación. Abre una ficha para revisar todos los datos antes de comprar.</p>
+            <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">Busca por número, tipo o generación. Abre una ficha para revisar todos los datos antes de comprar.</p>
           </div>
           <Link href="/cukies" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-4 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
             <Cookie className="h-4 w-4 text-[var(--uki-lilac)]" />
@@ -38,7 +38,7 @@ export default function MarketplacePage() {
       </nav>
 
       <section id="cukies-disponibles" className="scroll-mt-24">
-        <MarketplaceClient heading="Cukies disponibles" description="filtra por catálogo, red y tipo antes de abrir una ficha" />
+        <MarketplaceClient heading="Cukies disponibles" description="explora Legacy y V2 · UKI con filtros por red, tipo y generación" />
         {ukiMarketplaceReady ? <span data-testid="uki-marketplace" className="sr-only" aria-hidden="true" /> : null}
       </section>
 
@@ -54,7 +54,7 @@ export default function MarketplacePage() {
               <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">V2 · UKI</p>
               {!ukiMarketplaceReady && (
                 <p className="mt-2 text-sm font-semibold text-amber-100">
-                  El contrato Marketplace V2/UKI no está configurado en este entorno. No se muestran controles ficticios ni se reutiliza el contrato Legacy para UKI.
+                  La venta directa en UKI todavía no está disponible. Puedes seguir explorando el catálogo mientras tanto.
                 </p>
               )}
               <div className="mt-4"><UkiMarketplaceSellerPanel /></div>
