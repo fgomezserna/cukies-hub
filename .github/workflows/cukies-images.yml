@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           changed="$(git diff --name-only "${{ github.event.pull_request.base.sha }}"...HEAD)"
-          if printf '%s\n' "$changed" | grep -Eq '^(packages/world-|infrastructure/world/|Dockerfile\.ci$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|nx\.json$|docker-compose\.(coolify|images|workers)\.yml$|scripts/ci/(build-images|world-runtime-smoke|generate-images-compose|release-plan|release-delivery-plan|release-state|deliver-release|coolify-release)\.mjs$)'; then
+          if printf '%s\n' "$changed" | grep -E '^(packages/world-|infrastructure/world/|Dockerfile\.ci$|\.dockerignore$|\.npmrc$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|nx\.json$|docker-compose\.(coolify|images|workers)\.yml$|infrastructure/ci/components\.json$|scripts/ci/(build-images|world-runtime-smoke|generate-images-compose|release-plan|release-delivery-plan|release-state|deliver-release|coolify-release|image-ref)\.mjs$|\.github/workflows/cukies-images\.yml$)' >/dev/null; then
             echo 'changed=true' >> "$GITHUB_OUTPUT"
           else
             echo 'changed=false' >> "$GITHUB_OUTPUT"
