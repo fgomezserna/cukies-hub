@@ -1,0 +1,39 @@
+{
+  "recordedAt": "2026-09-10T13:21:49.062752+00:00",
+  "environment": "staging",
+  "reviewer": "root",
+  "nftCandidate": {
+    "sourceCommits": [
+      "c3424a9883f2c5d3663f48fb9655d9772ff1154e",
+      "de02156c7068677c336c11d906eab2490579df4e"
+    ],
+    "verdict": "changes_requested",
+    "finding": {
+      "id": "NFT-R01",
+      "priority": 1,
+      "file": "dapp/src/components/cukie-pool/status-panel.tsx",
+      "description": "New syncing_projection receipt/positionOf awaits have no subsequent disposed/context guard before persistence or cleanup. Cleanup matches only asset identity, so a delayed result can affect a replacement operation.",
+      "requiredEvidence": "Deferred-promise regression for context switch/unmount and same-asset replacement transaction; retain exact vault/collection/beneficiary/epoch binding."
+    },
+    "limits": [
+      "No candidate publication or live transaction.",
+      "Current public NFT98000006 is actionable; that does not identify its historical pending operation."
+    ]
+  },
+  "gameAudit": {
+    "report": "/tmp/cukies-ranking-positive-score-audit-20260910.md",
+    "agentObservation": "Five recent settled runs used own credits, scores43/2/6/117/6.",
+    "rootVerifiedPolicy": {
+      "ownCreditsWeeklyRanking": false,
+      "ownCreditsDirectRewards": true,
+      "rules": "docs/uki-current-operating-rules.md:598-650",
+      "code": "dapp/src/lib/uki-economy/game-economy/treasure-hunt-policy.ts:149"
+    },
+    "remainingEvidence": "Trace direct daily rewards for these runs through snapshots, settlement, allocation and publication; exact runtime gates still need confirmation.",
+    "limits": [
+      "No historical reset or closed settlement modified.",
+      "No paid game or ledger/cursor mutation performed.",
+      "Missing weekly ranking source is expected for own credits and does not establish missing direct reward cause."
+    ]
+  }
+}
