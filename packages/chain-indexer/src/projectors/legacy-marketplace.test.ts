@@ -7,7 +7,6 @@ import { projectEvent } from './index.js';
 import {
   buildNftOwnershipEvidence,
   decideNftOwnershipProjection,
-  type NftOwnershipEvidence,
 } from './nft-ownership.js';
 
 type Document = { _id: string; [key: string]: any };
@@ -265,7 +264,7 @@ function listingEvent(tokenId: string, blockNumber: number) {
 }
 
 describe('legacy marketplace Stage projectors', () => {
-  it('keeps ownership identity network-aware and preserves TRON Base58 case', () => {
+  it('keeps BSC ownership identity network-aware', () => {
     const bscResult = buildNftOwnershipEvidence(stageEvent({
       eventName: 'Transfer',
       alias: 'TOKEN',
@@ -302,96 +301,18 @@ describe('legacy marketplace Stage projectors', () => {
       'apply',
     );
 
-    const tronMintResult = buildNftOwnershipEvidence({
-      _id: 'TRON:TOKEN:Transfer:mint:0',
-      chain: 'TRON',
-      contractAlias: 'TOKEN',
-      contractAddress: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY4',
-      eventName: 'Transfer',
-      txHash: `0x${'2'.repeat(64)}`,
-      logIndex: 0,
-      blockNumber: 6,
-      blockHash: `0x${'3'.repeat(64)}`,
-      timestampMs: 6_000,
-      args: {
+    assert.equal(
+      buildNftOwnershipEvidence(tronTransferEvent({
         tokenId: '1',
         from: tronZeroAddress,
         to: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5',
-      },
-      normalized: normalizeDomainEvent('TRON', 'Transfer', 'TOKEN', {
-        tokenId: '1',
-        from: tronZeroAddress,
-        to: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5',
-      }),
-      raw: {},
-      status: 'projected',
-      attempts: 1,
-      schemaVersion: 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    assert.equal(tronMintResult.ok, true);
-    if (!tronMintResult.ok) return;
-    assert.equal(tronMintResult.evidence.fromNormalized, tronZeroAddress);
-    assert.equal(tronMintResult.evidence.isMint, true);
-
-    const tronEvidence: NftOwnershipEvidence = {
-      eventId: 'tron-transfer-1',
-      chain: 'TRON',
-      contractAlias: 'TOKEN',
-      contractAddress: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY4',
-      collectionAddressNormalized: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY4',
-      tokenId: '1',
-      from: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY4',
-      to: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5',
-      fromNormalized: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY4',
-      toNormalized: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5',
-      isMint: false,
-      blockNumber: 5,
-      logIndex: 0,
-      transactionHash: `0x${'1'.repeat(64)}`,
-      timestampMs: 5_000,
-    };
-    assert.equal(
-      decideNftOwnershipProjection(
-        {
-          chain: 'TRON',
-          network: 'tron',
-          tokenId: '1',
-          collectionAddressNormalized: tronEvidence.collectionAddressNormalized,
-          ownerNormalized: tronEvidence.fromNormalized,
-        },
-        tronEvidence,
-      ).kind,
-      'apply',
-    );
-    assert.equal(
-      decideNftOwnershipProjection(
-        {
-          chain: 'TRON',
-          tokenId: '1',
-          collectionAddressNormalized: tronEvidence.collectionAddressNormalized,
-          ownerNormalized: tronEvidence.fromNormalized.toLowerCase(),
-        },
-        tronEvidence,
-      ).kind,
-      'conflict',
-    );
-    assert.equal(
-      decideNftOwnershipProjection(
-        {
-          chain: 'TRON',
-          tokenId: '1',
-          collectionAddressNormalized: tronEvidence.collectionAddressNormalized.toLowerCase(),
-          ownerNormalized: tronEvidence.fromNormalized,
-        },
-        tronEvidence,
-      ).kind,
-      'conflict',
+        blockNumber: 6,
+      })).ok,
+      false,
     );
   });
 
-  it('keeps TRON mainnet ownership compatible with absent or null chainId', async () => {
+  it('keeps the historical TRON projection format and invalidation path', async () => {
     const context = memoryStore();
     const first = tronTransferEvent({
       tokenId: '1',
@@ -404,21 +325,31 @@ describe('legacy marketplace Stage projectors', () => {
     const projected = context.collections.get('cukies')!.documents.get('1')!;
     assert.equal(projected.network, 'TRON');
     assert.equal('chainId' in projected, false);
-    assert.equal(projected.ownerNormalized, 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5');
+    assert.equal(projected.owner, 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5');
+    assert.equal(projected.ownerNormalized, 'TQ5W8J5G9NQY4Z7YQJY4N4QY4QY4QY4QY5');
+    assert.equal('ownershipEventId' in projected, false);
+    context.collections.get('marketplace_listings')!.documents.set('1', {
+      _id: '1',
+      tokenId: '1',
+      status: 'active',
+    });
 
     // Some imported legacy documents materialize the same mainnet identity as
-    // an explicit null. The next canonical Transfer must still pass the CAS
-    // guard; no undefined/string(undefined) comparison is valid here.
+    // an explicit null. The historical update path keeps that value untouched.
     projected.chainId = null;
     const next = tronTransferEvent({
       tokenId: '1',
-      from: projected.ownerNormalized,
+      from: projected.owner,
       to: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY6',
       blockNumber: 7,
     });
     assert.equal(await projectEvent(context.store as never, next), null);
-    assert.equal(projected.ownerNormalized, 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY6');
+    assert.equal(projected.owner, 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY6');
+    assert.equal(projected.ownerNormalized, 'TQ5W8J5G9NQY4Z7YQJY4N4QY4QY4QY4QY6');
     assert.equal(projected.chainId, null);
+    assert.equal(context.collections.get('marketplace_listings')!.documents.get('1')!.status, 'invalid');
+    assert.equal(context.collections.get('tx_nfts')!.documents.size, 2);
+    assert.equal('ownershipEventId' in projected, false);
   });
 
   it('requires active owner-bound evidence and invalidates a listing when the Cukie is staked', async () => {

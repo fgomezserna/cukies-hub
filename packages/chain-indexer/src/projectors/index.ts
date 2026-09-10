@@ -279,6 +279,69 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
     return 'Transfer interno de contrato monitorizado';
   }
 
+  // TRON remains on the legacy projection path. Its historical documents use
+  // the generic uppercase normalizer for ownerNormalized and do not carry the
+  // BSC ownership tuple/CAS fields. Keep that schema and listing invalidation
+  // unchanged; the canonical ownership algorithm below is BSC-only.
+  if (event.chain === 'TRON') {
+    await invalidateActiveMarketplaceListing(store, event, id, 'transfer', documentId);
+    await collection(store, 'cukies').updateOne(
+      { _id: documentId },
+      {
+        $set: {
+          tokenId: id,
+          ...(legacyIdentity
+            ? {
+                ...(legacyIdentity.chainId === undefined
+                  ? {}
+                  : { chainId: legacyIdentity.chainId }),
+                collectionAddress: legacyIdentity.collectionAddress,
+                collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+              }
+            : {}),
+          user: to,
+          owner: to,
+          ownerNormalized: normalizeAddress(event.chain, to),
+          network: event.chain,
+          state: 'available',
+          price: 0,
+          priceOriginal: '0',
+          updatedAt: now(),
+          timeStamp: event.timestampMs,
+          lastEventId: event._id,
+          ...(isMintHint ? {
+            origin: 'mint',
+            mintEventId: event._id,
+            mintTransactionHash: event.txHash.toLowerCase(),
+            mintBlockNumber: event.blockNumber,
+            mintLogIndex: event.logIndex,
+            mintTimestampMs: event.timestampMs,
+            ...(event.blockHash ? { mintBlockHash: event.blockHash.toLowerCase() } : {}),
+          } : {}),
+        },
+        $setOnInsert: {
+          _id: documentId,
+          ...(!isMintHint ? { origin: 'transfer' } : {}),
+          birthNetwork: event.chain,
+          children: [],
+          parents: [null, null],
+          history: [],
+          createdAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+    await insertNftTx(store, event, {
+      nftType: 'CUKI',
+      tokenId: id,
+      from,
+      to,
+      type: isMintHint ? 'Mint' : 'Gift',
+      price: 0,
+    });
+    return null;
+  }
+
   const ownershipEvidence = buildNftOwnershipEvidence(event);
   if (!ownershipEvidence.ok) return `Transfer rechazado: ${ownershipEvidence.reason}`;
   const evidence = ownershipEvidence.evidence;
@@ -319,23 +382,13 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
           { ownerNormalized: evidence.fromNormalized },
         ],
       };
-  const chainIdGuard = event.chain === 'BSC'
-    ? {
-        $or: [
-          { chainId: { $exists: false } },
-          { chainId: evidence.chainId },
-          { chainId: String(evidence.chainId) },
-        ],
-      }
-    : {
-        // TRON legacy identities are mainnet-scoped and intentionally carry
-        // no numeric chainId. Accept only an absent/null field; never query
-        // with undefined or the string "undefined".
-        $or: [
-          { chainId: { $exists: false } },
-          { chainId: null },
-        ],
-      };
+  const chainIdGuard = {
+    $or: [
+      { chainId: { $exists: false } },
+      { chainId: evidence.chainId },
+      { chainId: String(evidence.chainId) },
+    ],
+  };
   const identityGuard = {
     $and: [
       ownerGuard,
