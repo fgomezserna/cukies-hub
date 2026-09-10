@@ -448,3 +448,29 @@ test('World integration refinement rejects global npmrc changes', async () => {
   });
   assert.deepEqual([...conservative.build].sort(), [...CI_COMPONENTS].sort());
 });
+
+test('World smoke wrapper y su test reconstruyen World; el test solo no reconstruye imagenes', () => {
+  const state = { ...worldManifest(), commit: SHA_A, components: allComponents() };
+  const paired = chooseReleasePlan({
+    state,
+    head: SHA_B,
+    configHash: HASH,
+    changedFiles: ['scripts/ci/world-runtime-smoke.mjs', 'scripts/ci/world-runtime-smoke.test.mjs'],
+    baseAncestor: true,
+  });
+  assert.deepEqual(paired.build, [...WORLD_COMPONENTS]);
+  assert.deepEqual(paired.reuse.map((entry) => entry.component), CI_COMPONENTS.filter((component) => !WORLD_COMPONENTS.includes(component)));
+  assert.deepEqual(componentForPath('scripts/ci/world-runtime-smoke.mjs'), [...WORLD_COMPONENTS]);
+  assert.deepEqual(componentForPath('scripts/ci/world-runtime-smoke.test.mjs'), []);
+
+  const testOnly = chooseReleasePlan({
+    state,
+    head: SHA_B,
+    configHash: HASH,
+    changedFiles: ['scripts/ci/world-runtime-smoke.test.mjs'],
+    baseAncestor: true,
+  });
+  assert.deepEqual(testOnly.build, []);
+  assert.deepEqual(testOnly.reuse.map((entry) => entry.component), [...CI_COMPONENTS]);
+  assert.deepEqual(componentForPath('scripts/ci/world-runtime-smoke.unknown.mjs'), [...CI_COMPONENTS]);
+});

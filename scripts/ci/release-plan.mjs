@@ -59,6 +59,7 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/image-ref.mjs',
   'scripts/ci/generate-images-compose.mjs',
   'scripts/ci/world-integration.test.mjs',
+  'scripts/ci/world-runtime-smoke.test.mjs',
 ]);
 
 const DAPP_DOCKERFILE_REFINEMENT_REASON = 'dockerfile-ci-final-dapp-stage-only';
