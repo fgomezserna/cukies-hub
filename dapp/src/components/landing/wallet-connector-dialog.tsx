@@ -42,6 +42,7 @@ type WalletConnectorDialogProps = {
   isConnecting?: boolean;
   title?: string;
   description?: string;
+  errorMessage?: string | null;
   tronLinkNative?: TronLinkNativeOption;
 };
 
@@ -86,6 +87,7 @@ export function WalletConnectorDialog({
   isConnecting = false,
   title = 'Conectar wallet',
   description = 'Elige como quieres conectar tu wallet.',
+  errorMessage,
   tronLinkNative,
 }: WalletConnectorDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -243,6 +245,12 @@ export function WalletConnectorDialog({
           {connectors.length === 0 && !tronLinkNative ? (
             <div className="rounded-[8px] border border-[#f2c34b]/30 bg-[#2b1d08]/42 p-3 text-sm font-semibold text-[#ffe2a0]">
               No se ha detectado ningun conector de wallet compatible.
+            </div>
+          ) : null}
+
+          {errorMessage ? (
+            <div role="alert" className="rounded-[8px] border border-[#ff75aa]/30 bg-[#40101f]/42 p-3 text-sm font-semibold text-[#ffd0df]">
+              {errorMessage}
             </div>
           ) : null}
 

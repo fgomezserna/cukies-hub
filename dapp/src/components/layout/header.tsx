@@ -27,6 +27,7 @@ import {
 } from '@/lib/wallet-connectors';
 import { HeaderWalletDialog } from '@/components/layout/header-wallet-dialog';
 import { cn } from '@/lib/utils';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 
 
@@ -65,13 +66,12 @@ export default function Header({
   const isGameOverlay = variant === 'game-overlay';
   const { toggleSidebar, state, isMobile } = useSidebar();
   const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
+  const { requestWallet, disconnectWallet } = useWalletCoordinator();
   const { address: evmAddress, isConnected: isEvmConnected } = useAccount();
   const { connectAsync, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const {
     address: tronAddress,
-    connect: connectTron,
-    disconnect: disconnectTron,
     error: tronError,
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
@@ -102,14 +102,10 @@ export default function Header({
         disconnect();
       }
 
-      if (isTronConnected) {
-        disconnectTron();
-      }
-
       const result = await connectAsync({ connector });
       const connectedAddress = result.accounts?.[0] || evmAddress;
 
-      if (connectedAddress) {
+      if (connectedAddress && !user) {
         await fetchUser(connectedAddress, { evmConnector: connector, promptForSignature: true, walletType: 'evm' });
       }
     } catch (error) {
@@ -119,20 +115,14 @@ export default function Header({
 
   const handleConnectTron = async () => {
     try {
-      if (isEvmConnected) {
-        disconnect();
-      }
-
-      if (isTronConnected && tronAddress) {
+      const ready = await requestWallet({
+        kind: 'tron',
+        targetTronNetwork: 'mainnet',
+        reason: 'Conecta TronLink en TRON Mainnet para operar con tu wallet TRON.',
+      });
+      if (ready.address && !user) {
         setIsWalletDialogOpen(false);
-        await fetchUser(tronAddress, { promptForSignature: true, walletType: 'tron' });
-        return;
-      }
-
-      const address = await connectTron();
-      if (address) {
-        setIsWalletDialogOpen(false);
-        await fetchUser(address, { promptForSignature: true, walletType: 'tron' });
+        await fetchUser(ready.address, { promptForSignature: true, walletType: 'tron' });
       }
     } catch (error) {
       console.error('Failed to connect TronLink:', error);
@@ -257,6 +247,30 @@ export default function Header({
                   </span>
                 </span>
               </div>
+              <div className="grid gap-2 px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-md border border-lilac-300/15 bg-lilac-400/5 px-2.5 py-2 text-xs">
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-foreground">EVM / BSC</span>
+                    <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                      {isEvmConnected && evmAddress ? `${evmAddress.slice(0, 6)}…${evmAddress.slice(-4)}` : 'No conectada'}
+                    </span>
+                  </span>
+                  <button type="button" className="shrink-0 text-[11px] font-bold text-lilac-200" onClick={() => (isEvmConnected ? disconnect() : setIsWalletDialogOpen(true))}>
+                    {isEvmConnected ? 'Desconectar' : 'Conectar'}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-md border border-emerald-300/15 bg-emerald-400/5 px-2.5 py-2 text-xs">
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-foreground">TRON / TronLink</span>
+                    <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                      {isTronConnected && tronAddress ? `${tronAddress.slice(0, 6)}…${tronAddress.slice(-4)}` : 'No conectada'}
+                    </span>
+                  </span>
+                  <button type="button" className="shrink-0 text-[11px] font-bold text-emerald-200" onClick={() => (isTronConnected ? disconnectWallet('tron') : setIsWalletDialogOpen(true))}>
+                    {isTronConnected ? 'Desconectar' : 'Conectar'}
+                  </button>
+                </div>
+              </div>
               <DropdownMenuItem asChild className="hover:bg-lilac-400/10 transition-colors">
                 <Link href={isGameOverlay ? '/games/treasure-hunt/profile' : '/profile'}>
                   <UserRound className="mr-3 h-4 w-4 text-lilac-300" />
@@ -311,21 +325,21 @@ export default function Header({
               )}
             </Button>
 
-            <HeaderWalletDialog
-              open={isWalletDialogOpen}
-              onOpenChange={setIsWalletDialogOpen}
-              connectors={evmConnectors}
-              onSelectMobileWallet={(walletId) => void handleMobileWallet(walletId)}
-              onSelectConnector={(connector) => void handleConnectEVM(connector)}
-              tronLink={{
-                error: tronError,
-                isInstalled: isTronInstalled,
-                isLoading: isTronLoading,
-                onSelect: () => void handleConnectTron(),
-              }}
-            />
           </>
         )}
+        <HeaderWalletDialog
+          open={isWalletDialogOpen}
+          onOpenChange={setIsWalletDialogOpen}
+          connectors={evmConnectors}
+          onSelectMobileWallet={(walletId) => void handleMobileWallet(walletId)}
+          onSelectConnector={(connector) => void handleConnectEVM(connector)}
+          tronLink={{
+            error: tronError,
+            isInstalled: isTronInstalled,
+            isLoading: isTronLoading,
+            onSelect: () => void handleConnectTron(),
+          }}
+        />
       </div>
     </header>
   );

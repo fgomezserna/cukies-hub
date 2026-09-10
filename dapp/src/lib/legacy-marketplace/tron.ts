@@ -5,6 +5,7 @@ import {
   legacyMarketplaceContracts,
   type LegacyTronContractName,
 } from './config';
+import { resolveTronWeb } from '@/lib/tronlink-provider';
 
 type LegacyTronContractCall = {
   call: () => Promise<unknown>;
@@ -32,16 +33,7 @@ function rpcOrigin(value?: string | null) {
 }
 
 export function getLegacyTronWeb(): LegacyTronWebLike | null {
-  if (typeof window === 'undefined') return null;
-  const browserWindow = window as Window & {
-    tron?: { tronWeb?: LegacyTronWebLike };
-    tronLink?: { tronWeb?: LegacyTronWebLike };
-    tronWeb?: LegacyTronWebLike;
-  };
-  return browserWindow.tronWeb
-    ?? browserWindow.tronLink?.tronWeb
-    ?? browserWindow.tron?.tronWeb
-    ?? null;
+  return resolveTronWeb() as LegacyTronWebLike | null;
 }
 
 export function getLegacyTronWalletRpcOrigin(

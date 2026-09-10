@@ -19,17 +19,13 @@ import {
 } from 'viem';
 import {
   useAccount,
-  useConnect,
   usePublicClient,
   useReadContract,
-  useSwitchChain,
   useWriteContract,
-  type Connector,
 } from 'wagmi';
 
 import { Panel } from './primitives';
 import { UKI_PRESALE_CHAIN_ID } from './sale-config';
-import { WalletConnectorDialog } from './wallet-connector-dialog';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
 import { erc20Abi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
@@ -46,8 +42,8 @@ import {
   pancakeV2RouterAbi,
   type UkiSwapSourceSymbol,
 } from '@/lib/uki-swap';
-import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
 import { usePublicLocale } from '@/providers/public-locale-provider';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 const SWAP_COPY = {
   es: {
@@ -144,9 +140,8 @@ export function UkiSwapPanel() {
   const { locale } = usePublicLocale();
   const copy = SWAP_COPY[locale];
   const { address, chainId, isConnected } = useAccount();
-  const { connectAsync, connectors, isPending: isConnecting } = useConnect();
-  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
+  const { requestWallet, evm: evmWallet } = useWalletCoordinator();
   const { toast } = useToast();
   const hasMounted = useHasMounted();
   const [sourceSymbol, setSourceSymbol] = useState<UkiSwapSourceSymbol>('BNB');
@@ -158,7 +153,6 @@ export function UkiSwapPanel() {
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
   const [lastTxHash, setLastTxHash] = useState<Hash | null>(null);
   const [locallyApproved, setLocallyApproved] = useState<{ token: Address; amount: bigint } | null>(null);
-  const [isConnectorDialogOpen, setIsConnectorDialogOpen] = useState(false);
 
   const asmAddress = configuredAddress(
     ukiSaleContracts.asmTokenAddress,
@@ -182,10 +176,6 @@ export function UkiSwapPanel() {
   const parsedSourceInput = useMemo(() => parsePositiveAmount(sourceAmountInput), [sourceAmountInput]);
   const parsedUkiInput = useMemo(() => parsePositiveAmount(ukiAmountInput), [ukiAmountInput]);
   const routePath = useMemo(() => source ? [...source.path] : [], [source]);
-  const visibleConnectors = useMemo(
-    () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
-    [connectors, hasMounted],
-  );
   const targetChainId = swapConfig?.chainId ?? UKI_PRESALE_CHAIN_ID;
   const targetNetworkLabel = getUkiSwapNetworkLabel(targetChainId);
   const publicClient = usePublicClient({ chainId: targetChainId });
@@ -275,39 +265,21 @@ export function UkiSwapPanel() {
   const isBusy = operationState === 'approving' || operationState === 'swapping';
   const canSwap = Boolean(sourceAmount && quotedUki && !quoteError && swapConfig && source);
 
-  async function connectWallet(connector: Connector) {
-    try {
-      await connectAsync({ connector, chainId: targetChainId });
-      setIsConnectorDialogOpen(false);
-      setOperationMessage(null);
-    } catch {
-      setOperationState('error');
-      setOperationMessage(copy.connectError);
-    }
-  }
-
   async function handlePrimaryAction() {
     if (!hasMounted || isBusy) return;
 
-    if (!isConnected) {
-      if (visibleConnectors.length === 1) {
-        await connectWallet(visibleConnectors[0]);
-      } else if (visibleConnectors.length > 1) {
-        setIsConnectorDialogOpen(true);
-      } else {
-        setOperationState('error');
-        setOperationMessage(copy.connectError);
-      }
-      return;
-    }
-
-    if (isWrongChain) {
+    if (!isConnected || isWrongChain) {
       try {
-        await switchChainAsync({ chainId: targetChainId });
-        setOperationMessage(null);
-      } catch {
+        await requestWallet({
+          kind: 'evm',
+          targetChainId: targetChainId as 56 | 97,
+          reason: `Prepara la wallet en ${targetNetworkLabel} para comprar UKI. No se firmará nada hasta confirmar.`,
+        });
+        setOperationState('idle');
+        setOperationMessage('Wallet lista. Revisa la operación y pulsa de nuevo para firmar.');
+      } catch (error) {
         setOperationState('error');
-        setOperationMessage(copy.connectError);
+        setOperationMessage(error instanceof Error ? error.message : copy.connectError);
       }
       return;
     }
@@ -622,10 +594,10 @@ export function UkiSwapPanel() {
             <button
               type="button"
               onClick={() => void handlePrimaryAction()}
-              disabled={ctaDisabled || isConnecting || isSwitching}
+              disabled={ctaDisabled || evmWallet.isConnecting}
               className="uki-wallet-button mt-4 w-full justify-center disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {isBusy || isConnecting || isSwitching || isQuoteLoading ? (
+              {isBusy || evmWallet.isConnecting || isQuoteLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.8} />
               ) : !isConnected ? (
                 <Wallet className="h-4 w-4" strokeWidth={1.8} />
@@ -666,15 +638,6 @@ export function UkiSwapPanel() {
         )}
       </div>
 
-      <WalletConnectorDialog
-        open={isConnectorDialogOpen}
-        onOpenChange={setIsConnectorDialogOpen}
-        connectors={visibleConnectors}
-        onSelectConnector={connectWallet}
-        isConnecting={isConnecting}
-        title={copy.connect}
-        description={`${targetNetworkLabel}. ${copy.helper}`}
-      />
     </Panel>
   );
 }

@@ -29,6 +29,10 @@ import {
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { rewardsDistributorAbi } from '@/lib/contracts/rewards-distributor';
 import { useAuth } from '@/providers/auth-provider';
+import {
+  FALLBACK_COORDINATOR,
+  useWalletCoordinator,
+} from '@/providers/wallet-coordinator-context';
 
 type RewardAllocation = {
   allocationId: string;
@@ -202,6 +206,7 @@ export function PremiosContent() {
   const walletAddress = user?.walletAddress ?? null;
   const { address, chainId, isConnected } = useAccount();
   const { switchChain, isPending: switchingChain } = useSwitchChain();
+  const { requestWallet, evm: evmWallet } = useWalletCoordinator();
   const { writeContractAsync } = useWriteContract();
   const [status, setStatus] = useState<RewardStatus | null>(null);
   const rewardChainId = status?.publishedRewards[0]?.batch.chainId;
@@ -415,6 +420,23 @@ export function PremiosContent() {
     } finally {
       setClaimingBatch(null);
     }
+  }
+
+  function prepareRewardNetwork(targetChainId: 56 | 97) {
+    if (requestWallet === FALLBACK_COORDINATOR.requestWallet) {
+      switchChain({ chainId: targetChainId });
+      return;
+    }
+    void requestWallet({
+      kind: 'evm',
+      targetChainId,
+      reason: 'Cambia la wallet a la red del premio antes de firmar el cobro.',
+    }).catch((error: unknown) => {
+      setClaimFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'No se pudo preparar la red para cobrar.',
+      });
+    });
   }
 
   if (authLoading) {
@@ -772,14 +794,12 @@ export function PremiosContent() {
                       {wrongChain && walletMatches ? (
                         <button
                           type="button"
-                          onClick={() =>
-                            switchChain({ chainId: reward.batch.chainId })
-                          }
-                          disabled={switchingChain || Boolean(claimingBatch)}
+                          onClick={() => prepareRewardNetwork(reward.batch.chainId)}
+                          disabled={switchingChain || evmWallet.isConnecting || Boolean(claimingBatch)}
                           className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 font-headline text-sm font-black uppercase tracking-[0.07em] text-[#09060f] disabled:opacity-50"
                         >
                           <Wallet className="h-4 w-4" />{' '}
-                          {switchingChain
+                          {switchingChain || evmWallet.isConnecting
                             ? 'Cambiando red…'
                             : 'Cambiar de red para cobrar'}
                         </button>

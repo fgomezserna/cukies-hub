@@ -7,6 +7,7 @@ import { useAccount } from 'wagmi';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Button } from '@/components/ui/button';
 import { useTronLink } from '@/hooks/use-tronlink';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import type {
   LegacyMarketplaceCukiItem,
   LegacyMarketplaceListResponse,
@@ -57,12 +58,13 @@ export function LegacyMarketplaceSellerPanel() {
   const { address } = useAccount();
   const {
     address: tronAddress,
-    connect: connectTron,
     isInstalled: isTronInstalled,
   } = useTronLink();
+  const { requestWallet } = useWalletCoordinator();
   const [state, setState] = useState<LoadState>('idle');
   const [items, setItems] = useState<LegacyMarketplaceCukiItem[]>([]);
   const [nextPages, setNextPages] = useState<WalletPage[]>([]);
+  const [walletError, setWalletError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const loadGenerationRef = useRef(0);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
@@ -162,12 +164,26 @@ export function LegacyMarketplaceSellerPanel() {
       <div className="mt-5 flex flex-wrap gap-3">
         {!address && <LandingWalletConnectButton evmOnly label="Conectar wallet BSC" compactLabel="Conectar BSC" />}
         {!tronAddress && (
-          <Button type="button" variant="outline" onClick={() => void connectTron()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setWalletError(null);
+              void requestWallet({
+                kind: 'tron',
+                targetTronNetwork: 'mainnet',
+                reason: 'Conecta TronLink en TRON Mainnet para consultar tus Cukies Legacy.',
+              }).catch((error: unknown) => {
+                setWalletError(error instanceof Error ? error.message : 'No se pudo conectar TronLink.');
+              });
+            }}
+          >
             <Wallet className="mr-2 h-4 w-4" />
             {isTronInstalled ? 'Conectar TronLink' : 'Instalar TronLink'}
           </Button>
         )}
       </div>
+      {walletError ? <p role="alert" className="mt-3 text-sm font-semibold text-amber-100">{walletError}</p> : null}
 
       {state === 'loading' && items.length === 0 && (
         <p role="status" className="mt-5 flex items-center text-sm font-semibold text-[var(--uki-muted)]">

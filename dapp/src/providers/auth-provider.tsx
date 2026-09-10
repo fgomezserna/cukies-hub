@@ -5,6 +5,7 @@ import { useAccount, useDisconnect, useSignMessage, type Connector } from 'wagmi
 import { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useTronLink } from '@/hooks/use-tronlink';
+import { resolveTronWeb } from '@/lib/tronlink-provider';
 
 type AuthContextType = {
   user: User | null;
@@ -43,13 +44,15 @@ function isUserRejectedRequest(error: unknown) {
   );
 }
 
-function getBrowserTronWeb() {
-  if (typeof window === 'undefined') return null;
-  return window.tronWeb ?? window.tronLink?.tronWeb ?? window.tron?.tronWeb ?? null;
+function walletAddressesEqual(walletType: LoginWalletType, left?: string | null, right?: string | null) {
+  if (!left || !right) return false;
+  return walletType === 'evm'
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
 }
 
 async function signTronLoginMessage(message: string) {
-  const tronWeb = getBrowserTronWeb();
+  const tronWeb = resolveTronWeb();
 
   if (!tronWeb?.toHex || !tronWeb?.trx?.sign) {
     throw new Error('No TronLink signing provider is available');
@@ -63,6 +66,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
   const [walletType, setWalletType] = useState<'evm' | 'tron' | null>(null);
+  const [primaryWalletInvalidated, setPrimaryWalletInvalidated] = useState(false);
 
   // EVM wallets (MetaMask, etc.)
   const { address: evmAddress, connector: activeEvmConnector, isConnected: isEvmConnected } = useAccount();
@@ -70,29 +74,101 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { signMessageAsync } = useSignMessage();
 
   // TronLink
-  const { address: tronAddress, isConnected: isTronConnected, connect: connectTron, disconnect: disconnectTron } = useTronLink();
+  const { address: tronAddress, isConnected: isTronConnected, disconnect: disconnectTron } = useTronLink();
 
   const { toast } = useToast();
   const hasObservedWalletStateRef = useRef(false);
-  const previousAddressRef = useRef<string | undefined>(evmAddress || tronAddress || undefined);
+  const initialRestorePendingRef = useRef(true);
+  const previousAddressRef = useRef<string | undefined>(undefined);
+  const authGenerationRef = useRef(0);
+  const explicitSelectionRef = useRef<{ address: string; walletType: LoginWalletType } | null>(null);
+  const walletSlotsRef = useRef({
+    evmAddress,
+    isEvmConnected,
+    tronAddress,
+    isTronConnected,
+    evmRevision: 0,
+    tronRevision: 0,
+  });
 
-  // Determine current wallet address and type
-  const currentAddress = isEvmConnected ? evmAddress : (isTronConnected ? tronAddress : null);
+  // The authenticated wallet is the primary identity. A secondary connection must
+  // remain visible to operations without replacing this session.
+  const currentAddress = walletType === 'tron'
+    ? (isTronConnected ? tronAddress : null)
+    : walletType === 'evm'
+      ? (isEvmConnected ? evmAddress : null)
+      : primaryWalletInvalidated
+        ? null
+        : (isEvmConnected ? evmAddress : (isTronConnected ? tronAddress : null));
   const isConnected = isEvmConnected || isTronConnected;
+
+  const previousWalletSlots = walletSlotsRef.current;
+  const evmSlotChanged = previousWalletSlots.evmAddress !== evmAddress
+    || previousWalletSlots.isEvmConnected !== isEvmConnected;
+  const tronSlotChanged = previousWalletSlots.tronAddress !== tronAddress
+    || previousWalletSlots.isTronConnected !== isTronConnected;
+  walletSlotsRef.current = {
+    evmAddress,
+    isEvmConnected,
+    tronAddress,
+    isTronConnected,
+    evmRevision: previousWalletSlots.evmRevision + (evmSlotChanged ? 1 : 0),
+    tronRevision: previousWalletSlots.tronRevision + (tronSlotChanged ? 1 : 0),
+  };
 
   const fetchUser = useCallback(async (walletAddress?: string, options: FetchUserOptions = {}) => {
     const addressToUse = walletAddress || currentAddress;
-    const loginWalletType: LoginWalletType = options.walletType || (isEvmConnected ? 'evm' : 'tron');
+    const loginWalletType: LoginWalletType = options.walletType || walletType || (isEvmConnected ? 'evm' : 'tron');
     const shouldPromptForSignature = Boolean(options.promptForSignature);
     const requireSignedWallet = options.requireSignedWallet === true;
+    const generation = ++authGenerationRef.current;
+    const startedSlotAddress = loginWalletType === 'evm'
+      ? walletSlotsRef.current.evmAddress
+      : walletSlotsRef.current.tronAddress;
+    const startedSlotRevision = loginWalletType === 'evm'
+      ? walletSlotsRef.current.evmRevision
+      : walletSlotsRef.current.tronRevision;
+    const isCurrentRequest = () => {
+      if (authGenerationRef.current !== generation) return false;
+      const slotRevision = loginWalletType === 'evm'
+        ? walletSlotsRef.current.evmRevision
+        : walletSlotsRef.current.tronRevision;
+      if (slotRevision !== startedSlotRevision) return false;
+      const slotAddress = loginWalletType === 'evm'
+        ? walletSlotsRef.current.evmAddress
+        : walletSlotsRef.current.tronAddress;
+      if (startedSlotAddress && !walletAddressesEqual(loginWalletType, startedSlotAddress, slotAddress)) return false;
+      if (slotAddress && !walletAddressesEqual(loginWalletType, addressToUse, slotAddress)) return false;
+      return true;
+    };
+
+    if (walletAddress || shouldPromptForSignature) {
+      initialRestorePendingRef.current = false;
+      if (walletAddress && options.walletType) {
+        explicitSelectionRef.current = {
+          address: walletAddress,
+          walletType: options.walletType,
+        };
+      }
+    }
     const canUseWalletAddress = isConnected || Boolean(walletAddress && shouldPromptForSignature);
 
-    if (!canUseWalletAddress || !addressToUse) {
+    if (primaryWalletInvalidated && !walletAddress && !shouldPromptForSignature) {
+      if (isCurrentRequest()) {
         setUser(null);
         setIsLoading(false);
         setIsWaitingForApproval(false);
-        setWalletType(null);
-        return;
+      }
+      return;
+    }
+
+    if (!canUseWalletAddress || !addressToUse) {
+      if (isCurrentRequest()) {
+        setUser(null);
+        setIsLoading(false);
+        setIsWaitingForApproval(false);
+      }
+      return;
     }
 
     setIsLoading(true);
@@ -111,9 +187,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (response.status === 401) {
+        if (!isCurrentRequest()) return;
         if (!shouldPromptForSignature) {
           setUser(null);
-          setWalletType(null);
+          setPrimaryWalletInvalidated(true);
           return;
         }
 
@@ -131,6 +208,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         const challenge = await challengeResponse.json();
+        if (!isCurrentRequest()) return;
         setIsWaitingForApproval(true);
         didRequestSignature = true;
         const signature =
@@ -142,6 +220,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               })
             : await signTronLoginMessage(challenge.message);
 
+        if (!isCurrentRequest()) return;
         response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -158,8 +237,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!response.ok) throw new Error('Login failed');
 
       const userData = await response.json();
+      if (!isCurrentRequest()) return;
       setUser(userData);
       setWalletType(loginWalletType);
+      setPrimaryWalletInvalidated(false);
+      if (
+        explicitSelectionRef.current
+        && walletAddressesEqual(loginWalletType, explicitSelectionRef.current.address, addressToUse)
+        && explicitSelectionRef.current.walletType === loginWalletType
+        && walletAddressesEqual(loginWalletType, addressToUse, currentAddress)
+      ) {
+        explicitSelectionRef.current = null;
+      }
 
       // Show success toast if we were waiting for approval
       if (didRequestSignature) {
@@ -169,17 +258,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
     } catch (error) {
+      if (!isCurrentRequest()) return;
       console.error(error);
       setUser(null);
-      setWalletType(null);
+      setPrimaryWalletInvalidated(true);
+      explicitSelectionRef.current = null;
 
       const wasRejected = didRequestSignature && isUserRejectedRequest(error);
 
       if (!wasRejected) {
         // Disconnect only on real auth/provider errors. A rejected signature should leave
         // the wallet connected so the user can retry from the Connect Wallet button.
-        if (isEvmConnected) disconnectEvm();
-        if (isTronConnected) disconnectTron();
+        if (loginWalletType === 'evm' && isEvmConnected && evmAddress?.toLowerCase() === addressToUse?.toLowerCase()) {
+          disconnectEvm();
+        }
+        if (loginWalletType === 'tron' && isTronConnected && tronAddress === addressToUse) {
+          disconnectTron();
+        }
       }
 
       // Show error toast
@@ -193,14 +288,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
     } finally {
-      setIsLoading(false);
-      setIsWaitingForApproval(false);
+      if (isCurrentRequest()) {
+        setIsLoading(false);
+        setIsWaitingForApproval(false);
+      }
     }
-  }, [activeEvmConnector, currentAddress, isConnected, isEvmConnected, isTronConnected, disconnectEvm, disconnectTron, signMessageAsync, toast]);
-
-  useEffect(() => {
-    fetchUser(undefined, { promptForSignature: false });
-  }, [fetchUser]);
+  }, [activeEvmConnector, currentAddress, disconnectEvm, disconnectTron, evmAddress, isConnected, isEvmConnected, isTronConnected, primaryWalletInvalidated, signMessageAsync, toast, tronAddress, walletType]);
 
   // Enhanced wallet change detection effect
   useEffect(() => {
@@ -212,18 +305,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       previousAddress: previousAddressRef.current
     });
 
-    // Skip only the first observed wallet state. A restored wallet can arrive
-    // after an initial disconnected render and must still trigger session restore.
+    // The first observed connected wallet may restore an existing session. This
+    // is deliberately the only implicit login; later wallet changes require an
+    // explicit selection/login from the user.
     if (!hasObservedWalletStateRef.current) {
       hasObservedWalletStateRef.current = true;
       previousAddressRef.current = currentAddress || undefined;
+      if (currentAddress && !primaryWalletInvalidated) {
+        initialRestorePendingRef.current = false;
+      }
+      void fetchUser(undefined, { promptForSignature: false });
       return;
     }
 
     // Detect wallet change
     const hasWalletChanged = previousAddressRef.current !== currentAddress;
 
-    if (hasWalletChanged) {
+    if (!hasWalletChanged) return;
+
+    const explicitSelection = explicitSelectionRef.current;
+    if (
+      explicitSelection
+      && currentAddress
+      && walletType === explicitSelection.walletType
+      && walletAddressesEqual(explicitSelection.walletType, explicitSelection.address, currentAddress)
+    ) {
+      previousAddressRef.current = currentAddress;
+      explicitSelectionRef.current = null;
+      return;
+    }
+
+    if (
+      initialRestorePendingRef.current
+      && !previousAddressRef.current
+      && currentAddress
+      && !primaryWalletInvalidated
+    ) {
+      initialRestorePendingRef.current = false;
+      previousAddressRef.current = currentAddress;
+      void fetchUser(undefined, { promptForSignature: false });
+      return;
+    }
+
+    {
       console.log('🔄 Wallet change detected:', {
         previous: previousAddressRef.current,
         current: currentAddress,
@@ -231,99 +355,90 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       // Clear current user state (logout)
+      authGenerationRef.current += 1;
       setUser(null);
-      setIsLoading(true);
+      setIsLoading(false);
+      setIsWaitingForApproval(false);
+      setPrimaryWalletInvalidated(true);
 
       // Update reference for next comparison
       previousAddressRef.current = currentAddress || undefined;
-
-      // If there's a new wallet connected, fetch user data (login)
-      if (isConnected && currentAddress) {
-        console.log('🔐 Logging in with new wallet:', currentAddress);
-        fetchUser(undefined, { promptForSignature: false });
-      } else {
-        // If disconnected, just finish loading
-        console.log('🔓 Wallet disconnected, finishing logout');
-        setIsLoading(false);
-        setWalletType(null);
-      }
     }
-  }, [evmAddress, tronAddress, currentAddress, isConnected, fetchUser]);
+  }, [evmAddress, tronAddress, currentAddress, isConnected, fetchUser, primaryWalletInvalidated, walletType]);
 
   // Direct wallet event listener as backup (EVM wallets)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      const handleAccountsChanged = (accounts: string[]) => {
-        console.log('🔄 Direct accountsChanged event:', accounts);
-        console.log('Current wagmi address:', evmAddress);
-        console.log('Previous address:', previousAddressRef.current);
+    if (walletType !== 'evm' || typeof window === 'undefined' || !window.ethereum) return;
+    const handleAccountsChanged = (accounts: string[]) => {
+      console.log('🔄 Direct accountsChanged event:', accounts);
+      console.log('Current wagmi address:', evmAddress);
+      console.log('Previous address:', previousAddressRef.current);
 
-        // Force a manual check if wagmi hasn't updated yet
-        const newAddress = accounts[0]?.toLowerCase();
-        if (newAddress && newAddress !== evmAddress && newAddress !== previousAddressRef.current) {
-          console.log('⚠️ Direct event detected change before wagmi update');
+      // Force a manual check if wagmi hasn't updated yet
+      const newAddress = accounts[0]?.toLowerCase();
+      if (newAddress && newAddress !== evmAddress && newAddress !== previousAddressRef.current) {
+        console.log('⚠️ Direct event detected change before wagmi update');
 
-          // Wagmi will settle the connection state; this fallback only clears stale auth.
-          setIsWaitingForApproval(true);
+        authGenerationRef.current += 1;
 
-          toast({
-            title: "Wallet Change Detected",
-            description: "Please confirm the new wallet before continuing.",
-          });
+        // Wagmi will settle the connection state; this fallback only clears stale auth.
+        setIsWaitingForApproval(true);
 
-          setUser(null);
-          setWalletType(null);
-          setIsLoading(false);
-          setIsWaitingForApproval(false);
-        }
-      };
+        toast({
+          title: "Wallet Change Detected",
+          description: "Please confirm the new wallet before continuing.",
+        });
 
-      const handleChainChanged = (chainId: string) => {
-        console.log('🔗 Chain changed:', chainId);
-      };
+        setUser(null);
+        setPrimaryWalletInvalidated(true);
+        setIsLoading(false);
+        setIsWaitingForApproval(false);
+      }
+    };
 
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
+    const handleChainChanged = (chainId: string) => {
+      console.log('🔗 Chain changed:', chainId);
+    };
 
-      return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
-      };
-    }
-  }, [evmAddress, toast]);
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
+
+    return () => {
+      window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
+      window.ethereum?.removeListener('chainChanged', handleChainChanged);
+    };
+  }, [evmAddress, toast, walletType]);
 
   // Additional polling mechanism for more reliable wallet change detection (EVM only)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      const pollWalletAccounts = async () => {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          const currentAccount = accounts[0]?.toLowerCase();
+    if (walletType !== 'evm' || typeof window === 'undefined' || !window.ethereum) return;
+    const pollWalletAccounts = async () => {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        const currentAccount = accounts[0]?.toLowerCase();
 
-          // Only log if there's an actual change and we haven't logged it recently
-          if (currentAccount && currentAccount !== evmAddress && currentAccount !== previousAddressRef.current) {
-            // This will trigger the useEffect above when wagmi updates
-            // We just log here to help with debugging
-          }
-        } catch (error) {
-          // Only log errors occasionally to avoid spam
-          console.error('Error polling wallet accounts:', error);
+        // Only log if there's an actual change and we haven't logged it recently
+        if (currentAccount && currentAccount !== evmAddress && currentAccount !== previousAddressRef.current) {
+          // This will trigger the useEffect above when wagmi updates.
         }
-      };
-
-      // Poll every 5 seconds when connected (reduced frequency)
-      let interval: NodeJS.Timeout;
-      if (isEvmConnected) {
-        interval = setInterval(pollWalletAccounts, 5000);
+      } catch (error) {
+        // Only log errors occasionally to avoid spam
+        console.error('Error polling wallet accounts:', error);
       }
+    };
 
-      return () => {
-        if (interval) {
-          clearInterval(interval);
-        }
-      };
+    // Poll every 5 seconds when connected (reduced frequency)
+    let interval: NodeJS.Timeout;
+    if (isEvmConnected) {
+      interval = setInterval(pollWalletAccounts, 5000);
     }
-  }, [evmAddress, isEvmConnected]);
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [evmAddress, isEvmConnected, walletType]);
 
   return (
     <AuthContext.Provider value={{ user, isLoading, isWaitingForApproval, walletType, fetchUser }}>

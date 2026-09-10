@@ -14,6 +14,10 @@ import { useAccount, useSwitchChain } from 'wagmi';
 import { usePathname } from 'next/navigation';
 
 import { useAuth } from '@/providers/auth-provider';
+import {
+  FALLBACK_COORDINATOR,
+  useWalletCoordinator,
+} from '@/providers/wallet-coordinator-context';
 import type { AppRuntimeServiceStatus, AppRuntimeStatus } from '@/lib/app-runtime/types';
 import { UKI_PRESALE_CHAIN_ID } from '@/components/landing/sale-config';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
@@ -279,6 +283,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
   const { user, walletType, isLoading: authLoading } = useAuth();
   const { address: connectedAddress, chainId, isConnected } = useAccount();
   const { switchChainAsync } = useSwitchChain();
+  const { requestWallet } = useWalletCoordinator();
   const pathname = usePathname();
   const queryClient = useQueryClient();
   const address = user?.walletAddress?.toLowerCase() ?? null;
@@ -414,12 +419,20 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     const targetChainId = expectedChainId(operation);
     if (!targetChainId || chainId === targetChainId) return targetChainId !== null;
     try {
-      await switchChainAsync({ chainId: targetChainId });
+      if (requestWallet === FALLBACK_COORDINATOR.requestWallet) {
+        await switchChainAsync({ chainId: targetChainId });
+      } else {
+        await requestWallet({
+          kind: 'evm',
+          targetChainId,
+          reason: 'Cambia la wallet a la red configurada para continuar.',
+        });
+      }
       return true;
     } catch {
       return false;
     }
-  }, [chainId, expectedChainId, switchChainAsync]);
+  }, [chainId, expectedChainId, requestWallet, switchChainAsync]);
 
   const runRefresh = useCallback(async (resources?: Set<string>, shouldInvalidate = false, waitForInFlight = false) => {
     if (!runtimeRouteActive || !address || !sessionReady) return;

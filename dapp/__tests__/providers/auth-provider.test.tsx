@@ -59,6 +59,10 @@ describe('providers/AuthProvider', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    mockUseAccount.mockReturnValue({
+      address: undefined,
+      isConnected: false,
+    } as any)
     mockUseDisconnect.mockReturnValue({
       disconnect: mockDisconnect,
     } as any)

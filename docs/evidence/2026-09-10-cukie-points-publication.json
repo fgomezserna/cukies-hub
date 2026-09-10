@@ -1,0 +1,153 @@
+{
+  "schema": "cukies.points-publication.v1",
+  "observedAt": "2026-09-10T10:39:57.209349+00:00",
+  "environment": "staging",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/379",
+  "commit": "803300730064b2f3b4873ab6cf8350506faf199d",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34465858191",
+  "workflowConclusion": "success",
+  "releaseUpdatedAt": "2026-09-10T10:31:27.082Z",
+  "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+  "webDigest": "sha256:e03a8362432a0735d14aaadf8953e3404e16adc70987f8e83c26d734ee2a2587",
+  "gameCommit": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+  "reusedComponents": [
+    "chain-indexer",
+    "cuki-card-worker",
+    "schedulers",
+    "cukies-bridge-relayer",
+    "treasure-hunt",
+    "world-api",
+    "world-matchmaking"
+  ],
+  "containerBaseline": {
+    "before": 92,
+    "after": 92,
+    "preserved": 91,
+    "replaced": [
+      "rwwsc4kkwc0ck84cgk40s8kk-084231591311"
+    ],
+    "scope": "All running host containers compared by ID; only staging DApp was replaced."
+  },
+  "health": {
+    "status": "ok",
+    "app": "cukies-hub",
+    "environment": "staging",
+    "gitSha": "803300730064b2f3b4873ab6cf8350506faf199d",
+    "gitRef": "staging",
+    "buildTime": null,
+    "coolify": {
+      "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+      "fqdn": null
+    }
+  },
+  "ready": {
+    "status": "ready",
+    "gitSha": "803300730064b2f3b4873ab6cf8350506faf199d",
+    "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+    "imageSha": "803300730064b2f3b4873ab6cf8350506faf199d"
+  },
+  "publicApi": {
+    "global": {
+      "status": "partial",
+      "source": "legacy",
+      "coverage": "legacy-historical",
+      "total": 23515,
+      "netPoints": 6151157
+    },
+    "filtersAndPaging": {
+      "bsc": {
+        "status": "partial",
+        "total": 3094,
+        "offset": 0,
+        "networks": [
+          "BSC"
+        ],
+        "types": [
+          "Mint"
+        ],
+        "itemIds": [
+          "67504e0ef0fee70ca5ab9a68",
+          "672ead378f7d684b465014cf"
+        ]
+      },
+      "tron": {
+        "status": "partial",
+        "total": 20421,
+        "offset": 0,
+        "networks": [
+          "TRON"
+        ],
+        "types": [
+          "Mint"
+        ],
+        "itemIds": [
+          "6a5e916ef7961ab212edf245",
+          "6a5e916ef7961ab212edf243"
+        ]
+      },
+      "bsc_breeding": {
+        "status": "partial",
+        "total": 1226,
+        "offset": 0,
+        "networks": [
+          "BSC"
+        ],
+        "types": [
+          "Breeding"
+        ],
+        "itemIds": [
+          "6710c43c48a5014f5f377f76",
+          "6710c43848a5014f5f377e90"
+        ]
+      },
+      "page2": {
+        "status": "partial",
+        "total": 23515,
+        "offset": 2,
+        "networks": [
+          "TRON"
+        ],
+        "types": [
+          "Mint"
+        ],
+        "itemIds": [
+          "6a5e9130f7961ab212edf241",
+          "6a5e9130f7961ab212edf23f"
+        ]
+      },
+      "wallet": {
+        "status": "partial",
+        "total": 0,
+        "offset": 0,
+        "networks": [],
+        "types": [],
+        "itemIds": []
+      }
+    }
+  },
+  "browserQa": {
+    "url": "https://cukieshub.eurekand.com/cukiepoints",
+    "browser": "Edge Perfil 1",
+    "signedSessionPreserved": true,
+    "globalRowsVisible": true,
+    "globalCount": 23515,
+    "bscCount": 3094,
+    "loadMoreAppendedRows": 24,
+    "coverageWarningVisible": true,
+    "walletHistoryEmpty": true,
+    "walletSignaturesOrTransactions": false
+  },
+  "validation": {
+    "lint": "pass",
+    "typecheck": "pass after explicit Filter<LegacyPointDocument> inference correction",
+    "jest": "245 suites / 1986 tests pass",
+    "build": "pass",
+    "prChecks": "pass",
+    "candidateAndMergedTreesIdentical": true
+  },
+  "limits": [
+    "Historical Legacy source is partial and not equivalent to present on-chain balances.",
+    "No import, backfill, worker activation or database writes.",
+    "No positive wallet transaction or financial settlement performed."
+  ]
+}

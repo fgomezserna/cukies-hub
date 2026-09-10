@@ -16,6 +16,7 @@ import { useAccount, useReadContract } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
 import { useTronLink } from '@/hooks/use-tronlink';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
@@ -139,10 +140,10 @@ export function CukiePointsClient() {
   const { address } = useAccount();
   const {
     address: tronAddress,
-    connect: connectTron,
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
   } = useTronLink();
+  const { requestWallet } = useWalletCoordinator();
   const [network, setNetwork] = useState<PointsNetworkFilter>('ALL');
   const [scope, setScope] = useState<PointsScope>('wallet');
   const [type, setType] = useState('ALL');
@@ -503,7 +504,11 @@ export function CukiePointsClient() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void connectTron()}
+                    onClick={() => void requestWallet({
+                      kind: 'tron',
+                      targetTronNetwork: 'mainnet',
+                      reason: 'Conecta TronLink en TRON Mainnet para consultar tus puntos.',
+                    }).catch((error) => setStatus(getErrorMessage(error)))}
                     disabled={!isTronInstalled}
                     className="h-7 border-emerald-300/25 bg-emerald-300/10 px-2 text-xs text-emerald-100 hover:bg-emerald-300/20"
                   >

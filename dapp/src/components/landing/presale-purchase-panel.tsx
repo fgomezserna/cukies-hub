@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Loader2, ShoppingCart, Wallet, WalletCards } from 'lucide-react';
 import { formatUnits, parseUnits, type Address } from 'viem';
-import { useAccount, useConnect, useDisconnect, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract, type Connector } from 'wagmi';
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { useToast } from '@/hooks/use-toast';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import {
@@ -16,10 +16,9 @@ import {
 } from '@/components/ui/sheet';
 import { erc20Abi, getBscScanTxUrl, presaleAbi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
 import { isBelowContractMinimumPurchase } from '@/lib/presale-purchase-validation';
-import { getConnectorDisplayName, getVisibleWalletConnectors } from '@/lib/wallet-connectors';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
 import { usePresaleLock } from './presale-countdown';
-import { WalletConnectorDialog } from './wallet-connector-dialog';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '1';
@@ -94,9 +93,7 @@ function formatRate(quote?: bigint, cost?: bigint) {
 
 export function PresalePurchasePanel() {
   const { address, chainId, isConnected } = useAccount();
-  const { connectAsync, connectors, isPending: isConnecting } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { requestWallet, evm: evmWallet } = useWalletCoordinator();
   const { toast } = useToast();
   const { isLocked: isPublicPresaleLocked, startShortLabel } = usePresaleLock();
   const hasMounted = useHasMounted();
@@ -108,17 +105,12 @@ export function PresalePurchasePanel() {
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [isConnectorDialogOpen, setIsConnectorDialogOpen] = useState(false);
   const handledReceiptHashRef = useRef<string | null>(null);
   const asmTokenAddress = ukiSaleContracts.asmTokenAddress as Address | undefined;
   const presaleAddress = ukiSaleContracts.presaleAddress as Address | undefined;
   const isReady = Boolean(isConnected && address && chainId === UKI_PRESALE_CHAIN_ID && asmTokenAddress && presaleAddress);
   const isWrongChain = isConnected && chainId !== UKI_PRESALE_CHAIN_ID;
   const parsedAmount = useMemo(() => parseTokenAmount(amount), [amount]);
-  const evmConnectors = useMemo(
-    () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
-    [connectors, hasMounted],
-  );
   const readsEnabled = Boolean((!isConnected || !isWrongChain) && asmTokenAddress && presaleAddress);
   const isPublicPresaleOpen = !isPublicPresaleLocked;
 
@@ -245,8 +237,7 @@ export function PresalePurchasePanel() {
     !isPending &&
     !isConfirming,
   );
-  const canConnect = Boolean(hasMounted && !isConnected && evmConnectors.length > 0 && !isConnecting);
-  const canSwitch = Boolean(isWrongChain && !isSwitching);
+  const canSwitch = Boolean(isWrongChain && !evmWallet.isConnecting);
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
 
   useEffect(() => {
@@ -366,74 +357,27 @@ export function PresalePurchasePanel() {
     return attribution.reason === 'self_referral' || attribution.reason === 'sponsor_already_locked';
   }
 
-  async function connectEvmForPurchase(connector: Connector) {
-    try {
-      if (isConnected) {
-        disconnect();
-      }
-
-      await connectAsync({ connector, chainId: UKI_PRESALE_CHAIN_ID });
-      setIsConnectorDialogOpen(false);
-      toast({
-        title: 'Wallet conectada',
-        description: `${getConnectorDisplayName(connector)} lista para comprar en ${UKI_PRESALE_CHAIN_LABEL}.`,
-      });
-    } catch {
-      toast({
-        title: 'Conexión fallida',
-        description: 'Aprueba la conexión en tu wallet y vuelve a intentarlo.',
-        variant: 'destructive',
-      });
-    }
-  }
-
-  function switchToPresaleChain() {
-    switchChain(
-      { chainId: UKI_PRESALE_CHAIN_ID },
-      {
-        onError: () => {
-          toast({
-            title: 'Cambio de red fallido',
-            description: `Desconecta esta wallet o cambia manualmente a ${UKI_PRESALE_CHAIN_LABEL}.`,
-            variant: 'destructive',
-          });
-        },
-      },
-    );
-  }
-
-  function disconnectCurrentWallet() {
-    disconnect();
-    toast({
-      title: 'Wallet desconectada',
-      description: 'Elige otra wallet para comprar UKI.',
-    });
-  }
-
   async function handleSubmit() {
     if (!hasMounted) return;
 
-    if (!isConnected) {
-      if (evmConnectors.length === 0) {
+    if (!isConnected || isWrongChain) {
+      try {
+        await requestWallet({
+          kind: 'evm',
+          targetChainId: UKI_PRESALE_CHAIN_ID as 56 | 97,
+          reason: `Prepara la wallet en ${UKI_PRESALE_CHAIN_LABEL} para comprar UKI. No se firmará nada hasta confirmar.`,
+        });
         toast({
-          title: 'Wallet no encontrada',
-          description: 'Instala una wallet EVM compatible para conectar.',
+          title: 'Wallet lista',
+          description: 'Revisa la compra y pulsa de nuevo para firmar.',
+        });
+      } catch (error) {
+        toast({
+          title: 'No se pudo preparar la wallet',
+          description: error instanceof Error ? error.message : 'Aprueba la conexión o el cambio de red e inténtalo de nuevo.',
           variant: 'destructive',
         });
-        return;
       }
-
-      if (evmConnectors.length === 1) {
-        await connectEvmForPurchase(evmConnectors[0]);
-        return;
-      }
-
-      setIsConnectorDialogOpen(true);
-      return;
-    }
-
-    if (isWrongChain) {
-      setIsConnectorDialogOpen(true);
       return;
     }
 
@@ -529,11 +473,11 @@ export function PresalePurchasePanel() {
 
   const ctaDisabled = isConnected && !canSwitch && !canSubmit;
   const ctaLabel = !isConnected
-    ? isConnecting
+    ? evmWallet.isConnecting
       ? 'Conectando wallet'
       : 'Conectar wallet'
       : isWrongChain
-        ? isSwitching
+        ? evmWallet.isConnecting
           ? 'Cambiando red'
           : 'Cambiar red'
       : isPublicPresaleLocked
@@ -723,39 +667,10 @@ export function PresalePurchasePanel() {
         </div>
       ) : null}
 
-      <button type="button" onClick={handleSubmit} disabled={ctaDisabled || (!canConnect && !isConnected && !isConnecting)} className={`uki-wallet-button mt-2 w-full justify-center ${ctaDisabled ? 'opacity-45' : ''}`}>
-        {isPending || isConfirming || isConnecting || isSwitching ? <Loader2 className="h-4 w-4 animate-spin" /> : <CtaIcon className="h-4 w-4" />}
+      <button type="button" onClick={handleSubmit} disabled={ctaDisabled || evmWallet.isConnecting} className={`uki-wallet-button mt-2 w-full justify-center ${ctaDisabled ? 'opacity-45' : ''}`}>
+        {isPending || isConfirming || evmWallet.isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CtaIcon className="h-4 w-4" />}
         {ctaLabel}
       </button>
-
-      <WalletConnectorDialog
-        open={isConnectorDialogOpen}
-        onOpenChange={setIsConnectorDialogOpen}
-        connectors={evmConnectors}
-        onSelectConnector={connectEvmForPurchase}
-        currentWalletAction={
-          isWrongChain
-            ? {
-                description: `Intenta mover la wallet actual a ${UKI_PRESALE_CHAIN_LABEL}.`,
-                isLoading: isSwitching,
-                label: 'Cambiar a BSC',
-                onSelect: switchToPresaleChain,
-              }
-            : undefined
-        }
-        disconnectAction={
-          isConnected && address
-            ? {
-                description: `${formatTxLabel(address as `0x${string}`) ?? address} no se usara para esta compra.`,
-                label: 'Desconectar wallet actual',
-                onSelect: disconnectCurrentWallet,
-              }
-            : undefined
-        }
-        isConnecting={isConnecting}
-        title="Conectar para comprar"
-        description={`Elige una wallet EVM compatible con ${UKI_PRESALE_CHAIN_LABEL}.`}
-      />
 
       {isConfirming ? (
         <p className="mt-2 text-center text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--uki-muted)]">
