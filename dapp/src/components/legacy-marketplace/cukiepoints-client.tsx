@@ -631,6 +631,16 @@ export function CukiePointsClient() {
           </Button>
         </div>
 
+        {pointsData?.coverage === 'legacy-historical' && (
+          <div
+            role="status"
+            className="mx-4 mt-4 rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100"
+          >
+            Historial Legacy parcial: esta consulta usa movimientos históricos
+            disponibles y no representa una proyección actual completa.
+          </div>
+        )}
+
         {pointsError && (
           <div
             role="status"
@@ -762,7 +772,9 @@ export function CukiePointsClient() {
           </div>
         ) : pointsFeedStatus === 'empty' ? (
           <div className="p-6 text-sm text-slate-400">
-            No hay actividad de Cukie Points para estos filtros.
+            {pointsData?.coverage === 'legacy-historical'
+              ? 'No se han encontrado movimientos en este historial Legacy para estos filtros.'
+              : 'No hay actividad de Cukie Points para estos filtros.'}
           </div>
         ) : null}
         {isLoadingPoints && pointsData && (

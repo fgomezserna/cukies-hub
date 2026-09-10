@@ -181,11 +181,13 @@ export type LegacyCukiePointsSummary = {
 };
 
 export type LegacyCukiePointsResponse = {
-  source: 'mongo' | 'empty';
+  source: 'mongo' | 'legacy' | 'empty';
   items: LegacyCukiePointsTransaction[];
   total: number;
   offset: number;
   limit: number;
   summary: LegacyCukiePointsSummary;
+  status?: 'verified' | 'partial' | 'unknown';
+  coverage?: 'current' | 'legacy-historical' | 'unavailable';
   error?: string;
 };
