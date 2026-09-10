@@ -373,7 +373,10 @@ async function buildCreditsStatus(
         && watermark.status === 'healthy'
         && validSourceHash(watermark.sourceHash)
       ));
-    const readable = status.grants.healthy === true && watermarkEvidence;
+    const readable = status.grants.healthy === true
+      && status.materialization.balance === 'ready'
+      && status.materialization.pool === 'ready'
+      && watermarkEvidence;
     return classifyHeartbeat(
       checkedAt,
       evidence,

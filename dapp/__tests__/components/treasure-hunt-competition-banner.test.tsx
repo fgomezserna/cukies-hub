@@ -103,6 +103,21 @@ describe('TreasureHuntCompetitionBanner', () => {
   beforeEach(() => {
     mockDisqualified = false;
     mockPhase = 'active';
+    Object.assign(mockCreditAccess, {
+      isError: false,
+      blocked: false,
+      ready: true,
+      costCredits: 10,
+      availableCredits: 480,
+      ownAvailableCredits: 480,
+      poolAvailableCredits: 120,
+      poolContributedCredits: 20,
+      reservedCredits: 0,
+      poolReservedCredits: 0,
+      creditSource: 'own',
+      canPlay: true,
+      missingCredits: 0,
+    });
   });
 
   it('sustituye el torneo cerrado por el modo de juego con créditos', () => {
@@ -123,6 +138,49 @@ describe('TreasureHuntCompetitionBanner', () => {
       'href',
       '/credits',
     );
+  });
+
+  it('no anuncia créditos cuando la comprobación pública falla', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      isError: true,
+      ready: false,
+      costCredits: null,
+      availableCredits: null,
+      ownAvailableCredits: null,
+      poolAvailableCredits: null,
+      poolContributedCredits: null,
+      reservedCredits: null,
+      poolReservedCredits: null,
+      creditSource: null,
+      canPlay: false,
+    });
+    render(<TreasureHuntCompetitionBanner />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'No hemos podido comprobar el saldo',
+    );
+    expect(screen.getAllByText('No verificado')).toHaveLength(3);
+    expect(screen.queryByText('10 créditos')).not.toBeInTheDocument();
+    expect(screen.queryByText('480 personales')).not.toBeInTheDocument();
+  });
+
+  it('no promete pool ni ranking cuando el acceso está bloqueado aunque haya saldo proyectado', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      blocked: true,
+      creditSource: 'pool',
+      canPlay: false,
+      ownAvailableCredits: 0,
+      poolAvailableCredits: 120,
+    });
+    render(<TreasureHuntCompetitionBanner />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('acceso con créditos está temporalmente bloqueado');
+    expect(screen.getByText('Acceso bloqueado')).toBeInTheDocument();
+    expect(screen.queryByText('Pool · con ranking')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Se usarán .*créditos del pool/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Sí entra en la semana')).not.toBeInTheDocument();
   });
 
   it('separa intentos disponibles de resultados que cuentan y enlaza a reglas y rankings', () => {

@@ -22,6 +22,7 @@ import {
 } from '@/components/cukie-master/credit-history';
 import { useAuth } from '@/providers/auth-provider';
 import { appRuntimeEndpoint, useAppRuntime, useAppRuntimeResource } from '@/providers/app-runtime-provider';
+import type { CreditMaterializationState } from '@/lib/uki-economy/credits/materialization';
 
 type CreditConfiguration = {
   slotId: string;
@@ -35,8 +36,8 @@ type CreditConfiguration = {
 };
 
 type CreditRouteStatus = {
-  balance: { blocked: boolean };
-  pool: { blocked: boolean };
+  balance: { blocked: boolean; materialization: { state: CreditMaterializationState } };
+  pool: { blocked: boolean; materialization: { state: CreditMaterializationState } };
   grants: { healthy: boolean; sourceObservedThrough: string | null; openIncidents: number };
 };
 
@@ -51,13 +52,13 @@ type CreditStatus = {
   period: { cutoff: string; nextCutoff: string };
   balance: {
     availableCredits: number;
-    reservedCredits: number;
-    spentCredits: number;
-    poolDepositedCredits: number;
-    expiredCredits: number;
+    reservedCredits: number | null;
+    spentCredits: number | null;
+    poolDepositedCredits: number | null;
+    expiredCredits: number | null;
     blocked: boolean;
   };
-  pool: { availableCredits: number; reservedCredits: number; blocked: boolean };
+  pool: { availableCredits: number; reservedCredits: number | null; blocked: boolean };
   routes: Partial<Record<'uki' | 'nft', CreditRouteStatus>>;
   configurations: CreditConfiguration[];
   activeReservations: number;
@@ -274,6 +275,20 @@ export function CompetitionCreditPanel() {
         || typeof source.balance?.blocked !== 'boolean'
         || typeof source.pool?.blocked !== 'boolean'
       ) return 'unknown';
+      const materializationStates = [
+        source.balance.materialization?.state,
+        source.pool.materialization?.state,
+      ];
+      if (!materializationStates.every((state) => (
+        state === 'ready'
+        || state === 'blocked'
+        || state === 'unknown'
+        || state === 'too_large'
+        || state === 'stale'
+      ))) return 'unknown';
+      if (materializationStates.some((state) => state !== 'ready')) {
+        return materializationStates.includes('blocked') ? 'blocked' : 'unknown';
+      }
       if (source.grants.healthy && !source.balance.blocked && !source.pool.blocked) return 'healthy';
       return 'blocked';
     };
@@ -851,11 +866,13 @@ export function CompetitionCreditPanel() {
   );
 }
 
-function CurrentBalance({ label, value }: { label: string; value: number }) {
+function CurrentBalance({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="border-b border-white/10 p-4 last:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(3)]:border-b-0 sm:[&:nth-child(4)]:border-b-0 lg:border-b-0 lg:border-r-0">
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--uki-muted)]">{label}</p>
-      <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-lilac)]">{value}</p>
+      <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-lilac)]">
+        {value === null ? 'No disponible' : value}
+      </p>
     </div>
   );
 }

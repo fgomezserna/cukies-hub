@@ -100,7 +100,10 @@ describe('getAppRuntimeStatus', () => {
     process.env.COMPETITION_CREDITS_RUNTIME_ENABLED = 'true';
     (getEconomyDb as jest.Mock).mockResolvedValue(fakeDb());
     (getCukieMasterWalletStatus as jest.Mock).mockResolvedValue(masterStatus());
-    (getCompetitionCreditWalletStatus as jest.Mock).mockResolvedValue({ grants: { healthy: true } });
+    (getCompetitionCreditWalletStatus as jest.Mock).mockResolvedValue({
+      grants: { healthy: true },
+      materialization: { balance: 'ready', pool: 'ready' },
+    });
     (publicCukieMasterRouteStatus as jest.Mock).mockReturnValue({ projectionFresh: true });
   });
 
@@ -173,6 +176,16 @@ describe('getAppRuntimeStatus', () => {
     const result = await getAppRuntimeStatus(wallet, now);
     expect(result.services.indexer.status).toBe('ready');
     expect(result.services.master.status).toBe('ready');
+    expect(result.services.credits.status).not.toBe('ready');
+  });
+
+  it('no marca ready creditos con una proyección materializada como stale', async () => {
+    (getCompetitionCreditWalletStatus as jest.Mock).mockResolvedValueOnce({
+      grants: { healthy: true },
+      materialization: { balance: 'ready', pool: 'stale' },
+    });
+    const result = await getAppRuntimeStatus(wallet, now);
+    expect(result.services.indexer.status).toBe('ready');
     expect(result.services.credits.status).not.toBe('ready');
   });
 

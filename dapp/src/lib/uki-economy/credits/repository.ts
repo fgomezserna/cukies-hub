@@ -19,6 +19,10 @@ import {
   stableCreditHash,
 } from "./rules";
 import {
+  materializeCreditLots,
+  type CreditMaterializationState,
+} from './materialization';
+import {
   buildCreditSourceHealthEvidenceHash,
   creditSourceCursorIsHealthy,
 } from "./source-health";
@@ -347,6 +351,195 @@ export function createMongoCompetitionCreditRepository(
     );
   }
 
+  type CreditLotMaterialization = Pick<
+    CreditLot,
+    | "totalCredits"
+    | "poolDepositedCredits"
+    | "availableCredits"
+    | "reservedCredits"
+    | "spentCredits"
+    | "expiredCredits"
+    | "expiresAt"
+    | "blocked"
+  >;
+
+  const creditLotMaterializationProjection = {
+    _id: 0,
+    totalCredits: 1,
+    poolDepositedCredits: 1,
+    availableCredits: 1,
+    reservedCredits: 1,
+    spentCredits: 1,
+    expiredCredits: 1,
+    expiresAt: 1,
+    blocked: 1,
+  } as const;
+
+  type AccountMaterialization = {
+    grantedCredits: number;
+    poolDepositedCredits: number;
+    availableCredits: number;
+    reservedCredits: number;
+    spentCredits: number;
+    expiredCredits: number;
+    blocked: boolean;
+    state: CreditMaterializationState;
+  };
+
+  type PoolMaterialization = {
+    contributedCredits: number;
+    availableCredits: number;
+    reservedCredits: number;
+    spentCredits: number;
+    expiredCredits: number;
+    blocked: boolean;
+    state: CreditMaterializationState;
+  };
+
+  function materializationConflict(
+    id: string,
+    state: CreditMaterializationState,
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    const reason = state === "stale"
+      ? "CREDIT_PROJECTION_STALE"
+      : state === "blocked"
+        ? "CREDIT_LOTS_BLOCKED"
+        : state === "too_large"
+          ? "CREDIT_LOT_PROJECTION_TOO_LARGE"
+          : "CREDIT_LOT_MATERIALIZATION_UNKNOWN";
+    return new DomainConflictError(
+      `La ${kind} ${id} no puede reconciliarse de forma segura (${state}).`,
+      { reason },
+    );
+  }
+
+  function requireReadyMaterialization(
+    id: string,
+    materialization: { state: CreditMaterializationState },
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    if (materialization.state !== "ready") {
+      throw materializationConflict(id, materialization.state, kind);
+    }
+  }
+
+  const accountProjectionFields = [
+    "grantedCredits",
+    "poolDepositedCredits",
+    "availableCredits",
+    "reservedCredits",
+    "spentCredits",
+    "expiredCredits",
+  ] as const;
+  const poolProjectionFields = [
+    "contributedCredits",
+    "availableCredits",
+    "reservedCredits",
+    "spentCredits",
+    "expiredCredits",
+  ] as const;
+
+  function assertProjectionCoherent(
+    id: string,
+    projection: Record<string, unknown>,
+    expected: Record<string, number>,
+    increments: Partial<Record<string, number>>,
+    fields: readonly string[],
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    if (projection.blocked === true) {
+      throw materializationConflict(id, "blocked", kind);
+    }
+    if (projection.blocked !== false) {
+      throw materializationConflict(id, "unknown", kind);
+    }
+    for (const field of fields) {
+      const current = projection[field];
+      if (!Number.isSafeInteger(current) || (current as number) < 0) {
+        throw materializationConflict(id, "unknown", kind);
+      }
+      const delta = increments[field] ?? 0;
+      if (!Number.isSafeInteger(delta)) {
+        throw materializationConflict(id, "unknown", kind);
+      }
+      const next = (current as number) + delta;
+      if (!Number.isSafeInteger(next) || next < 0) {
+        throw new DomainConflictError(
+          `La ${kind} ${id} produciria un saldo negativo o inseguro.`,
+          { reason: "CREDIT_PROJECTION_NEGATIVE" },
+        );
+      }
+      if (next !== expected[field]) {
+        throw materializationConflict(id, "stale", kind);
+      }
+    }
+  }
+
+  async function accountMaterialization(
+    walletNormalized: string,
+    periodId: string,
+    route: CreditRoute,
+  ): Promise<AccountMaterialization> {
+    const lots = await collections.ownLots
+      .find(
+        { walletNormalized, periodId, route },
+        { ...options, projection: creditLotMaterializationProjection },
+      )
+      .limit(RECONCILIATION_DOCUMENT_LIMITS.ownLots)
+      .toArray() as CreditLotMaterialization[];
+    const materialized = materializeCreditLots(
+      lots,
+      RECONCILIATION_DOCUMENT_LIMITS.ownLots - 1,
+    );
+    if (materialized.state === "ready" && lots.some((lot) => (
+      !(lot.expiresAt instanceof Date) || Number.isNaN(lot.expiresAt.getTime())
+    ))) {
+      materialized.state = "unknown";
+    }
+    return {
+      grantedCredits: materialized.totals.totalCredits,
+      poolDepositedCredits: materialized.totals.poolDepositedCredits,
+      availableCredits: materialized.totals.availableCredits,
+      reservedCredits: materialized.totals.reservedCredits,
+      spentCredits: materialized.totals.spentCredits,
+      expiredCredits: materialized.totals.expiredCredits,
+      blocked: materialized.state === "blocked",
+      state: materialized.state,
+    };
+  }
+
+  async function poolMaterialization(
+    periodId: string,
+    route: CreditRoute,
+  ): Promise<PoolMaterialization> {
+    const lots = await collections.poolLots
+      .find(
+        { periodId, route },
+        { ...options, projection: creditLotMaterializationProjection },
+      )
+      .limit(RECONCILIATION_DOCUMENT_LIMITS.poolLots)
+      .toArray() as CreditLotMaterialization[];
+    const materialized = materializeCreditLots(
+      lots,
+      RECONCILIATION_DOCUMENT_LIMITS.poolLots - 1,
+    );
+    if (materialized.state === "ready" && lots.some((lot) => (
+      !(lot.expiresAt instanceof Date) || Number.isNaN(lot.expiresAt.getTime())
+    ))) {
+      materialized.state = "unknown";
+    }
+    return {
+      contributedCredits: materialized.totals.totalCredits,
+      availableCredits: materialized.totals.availableCredits,
+      reservedCredits: materialized.totals.reservedCredits,
+      spentCredits: materialized.totals.spentCredits,
+      expiredCredits: materialized.totals.expiredCredits,
+      blocked: materialized.state === "blocked",
+      state: materialized.state,
+    };
+  }
+
   async function incrementAccount(
     walletNormalized: string,
     periodId: string,
@@ -365,27 +558,60 @@ export function createMongoCompetitionCreditRepository(
     now: Date
   ) {
     const id = accountPeriodId(walletNormalized, periodId, route);
-    await collections.accounts.updateOne(
-      { _id: id },
-      {
-        $setOnInsert: {
-          _id: id,
-          walletNormalized,
-          periodId,
-          route,
-          grantedCredits: 0,
-          poolDepositedCredits: 0,
-          availableCredits: 0,
-          reservedCredits: 0,
-          spentCredits: 0,
-          expiredCredits: 0,
-          blocked: false,
-          revision: 0,
-          createdAt: now,
-          updatedAt: now,
+    const existing = await collections.accounts.findOne({ _id: id }, options);
+    const materialization = await accountMaterialization(
+      walletNormalized,
+      periodId,
+      route,
+    );
+    if (!existing) {
+      requireReadyMaterialization(id, materialization, "cuenta");
+      const { state: _state, ...seedMaterialization } = materialization;
+      const seeded = await collections.accounts.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            walletNormalized,
+            periodId,
+            route,
+            ...seedMaterialization,
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
         },
+        { ...options, upsert: true },
+      );
+      if (seeded.upsertedCount === 1) {
+        // The lot mutation that triggered this call is already reflected in
+        // the materialization. Applying the same delta again would drift the
+        // projection away from the authoritative lots.
+        return;
+      }
+    }
+    requireReadyMaterialization(id, materialization, "cuenta");
+    const projection = existing ?? await collections.accounts.findOne({ _id: id }, options);
+    if (!projection) {
+      throw new DomainConflictError(
+        `La cuenta de creditos ${id} esta ausente tras la carrera de materializacion.`,
+        { reason: "CREDIT_PROJECTION_MISSING" },
+      );
+    }
+    assertProjectionCoherent(
+      id,
+      projection as Record<string, unknown>,
+      {
+        grantedCredits: materialization.grantedCredits,
+        poolDepositedCredits: materialization.poolDepositedCredits,
+        availableCredits: materialization.availableCredits,
+        reservedCredits: materialization.reservedCredits,
+        spentCredits: materialization.spentCredits,
+        expiredCredits: materialization.expiredCredits,
       },
-      { ...options, upsert: true }
+      increments,
+      accountProjectionFields,
+      "cuenta",
     );
     const updated = await collections.accounts.updateOne(
       { _id: id, blocked: false },
@@ -415,25 +641,52 @@ export function createMongoCompetitionCreditRepository(
     now: Date
   ) {
     const id = poolPeriodId(periodId, route);
-    await collections.poolPeriods.updateOne(
-      { _id: id },
-      {
-        $setOnInsert: {
-          _id: id,
-          periodId,
-          route,
-          contributedCredits: 0,
-          availableCredits: 0,
-          reservedCredits: 0,
-          spentCredits: 0,
-          expiredCredits: 0,
-          blocked: false,
-          revision: 0,
-          createdAt: now,
-          updatedAt: now,
+    const existing = await collections.poolPeriods.findOne({ _id: id }, options);
+    const materialization = await poolMaterialization(periodId, route);
+    if (!existing) {
+      requireReadyMaterialization(id, materialization, "periodo de pool");
+      const { state: _state, ...seedMaterialization } = materialization;
+      const seeded = await collections.poolPeriods.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            periodId,
+            route,
+            ...seedMaterialization,
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
         },
+        { ...options, upsert: true },
+      );
+      if (seeded.upsertedCount === 1) {
+        // See incrementAccount: the lot mutation is included in the baseline.
+        return;
+      }
+    }
+    requireReadyMaterialization(id, materialization, "periodo de pool");
+    const projection = existing ?? await collections.poolPeriods.findOne({ _id: id }, options);
+    if (!projection) {
+      throw new DomainConflictError(
+        `El periodo de pool ${id} esta ausente tras la carrera de materializacion.`,
+        { reason: "CREDIT_PROJECTION_MISSING" },
+      );
+    }
+    assertProjectionCoherent(
+      id,
+      projection as Record<string, unknown>,
+      {
+        contributedCredits: materialization.contributedCredits,
+        availableCredits: materialization.availableCredits,
+        reservedCredits: materialization.reservedCredits,
+        spentCredits: materialization.spentCredits,
+        expiredCredits: materialization.expiredCredits,
       },
-      { ...options, upsert: true }
+      increments,
+      poolProjectionFields,
+      "periodo de pool",
     );
     const updated = await collections.poolPeriods.updateOne(
       { _id: id, blocked: false },

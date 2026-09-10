@@ -75,9 +75,9 @@ const MODULE_DATA_VALIDATORS: Record<DashboardModuleId, (value: unknown) => bool
     && isSlotRoute(value.routes.nft),
   credits: (value) => isRecord(value)
     && isNonNegativeInteger(value.availableCredits)
-    && isNonNegativeInteger(value.reservedCredits)
-    && isNonNegativeInteger(value.spentCredits)
-    && isNonNegativeInteger(value.poolDepositedCredits)
+    && isNullableNonNegativeInteger(value.reservedCredits)
+    && isNullableNonNegativeInteger(value.spentCredits)
+    && isNullableNonNegativeInteger(value.poolDepositedCredits)
     && isNonNegativeInteger(value.poolAvailableCredits)
     && isNonNegativeInteger(value.activeReservations),
   cukiePool: (value) => isRecord(value)

@@ -61,6 +61,7 @@ describe('dashboard default dependencies', () => {
         blocked: false,
       },
       pool: { availableCredits: 900, blocked: false },
+      materialization: { balance: 'ready', pool: 'ready' },
       activeReservations: 1,
       grants: {
         healthy: true,

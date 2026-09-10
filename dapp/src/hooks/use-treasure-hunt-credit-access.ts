@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/providers/auth-provider';
+import type { CreditMaterializationState } from '@/lib/uki-economy/credits/materialization';
 
 const TREASURE_HUNT_START_COST_CODE = 'treasure-hunt:start';
 
@@ -18,16 +19,25 @@ type CreditStatus = {
     costs: CreditCost[];
   };
   balance: {
-    poolDepositedCredits: number;
+    poolDepositedCredits: number | null;
     availableCredits: number;
-    reservedCredits: number;
-    spentCredits: number;
+    reservedCredits: number | null;
+    spentCredits: number | null;
     blocked: boolean;
   };
   pool: {
     availableCredits: number;
-    reservedCredits: number;
+    reservedCredits: number | null;
     blocked: boolean;
+  };
+  materialization: {
+    balance: CreditMaterializationState;
+    pool: CreditMaterializationState;
+  };
+  currentRun?: {
+    routes: Array<{
+      status: string;
+    }>;
   };
 };
 
@@ -47,6 +57,17 @@ export function nextTreasureHuntCreditSource(input: {
 function isCreditStatus(value: unknown): value is CreditStatus {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const candidate = value as Partial<CreditStatus>;
+  const nullableNonNegativeInteger = (number: unknown) => (
+    number === null
+    || (typeof number === 'number' && Number.isSafeInteger(number) && number >= 0)
+  );
+  const materializationStates = new Set<CreditMaterializationState>([
+    'ready',
+    'blocked',
+    'unknown',
+    'too_large',
+    'stale',
+  ]);
   return Boolean(
     candidate.rule
     && typeof candidate.rule.version === 'string'
@@ -59,21 +80,26 @@ function isCreditStatus(value: unknown): value is CreditStatus {
       && typeof cost.active === 'boolean'
     ))
     && candidate.balance
-    && Number.isSafeInteger(candidate.balance.poolDepositedCredits)
-    && candidate.balance.poolDepositedCredits >= 0
+    && nullableNonNegativeInteger(candidate.balance.poolDepositedCredits)
     && Number.isSafeInteger(candidate.balance.availableCredits)
     && candidate.balance.availableCredits >= 0
-    && Number.isSafeInteger(candidate.balance.reservedCredits)
-    && candidate.balance.reservedCredits >= 0
-    && Number.isSafeInteger(candidate.balance.spentCredits)
-    && candidate.balance.spentCredits >= 0
+    && nullableNonNegativeInteger(candidate.balance.reservedCredits)
+    && nullableNonNegativeInteger(candidate.balance.spentCredits)
     && typeof candidate.balance.blocked === 'boolean'
     && candidate.pool
     && Number.isSafeInteger(candidate.pool.availableCredits)
     && candidate.pool.availableCredits >= 0
-    && Number.isSafeInteger(candidate.pool.reservedCredits)
-    && candidate.pool.reservedCredits >= 0
+    && nullableNonNegativeInteger(candidate.pool.reservedCredits)
     && typeof candidate.pool.blocked === 'boolean'
+    && candidate.materialization
+    && materializationStates.has(candidate.materialization.balance)
+    && materializationStates.has(candidate.materialization.pool)
+    && (!candidate.currentRun || (
+      Array.isArray(candidate.currentRun.routes)
+      && candidate.currentRun.routes.every((run) => (
+        run && typeof run.status === 'string'
+      ))
+    ))
   );
 }
 
@@ -104,23 +130,53 @@ export function useTreasureHuntCreditAccess() {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
-  const cost = query.data?.rule.costs.find((candidate) => (
+  const queryHasError = Boolean(walletAddress)
+    && (query.isError || query.isRefetchError || Boolean(query.error));
+  const materializationUnavailable = Boolean(
+    !queryHasError
+    && query.data
+    && (
+      query.data.materialization.balance !== 'ready'
+      || query.data.materialization.pool !== 'ready'
+    )
+  );
+  const statusUnavailable = queryHasError || materializationUnavailable;
+  const cost = statusUnavailable ? undefined : query.data?.rule.costs.find((candidate) => (
     candidate.active && candidate.costCode === TREASURE_HUNT_START_COST_CODE
   ));
   const costCredits = cost?.credits ?? null;
-  const ownAvailableCredits = query.data?.balance.availableCredits ?? null;
-  const poolAvailableCredits = query.data?.pool.availableCredits ?? null;
-  const creditSource = nextTreasureHuntCreditSource({
+  const ownAvailableCredits = statusUnavailable ? null : query.data?.balance.availableCredits ?? null;
+  const poolAvailableCredits = statusUnavailable ? null : query.data?.pool.availableCredits ?? null;
+  const candidateCreditSource = nextTreasureHuntCreditSource({
     costCredits,
     ownAvailableCredits,
     poolAvailableCredits,
   });
+  const currentRunStatuses = statusUnavailable
+    ? []
+    : query.data?.currentRun?.routes.map((run) => run.status) ?? [];
+  const currentRunBlocked = currentRunStatuses.length > 0
+    && currentRunStatuses.every((status) => status === 'blocked');
+  const currentRunPending = currentRunStatuses.some((status) => (
+    status === 'missing' || status === 'snapshotted' || status === 'processing'
+  ));
   const blocked = Boolean(
-    query.data?.balance.blocked
-    || (creditSource === 'pool' && query.data?.pool.blocked)
+    queryHasError
+    || materializationUnavailable
+    || (!statusUnavailable && query.data?.balance.blocked)
+    || (!statusUnavailable && candidateCreditSource === 'pool' && query.data?.pool.blocked)
+    || currentRunBlocked
   );
-  const ready = Boolean(query.data && costCredits !== null);
+  // Keep raw balances available for diagnostics, but never expose a source as
+  // selected while an account/run/pool incident blocks the access decision.
+  const creditSource = blocked ? null : candidateCreditSource;
+  const ready = Boolean(!statusUnavailable && query.data && costCredits !== null);
   const bestAvailableSource = Math.max(ownAvailableCredits ?? 0, poolAvailableCredits ?? 0);
+  const availabilityReason = materializationUnavailable
+    ? 'projection_unavailable' as const
+    : ready && !blocked && !creditSource
+      ? currentRunPending ? 'run_pending' as const : 'insufficient' as const
+      : null;
 
   return {
     walletConnected: Boolean(walletAddress),
@@ -133,13 +189,15 @@ export function useTreasureHuntCreditAccess() {
     availableCredits: ownAvailableCredits,
     ownAvailableCredits,
     poolAvailableCredits,
-    poolContributedCredits: query.data?.balance.poolDepositedCredits ?? null,
-    spentCredits: query.data?.balance.spentCredits ?? null,
+    poolContributedCredits: statusUnavailable ? null : query.data?.balance.poolDepositedCredits ?? null,
+    spentCredits: statusUnavailable ? null : query.data?.balance.spentCredits ?? null,
     creditSource,
-    reservedCredits: query.data?.balance.reservedCredits ?? null,
-    poolReservedCredits: query.data?.pool.reservedCredits ?? null,
+    availabilityReason,
+    reservedCredits: statusUnavailable ? null : query.data?.balance.reservedCredits ?? null,
+    poolReservedCredits: statusUnavailable ? null : query.data?.pool.reservedCredits ?? null,
     canPlay: Boolean(
-      ready
+      !queryHasError
+      && ready
       && !blocked
       && creditSource
     ),

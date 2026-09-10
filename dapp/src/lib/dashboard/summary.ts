@@ -28,9 +28,9 @@ export type DashboardModulePayloads = {
   };
   credits: {
     availableCredits: number;
-    reservedCredits: number;
-    spentCredits: number;
-    poolDepositedCredits: number;
+    reservedCredits: number | null;
+    spentCredits: number | null;
+    poolDepositedCredits: number | null;
     poolAvailableCredits: number;
     activeReservations: number;
   };

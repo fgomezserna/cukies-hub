@@ -25,6 +25,7 @@ const mockCreditAccess = {
   poolReservedCredits: 0,
   canPlay: true,
   missingCredits: 0,
+  availabilityReason: null as 'run_pending' | 'insufficient' | null,
   reload: jest.fn(),
 };
 
@@ -248,6 +249,7 @@ describe('vistas UX de Treasure Hunt', () => {
       poolReservedCredits: 0,
       canPlay: true,
       missingCredits: 0,
+      availabilityReason: null,
     });
   });
 
@@ -342,6 +344,28 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('120 créditos disponibles en el pool compartido')).toBeInTheDocument();
   });
 
+  it('no promete pool ni ranking cuando el acceso está bloqueado aunque haya saldo proyectado', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      blocked: true,
+      ownAvailableCredits: 0,
+      poolAvailableCredits: 120,
+      creditSource: 'pool',
+      canPlay: false,
+      missingCredits: 0,
+    });
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    expect(screen.getByRole('button', { name: 'Créditos no disponibles' })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('acceso con créditos está temporalmente bloqueado');
+    expect(screen.getByText('No confirmado')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Competir con/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Sí, esta partida cuenta')).not.toBeInTheDocument();
+    expect(screen.queryByText('120 créditos disponibles en el pool compartido')).not.toBeInTheDocument();
+    expect(onStartSinglePlayer).not.toHaveBeenCalled();
+  });
+
   it('explica cuánto falta y bloquea la partida si no hay créditos suficientes', () => {
     mockPhase = 'closed';
     Object.assign(mockCreditAccess, {
@@ -357,6 +381,53 @@ describe('vistas UX de Treasure Hunt', () => {
 
     expect(screen.getByRole('button', { name: 'Te faltan 6 créditos' })).toBeDisabled();
     expect(screen.getByText('4 créditos')).toBeInTheDocument();
+    expect(onStartSinglePlayer).not.toHaveBeenCalled();
+  });
+
+  it('explica que el reparto sigue pendiente cuando aún no existe un lote abierto', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      availableCredits: 0,
+      ownAvailableCredits: 0,
+      poolAvailableCredits: 0,
+      creditSource: null,
+      canPlay: false,
+      missingCredits: 10,
+      availabilityReason: 'run_pending',
+    });
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    expect(screen.getByRole('button', { name: 'Reparto de créditos pendiente' })).toBeDisabled();
+    expect(screen.getByText(/reparto del periodo sigue en preparación/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Te faltan/ })).not.toBeInTheDocument();
+    expect(onStartSinglePlayer).not.toHaveBeenCalled();
+  });
+
+  it('bloquea el CTA y no promete saldo cuando falla la comprobación', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      isError: true,
+      ready: false,
+      costCredits: null,
+      availableCredits: null,
+      ownAvailableCredits: null,
+      poolAvailableCredits: null,
+      poolContributedCredits: null,
+      reservedCredits: null,
+      poolReservedCredits: null,
+      creditSource: null,
+      canPlay: false,
+      missingCredits: 0,
+    });
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    expect(screen.getByRole('button', { name: 'Créditos no disponibles' })).toBeDisabled();
+    expect(screen.getByText(/No hemos podido comprobar tus créditos/i)).toBeInTheDocument();
+    expect(screen.getByText('No verificado')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente de comprobar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Te faltan/ })).not.toBeInTheDocument();
     expect(onStartSinglePlayer).not.toHaveBeenCalled();
   });
 

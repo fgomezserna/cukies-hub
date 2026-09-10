@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-09-10T15:02:00Z",
+  "environment": "staging",
+  "pr": 389,
+  "candidateSha": "357ee598aa5746eb30123282900791e060fe1fc4",
+  "deployedSha": "e71c32c8b6e64b67bbca5dda856951621e64f3cd",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34490483988",
+  "releasedAt": "2026-09-10T14:46:27.299Z",
+  "health": {
+    "http": 200,
+    "exactSha": true
+  },
+  "checks": {
+    "lint": "pass",
+    "typecheck": "pass",
+    "testSuites": 249,
+    "tests": 2047,
+    "build": "pass"
+  },
+  "qa": {
+    "browser": "Edge",
+    "wallet": "0x2678…0c13",
+    "chainId": 97,
+    "tokenId": "98000006",
+    "poolActionEnabled": "Solicitar devolucion del Cukie Pool",
+    "updatingDepositAbsent": true,
+    "signedTransaction": false,
+    "myCukies": {
+      "total": 12,
+      "wallet": 5,
+      "pool": 7,
+      "master": 0
+    },
+    "poolCurrentPositions": 4,
+    "withdrawablePriorVaultTokens": [
+      "98000001",
+      "98000003",
+      "98000004"
+    ]
+  },
+  "rollout": {
+    "replacedServices": [
+      "dapp"
+    ],
+    "priorHostContainersPreserved": 91,
+    "priorHostContainers": 92,
+    "gameWorkersProductionUnchanged": true
+  },
+  "limits": [
+    "Historical browser pending operation was not captured; enabled current action is verified, not full historical reproduction.",
+    "Pool current-position summary omits three withdrawable prior-vault positions included in My Cukies; follow-up remains open.",
+    "No wallet signing, NFT withdrawal or ledger repair was performed."
+  ]
+}

@@ -100,6 +100,490 @@ describe('competition credit public status conflicts', () => {
     });
   });
 
+  it('does not advertise pooled credits while the settlement run is still processing', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_pool_periods: [{
+        _id: `pool:${period.periodId}:uki`,
+        periodId: period.periodId,
+        route: 'uki',
+        contributedCredits: 50,
+        availableCredits: 50,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      }],
+      competition_credit_runs: [{
+        runId: 'run-processing',
+        route: 'uki',
+        status: 'processing',
+        settlementPeriod: period,
+      }],
+      competition_credit_pool_lots: [{
+        lotId: 'pool-lot-processing',
+        bucket: 'pool',
+        route: 'uki',
+        walletNormalized: null,
+        periodId: period.periodId,
+        runId: 'run-processing',
+        runItemId: 'run-item-processing',
+        sourceSlotId: 'slot-processing',
+        eligibilityEpoch: 1,
+        totalCredits: 50,
+        poolDepositedCredits: 0,
+        availableCredits: 50,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.pool.availableCredits).toBe(0);
+    expect(status.currentRun.routes).toEqual([
+      { route: 'uki', status: 'processing' },
+      { route: 'nft', status: 'missing' },
+    ]);
+  });
+
+  it('publishes only usable pool lots from an open settlement run', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_pool_periods: [{
+        _id: `pool:${period.periodId}:uki`,
+        periodId: period.periodId,
+        route: 'uki',
+        contributedCredits: 80,
+        availableCredits: 80,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      }],
+      competition_credit_runs: [{
+        runId: 'run-open',
+        route: 'uki',
+        status: 'open',
+        settlementPeriod: period,
+      }],
+      competition_credit_pool_lots: [
+        {
+          lotId: 'pool-lot-open',
+          bucket: 'pool',
+          route: 'uki',
+          walletNormalized: null,
+          periodId: period.periodId,
+          runId: 'run-open',
+          runItemId: 'run-item-open',
+          sourceSlotId: 'slot-open',
+          eligibilityEpoch: 1,
+          totalCredits: 50,
+          poolDepositedCredits: 0,
+          availableCredits: 50,
+          reservedCredits: 0,
+          spentCredits: 0,
+          expiredCredits: 0,
+          blocked: false,
+          expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+        },
+        {
+          lotId: 'pool-lot-blocked',
+          bucket: 'pool',
+          route: 'uki',
+          walletNormalized: null,
+          periodId: period.periodId,
+          runId: 'run-open',
+          runItemId: 'run-item-blocked',
+          sourceSlotId: 'slot-blocked',
+          eligibilityEpoch: 1,
+          totalCredits: 20,
+          poolDepositedCredits: 0,
+          availableCredits: 20,
+          reservedCredits: 0,
+          spentCredits: 0,
+          expiredCredits: 0,
+          blocked: true,
+          expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+        },
+        {
+          lotId: 'pool-lot-expired',
+          bucket: 'pool',
+          route: 'uki',
+          walletNormalized: null,
+          periodId: period.periodId,
+          runId: 'run-open',
+          runItemId: 'run-item-expired',
+          sourceSlotId: 'slot-expired',
+          eligibilityEpoch: 1,
+          totalCredits: 10,
+          poolDepositedCredits: 0,
+          availableCredits: 10,
+          reservedCredits: 0,
+          spentCredits: 0,
+          expiredCredits: 0,
+          blocked: false,
+          expiresAt: new Date('2026-09-07T08:00:00.000Z'),
+        },
+      ],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.pool.availableCredits).toBe(0);
+    expect(status.routes.uki.pool.availableCredits).toBe(0);
+    expect(status.routes.uki.pool.materialization).toEqual({ state: 'blocked' });
+    expect(status.currentRun.routes[0]).toEqual({ route: 'uki', status: 'open' });
+  });
+
+  it('derives a usable pool lot even when its pool projection is absent', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [{
+        runId: 'run-open-without-pool-projection',
+        route: 'uki',
+        status: 'open',
+        settlementPeriod: period,
+      }],
+      competition_credit_pool_lots: [{
+        _id: 'pool-lot-without-projection',
+        lotId: 'pool-lot-without-projection',
+        bucket: 'pool',
+        route: 'uki',
+        walletNormalized: null,
+        periodId: period.periodId,
+        runId: 'run-open-without-pool-projection',
+        runItemId: 'run-item-without-pool-projection',
+        sourceSlotId: 'slot-without-pool-projection',
+        eligibilityEpoch: 1,
+        totalCredits: 40,
+        poolDepositedCredits: 0,
+        availableCredits: 40,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.pool.availableCredits).toBe(40);
+    expect(status.routes.uki.pool.availableCredits).toBe(40);
+    expect(status.routes.uki.pool.reservedCredits).toBeNull();
+    expect(status.balance.reservedCredits).toBeNull();
+  });
+
+  it('derives a usable own lot even when its account projection is absent', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [{
+        runId: 'run-open-without-account-projection',
+        route: 'uki',
+        status: 'open_with_holds',
+        settlementPeriod: period,
+      }],
+      competition_credit_lots: [{
+        _id: 'own-lot-without-projection',
+        lotId: 'own-lot-without-projection',
+        bucket: 'own',
+        route: 'uki',
+        walletNormalized: wallet,
+        periodId: period.periodId,
+        runId: 'run-open-without-account-projection',
+        runItemId: 'run-item-without-account-projection',
+        sourceSlotId: 'slot-without-account-projection',
+        eligibilityEpoch: 1,
+        totalCredits: 30,
+        poolDepositedCredits: 0,
+        availableCredits: 30,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.balance.availableCredits).toBe(30);
+    expect(status.routes.uki.balance.availableCredits).toBe(30);
+    expect(status.routes.uki.balance.grantedCredits).toBeNull();
+    expect(status.balance.spentCredits).toBeNull();
+    expect(status.currentRun.routes[0]).toEqual({ route: 'uki', status: 'open_with_holds' });
+  });
+
+  it('fails closed when an absent account projection has a blocked historical lot', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [{
+        runId: 'run-open-account-blocked-history',
+        route: 'uki',
+        status: 'open',
+        settlementPeriod: period,
+      }],
+      competition_credit_lots: [
+        {
+          _id: 'own-lot-valid',
+          lotId: 'own-lot-valid',
+          bucket: 'own',
+          route: 'uki',
+          walletNormalized: wallet,
+          periodId: period.periodId,
+          runId: 'run-open-account-blocked-history',
+          runItemId: 'item-valid',
+          sourceSlotId: 'slot-valid',
+          eligibilityEpoch: 1,
+          totalCredits: 30,
+          poolDepositedCredits: 0,
+          availableCredits: 30,
+          reservedCredits: 0,
+          spentCredits: 0,
+          expiredCredits: 0,
+          blocked: false,
+          expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+        },
+        {
+          _id: 'own-lot-blocked-history',
+          lotId: 'own-lot-blocked-history',
+          bucket: 'own',
+          route: 'uki',
+          walletNormalized: wallet,
+          periodId: period.periodId,
+          runId: 'run-closed-account-blocked-history',
+          runItemId: 'item-blocked',
+          sourceSlotId: 'slot-blocked',
+          eligibilityEpoch: 1,
+          totalCredits: 20,
+          poolDepositedCredits: 0,
+          availableCredits: 20,
+          reservedCredits: 0,
+          spentCredits: 0,
+          expiredCredits: 0,
+          blocked: true,
+          expiresAt: new Date('2026-09-06T09:00:00.000Z'),
+        },
+      ],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.balance.materialization).toEqual({ state: 'blocked' });
+    expect(status.routes.uki.balance.availableCredits).toBe(0);
+    expect(status.balance.availableCredits).toBe(0);
+  });
+
+  it('keeps a missing blocked flag as unknown instead of treating it as an available lot', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [{
+        runId: 'run-open-account-unknown-lot',
+        route: 'uki',
+        status: 'open',
+        settlementPeriod: period,
+      }],
+      competition_credit_lots: [{
+        _id: 'own-lot-unknown-blocked',
+        lotId: 'own-lot-unknown-blocked',
+        bucket: 'own',
+        route: 'uki',
+        walletNormalized: wallet,
+        periodId: period.periodId,
+        runId: 'run-open-account-unknown-lot',
+        runItemId: 'item-unknown',
+        sourceSlotId: 'slot-unknown',
+        eligibilityEpoch: 1,
+        totalCredits: 30,
+        poolDepositedCredits: 0,
+        availableCredits: 30,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.balance.materialization).toEqual({ state: 'unknown' });
+    expect(status.routes.uki.balance.availableCredits).toBe(0);
+    expect(status.balance.materialization).toEqual({ state: 'unknown' });
+  });
+
+  it('fails closed when historical lots exceed the public reconciliation limit', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    const lots = Array.from({ length: 5_001 }, (_, index) => ({
+      _id: `own-lot-${index}`,
+      lotId: `own-lot-${index}`,
+      bucket: 'own',
+      route: 'uki',
+      walletNormalized: wallet,
+      periodId: period.periodId,
+      runId: 'run-open-too-many-lots',
+      runItemId: `item-${index}`,
+      sourceSlotId: `slot-${index}`,
+      eligibilityEpoch: 1,
+      totalCredits: 1,
+      poolDepositedCredits: 0,
+      availableCredits: 1,
+      reservedCredits: 0,
+      spentCredits: 0,
+      expiredCredits: 0,
+      blocked: false,
+      expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+    }));
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [{
+        runId: 'run-open-too-many-lots',
+        route: 'uki',
+        status: 'open',
+        settlementPeriod: period,
+      }],
+      competition_credit_lots: lots,
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.balance.materialization).toEqual({ state: 'too_large' });
+    expect(status.routes.uki.balance.availableCredits).toBe(0);
+    expect(status.balance.availableCredits).toBe(0);
+  });
+
+  it('does not announce a stale pool projection even when its lot is usable', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_pool_periods: [{
+        _id: `pool:${period.periodId}:uki`,
+        periodId: period.periodId,
+        route: 'uki',
+        contributedCredits: 100,
+        availableCredits: 0,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      }],
+      competition_credit_runs: [{
+        runId: 'run-open-stale-pool-projection',
+        route: 'uki',
+        status: 'open',
+        settlementPeriod: period,
+      }],
+      competition_credit_pool_lots: [{
+        _id: 'pool-lot-stale-projection',
+        lotId: 'pool-lot-stale-projection',
+        bucket: 'pool',
+        route: 'uki',
+        walletNormalized: null,
+        periodId: period.periodId,
+        runId: 'run-open-stale-pool-projection',
+        runItemId: 'item-stale-projection',
+        sourceSlotId: 'slot-stale-projection',
+        eligibilityEpoch: 1,
+        totalCredits: 100,
+        poolDepositedCredits: 0,
+        availableCredits: 100,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.pool.materialization).toEqual({ state: 'stale' });
+    expect(status.routes.uki.pool.availableCredits).toBe(0);
+    expect(status.pool.availableCredits).toBe(0);
+  });
+
+  it('does not announce a stale account projection even when its own lot is usable', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_account_periods: [{
+        _id: `${wallet}:${period.periodId}:uki`,
+        walletNormalized: wallet,
+        periodId: period.periodId,
+        route: 'uki',
+        grantedCredits: 100,
+        poolDepositedCredits: 0,
+        availableCredits: 0,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      }],
+      competition_credit_runs: [{
+        runId: 'run-open-stale-account-projection',
+        route: 'uki',
+        status: 'open',
+        settlementPeriod: period,
+      }],
+      competition_credit_lots: [{
+        _id: 'own-lot-stale-projection',
+        lotId: 'own-lot-stale-projection',
+        bucket: 'own',
+        route: 'uki',
+        walletNormalized: wallet,
+        periodId: period.periodId,
+        runId: 'run-open-stale-account-projection',
+        runItemId: 'item-stale-account-projection',
+        sourceSlotId: 'slot-stale-account-projection',
+        eligibilityEpoch: 1,
+        totalCredits: 100,
+        poolDepositedCredits: 0,
+        availableCredits: 100,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.balance.materialization).toEqual({ state: 'stale' });
+    expect(status.routes.uki.balance.availableCredits).toBe(0);
+    expect(status.balance.availableCredits).toBe(0);
+  });
+
   it('does not report stale source watermarks as current grant eligibility', async () => {
     mockCollections({
       economy_rule_versions: [testCompetitionCreditRule()],
