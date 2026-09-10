@@ -25,6 +25,7 @@ const mockCreditAccess = {
   poolReservedCredits: 0,
   canPlay: true,
   missingCredits: 0,
+  availabilityReason: null as 'run_pending' | 'insufficient' | null,
   reload: jest.fn(),
 };
 
@@ -248,6 +249,7 @@ describe('vistas UX de Treasure Hunt', () => {
       poolReservedCredits: 0,
       canPlay: true,
       missingCredits: 0,
+      availabilityReason: null,
     });
   });
 
@@ -357,6 +359,26 @@ describe('vistas UX de Treasure Hunt', () => {
 
     expect(screen.getByRole('button', { name: 'Te faltan 6 créditos' })).toBeDisabled();
     expect(screen.getByText('4 créditos')).toBeInTheDocument();
+    expect(onStartSinglePlayer).not.toHaveBeenCalled();
+  });
+
+  it('explica que el reparto sigue pendiente cuando aún no existe un lote abierto', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      availableCredits: 0,
+      ownAvailableCredits: 0,
+      poolAvailableCredits: 0,
+      creditSource: null,
+      canPlay: false,
+      missingCredits: 10,
+      availabilityReason: 'run_pending',
+    });
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    expect(screen.getByRole('button', { name: 'Reparto de créditos pendiente' })).toBeDisabled();
+    expect(screen.getByText(/reparto del periodo sigue en preparación/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Te faltan/ })).not.toBeInTheDocument();
     expect(onStartSinglePlayer).not.toHaveBeenCalled();
   });
 

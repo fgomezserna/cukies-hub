@@ -39,6 +39,7 @@ function CreditMetric({
 
 export function TreasureHuntCreditModeBanner() {
   const access = useTreasureHuntCreditAccess();
+  const waitingForRun = access.availabilityReason === 'run_pending';
   const costLabel = access.costCredits === null ? '—' : `${access.costCredits} créditos`;
   const balanceLabel = !access.walletConnected
     ? 'Conecta tu wallet'
@@ -49,12 +50,16 @@ export function TreasureHuntCreditModeBanner() {
     ? 'Personal'
     : access.creditSource === 'pool'
       ? 'Pool · con ranking'
-      : 'Sin saldo suficiente';
+      : waitingForRun
+        ? 'Reparto pendiente'
+        : 'Sin saldo suficiente';
   const sourceDetail = access.creditSource === 'own'
     ? 'Premio directo · no clasifica'
     : access.creditSource === 'pool'
       ? 'Sí entra en la semana'
-      : 'No se iniciará la partida';
+      : waitingForRun
+        ? 'Esperando créditos confirmados'
+        : 'No se iniciará la partida';
   const nextGameCopy = !access.walletConnected
     ? 'Conecta tu wallet para ver qué créditos se usarán y si la partida entrará en el ranking.'
     : access.isLoading
@@ -63,7 +68,9 @@ export function TreasureHuntCreditModeBanner() {
         ? `Se usarán ${access.costCredits} créditos del pool y tu resultado sí entrará en el ranking semanal.`
         : access.creditSource === 'own'
           ? `Se descontarán ${access.costCredits} créditos personales. Recibirás el reparto directo, pero esta partida no entrará en el ranking.`
-          : 'No hay una fuente con saldo suficiente para crear la partida.';
+          : waitingForRun
+            ? 'El reparto de créditos del periodo aún no está abierto. No se iniciará ni cobrará ninguna partida hasta confirmarlo.'
+            : 'No hay una fuente con saldo suficiente para crear la partida.';
   const contributedDetail = access.poolContributedCredits
     ? `${access.poolContributedCredits} aportados al pool este periodo`
     : 'Nada aportado al pool este periodo';
@@ -158,6 +165,7 @@ export function TreasureHuntCreditModeSidebar({
   readonly onStartSinglePlayer: () => void;
 }) {
   const access = useTreasureHuntCreditAccess();
+  const waitingForRun = access.availabilityReason === 'run_pending';
   const connectedUnavailable = access.walletConnected && (
     access.isLoading || access.isError || access.blocked || !access.ready
   );
@@ -174,11 +182,13 @@ export function TreasureHuntCreditModeSidebar({
       ? 'Comprobando tus créditos'
       : access.isError || access.blocked || !access.ready
         ? 'Créditos no disponibles'
-        : access.canPlay
-          ? isPoolGame
-            ? `Competir con ${access.costCredits} créditos del pool`
-            : `Jugar con ${access.costCredits} créditos personales`
-          : `Te faltan ${access.missingCredits} créditos`;
+        : waitingForRun
+          ? 'Reparto de créditos pendiente'
+          : access.canPlay
+            ? isPoolGame
+              ? `Competir con ${access.costCredits} créditos del pool`
+              : `Jugar con ${access.costCredits} créditos personales`
+            : `Te faltan ${access.missingCredits} créditos`;
   const introCopy = !access.walletConnected
     ? 'Conecta tu wallet para comprobar el coste, el saldo y si la partida entra en el ranking.'
     : access.isLoading
@@ -187,7 +197,9 @@ export function TreasureHuntCreditModeSidebar({
         ? 'Tu próxima partida usará créditos del pool: genera reparto directo y sí compite en el ranking semanal.'
         : access.creditSource === 'own'
           ? 'Tu próxima partida usará créditos personales: genera reparto directo, pero no compite en el ranking semanal.'
-          : 'No hay saldo suficiente para crear una nueva partida.';
+          : waitingForRun
+            ? 'El reparto de créditos del periodo aún no está abierto. Espera a que el Hub confirme lotes utilizables.'
+            : 'No hay saldo suficiente para crear una nueva partida.';
 
   return (
     <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#0d0914]/94 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -250,7 +262,11 @@ export function TreasureHuntCreditModeSidebar({
         {!access.isLoading ? <ArrowRight className="h-5 w-5" weight="bold" aria-hidden="true" /> : null}
       </button>
 
-      {access.walletConnected && !access.isLoading && !access.isError && !access.blocked && !access.canPlay ? (
+      {access.walletConnected && !access.isLoading && !access.isError && !access.blocked && !access.canPlay && waitingForRun ? (
+        <p role="status" className="mt-3 text-center text-xs font-semibold leading-relaxed text-[#969994]">
+          El reparto del periodo sigue en preparación. No se reservará ni cobrará ninguna partida hasta que exista un lote abierto y utilizable.
+        </p>
+      ) : access.walletConnected && !access.isLoading && !access.isError && !access.blocked && !access.canPlay ? (
         <p role="status" className="mt-3 text-center text-xs font-semibold leading-relaxed text-[#969994]">
           Necesitas créditos disponibles para iniciar. No se iniciará ni cobrará una partida mientras el saldo sea insuficiente.
         </p>

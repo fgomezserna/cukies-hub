@@ -46,6 +46,7 @@ export default function TreasureHuntExperienceShell({
     if (status?.phase === 'closed') {
       if (!creditAccess.walletConnected) return 'Conecta wallet';
       if (creditAccess.isError || creditAccess.blocked || !creditAccess.ready) return 'Acceso pendiente';
+      if (creditAccess.availabilityReason === 'run_pending') return 'Reparto pendiente';
       return creditAccess.canPlay ? 'Disponible' : 'Sin créditos';
     }
     if (status?.phase === 'active') {
@@ -67,7 +68,9 @@ export default function TreasureHuntExperienceShell({
           ? 'El Hub no ha podido confirmar el acceso con créditos todavía. Revisa el aviso del panel antes de iniciar.'
         : creditAccess.canPlay
           ? 'Modo de créditos disponible.'
-          : 'Necesitas saldo suficiente para iniciar; no se cobrará una partida bloqueada.'
+          : creditAccess.availabilityReason === 'run_pending'
+            ? 'El reparto de créditos del periodo aún no está abierto; no se cobrará una partida hasta confirmarlo.'
+            : 'Necesitas saldo suficiente para iniciar; no se cobrará una partida bloqueada.'
     : status?.phase === 'active'
       ? !status.eligibility
         ? 'Comprobando los intentos confirmados de esta wallet.'

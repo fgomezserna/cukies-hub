@@ -21,7 +21,10 @@ import type {
   CreditSourceWatermark,
   CreditRoute,
   CompetitionCreditRun,
+  CreditLot,
 } from './types';
+
+const MAX_PUBLIC_CREDIT_LOTS = 5_000;
 
 function exactCredits(value: unknown, label: string) {
   if (typeof value !== 'number') throw new DomainConflictError(`${label} no es numerico.`);
@@ -43,6 +46,49 @@ function sourceWatermarkIsFresh(
   if (!(observedThrough instanceof Date) || Number.isNaN(observedThrough.getTime())) return false;
   const timestamp = observedThrough.getTime();
   return timestamp <= now.getTime() && timestamp >= now.getTime() - freshnessMs;
+}
+
+function isOpenCreditRun(status: CompetitionCreditRun['status']) {
+  return status === 'open' || status === 'open_with_holds';
+}
+
+function summarizeUsableLots(input: {
+  lots: CreditLot[];
+  bucket: CreditLot['bucket'];
+  walletNormalized: string;
+  periodId: string;
+  openRunIdsByRoute: ReadonlyMap<CreditRoute, ReadonlySet<string>>;
+  now: Date;
+}) {
+  if (input.lots.length > MAX_PUBLIC_CREDIT_LOTS) {
+    throw new DomainConflictError('La proyeccion publica de lotes de creditos excede el limite seguro.', {
+      reason: 'CREDIT_LOT_PROJECTION_TOO_LARGE',
+    });
+  }
+  const totals: Record<CreditRoute, number> = { uki: 0, nft: 0 };
+  for (const lot of input.lots) {
+    const openRunIds = input.openRunIdsByRoute.get(lot.route);
+    if (
+      lot.bucket !== input.bucket
+      || lot.periodId !== input.periodId
+      || !openRunIds?.has(lot.runId)
+      || lot.blocked !== false
+      || (input.bucket === 'own' && lot.walletNormalized !== input.walletNormalized)
+      || (input.bucket === 'pool' && lot.walletNormalized !== null)
+      || !(lot.expiresAt instanceof Date)
+      || Number.isNaN(lot.expiresAt.getTime())
+      || lot.expiresAt.getTime() <= input.now.getTime()
+    ) {
+      continue;
+    }
+    const availableCredits = exactCredits(
+      lot.availableCredits,
+      `${input.bucket}.${lot.lotId}.availableCredits`,
+    );
+    if (availableCredits <= 0) continue;
+    totals[lot.route] = assertCreditAmount(totals[lot.route] + availableCredits);
+  }
+  return totals;
 }
 
 export async function getCompetitionCreditWalletStatus(
@@ -82,6 +128,7 @@ export async function getCompetitionCreditWalletStatus(
     unknownRouteIncidentCount,
     blockedAccountCount,
     activeReservations,
+    currentRuns,
   ] = await Promise.all([
     db.collection<CreditAccountPeriod>('competition_credit_account_periods').find({
       walletNormalized,
@@ -144,21 +191,84 @@ export async function getCompetitionCreditWalletStatus(
       status: 'active',
       expiresAt: { $gt: now },
     }, { limit: 1_001 }),
+    db.collection<CompetitionCreditRun>('competition_credit_runs').find({
+      'settlementPeriod.periodId': period.periodId,
+      'settlementPeriod.cutoff': { $lte: now },
+      'settlementPeriod.nextCutoff': { $gt: now },
+      route: { $in: routes },
+    }, {
+      projection: { _id: 0, runId: 1, route: 1, status: 1 },
+    }).limit(routes.length + 1).toArray(),
   ]);
-  const currentRuns = await db.collection<CompetitionCreditRun>('competition_credit_runs').find({
-    'period.periodId': period.periodId,
-    route: { $in: routes },
-  }, {
-    projection: { _id: 0, route: 1, status: 1, 'period.cutoff': 1 },
-  }).limit(3).toArray();
   if (slots.length > 10) {
     throw new DomainConflictError('La wallet excede el maximo canonico de 10 slots.');
   }
-  if (accounts.length > routes.length || pools.length > routes.length || watermarks.length > routes.length) {
+  if (
+    accounts.length > routes.length
+    || pools.length > routes.length
+    || watermarks.length > routes.length
+    || currentRuns.length > routes.length
+  ) {
     throw new DomainConflictError('La proyeccion de creditos contiene rutas duplicadas.', {
       reason: 'CREDIT_PROJECTION_DUPLICATE_ROUTES',
     });
   }
+  const seenCurrentRunRoutes = new Set<CreditRoute>();
+  if (currentRuns.some((run) => {
+    if (seenCurrentRunRoutes.has(run.route)) return true;
+    seenCurrentRunRoutes.add(run.route);
+    return false;
+  })) {
+    throw new DomainConflictError('La proyeccion de runs de creditos contiene rutas duplicadas.', {
+      reason: 'CREDIT_PROJECTION_DUPLICATE_ROUTES',
+    });
+  }
+
+  const openRunIdsByRoute = new Map<CreditRoute, Set<string>>();
+  for (const run of currentRuns) {
+    if (!isOpenCreditRun(run.status) || typeof run.runId !== 'string') continue;
+    const ids = openRunIdsByRoute.get(run.route) ?? new Set<string>();
+    ids.add(run.runId);
+    openRunIdsByRoute.set(run.route, ids);
+  }
+  const openRunIds = [...openRunIdsByRoute.values()].flatMap((ids) => [...ids]);
+  const [ownLots, poolLots]: [CreditLot[], CreditLot[]] = openRunIds.length === 0
+    ? [[], []]
+    : await Promise.all([
+      db.collection<CreditLot>('competition_credit_lots').find({
+        walletNormalized,
+        periodId: period.periodId,
+        route: { $in: routes },
+        runId: { $in: openRunIds },
+        blocked: false,
+        availableCredits: { $gt: 0 },
+        expiresAt: { $gt: now },
+      }).limit(MAX_PUBLIC_CREDIT_LOTS + 1).toArray(),
+      db.collection<CreditLot>('competition_credit_pool_lots').find({
+        periodId: period.periodId,
+        route: { $in: routes },
+        runId: { $in: openRunIds },
+        blocked: false,
+        availableCredits: { $gt: 0 },
+        expiresAt: { $gt: now },
+      }).limit(MAX_PUBLIC_CREDIT_LOTS + 1).toArray(),
+    ]);
+  const usableOwnCredits = summarizeUsableLots({
+    lots: ownLots,
+    bucket: 'own',
+    walletNormalized,
+    periodId: period.periodId,
+    openRunIdsByRoute,
+    now,
+  });
+  const usablePoolCredits = summarizeUsableLots({
+    lots: poolLots,
+    bucket: 'pool',
+    walletNormalized,
+    periodId: period.periodId,
+    openRunIdsByRoute,
+    now,
+  });
 
   const configurations = await Promise.all(slots.map(async (slot) => {
     const creditEligibleFrom = exactDate(slot.creditEligibleFrom, 'creditEligibleFrom');
@@ -204,14 +314,14 @@ export async function getCompetitionCreditWalletStatus(
       balance: account ? {
         grantedCredits: exactCredits(account.grantedCredits, `${route}.grantedCredits`),
         poolDepositedCredits: exactCredits(account.poolDepositedCredits, `${route}.poolDepositedCredits`),
-        availableCredits: exactCredits(account.availableCredits, `${route}.availableCredits`),
+        availableCredits: usableOwnCredits[route],
         reservedCredits: exactCredits(account.reservedCredits, `${route}.reservedCredits`),
         spentCredits: exactCredits(account.spentCredits, `${route}.spentCredits`),
         expiredCredits: exactCredits(account.expiredCredits, `${route}.expiredCredits`),
         blocked: account.blocked === true,
       } : { ...emptyBalance },
       pool: pool ? {
-        availableCredits: exactCredits(pool.availableCredits, `${route}.pool.availableCredits`),
+        availableCredits: usablePoolCredits[route],
         reservedCredits: exactCredits(pool.reservedCredits, `${route}.pool.reservedCredits`),
         blocked: pool.blocked === true,
       } : { availableCredits: 0, reservedCredits: 0, blocked: false },

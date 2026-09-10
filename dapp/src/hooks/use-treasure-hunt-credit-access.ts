@@ -29,6 +29,11 @@ type CreditStatus = {
     reservedCredits: number;
     blocked: boolean;
   };
+  currentRun?: {
+    routes: Array<{
+      status: string;
+    }>;
+  };
 };
 
 export function nextTreasureHuntCreditSource(input: {
@@ -74,6 +79,12 @@ function isCreditStatus(value: unknown): value is CreditStatus {
     && Number.isSafeInteger(candidate.pool.reservedCredits)
     && candidate.pool.reservedCredits >= 0
     && typeof candidate.pool.blocked === 'boolean'
+    && (!candidate.currentRun || (
+      Array.isArray(candidate.currentRun.routes)
+      && candidate.currentRun.routes.every((run) => (
+        run && typeof run.status === 'string'
+      ))
+    ))
   );
 }
 
@@ -115,12 +126,22 @@ export function useTreasureHuntCreditAccess() {
     ownAvailableCredits,
     poolAvailableCredits,
   });
+  const currentRunStatuses = query.data?.currentRun?.routes.map((run) => run.status) ?? [];
+  const currentRunBlocked = currentRunStatuses.length > 0
+    && currentRunStatuses.every((status) => status === 'blocked');
+  const currentRunPending = currentRunStatuses.some((status) => (
+    status === 'missing' || status === 'snapshotted' || status === 'processing'
+  ));
   const blocked = Boolean(
     query.data?.balance.blocked
     || (creditSource === 'pool' && query.data?.pool.blocked)
+    || currentRunBlocked
   );
   const ready = Boolean(query.data && costCredits !== null);
   const bestAvailableSource = Math.max(ownAvailableCredits ?? 0, poolAvailableCredits ?? 0);
+  const availabilityReason = ready && !blocked && !creditSource
+    ? currentRunPending ? 'run_pending' as const : 'insufficient' as const
+    : null;
 
   return {
     walletConnected: Boolean(walletAddress),
@@ -136,6 +157,7 @@ export function useTreasureHuntCreditAccess() {
     poolContributedCredits: query.data?.balance.poolDepositedCredits ?? null,
     spentCredits: query.data?.balance.spentCredits ?? null,
     creditSource,
+    availabilityReason,
     reservedCredits: query.data?.balance.reservedCredits ?? null,
     poolReservedCredits: query.data?.pool.reservedCredits ?? null,
     canPlay: Boolean(
