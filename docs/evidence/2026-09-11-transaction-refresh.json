@@ -1,6 +1,6 @@
 {
-  "status": "first-delivery-ready-for-validation",
-  "recordedAt": "2026-09-10T22:06:15.441450+00:00",
+  "status": "first-delivery-published-followups-in-progress",
+  "recordedAt": "2026-09-10T23:11:46.331617+00:00",
   "scope": "Automatic UI convergence after confirmed transactions; staging only",
   "baseCommit": "151c33bf02533963973358a2eb486cc9dc5b6087",
   "servedBaseline": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
@@ -145,9 +145,9 @@
     "Retain existing runtime gates, transaction validation, tabs and sheets"
   ],
   "areas": {
-    "masterAndRuntime": "implemented and root-reviewed; 63 focal tests pass; full isolated validation and staging delivery pending",
-    "marketplaceAndClaims": "implementation in progress",
-    "poolRecovery": "bounded follow-up after first Master/runtime delivery",
+    "masterAndRuntime": "PR404 published and read-only browser verified; deferred reconciliation covered by component tests",
+    "marketplaceAndClaims": "implementation and root review in progress; delayed reads, context changes and retry controls under regression tests",
+    "poolRecovery": "implementation in progress; chain confirmation, withdrawal epoch and background reconciliation",
     "bridgeBreeding": "active legacy write paths identified; receipt and refresh follow-up pending"
   },
   "validation": {
@@ -160,8 +160,17 @@
       "typecheck": "passed",
       "reportedBy": "implementation agent"
     },
-    "full": "pending isolated first-delivery commit",
-    "public": "not deployed"
+    "full": {
+      "sha": "fe11bed4c1606e8ecfab0ee450d0d742ad87a73d",
+      "suites": 261,
+      "tests": 2165,
+      "test": "passed",
+      "lint": "passed with existing Pool warning",
+      "typecheck": "passed",
+      "build": "passed",
+      "isolatedWorktree": true
+    },
+    "public": "PR404 public health SHA d465f95271ced5faa0740dae112f6c9bc7a2f85a, ready200, authenticated Master #98000002 action verified"
   },
   "transactionsSignedByAgent": false,
   "dataMutations": false,
@@ -177,6 +186,32 @@
       "Persistent storage is authoritative; memory fallback only on storage failure",
       "Accelerated transaction uses actual hash; cancellation is not NFT success"
     ],
-    "publicValidationLimit": "No new signed wallet transactions will be executed by the agent; deferred API/RPC states are verified in automated component tests."
+    "publicValidationLimit": "No new signed wallet transactions will be executed by the agent; deferred API/RPC states are verified in automated component tests.",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/404",
+    "mergeSha": "d465f95271ced5faa0740dae112f6c9bc7a2f85a",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34540354647",
+    "postflight": {
+      "observedAt": "2026-09-10T23:10:46.817275+00:00",
+      "readyHttpStatus": 200,
+      "journal": "clean",
+      "workerCount": 10,
+      "workersRunningNoRestarts": true,
+      "protected": {
+        "total": 25,
+        "preserved": 25,
+        "changed": []
+      },
+      "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+      "gitSha": "d465f95271ced5faa0740dae112f6c9bc7a2f85a",
+      "workflowResult": "success",
+      "browser": {
+        "route": "/cukie-master",
+        "tab": "Gestionar Cukies",
+        "tokenId": "98000002",
+        "action": "Retirar inmediatamente de Cukie Master",
+        "pendingSpinnerVisible": false,
+        "newTransactionSigned": false
+      }
+    }
   }
 }
