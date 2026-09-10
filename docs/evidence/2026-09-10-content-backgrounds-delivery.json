@@ -1,0 +1,419 @@
+{
+  "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+  "observedAt": "2026-09-10T20:14:13.382027+00:00",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/400",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34524368627",
+  "release": {
+    "schemaVersion": 1,
+    "environment": "staging",
+    "chainId": "97",
+    "commit": "ea62f94895a992f4d918baacbd698aca45e736eb",
+    "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+    "deploymentUuid": "jkwco4kcs00gcwg4ckss4g4c",
+    "deliveryMode": "rolling",
+    "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+    "webResourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+    "workersResourceUuid": "u4s804o4wwcckowgk0woo4wg",
+    "gameResourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+    "gameDeploymentUuid": "koccwkw8o8kk8sw08ksw8ow0",
+    "components": {
+      "dapp": {
+        "image": "192.168.1.207:5000/cukies-hub/dapp:ea62f94895a992f4d918baacbd698aca45e736eb-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:fe4090f67e5539a1f36df6f32b9e5988b3180487759e8b90daa517e9497f1024",
+        "digest": "sha256:fe4090f67e5539a1f36df6f32b9e5988b3180487759e8b90daa517e9497f1024",
+        "tag": "ea62f94895a992f4d918baacbd698aca45e736eb-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "ea62f94895a992f4d918baacbd698aca45e736eb",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "chain-indexer": {
+        "image": "192.168.1.207:5000/cukies-hub/chain-indexer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "digest": "sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cuki-card-worker": {
+        "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "digest": "sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "schedulers": {
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "digest": "sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cukies-bridge-relayer": {
+        "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "digest": "sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "treasure-hunt": {
+        "image": "192.168.1.207:5000/cukies-hub/treasure-hunt:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "digest": "sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-api": {
+        "image": "192.168.1.207:5000/cukies-hub/world-api:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "digest": "sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-matchmaking": {
+        "image": "192.168.1.207:5000/cukies-hub/world-matchmaking:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "digest": "sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      }
+    },
+    "webCommit": "ea62f94895a992f4d918baacbd698aca45e736eb",
+    "gameCommit": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+    "previousCommit": "56cd2e85e484149093c44385ff485a9de5a2a23b",
+    "updatedAt": "2026-09-10T20:13:36.583Z"
+  },
+  "health": {
+    "status": "ok",
+    "app": "cukies-hub",
+    "environment": "staging",
+    "gitSha": "ea62f94895a992f4d918baacbd698aca45e736eb",
+    "gitRef": "staging",
+    "buildTime": null,
+    "coolify": {
+      "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+      "fqdn": null
+    }
+  },
+  "readyHttpStatus": 200,
+  "journal": "clean",
+  "web": [
+    {
+      "id": "aff5b14c68f1f57d8d205f3041cb00f41d7af9d754ad780074728e7f8e5ca72d",
+      "name": "rwwsc4kkwc0ck84cgk40s8kk-201250657985",
+      "image": "192.168.1.207:5000/cukies-hub/dapp@sha256:fe4090f67e5539a1f36df6f32b9e5988b3180487759e8b90daa517e9497f1024",
+      "imageId": "sha256:1cba84668c149ba83f51f0d49fca6e7016abe1f317d71d00b333f76186a99600",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0
+    }
+  ],
+  "workerCount": 10,
+  "workersRunningNoRestarts": true,
+  "protected": {
+    "total": 25,
+    "preserved": 25,
+    "changed": []
+  },
+  "ui": {
+    "observedAt": "2026-09-10T20:14:13.382027+00:00",
+    "publicRoutes": [
+      {
+        "route": "/dashboard",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme min-h-full w-full",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/credits",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/cukie-hodler",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/cukies",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/marketplace",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme mx-auto flex min-h-full w-full max-w-[1480px] flex-col pb-10 text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/cukie-master",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/premios",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/vesting",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/como-jugar",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme overflow-x-clip text-[var(--uki-cream)] min-h-full w-full",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/games",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/bridge",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/breeding",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/cukiepoints",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/embajadores",
+        "width": 1440,
+        "mainCount": 1,
+        "bodyOverflow": false,
+        "mainOverflow": false,
+        "landingCount": 0,
+        "roots": [
+          {
+            "tag": "DIV",
+            "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none",
+            "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+          }
+        ]
+      },
+      {
+        "route": "/",
+        "width": 1440,
+        "appShell": 0,
+        "landing": [
+          {
+            "image": "radial-gradient(circle at 20% 6%, rgba(124, 60, 255, 0.08), rgba(0, 0, 0, 0) 400px), radial-gradient(circle at 78% 18%, rgba(242, 195, 75, 0.13), rgba(0, 0, 0, 0) 352px), linear-gradient(rgb(11, 8, 16), rgb(4, 3, 10) 48%, rgb(7, 3, 10))"
+          }
+        ]
+      }
+    ],
+    "authenticatedEdge": {
+      "myCukies": {
+        "cards": 12,
+        "rootBackgroundImage": "none",
+        "rootBackgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      "saleSheet": {
+        "position": "fixed",
+        "width": 560,
+        "backgroundColor": "rgb(4, 3, 10)",
+        "backgroundImage": "none",
+        "primaryButtonColor": "rgb(228, 92, 255)",
+        "primaryButton": "Aprobar Cukie",
+        "closeRestoresFocus": "Vender",
+        "alerts": []
+      },
+      "nftDetail": {
+        "route": "/marketplace/4000000007954",
+        "heading": "Cukie #7954",
+        "rootBackgroundImage": "none",
+        "rootBackgroundColor": "rgba(0, 0, 0, 0)",
+        "horizontalOverflow": false
+      }
+    },
+    "signedTransactions": false
+  },
+  "signedTransactions": "not_executed",
+  "sourceInventoryPageCount": 40,
+  "localVerification": {
+    "tests": 2132,
+    "suites": 261,
+    "lint": "pass",
+    "typecheck": "pass",
+    "build": "pass",
+    "responsiveObservations": 45,
+    "qa": "2026-09-10-content-backgrounds-qa/README.md"
+  }
+}
