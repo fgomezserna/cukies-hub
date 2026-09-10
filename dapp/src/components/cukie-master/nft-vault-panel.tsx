@@ -255,16 +255,20 @@ export function CukieMasterNftVaultPanel() {
     const merged = new Map<string, NftVaultPendingOperation>(
       persisted.map((operation) => [pendingNftVaultOperationAssetKey(operation), operation]),
     );
+    const nextEphemeral = { ...ephemeral };
+    let ephemeralChanged = false;
     for (const [key, entry] of Object.entries(ephemeral)) {
       const storageUnchanged = !storageSnapshot.readable || entry.storageRaw === storageSnapshot.raw;
-      if (storageUnchanged) {
-        merged.set(key, entry.operation);
-        continue;
-      }
-      const next = { ...ephemeral };
-      delete next[key];
-      if (Object.keys(next).length === 0) pendingEphemeralByContextRef.current.delete(contextKey);
-      else pendingEphemeralByContextRef.current.set(contextKey, next);
+      if (storageUnchanged) continue;
+      delete nextEphemeral[key];
+      ephemeralChanged = true;
+    }
+    if (ephemeralChanged) {
+      if (Object.keys(nextEphemeral).length === 0) pendingEphemeralByContextRef.current.delete(contextKey);
+      else pendingEphemeralByContextRef.current.set(contextKey, nextEphemeral);
+    }
+    for (const [key, entry] of Object.entries(ephemeralChanged ? nextEphemeral : ephemeral)) {
+      merged.set(key, entry.operation);
     }
     return [...merged.values()];
   }, []);

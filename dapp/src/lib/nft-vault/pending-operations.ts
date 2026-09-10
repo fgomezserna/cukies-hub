@@ -201,7 +201,7 @@ function isPendingOperation(value: unknown, context: NftVaultPendingContext): va
     && typeof operation.tokenId === 'string'
     && /^\d+$/.test(operation.tokenId)
     && (operation.depositEpoch === undefined
-      || (operation.action === 'deposit'
+      || (operation.action !== 'approval'
         && typeof operation.depositEpoch === 'string'
         && /^\d+$/.test(operation.depositEpoch)))
     && (
@@ -292,9 +292,13 @@ export function clearPendingNftVaultOperation(
   >,
 ) {
   try {
+    const expectedAssetKey = expected ? pendingNftVaultOperationAssetKey(expected) : null;
     const next = loadPendingNftVaultOperations(storage, context)
       .filter((item) => {
-        const sameAsset = item.assetId === assetId || pendingNftVaultOperationAssetKey(item) === assetId;
+        const itemAssetKey = pendingNftVaultOperationAssetKey(item);
+        const sameAsset = item.assetId === assetId
+          || itemAssetKey === assetId
+          || (expectedAssetKey !== null && itemAssetKey === expectedAssetKey);
         return !(sameAsset && (!expected || pendingNftVaultOperationMatches(item, expected)));
       });
     const key = pendingNftVaultStorageKey(context);

@@ -66,7 +66,11 @@ describe('executeNftTransaction replacements', () => {
       replacedHash: originalHash,
       replacementHash,
     }), true);
-    expect(baseInput.onConfirmed).toHaveBeenCalledWith(replacementHash, true);
+    expect(baseInput.onConfirmed).toHaveBeenCalledWith(
+      replacementHash,
+      true,
+      expect.objectContaining({ status: 'success', transactionHash: replacementHash }),
+    );
     expect(baseInput.onReverted).not.toHaveBeenCalled();
   });
 

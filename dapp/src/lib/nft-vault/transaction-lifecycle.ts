@@ -107,7 +107,7 @@ export async function executeNftTransaction<TRequest extends Record<string, unkn
   errorPrefix: string;
   onSubmitted: (hash: Hash, identityCurrent: boolean) => void;
   onReverted: (identityCurrent: boolean) => void;
-  onConfirmed: (hash: Hash, identityCurrent: boolean) => void;
+  onConfirmed: (hash: Hash, identityCurrent: boolean, receipt: NftTransactionReceipt) => void;
   onReplaced?: (replacement: NftTransactionReplacement, identityCurrent: boolean) => void;
 }) {
   if (!guard.ready) {
@@ -161,7 +161,7 @@ export async function executeNftTransaction<TRequest extends Record<string, unkn
     onReverted(identityCurrent);
     throw new Error(`${errorPrefix}_TRANSACTION_REVERTED`);
   }
-  onConfirmed(actualHash, identityCurrent);
+  onConfirmed(actualHash, identityCurrent, receipt);
   if (!identityCurrent || !isReady()) throw new Error(`${errorPrefix}_CONTEXT_CHANGED_AFTER_RECEIPT`);
   return actualHash;
 }

@@ -1,6 +1,7 @@
 import {
   clearPendingNftVaultOperation,
   loadPendingNftVaultOperations,
+  pendingNftVaultOperationMatches,
   pendingNftVaultStorageKey,
   projectionMatchesPendingOperation,
   savePendingNftVaultOperation,
@@ -82,11 +83,61 @@ describe('pending NFT vault operations', () => {
     expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([replacement]);
   });
 
+  it('puede limpiar una operación antigua con assetId no canónico usando su identidad y epoch', () => {
+    const legacy = operation({
+      assetId: 'legacy-label-1',
+      depositEpoch: '4',
+      action: 'withdraw',
+    });
+    savePendingNftVaultOperation(localStorage, legacy);
+
+    clearPendingNftVaultOperation(localStorage, context, legacy.assetId, legacy);
+
+    expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([]);
+  });
+
   it('conserva solicitudes de salida del vault de préstamos', () => {
     const requestExit = operation({ action: 'request_exit' });
     savePendingNftVaultOperation(localStorage, requestExit);
 
     expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([requestExit]);
+  });
+
+  it('conserva y compara el epoch de depósito en salidas, sin liberar una época distinta', () => {
+    const requestExit = operation({
+      action: 'request_exit',
+      depositEpoch: '4',
+    });
+    savePendingNftVaultOperation(localStorage, requestExit);
+
+    const loaded = loadPendingNftVaultOperations(localStorage, context);
+    expect(loaded).toEqual([requestExit]);
+    expect(pendingNftVaultOperationMatches(loaded[0], requestExit)).toBe(true);
+
+    const differentEpoch = { ...requestExit, depositEpoch: '5' };
+    expect(pendingNftVaultOperationMatches(loaded[0], differentEpoch)).toBe(false);
+    clearPendingNftVaultOperation(localStorage, context, requestExit.assetId, differentEpoch);
+    expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([requestExit]);
+
+    clearPendingNftVaultOperation(localStorage, context, requestExit.assetId, requestExit);
+    expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([]);
+  });
+
+  it('permite epoch en una retirada y descarta epoch malformado o heredado en approvals', () => {
+    const withdrawal = operation({
+      action: 'withdraw',
+      depositEpoch: '9',
+      assetId: '97:0x3333333333333333333333333333333333333333:2',
+      tokenId: '2',
+    });
+    savePendingNftVaultOperation(localStorage, withdrawal);
+    expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([withdrawal]);
+
+    localStorage.setItem(pendingNftVaultStorageKey(context), JSON.stringify([
+      operation({ action: 'approval', depositEpoch: '4' }),
+      operation({ action: 'withdraw', depositEpoch: 'not-a-number', tokenId: '3', assetId: 'asset-3' }),
+    ]));
+    expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([]);
   });
 
   it('solo considera liquidada la proyección cuando la custodia esperada ya aparece', () => {

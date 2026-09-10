@@ -11,9 +11,14 @@ import {
   ukiNftVaults,
 } from '@/lib/contracts/uki-nft-vaults';
 import {
+  canonicalNftVaultAssetId,
   clearPendingNftVaultOperation,
   getNftVaultBrowserStorage,
+  getNftVaultStorageSnapshot,
   loadPendingNftVaultOperations,
+  pendingNftVaultOperationAssetKey,
+  pendingNftVaultOperationMatches,
+  pendingNftVaultOperationMatchesAsset,
   pendingNftVaultStorageKey,
   savePendingNftVaultOperation,
   type NftVaultPendingAction,
@@ -27,6 +32,10 @@ import {
   type NftTransactionClient,
   type NftTransactionContext,
 } from '@/lib/nft-vault/transaction-lifecycle';
+import {
+  withdrawnEpochFromMasterReceipt,
+  withdrawnEpochFromReceipt,
+} from '@/lib/nft-vault/pending-reconciliation';
 import { useAppRuntime, useGuardedOperation } from '@/providers/app-runtime-provider';
 
 type VaultKind = 'cukie_master' | 'cukie_pool';
@@ -60,6 +69,12 @@ type RequestedPoolLink = {
 
 const ZERO_ADDRESS = zeroAddress.toLowerCase();
 const READ_CONTEXT_CHANGED = 'RECOVERY_READ_CONTEXT_CHANGED';
+const INSPECT_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000] as const;
+
+type EphemeralPendingEntry = {
+  operation: NftVaultPendingOperation;
+  storageRaw: string | null;
+};
 
 function sameAddress(left: string | null | undefined, right: string | null | undefined) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -188,6 +203,9 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1_000));
   const [chainTimeVerified, setChainTimeVerified] = useState(false);
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
+  const pendingByAssetRef = useRef(pendingByAsset);
+  pendingByAssetRef.current = pendingByAsset;
+  const pendingEphemeralByContextRef = useRef(new Map<string, Record<string, EphemeralPendingEntry>>());
   const operationLockRef = useRef(false);
   const [requestedTokenId, setRequestedTokenId] = useState<string | null>(null);
   const [requestedPoolLink, setRequestedPoolLink] = useState<RequestedPoolLink>({
@@ -200,6 +218,8 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   const [manualOpen, setManualOpen] = useState(false);
   const autoInspectKeyRef = useRef<string | null>(null);
   const readGenerationRef = useRef(0);
+  const inspectRetryTimerRef = useRef<number | null>(null);
+  const inspectRetryAttemptRef = useRef(0);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTokenId = params.get('tokenId');
@@ -270,6 +290,34 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   }, [address, vaultAddress]);
   const pendingKey = pendingContext ? pendingNftVaultStorageKey(pendingContext) : null;
 
+  const pendingOperationsForContext = useCallback((context: NftVaultPendingContext) => {
+    const storage = getNftVaultBrowserStorage();
+    const storageSnapshot = getNftVaultStorageSnapshot(storage, context);
+    const persisted = loadPendingNftVaultOperations(storage, context)
+      .filter((operation) => operation.action === 'request_exit' || operation.action === 'withdraw');
+    const contextKey = pendingNftVaultStorageKey(context);
+    const ephemeral = pendingEphemeralByContextRef.current.get(contextKey) ?? {};
+    const merged = new Map<string, NftVaultPendingOperation>(
+      persisted.map((operation) => [pendingNftVaultOperationAssetKey(operation), operation]),
+    );
+    const nextEphemeral = { ...ephemeral };
+    let ephemeralChanged = false;
+    for (const [key, entry] of Object.entries(ephemeral)) {
+      const storageUnchanged = !storageSnapshot.readable || entry.storageRaw === storageSnapshot.raw;
+      if (storageUnchanged) continue;
+      delete nextEphemeral[key];
+      ephemeralChanged = true;
+    }
+    if (ephemeralChanged) {
+      if (Object.keys(nextEphemeral).length === 0) pendingEphemeralByContextRef.current.delete(contextKey);
+      else pendingEphemeralByContextRef.current.set(contextKey, nextEphemeral);
+    }
+    for (const [key, entry] of Object.entries(ephemeralChanged ? nextEphemeral : ephemeral)) {
+      merged.set(key, entry.operation);
+    }
+    return [...merged.values()];
+  }, []);
+
   const publicConfigReady = Boolean(
     configuredMode === 'custodial'
     && configuredReady
@@ -331,6 +379,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     && (!requestedPoolLink.chainId || requestedPoolLink.chainId === ukiNftVaults.chainId)
     && linkedPoolPosition
     && publicClient
+    && !operationLockRef.current
     && phase === 'idle',
   );
   const hasKnownIdentity = Boolean(requestedTokenId && tokenIdValid);
@@ -369,17 +418,21 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       return;
     }
     const load = () => {
-      const operations = loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
-        .filter((operation) => operation.action === 'request_exit' || operation.action === 'withdraw');
-      setPendingByAsset(Object.fromEntries(operations.map((operation) => [operation.assetId, operation])));
+      const operations = pendingOperationsForContext(pendingContext);
+      setPendingByAsset(Object.fromEntries(operations.map((operation) => [
+        pendingNftVaultOperationAssetKey(operation),
+        operation,
+      ])));
     };
     load();
     const sync = (event: StorageEvent) => {
-      if (event.key === pendingKey) load();
+      if (event.key !== pendingKey) return;
+      pendingEphemeralByContextRef.current.delete(pendingKey!);
+      load();
     };
     window.addEventListener('storage', sync);
     return () => window.removeEventListener('storage', sync);
-  }, [pendingContext, pendingKey]);
+  }, [pendingContext, pendingKey, pendingOperationsForContext]);
 
   const persistPending = useCallback((input: {
     action: NftVaultPendingAction;
@@ -388,7 +441,10 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     collectionAddress: Address;
     tokenId: bigint;
     txHash: Hash;
+    depositEpoch?: string;
     context?: NftTransactionContext;
+    expectedOperation?: NftVaultPendingOperation;
+    isCurrent?: () => boolean;
     updateUi?: boolean;
   }) => {
     const storageContext = input.context
@@ -398,15 +454,27 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         vaultAddress: input.context.vault,
       }
       : pendingContext;
-    if (!storageContext) return null;
-    const previous = input.context
-      ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), storageContext)
-        .find((operation) => operation.assetId === input.assetId)
-      : pendingByAsset[input.assetId];
+    if (!storageContext || (input.isCurrent && !input.isCurrent())) return null;
+    const canonicalAssetId = canonicalNftVaultAssetId({
+      chainId: storageContext.chainId,
+      collectionAddress: input.collectionAddress,
+      tokenId: input.tokenId.toString(),
+    });
+    if (!canonicalAssetId || canonicalAssetId !== input.assetId) return null;
+    const storage = getNftVaultBrowserStorage();
+    const operationKey = pendingNftVaultOperationAssetKey({
+      assetId: canonicalAssetId,
+      chainId: storageContext.chainId,
+      collectionAddress: input.collectionAddress,
+      tokenId: input.tokenId.toString(),
+    });
+    const previous = pendingOperationsForContext(storageContext)
+      .find((operation) => pendingNftVaultOperationAssetKey(operation) === operationKey);
+    if (input.expectedOperation && !pendingNftVaultOperationMatches(previous, input.expectedOperation)) return null;
     const operation: NftVaultPendingOperation = {
       version: 1,
       ...storageContext,
-      assetId: input.assetId,
+      assetId: canonicalAssetId,
       collectionAddress: input.collectionAddress,
       tokenId: input.tokenId.toString(),
       action: input.action,
@@ -414,15 +482,49 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       txHash: input.txHash,
       createdAt: previous?.createdAt ?? Date.now(),
       updatedAt: Date.now(),
+      ...(input.depositEpoch ?? previous?.depositEpoch
+        ? { depositEpoch: input.depositEpoch ?? previous?.depositEpoch }
+        : {}),
     };
-    savePendingNftVaultOperation(getNftVaultBrowserStorage(), operation);
+    const persisted = savePendingNftVaultOperation(storage, operation);
+    const contextKey = pendingNftVaultStorageKey(storageContext);
+    const contextEphemeral = pendingEphemeralByContextRef.current.get(contextKey);
+    if (persisted) {
+      if (contextEphemeral) {
+        const next = { ...contextEphemeral };
+        delete next[operationKey];
+        if (Object.keys(next).length === 0) pendingEphemeralByContextRef.current.delete(contextKey);
+        else pendingEphemeralByContextRef.current.set(contextKey, next);
+      }
+    } else {
+      pendingEphemeralByContextRef.current.set(contextKey, {
+        ...(contextEphemeral ?? {}),
+        [operationKey]: {
+          operation,
+          storageRaw: getNftVaultStorageSnapshot(storage, storageContext).raw,
+        },
+      });
+    }
     if (input.updateUi !== false) {
-      setPendingByAsset((current) => ({ ...current, [operation.assetId]: operation }));
+      setPendingByAsset((current) => {
+        if (input.isCurrent && !input.isCurrent()) return current;
+        if (input.expectedOperation) {
+          const currentOperation = Object.values(current)
+            .find((item) => pendingNftVaultOperationAssetKey(item) === operationKey);
+          if (!pendingNftVaultOperationMatches(currentOperation, input.expectedOperation)) return current;
+        }
+        return { ...current, [operationKey]: operation };
+      });
     }
     return operation;
-  }, [pendingByAsset, pendingContext]);
+  }, [pendingContext, pendingOperationsForContext]);
 
-  const clearPending = useCallback((assetId: string, input: { context?: NftTransactionContext; updateUi?: boolean } = {}) => {
+  const clearPending = useCallback((assetId: string, input: {
+    context?: NftTransactionContext;
+    expectedOperation?: NftVaultPendingOperation;
+    isCurrent?: () => boolean;
+    updateUi?: boolean;
+  } = {}) => {
     const storageContext = input.context
       ? {
         chainId: input.context.chainId,
@@ -430,20 +532,54 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         vaultAddress: input.context.vault,
       }
       : pendingContext;
+    if (input.isCurrent && !input.isCurrent()) return;
     if (storageContext) {
-      clearPendingNftVaultOperation(getNftVaultBrowserStorage(), storageContext, assetId);
+      const storage = getNftVaultBrowserStorage();
+      if (input.expectedOperation) {
+        const storedOperation = pendingOperationsForContext(storageContext)
+          .find((operation) => pendingNftVaultOperationAssetKey(operation) === pendingNftVaultOperationAssetKey(input.expectedOperation!));
+        if (storedOperation && !pendingNftVaultOperationMatches(storedOperation, input.expectedOperation)) return;
+      }
+      clearPendingNftVaultOperation(storage, storageContext, assetId, input.expectedOperation);
+      if (input.expectedOperation) {
+        const contextKey = pendingNftVaultStorageKey(storageContext);
+        const contextEphemeral = pendingEphemeralByContextRef.current.get(contextKey);
+        if (contextEphemeral) {
+          const operationKey = pendingNftVaultOperationAssetKey(input.expectedOperation);
+          const mirror = contextEphemeral[operationKey]?.operation;
+          if (pendingNftVaultOperationMatches(mirror, input.expectedOperation)) {
+            const next = { ...contextEphemeral };
+            delete next[operationKey];
+            if (Object.keys(next).length === 0) pendingEphemeralByContextRef.current.delete(contextKey);
+            else pendingEphemeralByContextRef.current.set(contextKey, next);
+          }
+        }
+      }
     }
     if (input.updateUi === false) return;
     setPendingByAsset((current) => {
+      if (input.isCurrent && !input.isCurrent()) return current;
       const next = { ...current };
-      delete next[assetId];
+      for (const [key, operation] of Object.entries(current)) {
+        const matches = input.expectedOperation
+          ? pendingNftVaultOperationMatches(operation, input.expectedOperation)
+          : key === assetId
+            || operation.assetId === assetId
+            || pendingNftVaultOperationAssetKey(operation) === assetId;
+        if (matches) delete next[key];
+      }
       return next;
     });
-  }, [pendingContext]);
+  }, [pendingContext, pendingOperationsForContext]);
 
   useEffect(() => {
     readGenerationRef.current += 1;
     autoInspectKeyRef.current = null;
+    inspectRetryAttemptRef.current = 0;
+    if (inspectRetryTimerRef.current !== null) {
+      window.clearTimeout(inspectRetryTimerRef.current);
+      inspectRetryTimerRef.current = null;
+    }
     setResult({ kind: 'idle' });
     setPhase('idle');
     setNotice(null);
@@ -454,6 +590,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   useEffect(() => () => {
     readGenerationRef.current += 1;
     autoInspectKeyRef.current = null;
+    if (inspectRetryTimerRef.current !== null) window.clearTimeout(inspectRetryTimerRef.current);
   }, []);
 
   const withdrawableAt = result.kind === 'position'
@@ -545,6 +682,29 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     setResult({ kind: 'position', position });
   }
 
+  function scheduleInspectRetry(readGeneration: number) {
+    if (inspectRetryTimerRef.current !== null || readGenerationRef.current !== readGeneration) return;
+    const delay = INSPECT_RETRY_DELAYS_MS[Math.min(
+      inspectRetryAttemptRef.current,
+      INSPECT_RETRY_DELAYS_MS.length - 1,
+    )];
+    inspectRetryAttemptRef.current += 1;
+    inspectRetryTimerRef.current = window.setTimeout(() => {
+      inspectRetryTimerRef.current = null;
+      if (readGenerationRef.current !== readGeneration || !canInspect) return;
+      autoInspectKeyRef.current = autoInspectKey;
+      void inspectPosition();
+    }, delay);
+  }
+
+  function cancelInspectRetry() {
+    inspectRetryAttemptRef.current = 0;
+    if (inspectRetryTimerRef.current !== null) {
+      window.clearTimeout(inspectRetryTimerRef.current);
+      inspectRetryTimerRef.current = null;
+    }
+  }
+
   async function inspectPosition() {
     if (!canInspect || !selectedCollection || !tokenIdValid) return;
     const readGeneration = readGenerationRef.current;
@@ -556,44 +716,135 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     setLatestTxHash(selectedPending?.txHash ?? null);
     try {
       let pending = selectedPending;
+      let receiptConfirmed = pending?.phase === 'syncing_projection';
+      let receiptEpochVerified = !pending?.depositEpoch;
       if (pending?.phase === 'awaiting_receipt') {
         try {
           const receipt = await publicClient!.getTransactionReceipt({ hash: pending.txHash });
           if (!isCurrentRead()) return;
           if (receipt.status === 'reverted') {
-            clearPending(pending.assetId);
+            clearPending(pending.assetId, {
+              context: {
+                wallet: pending.walletAddress,
+                chainId: pending.chainId,
+                vault: pending.vaultAddress,
+              },
+              expectedOperation: pending,
+              isCurrent: isCurrentRead,
+            });
             pending = null;
             setNotice('La transacción pendiente fue revertida. Ya puedes volver a intentarlo.');
+          } else if (receipt.status === 'success') {
+            if (pending.action !== 'withdraw' || !pending.depositEpoch) receiptEpochVerified = true;
+            if (pending.action === 'withdraw' && pending.depositEpoch) {
+              const withdrawnEpoch = kind === 'cukie_master'
+                ? withdrawnEpochFromMasterReceipt(receipt, pending)
+                : withdrawnEpochFromReceipt(receipt, pending);
+              receiptEpochVerified = withdrawnEpoch === pending.depositEpoch;
+            }
+            const pendingCanonicalAssetId = canonicalNftVaultAssetId({
+              chainId: pending.chainId,
+              collectionAddress: pending.collectionAddress,
+              tokenId: pending.tokenId,
+            }) ?? pending.assetId;
+            if (receiptEpochVerified) {
+              pending = persistPending({
+                action: pending.action,
+                phase: 'syncing_projection',
+                assetId: pendingCanonicalAssetId,
+                collectionAddress: pending.collectionAddress as Address,
+                tokenId: BigInt(pending.tokenId),
+                txHash: pending.txHash,
+                depositEpoch: pending.depositEpoch,
+                context: {
+                  wallet: pending.walletAddress,
+                  chainId: pending.chainId,
+                  vault: pending.vaultAddress,
+                },
+                expectedOperation: pending,
+                isCurrent: isCurrentRead,
+              }) ?? pending;
+              receiptConfirmed = true;
+            }
           } else {
-            pending = persistPending({
-              action: pending.action,
-              phase: 'syncing_projection',
-              assetId: pending.assetId,
-              collectionAddress: pending.collectionAddress as Address,
-              tokenId: BigInt(pending.tokenId),
-              txHash: pending.txHash,
-            }) ?? pending;
+            receiptConfirmed = false;
           }
         } catch {
           if (!isCurrentRead()) return;
           setNotice('La transacción sigue pendiente o aún no tiene recibo. No repitas la operación.');
         }
       }
+      if (
+        pending?.phase === 'syncing_projection'
+        && pending.action === 'withdraw'
+      ) {
+        try {
+          if (typeof publicClient!.getTransactionReceipt !== 'function') {
+            receiptEpochVerified = false;
+          } else {
+            const receipt = await publicClient!.getTransactionReceipt({ hash: pending.txHash });
+            if (!isCurrentRead()) return;
+            if (receipt.status === 'reverted') {
+              clearPending(pending.assetId, {
+                context: {
+                  wallet: pending.walletAddress,
+                  chainId: pending.chainId,
+                  vault: pending.vaultAddress,
+                },
+                expectedOperation: pending,
+                isCurrent: isCurrentRead,
+              });
+              pending = null;
+              receiptConfirmed = false;
+              receiptEpochVerified = false;
+              setNotice('La transacción pendiente fue revertida. Ya puedes volver a intentarlo.');
+            } else if (receipt.status === 'success' && pending.depositEpoch) {
+              const withdrawnEpoch = kind === 'cukie_master'
+                ? withdrawnEpochFromMasterReceipt(receipt, pending)
+                : withdrawnEpochFromReceipt(receipt, pending);
+              receiptEpochVerified = withdrawnEpoch === pending.depositEpoch;
+            } else {
+              receiptEpochVerified = receipt.status === 'success';
+            }
+          }
+        } catch {
+          if (!isCurrentRead()) return;
+          receiptEpochVerified = false;
+        }
+      }
       const position = await readPosition(identity, isCurrentRead);
       if (!isCurrentRead()) return;
       applyPosition(position);
       if (pending) {
+        const sameEpoch = !pending.depositEpoch
+          || pending.action === 'withdraw' && position.beneficialOwner.toLowerCase() === ZERO_ADDRESS
+          || pending.depositEpoch === position.depositEpoch.toString();
         const reflected = pending.action === 'withdraw'
-          ? position.beneficialOwner.toLowerCase() === ZERO_ADDRESS
-          : position.withdrawableAt > BigInt(0);
+          ? receiptConfirmed && receiptEpochVerified && position.beneficialOwner.toLowerCase() === ZERO_ADDRESS && sameEpoch
+          : receiptConfirmed && position.withdrawableAt > BigInt(0) && sameEpoch;
         if (reflected) {
-          clearPending(pending.assetId);
+          cancelInspectRetry();
+          clearPending(pending.assetId, {
+            context: {
+              wallet: pending.walletAddress,
+              chainId: pending.chainId,
+              vault: pending.vaultAddress,
+            },
+            expectedOperation: pending,
+            isCurrent: isCurrentRead,
+          });
           setNotice(pending.action === 'withdraw'
             ? 'La retirada pendiente ya está confirmada en el contrato.'
             : 'La solicitud de salida pendiente ya está confirmada en el contrato.');
         } else if (pending.phase === 'syncing_projection') {
+          scheduleInspectRetry(readGeneration);
           setNotice('La transacción está confirmada, pero el estado del vault aún no refleja el cambio. No la repitas.');
+        } else if (pending.phase === 'awaiting_receipt') {
+          scheduleInspectRetry(readGeneration);
+          setNotice('La transacción sigue pendiente o aún no tiene recibo. No repitas la operación.');
         }
+      } else {
+        cancelInspectRetry();
       }
     } catch (caught) {
       if (!isCurrentRead()) return;
@@ -601,6 +852,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         kind: 'error',
         message: 'No se pudo validar la posición directamente en el contrato. No se habilita ninguna firma.',
       });
+      scheduleInspectRetry(readGeneration);
     } finally {
       if (isCurrentRead()) setPhase('idle');
     }
@@ -628,6 +880,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
 
   function retryKnownPosition() {
     if (!hasKnownIdentity || !canInspect) return;
+    cancelInspectRetry();
     autoInspectKeyRef.current = autoInspectKey;
     void inspectPosition();
   }
@@ -663,10 +916,15 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     ) return;
 
     const isPool = kind === 'cukie_pool';
-    const exitRequested = result.position.withdrawableAt > BigInt(0);
+    const expectedPosition = result.position;
+    const expectedAssetId = selectedAssetId;
+    const expectedCollection = expectedPosition.collection;
+    const expectedTokenId = expectedPosition.tokenId;
+    const expectedDepositEpoch = expectedPosition.depositEpoch.toString();
+    const exitRequested = expectedPosition.withdrawableAt > BigInt(0);
     let withdrawalReady = exitRequested
       && chainTimeVerified
-      && BigInt(nowSeconds) >= result.position.withdrawableAt;
+      && BigInt(nowSeconds) >= expectedPosition.withdrawableAt;
     if (
       (operation === 'request_exit' && (!isPool || exitRequested))
       || (operation === 'withdraw' && isPool && !withdrawalReady)
@@ -674,6 +932,8 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
 
     operationLockRef.current = true;
     let submittedHash: Hash | null = null;
+    let submittedOperation: NftVaultPendingOperation | null = null;
+    let submittedReceipt: { status: string; transactionHash?: Hash; logs?: unknown } | null = null;
     let transactionReverted = false;
     try {
       if (
@@ -687,7 +947,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
           if (!Number.isSafeInteger(latestBlockSeconds)) return;
           setNowSeconds(latestBlockSeconds);
           setChainTimeVerified(true);
-          withdrawalReady = BigInt(latestBlockSeconds) >= result.position.withdrawableAt;
+          withdrawalReady = BigInt(latestBlockSeconds) >= expectedPosition.withdrawableAt;
           if (!withdrawalReady) return;
         } catch {
           setChainTimeVerified(false);
@@ -709,12 +969,52 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       };
       const identityMatches = () => nftTransactionContextMatches(expectedContext, writeContextRef.current);
       const operationReady = () => operationGuardRef.current.ready && identityMatches();
+      const isCurrentContext = (callbackCurrent: boolean) => (
+        callbackCurrent && identityMatches()
+      );
+      const operationForSubmittedHash = () => {
+        if (!submittedHash) return selectedPending ?? undefined;
+        const storageContext: NftVaultPendingContext = {
+          chainId: expectedContext.chainId,
+          walletAddress: expectedContext.wallet,
+          vaultAddress: expectedContext.vault,
+        };
+        const storageSnapshot = getNftVaultStorageSnapshot(
+          getNftVaultBrowserStorage(),
+          storageContext,
+        );
+        const assetKey = canonicalNftVaultAssetId({
+          chainId: storageContext.chainId,
+          collectionAddress: expectedCollection,
+          tokenId: expectedTokenId.toString(),
+        });
+        const operation = pendingOperationsForContext(storageContext)
+          .find((candidate) => (
+            (!assetKey || pendingNftVaultOperationAssetKey(candidate) === assetKey)
+            && candidate.txHash.toLowerCase() === submittedHash?.toLowerCase()
+          ));
+        if (operation) return operation;
+        if (
+          !storageSnapshot.readable
+          &&
+          submittedOperation
+          && (!assetKey || pendingNftVaultOperationAssetKey(submittedOperation) === assetKey)
+          && submittedOperation.txHash.toLowerCase() === submittedHash.toLowerCase()
+          && pendingNftVaultOperationMatchesAsset(submittedOperation, {
+            chainId: storageContext.chainId,
+            collectionAddress: expectedCollection,
+            tokenId: expectedTokenId.toString(),
+            assetId: assetKey ?? '',
+          })
+        ) return submittedOperation;
+        return undefined;
+      };
       const request = {
         chainId: ukiNftVaults.chainId,
         address: vaultAddress,
         abi: vaultAbi,
         functionName: operation === 'request_exit' ? 'requestExit' : 'withdraw',
-        args: [result.position.collection, result.position.tokenId],
+        args: [expectedCollection, expectedTokenId],
         account: expectedContext.wallet,
       };
       await executeNftTransaction({
@@ -728,60 +1028,137 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         errorPrefix: 'RECOVERY_OPERATION',
         onSubmitted: (hash, isCurrent) => {
           submittedHash = hash;
-          if (isCurrent) setLatestTxHash(hash);
-          persistPending({
+          if (isCurrentContext(isCurrent)) setLatestTxHash(hash);
+          submittedOperation = persistPending({
             action: operation,
             phase: 'awaiting_receipt',
-            assetId: selectedAssetId,
-            collectionAddress: result.position.collection,
-            tokenId: result.position.tokenId,
+            assetId: expectedAssetId,
+            collectionAddress: expectedCollection,
+            tokenId: expectedTokenId,
             txHash: hash,
+            depositEpoch: expectedDepositEpoch,
             context: expectedContext,
-            updateUi: isCurrent,
+            updateUi: isCurrentContext(isCurrent),
           });
         },
         onReverted: (isCurrent) => {
           transactionReverted = true;
-          clearPending(selectedAssetId, { context: expectedContext, updateUi: isCurrent });
+          const operationForClear = operationForSubmittedHash();
+          if (!operationForClear) return;
+          clearPending(expectedAssetId, {
+            context: expectedContext,
+            expectedOperation: operationForClear,
+            updateUi: isCurrentContext(isCurrent),
+          });
         },
-        onConfirmed: (hash, isCurrent) => persistPending({
-          action: operation,
-          phase: 'syncing_projection',
-          assetId: selectedAssetId,
-          collectionAddress: result.position.collection,
-          tokenId: result.position.tokenId,
-          txHash: hash,
-          context: expectedContext,
-          updateUi: isCurrent,
-        }),
+        onReplaced: (replacement, isCurrent) => {
+          if (replacement.reason !== 'repriced') return;
+          const originalOperation = operationForSubmittedHash();
+          if (!originalOperation) return;
+          submittedHash = replacement.replacementHash;
+          if (isCurrentContext(isCurrent)) setLatestTxHash(replacement.replacementHash);
+          submittedOperation = persistPending({
+            action: operation,
+            phase: 'awaiting_receipt',
+            assetId: expectedAssetId,
+            collectionAddress: expectedCollection,
+            tokenId: expectedTokenId,
+            txHash: replacement.replacementHash,
+            depositEpoch: expectedDepositEpoch,
+            context: expectedContext,
+            expectedOperation: originalOperation,
+            updateUi: isCurrentContext(isCurrent),
+          });
+        },
+        onConfirmed: (hash, isCurrent, receipt) => {
+          submittedReceipt = receipt;
+          const operationForConfirm = operationForSubmittedHash();
+          if (!operationForConfirm) return;
+          submittedOperation = persistPending({
+            action: operation,
+            phase: 'syncing_projection',
+            assetId: expectedAssetId,
+            collectionAddress: expectedCollection,
+            tokenId: expectedTokenId,
+            txHash: hash,
+            depositEpoch: expectedDepositEpoch,
+            context: expectedContext,
+            expectedOperation: operationForConfirm,
+            updateUi: isCurrentContext(isCurrent),
+          });
+        },
       });
       if (!operationReady()) throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED_AFTER_RECEIPT');
-      try {
-        await runtime.refreshAfterTransaction(isPool ? 'pool' : 'master');
-      } catch {
-        // La comprobación directa del contrato sigue siendo la fuente de verdad
-        // de la posición aunque la proyección compartida no esté disponible.
-      }
-      if (!identityMatches()) throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED');
-      if (!operationReady()) throw new Error('RECOVERY_OPERATION_CONTEXT_NOT_READY');
-
+      setPhase('idle');
       setNotice(operation === 'request_exit'
-        ? 'Salida confirmada en BSC. La fecha retirable se ha vuelto a leer directamente del contrato.'
-        : 'Retirada confirmada en BSC. El NFT ha vuelto a tu wallet.');
+        ? 'Salida confirmada en BSC. Comprobando directamente la fecha de retirada; no repitas la operación.'
+        : 'Retirada confirmada en BSC. Comprobando que el NFT volvió a tu wallet; no repitas la operación.');
+      void runtime.refreshAfterTransaction(isPool ? 'pool' : 'master').catch(() => undefined);
       try {
         const position = await readPosition({
-          collection: result.position.collection,
-          tokenId: result.position.tokenId,
+          collection: expectedCollection,
+          tokenId: expectedTokenId,
         }, identityMatches);
         if (!identityMatches()) throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED');
         applyPosition(position);
+        const settledHash: Hash | null = submittedHash as Hash | null;
+        const settledReceipt = submittedReceipt as { status: string; transactionHash?: Hash; logs?: unknown } | null;
+        const currentPending = pendingOperationsForContext({
+          walletAddress: expectedContext.wallet,
+          chainId: expectedContext.chainId,
+          vaultAddress: expectedContext.vault,
+        }).find((candidate) => (
+          pendingNftVaultOperationAssetKey(candidate) === expectedAssetId
+          && settledHash
+          && candidate.txHash.toLowerCase() === settledHash.toLowerCase()
+        ));
+        let withdrawalEpochVerified = !currentPending?.depositEpoch;
+        if (operation === 'withdraw' && currentPending?.depositEpoch) {
+          const receiptForVerification = settledReceipt
+            && settledReceipt.transactionHash?.toLowerCase() === settledHash?.toLowerCase()
+            ? settledReceipt
+            : null;
+          if (receiptForVerification) {
+            const withdrawnEpoch = kind === 'cukie_master'
+              ? withdrawnEpochFromMasterReceipt(receiptForVerification, currentPending)
+              : withdrawnEpochFromReceipt(receiptForVerification, currentPending);
+            withdrawalEpochVerified = withdrawnEpoch === currentPending.depositEpoch;
+          } else if (typeof publicClient.getTransactionReceipt === 'function' && settledHash) {
+            try {
+              const receipt = await publicClient.getTransactionReceipt({ hash: settledHash });
+              if (!identityMatches()) throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED');
+              const withdrawnEpoch = kind === 'cukie_master'
+                ? withdrawnEpochFromMasterReceipt(receipt, currentPending)
+                : withdrawnEpochFromReceipt(receipt, currentPending);
+              withdrawalEpochVerified = withdrawnEpoch === currentPending.depositEpoch;
+            } catch (caught) {
+              if (!identityMatches()) throw caught;
+              withdrawalEpochVerified = false;
+            }
+          }
+        }
+        const sameEpoch = !currentPending?.depositEpoch
+          || operation === 'withdraw'
+          || currentPending.depositEpoch === position.depositEpoch.toString();
         const reflected = operation === 'withdraw'
-          ? position.beneficialOwner.toLowerCase() === ZERO_ADDRESS
-          : position.withdrawableAt > BigInt(0);
-        if (reflected) clearPending(selectedAssetId);
+          ? withdrawalEpochVerified && position.beneficialOwner.toLowerCase() === ZERO_ADDRESS && sameEpoch
+          : position.withdrawableAt > BigInt(0) && sameEpoch;
+        if (reflected && currentPending) {
+          clearPending(expectedAssetId, {
+            context: expectedContext,
+            expectedOperation: currentPending,
+            isCurrent: identityMatches,
+          });
+        }
+        if (reflected) {
+          setNotice(operation === 'request_exit'
+            ? 'Salida confirmada en BSC. La fecha retirable se ha leído directamente del contrato.'
+            : 'Retirada confirmada en BSC. El NFT ha vuelto a tu wallet.');
+        }
         else setNotice('La transacción está confirmada, pero el estado del vault aún no refleja el cambio. No la repitas.');
       } catch {
         if (!identityMatches()) throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED');
+        scheduleInspectRetry(readGenerationRef.current);
         setNotice('La transacción está confirmada, pero no pudimos releer el vault. Queda bloqueada hasta que vuelvas a comprobarla.');
       }
     } catch (reason) {
@@ -1044,7 +1421,9 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         <div role="status" aria-live="polite" className="mt-4 grid gap-2 rounded-[7px] border border-amber-300/25 bg-amber-300/5 p-3 text-xs font-semibold text-amber-100">
           {Object.values(pendingByAsset).map((pending) => (
             <p key={pending.assetId}>
-              Cukie #{pending.tokenId}: operación enviada y bloqueada hasta comprobar su resultado.
+              Cukie #{pending.tokenId}: {pending.phase === 'syncing_projection'
+                ? 'operación confirmada en cadena y bloqueada hasta comprobar el estado final.'
+                : 'operación enviada y bloqueada hasta comprobar su resultado.'}
               {' '}<a href={getNftVaultExplorerTxUrl(pending.txHash) ?? '#'} target="_blank" rel="noreferrer" className="font-black text-[var(--uki-lilac)] underline">Ver transacción</a>.
               {' '}{hasKnownIdentity && pending.tokenId === requestedTokenId
                 ? 'Esta posición se volverá a comprobar automáticamente.'

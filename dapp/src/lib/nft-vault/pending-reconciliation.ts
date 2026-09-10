@@ -101,11 +101,82 @@ function depositedEpochFromReceiptWithAbi(
   return null;
 }
 
+/**
+ * Extracts the epoch from the Withdrawn event emitted by this operation's
+ * vault. Withdraw deletes the stored position, so the receipt event is the
+ * only on-chain source that can bind a known pending epoch to the transfer.
+ */
+function withdrawnEpochFromReceiptWithAbi(
+  receipt: unknown,
+  operation: Pick<NftVaultPendingOperation, 'vaultAddress' | 'collectionAddress' | 'tokenId' | 'walletAddress'>,
+  abi: typeof cukiePoolNftVaultAbi,
+) {
+  if (!receipt || typeof receipt !== 'object') return null;
+  const logs = (receipt as { logs?: unknown }).logs;
+  if (!Array.isArray(logs)) return null;
+  const expectedTokenId = normalizedTokenId(operation.tokenId);
+  if (expectedTokenId === null) return null;
+
+  for (const log of logs) {
+    if (!log || typeof log !== 'object') continue;
+    const candidate = log as {
+      address?: unknown;
+      data?: unknown;
+      topics?: unknown;
+      eventName?: unknown;
+      args?: unknown;
+    };
+    if (!sameAddress(candidate.address, operation.vaultAddress)) continue;
+    let eventName = candidate.eventName;
+    let args = candidate.args;
+    if (eventName !== 'Withdrawn') {
+      if (
+        typeof candidate.data !== 'string'
+        || !Array.isArray(candidate.topics)
+        || candidate.topics.length === 0
+      ) continue;
+      let decoded: { eventName?: string; args?: unknown };
+      try {
+        decoded = decodeEventLog({
+          abi,
+          data: candidate.data as Hex,
+          topics: candidate.topics as [Hex, ...Hex[]],
+        }) as unknown as { eventName?: string; args?: unknown };
+      } catch {
+        continue;
+      }
+      eventName = decoded.eventName;
+      args = decoded.args;
+    }
+    if (eventName !== 'Withdrawn') continue;
+    const collection = tupleField(args, 'collection', 0);
+    const tokenId = normalizedTokenId(tupleField(args, 'tokenId', 1));
+    const beneficiary = tupleField(args, 'beneficiary', 2);
+    const depositEpoch = normalizedTokenId(tupleField(args, 'depositEpoch', 3));
+    if (
+      !sameAddress(collection, operation.collectionAddress)
+      || tokenId !== expectedTokenId
+      || !sameAddress(beneficiary, operation.walletAddress)
+      || depositEpoch === null
+      || depositEpoch === '0'
+    ) continue;
+    return depositEpoch;
+  }
+  return null;
+}
+
 export function depositedEpochFromReceipt(
   receipt: unknown,
   operation: Pick<NftVaultPendingOperation, 'vaultAddress' | 'collectionAddress' | 'tokenId' | 'walletAddress'>,
 ) {
   return depositedEpochFromReceiptWithAbi(receipt, operation, cukiePoolNftVaultAbi);
+}
+
+export function withdrawnEpochFromReceipt(
+  receipt: unknown,
+  operation: Pick<NftVaultPendingOperation, 'vaultAddress' | 'collectionAddress' | 'tokenId' | 'walletAddress'>,
+) {
+  return withdrawnEpochFromReceiptWithAbi(receipt, operation, cukiePoolNftVaultAbi);
 }
 
 /**
@@ -119,6 +190,13 @@ export function depositedEpochFromMasterReceipt(
   operation: Pick<NftVaultPendingOperation, 'vaultAddress' | 'collectionAddress' | 'tokenId' | 'walletAddress'>,
 ) {
   return depositedEpochFromReceiptWithAbi(receipt, operation, cukieMasterNftVaultAbi);
+}
+
+export function withdrawnEpochFromMasterReceipt(
+  receipt: unknown,
+  operation: Pick<NftVaultPendingOperation, 'vaultAddress' | 'collectionAddress' | 'tokenId' | 'walletAddress'>,
+) {
+  return withdrawnEpochFromReceiptWithAbi(receipt, operation, cukieMasterNftVaultAbi);
 }
 
 /**
