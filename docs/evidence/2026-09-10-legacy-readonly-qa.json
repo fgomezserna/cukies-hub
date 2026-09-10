@@ -1,6 +1,6 @@
 {
   "observedAt": "2026-09-10T02:16:47.358380+00:00",
-  "status": "reviewed_and_validated_candidate_pending_delivery",
+  "status": "deployed_read_flows_verified_breeding_candidate_identity_open",
   "sourceCandidate": "12140c417292733daeeec9cce6ecf954e35df2af",
   "sourceCommits": [
     "17cff24dcbeb4e3dad3036a7d89542c617cbad98",
@@ -46,8 +46,121 @@
     "legacyWritesDisabled": true
   },
   "limits": [
-    "Pending staging delivery and browser QA",
+    "Read-only delivery and two visible read flows verified; breeding candidate identity remains open",
     "No mainnet writes, signatures or wallet network changes",
-    "No claim of full Legacy event, cursor, contract or UX parity"
-  ]
+    "No claim of full Legacy event, cursor, contract, candidate eligibility or UX parity"
+  ],
+  "updatedAt": "2026-09-10T02:34:52.974547+00:00",
+  "delivery": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/370",
+    "mergeCommit": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+    "ci": {
+      "runId": 34428987963,
+      "status": "completed",
+      "conclusion": "success",
+      "durationSeconds": 558,
+      "build": [
+        "dapp"
+      ],
+      "reuse": [
+        "chain-indexer",
+        "cuki-card-worker",
+        "schedulers",
+        "cukies-bridge-relayer",
+        "treasure-hunt"
+      ],
+      "decision": {
+        "deliveryMode": "rolling",
+        "web": true,
+        "workers": false,
+        "game": false,
+        "skip": false,
+        "changed": [
+          "dapp"
+        ],
+        "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+      },
+      "artifactDirectory": "/tmp/cukies-pr370-artifacts"
+    },
+    "webDigest": "sha256:3399aee87f1e91477fcb76198b1cb427c9a5977548a3a94410e52d442a8a9372",
+    "webContainer": "254767e92ac84b93b2e1a36ff7737c57920f80ca0ddbcb5ce07b2cfb1616de2b",
+    "gameSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+    "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+    "deploymentUuid": "kcwcc8gcgk0o44wwwswos484",
+    "checks": {
+      "protected13Unchanged": true,
+      "journalClean": true,
+      "sixComponentsAndSameConfig": true,
+      "releaseCommit": true,
+      "reuse5References": true,
+      "sameWorkersComposeHash": true,
+      "runtimeGuards": true,
+      "webContainer": true,
+      "webMetadata": true,
+      "webDigest": true,
+      "webHealth": true,
+      "webReady": true,
+      "newWebContainerAndDigest": true,
+      "gameContainer": true,
+      "gameMetadata": true,
+      "gameDigest": true,
+      "gameHealth": true,
+      "gameReady": true,
+      "sameGameContainerAndDigest": true,
+      "buildDappOnly": true,
+      "reuse5": true,
+      "manifestMatchesLive": true,
+      "webOnlyDelivery": true
+    },
+    "postflightSha256": "037aaaefcfe1f847c9b111f1cefe0375e4f0a5485d73962b3c66150221a991ca"
+  },
+  "rootBrowserQa": {
+    "observedAt": "2026-09-10T02:34:52.974547+00:00",
+    "browser": "Edge",
+    "readOnly": true,
+    "walletNetworkChanged": false,
+    "signatureRequested": false,
+    "gamePlayed": false,
+    "breeding": {
+      "bscReadVerified": true,
+      "walletPoints": 0,
+      "maxBreeds": 1,
+      "activeRefreshEnabledAndExercised": true,
+      "activeViewResult": "No hay crías activas verificadas para esta wallet.",
+      "approvalAndStartDisabled": true,
+      "candidateCount": 18,
+      "candidateSelectionNotCertified": true
+    },
+    "cukiePoints": {
+      "bscWalletBalance": 0,
+      "tronWalletBalance": 0,
+      "tronReadVerified": true,
+      "bscTotal": 1205934,
+      "bscIssued": 1358198,
+      "bscBurned": 152264,
+      "tronTotal": 5024269,
+      "tronIssued": 5505861,
+      "tronBurned": 481592,
+      "filteredMovementsVisible": 0,
+      "historyCompletenessVerified": false
+    }
+  },
+  "openFinding": {
+    "id": "LEGACY-BREEDING-IDENTITY",
+    "status": "confirmed_in_readonly_api_response_and_code",
+    "endpoint": "/api/cukies/breeding/candidates",
+    "cause": "Filter uses network BSC and owner aliases, but does not restrict chainId or collectionAddress to the deployed Legacy breeding token",
+    "responseItems": 18,
+    "explicitChain97Items": 12,
+    "missingChainAndCollectionItems": 6,
+    "testCollection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+    "contractReadChain": 56,
+    "evidence": [
+      "dapp/src/lib/cukies-data/data.ts:600",
+      "dapp/src/components/legacy-marketplace/breeding-client.tsx:494"
+    ],
+    "responseSha256": "ab5de442b0bca9a3d373645325f3ea45d46494290d05fe2744c5ba8f6fe9cfea",
+    "writesRemainDisabled": true,
+    "nextStep": "Next bounded Legacy lot: verify canonical mainnet chain+collection and current ownership/eligibility on server and preview, fail closed on incomplete identity, preserve staging fixtures and data; do not activate writes or claim missing inventory as confirmed empty"
+  }
 }
