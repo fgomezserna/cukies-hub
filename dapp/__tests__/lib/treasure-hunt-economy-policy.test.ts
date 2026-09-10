@@ -145,31 +145,27 @@ describe("Treasure Hunt economy policy", () => {
     });
   });
 
-  it("only ranks settled games paid with pool credits", () => {
-    expect(treasureHuntResultEligibility({
-      status: "settled",
-      creditSource: "pool",
-    })).toEqual({
-      leaderboardEligible: true,
-      rewardEligible: true,
-      jackpotEligible: true,
-    });
-    expect(treasureHuntResultEligibility({
-      status: "settled",
-      creditSource: "own",
-    })).toEqual({
-      leaderboardEligible: false,
-      rewardEligible: true,
-      jackpotEligible: false,
-    });
-    expect(treasureHuntResultEligibility({
-      status: "forfeited",
-      creditSource: "pool",
-    })).toEqual({
-      leaderboardEligible: false,
-      rewardEligible: false,
-      jackpotEligible: false,
-    });
+  it("incluye OWN y POOL cuando la partida queda settled y mantiene los flags semanales alineados", () => {
+    for (const creditSource of ["own", "pool"] as const) {
+      expect(treasureHuntResultEligibility({
+        status: "settled",
+        creditSource,
+      })).toEqual({
+        leaderboardEligible: true,
+        rewardEligible: true,
+        jackpotEligible: true,
+      });
+    }
+    for (const creditSource of ["own", "pool"] as const) {
+      expect(treasureHuntResultEligibility({
+        status: "forfeited",
+        creditSource,
+      })).toEqual({
+        leaderboardEligible: false,
+        rewardEligible: false,
+        jackpotEligible: false,
+      });
+    }
   });
 
   it("accepts monotonic server-timed evidence and fails closed on score or clock jumps", () => {

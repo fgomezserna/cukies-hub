@@ -456,7 +456,8 @@ Partidas disponibles por periodo:
 ## Arena ranking
 
 - Este ranking de eficiencia #1 a #9 es distinto del leaderboard semanal de
-  mejor puntuacion que reparte el bote de premios.
+  mejor puntuacion que reparte el bote de premios; ese leaderboard semanal
+  acepta partidas validas settled con creditos propios o del pool.
 - Solo se rankean los jugadores que usan creditos del pool.
 - Los jugadores empiezan en ranking #5.
 - El ranking se actualiza semanalmente.
@@ -596,9 +597,11 @@ preventa, sin modificar sus compras ni sus pagos pasados.
 Uso de creditos:
 
 - Si el jugador tiene creditos propios, se usan sus creditos.
-- Las partidas con creditos propios no computan para ranking y no aplican el rank al jugador.
+- Las partidas validas finalizadas con creditos propios computan en el leaderboard
+  semanal de mejores puntuaciones y conservan su reparto directo.
 - Si no tiene creditos propios, se asignan 10 creditos del pool mientras haya disponibilidad.
-- Las partidas con creditos del pool computan para ranking y aplican el rank sobre la parte del jugador.
+- Las partidas con creditos del pool computan en el leaderboard semanal y aplican
+  el rank Arena sobre la parte del jugador.
 - Con creditos propios no hay limite diario de partidas y esas partidas no
   incrementan los contadores de uso del pool.
 - Con creditos del pool existe un limite de 30 partidas por dia economico y un
@@ -646,11 +649,13 @@ del jugador pasa tambien a `undistributed_pending`.
 
 - Los 2 UKI reservados por cada partida valida alimentan el bote semanal de mejores jugadores.
 - El leaderboard conserva una unica mejor puntuacion raw por wallet, sin tope
-  de 3,000 puntos y solo acepta partidas pagadas con creditos del pool. Las
-  partidas con creditos propios conservan su reparto directo pero no pueden
-  crear ni sustituir la mejor puntuacion semanal. Solo reemplaza el resultado si la nueva puntuacion es mayor;
+  de 3,000 puntos y acepta partidas validas pagadas con creditos propios o del
+  pool. Solo reemplaza el resultado si la nueva puntuacion es mayor;
   en empate queda primero quien la logro antes. `winningGameId` identifica la
   partida exacta que origina cualquier reparto.
+- La elegibilidad semanal que permite aparecer en este leaderboard es la misma
+  que habilita `jackpotEligible`; no se aplica un filtro adicional por origen
+  de credito. La Arena #1–#9 mantiene su snapshot separado y pool-only.
 - El 60% se reparte entre el Top 10 con porcentajes
   `9/8/7/6.5/6/5.5/5/4.5/4.5/4`. El 30% se reparte a partes iguales entre los
   puestos 11 a 25, 2% cada uno. El 10% se sortea entre diez wallets fuera del

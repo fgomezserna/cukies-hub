@@ -243,7 +243,7 @@ describe('histórico de Rankings de Treasure Hunt', () => {
     mockActiveEligibilityKind = 'presale';
     render(<TreasureHuntRankingsView />);
 
-    expect(screen.getByRole('heading', { name: 'Tu mejor partida con créditos del pool' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tu mejor partida de la semana' })).toBeInTheDocument();
     expect(screen.getByText('Bote acumulado')).toBeInTheDocument();
     expect(screen.queryByText('Treasure Hunt · Torneo de preventa')).not.toBeInTheDocument();
     expect(screen.queryByText(/Staking UKI/)).not.toBeInTheDocument();

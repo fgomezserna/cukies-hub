@@ -92,7 +92,7 @@ jest.mock('@/hooks/use-treasure-hunt-weekly-overview', () => ({
       participation: {
         ownCreditRuns: 1,
         poolCreditRuns: 1,
-        bestPoolScoreRaw: '12500',
+        bestScoreRaw: '12500',
       },
       latestResult: null,
     },
@@ -289,7 +289,7 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('Cómo se reparte el bote semanal')).toBeInTheDocument();
     expect(screen.getByText('Abandonos, fallos y torneos especiales')).toBeInTheDocument();
     expect(screen.getAllByText('10 créditos').length).toBeGreaterThan(0);
-    expect(screen.getByText(/Solo cuentan las partidas pagadas con créditos del pool/i)).toBeInTheDocument();
+    expect(screen.getByText(/Las partidas válidas pagadas con créditos personales o del pool/i)).toBeInTheDocument();
     expect(screen.getByText(/Cada partida válida añade 2 UKI al bote/i)).toBeInTheDocument();
     expect(screen.getByText(/Empiezas en #5/i)).toBeInTheDocument();
     expect(screen.queryByText(/Torneo Lanzamiento UKI/i)).not.toBeInTheDocument();
@@ -320,7 +320,7 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(onStartSinglePlayer).toHaveBeenCalledTimes(1);
     expect(screen.getByText('480 créditos')).toBeInTheDocument();
     expect(screen.getByText('20 aportados al pool este periodo')).toBeInTheDocument();
-    expect(screen.getByText('No entra en la clasificación')).toBeInTheDocument();
+    expect(screen.getByText('Sí, esta partida cuenta')).toBeInTheDocument();
     expect(screen.queryByText('Torneo Lanzamiento UKI')).not.toBeInTheDocument();
   });
 
@@ -447,7 +447,7 @@ describe('vistas UX de Treasure Hunt', () => {
     render(<TreasureHuntRankingsView />);
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Tu mejor partida con créditos del pool' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tu mejor partida de la semana' })).toBeInTheDocument();
     expect(screen.getByText('Mejor puntuación clasificada: 12.500')).toBeInTheDocument();
   });
 

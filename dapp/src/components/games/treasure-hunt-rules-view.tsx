@@ -82,10 +82,10 @@ export default function TreasureHuntRulesView() {
         <div className="p-5 sm:p-7">
           <p className="text-xs font-black text-[var(--uki-lilac)]">La regla esencial</p>
           <h3 className="mt-2 text-balance font-headline text-2xl font-black tracking-[-0.025em] text-[var(--uki-cream)] sm:text-3xl">
-            Todas las partidas generan recompensa. Solo algunas compiten.
+            Todas las partidas válidas generan recompensa y pueden competir.
           </h3>
           <p className="mt-3 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-            Treasure Hunt usa primero tus créditos personales. Cuando no tienes diez disponibles, puede usar créditos del pool. El origen de esos créditos determina si tu puntuación entra en la semana.
+            Treasure Hunt usa primero tus créditos personales. Cuando no tienes diez disponibles, puede usar créditos del pool. Toda partida válida finalizada con cualquiera de las dos fuentes cuenta en la semana.
           </p>
         </div>
         <dl className="grid border-t border-white/10 sm:grid-cols-2 md:border-l md:border-t-0 md:grid-cols-1">
@@ -131,8 +131,8 @@ export default function TreasureHuntRulesView() {
           >
             <div className="grid gap-3 md:grid-cols-2">
               <SourceCard title="Partida individual" badge="Créditos personales">
-                <p>Recibes la recompensa directa que genere tu puntuación.</p>
-                <p><strong className="text-[var(--uki-cream)]">No entra</strong> en la clasificación semanal.</p>
+                <p>Recibes la recompensa directa que genere tu puntuación y tu mejor resultado cuenta en la semana.</p>
+                <p><strong className="text-[var(--uki-cream)]">Sí entra</strong> en la clasificación semanal.</p>
                 <p>No tiene límite diario de partidas.</p>
               </SourceCard>
               <SourceCard title="Partida de competición" badge="Créditos del pool">
@@ -214,7 +214,8 @@ export default function TreasureHuntRulesView() {
               <CalendarClock className="h-7 w-7 text-[var(--uki-lilac)]" aria-hidden="true" />
               <div className="space-y-2">
                 <p>Cada competición abarca siete periodos de créditos. Consulta las fechas de inicio y cierre en Rankings.</p>
-                <p>Solo cuentan las partidas pagadas con créditos del pool y se conserva una única puntuación por wallet: la mejor de la semana.</p>
+                <p>Las partidas válidas pagadas con créditos personales o del pool se conservan en una única puntuación por wallet: la mejor de la semana.</p>
+                <p>Esta clasificación semanal es distinta del ranking Arena #1–#9, que sigue usando solo partidas con créditos del pool.</p>
                 <p>Si dos jugadores empatan, queda delante quien consiguió antes esa puntuación.</p>
                 <p>Al comenzar la semana siguiente, la clasificación anterior queda congelada en el historial.</p>
               </div>

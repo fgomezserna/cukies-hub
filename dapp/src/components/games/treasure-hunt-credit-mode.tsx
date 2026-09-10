@@ -62,7 +62,7 @@ export function TreasureHuntCreditModeBanner() {
     : creditBlocked
       ? 'Acceso bloqueado'
     : selectedSource === 'own'
-    ? 'Personal'
+    ? 'Personal · con ranking'
     : selectedSource === 'pool'
       ? 'Pool · con ranking'
       : waitingForRun
@@ -73,7 +73,7 @@ export function TreasureHuntCreditModeBanner() {
     : creditBlocked
       ? 'No se confirmará ninguna fuente mientras siga bloqueado'
     : selectedSource === 'own'
-    ? 'Premio directo · no clasifica'
+    ? 'Premio directo · cuenta en la semana'
     : selectedSource === 'pool'
       ? 'Sí entra en la semana'
       : waitingForRun
@@ -90,7 +90,7 @@ export function TreasureHuntCreditModeBanner() {
       : selectedSource === 'pool'
         ? `Se usarán ${access.costCredits} créditos del pool y tu resultado sí entrará en el ranking semanal.`
         : selectedSource === 'own'
-          ? `Se descontarán ${access.costCredits} créditos personales. Recibirás el reparto directo, pero esta partida no entrará en el ranking.`
+          ? `Se descontarán ${access.costCredits} créditos personales. Recibirás el reparto directo y tu mejor puntuación contará en el ranking semanal.`
           : waitingForRun
             ? 'El reparto de créditos del periodo aún no está abierto. No se iniciará ni cobrará ninguna partida hasta confirmarlo.'
             : 'No hay una fuente con saldo suficiente para crear la partida.';
@@ -205,6 +205,7 @@ export function TreasureHuntCreditModeSidebar({
   const disabled = connectedUnavailable || (access.walletConnected && !access.canPlay);
   const selectedSource = access.canPlay && !access.blocked ? access.creditSource : null;
   const isPoolGame = !creditUnavailable && selectedSource === 'pool';
+  const isRankedGame = !creditUnavailable && (selectedSource === 'own' || isPoolGame);
   const modeLabel = isPoolGame
     ? 'Competición semanal'
     : selectedSource === 'own'
@@ -234,7 +235,7 @@ export function TreasureHuntCreditModeSidebar({
       : isPoolGame
         ? 'Tu próxima partida usará créditos del pool: genera reparto directo y sí compite en el ranking semanal.'
         : selectedSource === 'own'
-          ? 'Tu próxima partida usará créditos personales: genera reparto directo, pero no compite en el ranking semanal.'
+          ? 'Tu próxima partida usará créditos personales: genera reparto directo y también compite en el ranking semanal.'
           : waitingForRun
             ? 'El reparto de créditos del periodo aún no está abierto. Espera a que el Hub confirme lotes utilizables.'
             : 'No hay saldo suficiente para crear una nueva partida.';
@@ -295,7 +296,7 @@ export function TreasureHuntCreditModeSidebar({
             ? 'Pendiente de comprobar'
             : creditBlocked
               ? 'No confirmado'
-            : isPoolGame
+            : isRankedGame
               ? 'Sí, esta partida cuenta'
               : 'No entra en la clasificación'}
           detail={creditUnavailable
@@ -303,8 +304,10 @@ export function TreasureHuntCreditModeSidebar({
             : creditBlocked
               ? 'La fuente y la participación en ranking se confirmarán cuando se desbloquee el acceso'
             : isPoolGame
-            ? `${access.poolAvailableCredits ?? 0} créditos disponibles en el pool compartido`
-            : 'El sistema utiliza primero tus créditos personales'}
+              ? `${access.poolAvailableCredits ?? 0} créditos disponibles en el pool compartido`
+              : selectedSource === 'own'
+                ? 'Tus créditos personales también cuentan en la semana'
+                : 'El sistema utiliza primero tus créditos personales'}
         />
         <SidebarRow
           icon={<Stack className="h-4 w-4" weight="fill" aria-hidden="true" />}

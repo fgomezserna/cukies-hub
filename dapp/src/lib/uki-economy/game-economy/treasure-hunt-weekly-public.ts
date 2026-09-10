@@ -14,7 +14,10 @@ import type {
   RewardSourceManifest,
 } from "@/lib/uki-economy/rewards/types";
 
-import { getTreasureHuntWeeklyPeriod } from "./treasure-hunt-policy";
+import {
+  getTreasureHuntWeeklyPeriod,
+  treasureHuntResultEligibility,
+} from "./treasure-hunt-policy";
 import type {
   TreasureHuntEconomyRun,
   TreasureHuntWeeklyBest,
@@ -51,6 +54,7 @@ export type TreasureHuntWeeklyLatestResult = {
   cukieGeneration: string;
   cukieRarity: string;
   leaderboardEligible: boolean;
+  leaderboardRecorded: boolean;
   rewardEligible: boolean;
   jackpotEligible: boolean;
   reward: {
@@ -77,7 +81,7 @@ export type TreasureHuntWeeklyOverview = {
   participation: null | {
     ownCreditRuns: number;
     poolCreditRuns: number;
-    bestPoolScoreRaw: string | null;
+    bestScoreRaw: string | null;
   };
   latestResult: TreasureHuntWeeklyLatestResult | null;
 };
@@ -126,7 +130,7 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
   if (!run || (run.status !== "settled" && run.status !== "forfeited")) return null;
 
   const sourceId = `game-session:${run.gameEconomySessionId}`;
-  const [manifest, allocation, creditReservation] = await Promise.all([
+  const [manifest, allocation, creditReservation, weeklyBest] = await Promise.all([
     db.collection<RewardSourceManifest>("reward_source_manifests").findOne({ sourceId }),
     db.collection<RewardAllocation>("reward_allocations").findOne({
       sourceId,
@@ -136,6 +140,13 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
     db.collection<CreditReservation>("competition_credit_reservations").findOne({
       reservationId: run.creditReservationId,
     }),
+    db.collection<TreasureHuntWeeklyBest>("treasure_hunt_weekly_bests").findOne({
+      weeklyPeriodId,
+      gameId: "treasure-hunt",
+      creditSource: { $in: ["own", "pool"] as const },
+      walletNormalized,
+      winningGameId: run.gameEconomySessionId,
+    }),
   ]);
   const rewardStatus = run.status !== "settled"
     ? "not_applicable" as const
@@ -144,7 +155,10 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
       : manifest?.status === "allocated"
         ? "allocated" as const
         : "processing" as const;
-  const weeklyEligible = run.status === "settled" && run.creditSource === "pool";
+  const eligibility = treasureHuntResultEligibility({
+    status: run.status,
+    creditSource: run.creditSource,
+  });
 
   return {
     runId: run.runId,
@@ -160,9 +174,8 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
     cukieTokenId: run.cukieTokenId,
     cukieGeneration: run.cukieGeneration,
     cukieRarity: run.cukieRarity,
-    leaderboardEligible: weeklyEligible,
-    rewardEligible: run.status === "settled",
-    jackpotEligible: weeklyEligible,
+    ...eligibility,
+    leaderboardRecorded: Boolean(weeklyBest),
     reward: {
       status: rewardStatus,
       amountRaw: rewardStatus === "allocated" ? allocation?.amountRaw ?? "0" : null,
@@ -187,7 +200,7 @@ export async function getTreasureHuntWeeklyOverview(input: {
   const rankingFilter = {
     weeklyPeriodId: period.periodId,
     gameId: "treasure-hunt" as const,
-    creditSource: "pool" as const,
+    creditSource: { $in: ["own", "pool"] as const },
     ...(input.mineOnly && walletNormalized ? { walletNormalized } : {}),
     ...(input.mineOnly && !walletNormalized ? { walletNormalized: "__signed_wallet_required__" } : {}),
   };
@@ -195,7 +208,7 @@ export async function getTreasureHuntWeeklyOverview(input: {
   const globalRankingFilter = {
     weeklyPeriodId: period.periodId,
     gameId: "treasure-hunt" as const,
-    creditSource: "pool" as const,
+    creditSource: { $in: ["own", "pool"] as const },
   };
   const [totalEntries, totalRankedWallets, bests, poolAccruals, participationRows, latestResult] = await Promise.all([
     db.collection<TreasureHuntWeeklyBest>("treasure_hunt_weekly_bests")
@@ -258,11 +271,11 @@ export async function getTreasureHuntWeeklyOverview(input: {
     (total, accrual) => total + parseRawAmount(accrual.amountRaw),
     BigInt(0),
   ));
-  const bestPool = walletNormalized
+  const best = walletNormalized
     ? await db.collection<TreasureHuntWeeklyBest>("treasure_hunt_weekly_bests").findOne({
       weeklyPeriodId: period.periodId,
       gameId: "treasure-hunt",
-      creditSource: "pool",
+      creditSource: { $in: ["own", "pool"] as const },
       walletNormalized,
     })
     : null;
@@ -294,7 +307,7 @@ export async function getTreasureHuntWeeklyOverview(input: {
       ? {
           ownCreditRuns: counts.get("own") ?? 0,
           poolCreditRuns: counts.get("pool") ?? 0,
-          bestPoolScoreRaw: bestPool?.scoreRaw ?? null,
+          bestScoreRaw: best?.scoreRaw ?? null,
         }
       : null,
     latestResult,
