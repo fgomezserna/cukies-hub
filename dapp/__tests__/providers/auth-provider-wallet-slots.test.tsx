@@ -87,6 +87,100 @@ describe('AuthProvider wallet slots', () => {
     expect(mockUseSignMessage().signMessageAsync).not.toHaveBeenCalled();
   });
 
+  it('restaura la sesión TRON si EVM se hidrata primero', async () => {
+    mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
+    mockUseTronLink.mockReturnValue({
+      address: null,
+      isConnected: false,
+      disconnect: jest.fn(),
+    } as never);
+    mockFetch.mockImplementation(async (_input, init) => {
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {};
+      if (body.walletType === 'evm' && body.requireSignedWallet) {
+        return { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+      }
+      return body.walletAddress === tronAddress
+        ? { ok: true, status: 200, json: async () => ({ ...user, walletAddress: tronAddress }) } as Response
+        : { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+    });
+
+    const { rerender } = renderAuth();
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(mockFetch.mock.calls[0][1]?.body as string)).toEqual({
+      walletAddress: evmAddress,
+      walletType: 'evm',
+      requireSignedWallet: true,
+    });
+
+    mockUseTronLink.mockReturnValue({
+      address: tronAddress,
+      isConnected: true,
+      disconnect: jest.fn(),
+    } as never);
+    rerender(<AuthProvider><Probe /></AuthProvider>);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-type')).toHaveTextContent('tron');
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent(tronAddress);
+    });
+    expect(mockUseSignMessage().signMessageAsync).not.toHaveBeenCalled();
+  });
+
+  it('elige la sesión TRON por identidad firmada cuando ambos slots hidratan juntos', async () => {
+    mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
+    mockUseTronLink.mockReturnValue({
+      address: tronAddress,
+      isConnected: true,
+      disconnect: jest.fn(),
+    } as never);
+    mockFetch.mockImplementation(async (_input, init) => {
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {};
+      if (body.walletType === 'evm' && body.requireSignedWallet) {
+        return { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+      }
+      return body.walletAddress === tronAddress
+        ? { ok: true, status: 200, json: async () => ({ ...user, walletAddress: tronAddress }) } as Response
+        : { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+    });
+
+    renderAuth();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-type')).toHaveTextContent('tron');
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent(tronAddress);
+    });
+    const requestBodies = mockFetch.mock.calls.map(([, init]) => (
+      typeof init?.body === 'string' ? JSON.parse(init.body) : null
+    ));
+    expect(requestBodies).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        walletAddress: evmAddress,
+        walletType: 'evm',
+        requireSignedWallet: true,
+      }),
+      expect.objectContaining({
+        walletAddress: tronAddress,
+        walletType: 'tron',
+      }),
+    ]));
+  });
+
+  it('reintenta una restauración 503 una sola vez y no entra en bucle', async () => {
+    mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({ error: 'Unavailable' }),
+    } as Response);
+
+    renderAuth();
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('wallet-type')).toHaveTextContent('none');
+  });
+
   it('mantiene una sesión TRON al conectar una wallet EVM secundaria', async () => {
     mockUseAccount.mockReturnValue({ address: undefined, isConnected: false } as never);
     mockUseTronLink.mockReturnValue({
