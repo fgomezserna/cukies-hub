@@ -91,6 +91,25 @@ describe('useTronLink', () => {
     unmount();
   });
 
+  it('no trata un TronWeb SDK de lectura como una wallet instalada', () => {
+    delete window.tron;
+    Object.defineProperty(window, 'tronWeb', {
+      configurable: true,
+      value: {
+        defaultAddress: { base58: tronAddress },
+        contract: jest.fn(),
+        trx: { sign: jest.fn() },
+        fullNode: { host: 'https://api.trongrid.io' },
+      },
+    });
+
+    const { result, unmount } = renderHook(() => useTronLink());
+    expect(result.current.isInstalled).toBe(false);
+    expect(result.current.isConnected).toBe(false);
+    expect(result.current.address).toBeNull();
+    unmount();
+  });
+
   it('registra un anuncio TIP-6963 TronLink válido con tronWeb anidado', () => {
     delete window.tron;
     delete window.tronWeb;

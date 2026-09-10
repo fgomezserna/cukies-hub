@@ -5,6 +5,7 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import {
   resolveTronAddress,
   resolveTronProvider,
+  resolveTronSignerWeb,
   resolveTronWeb,
   resolveTronChainId,
   registerTronProvider,
@@ -82,9 +83,13 @@ function syncConnection() {
   if (typeof window === 'undefined') return;
   const provider = resolveTronProvider();
   const tronWeb = resolveTronWeb();
-  const isInstalled = Boolean(provider || tronWeb);
+  const signerWeb = resolveTronSignerWeb();
+  const isInstalled = Boolean(provider || signerWeb);
   const chainId = resolveTronChainId(provider, tronWeb);
-  const address = resolveTronAddress(tronWeb);
+  // `window.tronWeb` may be a read-only SDK client. It can expose a
+  // defaultAddress but does not represent a connected wallet until it is
+  // associated with an injected provider (or an explicit ready fallback).
+  const address = provider || signerWeb ? resolveTronAddress(signerWeb ?? tronWeb) : null;
   if (isManualDisconnectActive()) {
     emit({
       isInstalled,
@@ -192,7 +197,10 @@ async function connectTronLink() {
   setManualDisconnect(false);
   emit({ isLoading: true, error: null });
   const provider = resolveTronProvider();
-  const existingAddress = resolveTronAddress();
+  const existingSignerWeb = resolveTronSignerWeb();
+  const existingAddress = provider || existingSignerWeb
+    ? resolveTronAddress(existingSignerWeb ?? resolveTronWeb())
+    : null;
   if (existingAddress) {
     syncConnection();
     emit({ address: existingAddress, isConnected: true, isLoading: false, error: null });

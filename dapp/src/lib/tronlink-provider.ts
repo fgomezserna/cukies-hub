@@ -61,6 +61,57 @@ function hasExplicitTronCapability(provider: TronLinkProviderLike) {
   return Boolean(provider.tronWeb);
 }
 
+function hasProviderSignal(provider?: TronLinkProviderLike | null) {
+  return Boolean(provider && (provider.request || provider.on));
+}
+
+function tronWebCandidates(currentWindow: Window) {
+  // TronLink can expose a read-only legacy `window.tronWeb` alongside the
+  // signer-backed instance nested under its provider. Keep both surfaces, but
+  // let the signer-backed candidate win when a write is requested.
+  return [
+    currentWindow.tron?.tronWeb,
+    announcedTronProvider?.tronWeb,
+    currentWindow.tronLink?.tronWeb,
+    currentWindow.tronWeb,
+  ].filter((candidate): candidate is TronWebLike => Boolean(candidate));
+}
+
+function hasTronWebSignerShape(value?: TronWebLike | null) {
+  return Boolean(
+    value?.trx?.sign
+      && value.contract
+      && (value.defaultAddress?.base58 || value.defaultAddress?.hex),
+  );
+}
+
+/**
+ * A signer is valid only when its TronWeb instance is tied to an injected
+ * wallet provider. TronWeb's read-only SDK also exposes `trx.sign`, so the
+ * method shape alone must never authorize a write.
+ */
+export function isTronWebSignerReady(value?: TronWebLike | null) {
+  if (!value || !hasTronWebSignerShape(value) || value.ready === false) return false;
+  const currentWindow = browserWindow();
+  if (!currentWindow) return false;
+  const providers = [currentWindow.tron, announcedTronProvider, currentWindow.tronLink]
+    .filter((provider): provider is TronLinkProviderLike => hasProviderSignal(provider));
+  if (providers.some((provider) => provider.tronWeb === value)) return true;
+
+  // Older TronLink builds expose only `window.tronWeb`; its explicit ready
+  // marker distinguishes the injected signer from a plain SDK reader.
+  return currentWindow.tronWeb === value && value.ready === true;
+}
+
+/**
+ * A TronWeb-shaped object can expose `trx.sign` even when it was created as a
+ * read-only SDK client. Only instances associated with an injected TronLink
+ * provider are eligible for a wallet write.
+ */
+export function isTronWebWalletSignerReady(value?: TronWebLike | null) {
+  return isTronWebSignerReady(value);
+}
+
 export function registerTronProvider(
   candidate: unknown,
   info?: unknown,
@@ -81,31 +132,51 @@ export function clearRegisteredTronProvider() {
 export function resolveTronProvider(): TronLinkProviderLike | null {
   const currentWindow = browserWindow();
   if (!currentWindow) return null;
-  const candidates = [currentWindow.tron, currentWindow.tronLink, currentWindow.tronWeb, announcedTronProvider];
-  return candidates.find((candidate) => {
+  const candidates = [currentWindow.tron, announcedTronProvider, currentWindow.tronLink, currentWindow.tronWeb];
+  const providerWithSignal = candidates.find((candidate) => {
     const provider = candidate as TronLinkProviderLike;
     return Boolean(provider && (provider.request || provider.on));
-  }) as TronLinkProviderLike | undefined
-    ?? candidates.find((candidate) => {
-      const provider = candidate as TronLinkProviderLike;
-      return Boolean(provider && (provider.selectedAddress || provider.defaultAddress));
-    }) as TronLinkProviderLike | undefined
-    ?? null;
+  }) as TronLinkProviderLike | undefined;
+  if (providerWithSignal) return providerWithSignal;
+
+  // Older TronLink builds expose only `window.tronWeb`. A plain TronWeb SDK
+  // reader has the same address fields but no wallet readiness marker; accept
+  // this fallback only when the injected instance explicitly reports ready.
+  return candidates.find((candidate) => {
+    if (!candidate) return false;
+    const provider = candidate as TronLinkProviderLike;
+    if (candidate === currentWindow.tronWeb) {
+      const tronWeb = candidate as unknown as TronWebLike;
+      return tronWeb.ready === true && Boolean(tronWeb.defaultAddress?.base58 || tronWeb.defaultAddress?.hex);
+    }
+    return Boolean(provider.selectedAddress || provider.defaultAddress);
+  }) as TronLinkProviderLike | undefined ?? null;
 }
 
 export function resolveTronWeb(): TronWebLike | null {
   const currentWindow = browserWindow();
   if (!currentWindow) return null;
-  return currentWindow.tronWeb
-    ?? currentWindow.tronLink?.tronWeb
-    ?? currentWindow.tron?.tronWeb
-    ?? announcedTronProvider?.tronWeb
+  const candidates = tronWebCandidates(currentWindow);
+  return candidates.find(isTronWebWalletSignerReady)
+    ?? candidates.find(hasTronWebSignerShape)
+    ?? candidates[0]
     ?? null;
+}
+
+export function resolveTronSignerWeb(): TronWebLike | null {
+  const currentWindow = browserWindow();
+  if (!currentWindow) return null;
+  return tronWebCandidates(currentWindow).find(isTronWebWalletSignerReady) ?? null;
 }
 
 export function resolveTronAddress(tronWeb = resolveTronWeb()) {
   const currentWindow = browserWindow();
   if (!currentWindow) return null;
+  if (tronWeb && isTronWebSignerReady(tronWeb)) {
+    return tronWeb.defaultAddress?.base58
+      ?? tronWeb.defaultAddress?.hex
+      ?? null;
+  }
   return currentWindow.tron?.selectedAddress
     ?? currentWindow.tron?.defaultAddress?.base58
     ?? tronWeb?.defaultAddress?.base58

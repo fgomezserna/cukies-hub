@@ -107,8 +107,39 @@ function findProvider(
   return providers.find(predicate);
 }
 
+function allInjectedProviders(windowObject?: unknown) {
+  const browserWindow = windowObject as BrowserWindowWithTronLink | undefined;
+  const candidates = [
+    browserWindow?.ethereum,
+    ...(browserWindow?.ethereum?.providers ?? []),
+    browserWindow?.safepalProvider,
+    browserWindow?.tokenpocket?.ethereum,
+    browserWindow?.trustwallet?.ethereum,
+    browserWindow?.tronLink?.ethereum,
+    browserWindow?.tron?.ethereum,
+  ];
+  return candidates.filter((provider): provider is TaggedEvmProvider => Boolean(provider));
+}
+
+/**
+ * MetaMask is configured in wagmi even when its extension is absent. Keep the
+ * connector in the internal config for hydration, but only present it in the
+ * selector when a MetaMask provider is actually exposed by the browser.
+ */
+export function findMetaMaskEvmProvider(windowObject?: unknown) {
+  return allInjectedProviders(windowObject).find((provider) => (
+    provider.isMetaMask === true
+      || provider.rdns?.toLowerCase().includes('metamask')
+  ));
+}
+
+export function hasAnyEvmProvider(windowObject?: unknown) {
+  return allInjectedProviders(windowObject).length > 0;
+}
+
 export function findSafePalEvmProvider(windowObject?: unknown) {
   const browserWindow = windowObject as BrowserWindowWithTronLink | undefined;
+  if (browserWindow?.ethereum?.isSafePal) return browserWindow.ethereum;
   return browserWindow?.safepalProvider ?? findProvider(windowObject, (provider) => (
     Boolean(provider.isSafePal || provider.rdns?.toLowerCase().includes('safepal'))
   ));
@@ -327,11 +358,38 @@ export function getVisibleWalletConnectors<TConnector extends ConnectorLike>(
       continue;
     }
 
+    if (isMetaMaskConnector(connector) && !findMetaMaskEvmProvider(browserWindow)) {
+      continue;
+    }
+
+    if (
+      connector.id === 'injected'
+      && connector.name === 'Injected'
+      && !hasAnyEvmProvider(browserWindow)
+    ) {
+      continue;
+    }
+
     if (connector.id === 'injected' && connector.name === 'Injected' && defaultInjectedProviderIsPhantom) {
       continue;
     }
 
-    const familyKey = getConnectorFamilyKey(connector);
+    // wagmi keeps a generic `injected` connector alongside its dedicated
+    // MetaMask connector. When the injected provider is MetaMask, both rows
+    // represent the same wallet identity; retain the higher-priority
+    // dedicated row and let the generic row fall through this family guard.
+    const isGenericInjected = connector.id === 'injected' && connector.name === 'Injected';
+    const familyKey = isGenericInjected
+      ? findMetaMaskEvmProvider(browserWindow)
+        ? 'metamask'
+        : findSafePalEvmProvider(browserWindow)
+          ? 'safepal'
+          : findTrustWalletEvmProvider(browserWindow)
+            ? 'trustwallet'
+            : findTokenPocketEvmProvider(browserWindow)
+              ? 'tokenpocket'
+              : getConnectorFamilyKey(connector)
+      : getConnectorFamilyKey(connector);
     if (seenFamilies.has(familyKey)) continue;
 
     seenFamilies.add(familyKey);
@@ -348,17 +406,20 @@ export function getPreferredWalletConnector<TConnector extends ConnectorLike>(co
 export function getMobileWalletConnector<TConnector extends ConnectorLike>(
   connectors: readonly TConnector[],
   walletId: MobileWalletId,
+  windowObject?: unknown,
 ) {
+  const browserWindow = windowObject ?? (typeof window === 'undefined' ? undefined : window);
   return connectors.find((connector) => {
+    const isGenericInjected = connector.id === 'injected' && connector.name === 'Injected';
     switch (walletId) {
       case 'safepal':
-        return isSafePalConnector(connector);
+        return isSafePalConnector(connector) || (isGenericInjected && Boolean(findSafePalEvmProvider(browserWindow)));
       case 'trustWallet':
-        return isTrustWalletConnector(connector);
+        return isTrustWalletConnector(connector) || (isGenericInjected && Boolean(findTrustWalletEvmProvider(browserWindow)));
       case 'metaMask':
-        return isMetaMaskConnector(connector);
+        return isMetaMaskConnector(connector) || (isGenericInjected && Boolean(findMetaMaskEvmProvider(browserWindow)));
       case 'tokenPocket':
-        return isTokenPocketConnector(connector);
+        return isTokenPocketConnector(connector) || (isGenericInjected && Boolean(findTokenPocketEvmProvider(browserWindow)));
     }
   });
 }

@@ -8,7 +8,10 @@ import {
   resolveTronAddress,
   resolveTronChainId,
   resolveTronProvider,
+  resolveTronSignerWeb,
   resolveTronWeb,
+  isTronWebSignerReady,
+  isTronWebWalletSignerReady,
   tronNetworkFromChainId,
 } from '@/lib/tronlink-provider';
 
@@ -93,6 +96,61 @@ describe('tronlink-provider', () => {
     })).toBeNull();
     expect(resolveTronProvider()).toBe(globalProvider);
     expect(resolveTronAddress()).toBe(tronAddress);
+  });
+
+  it('prefiere el tronWeb signer frente a una instancia global de solo lectura', () => {
+    const readOnlyAddress = 'TReadOnly1111111111111111111111111111111';
+    const signerAddress = 'TSigner111111111111111111111111111111111';
+    const readOnly = {
+      defaultAddress: { base58: readOnlyAddress },
+      contract: jest.fn(),
+    };
+    const signer = {
+      defaultAddress: { base58: signerAddress },
+      contract: jest.fn(),
+      trx: { sign: jest.fn() },
+    };
+    Object.defineProperty(window, 'tronWeb', { configurable: true, value: readOnly });
+    Object.defineProperty(window, 'tronLink', {
+      configurable: true,
+      value: { request: jest.fn(), tronWeb: signer },
+    });
+
+    expect(isTronWebSignerReady(readOnly)).toBe(false);
+    expect(resolveTronWeb()).toBe(signer);
+    expect(isTronWebSignerReady(signer)).toBe(true);
+    expect(resolveTronSignerWeb()).toBe(signer);
+    expect(isTronWebWalletSignerReady(signer)).toBe(true);
+    expect(resolveTronAddress()).toBe(signerAddress);
+  });
+
+  it('no acredita como wallet un TronWeb SDK con forma signer pero sin proveedor asociado', () => {
+    const sdkReader = {
+      defaultAddress: { base58: 'TReader11111111111111111111111111111111' },
+      contract: jest.fn(),
+      trx: { sign: jest.fn() },
+    };
+    Object.defineProperty(window, 'tronWeb', { configurable: true, value: sdkReader });
+
+    expect(isTronWebSignerReady(sdkReader)).toBe(false);
+    expect(isTronWebWalletSignerReady(sdkReader)).toBe(false);
+    expect(resolveTronSignerWeb()).toBeNull();
+  });
+
+  it('deja de considerar signer a un TronLink bloqueado aunque conserve la forma SDK', () => {
+    const signer = {
+      ready: false,
+      defaultAddress: { base58: 'TLocked1111111111111111111111111111111' },
+      contract: jest.fn(),
+      trx: { sign: jest.fn() },
+    };
+    Object.defineProperty(window, 'tron', {
+      configurable: true,
+      value: { request: jest.fn(), tronWeb: signer },
+    });
+
+    expect(resolveTronSignerWeb()).toBeNull();
+    expect(isTronWebSignerReady(signer)).toBe(false);
   });
 
   it.each([

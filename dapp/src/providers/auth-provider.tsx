@@ -5,7 +5,10 @@ import { useAccount, useDisconnect, useSignMessage, type Connector } from 'wagmi
 import { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useTronLink } from '@/hooks/use-tronlink';
-import { resolveTronWeb } from '@/lib/tronlink-provider';
+import {
+  isTronWebSignerReady,
+  resolveTronSignerWeb,
+} from '@/lib/tronlink-provider';
 
 type AuthContextType = {
   user: User | null;
@@ -54,9 +57,9 @@ function walletAddressesEqual(walletType: LoginWalletType, left?: string | null,
 }
 
 async function signTronLoginMessage(message: string) {
-  const tronWeb = resolveTronWeb();
+  const tronWeb = resolveTronSignerWeb();
 
-  if (!tronWeb?.toHex || !tronWeb?.trx?.sign) {
+  if (!tronWeb?.toHex || typeof tronWeb.trx?.sign !== 'function' || !isTronWebSignerReady(tronWeb)) {
     throw new Error('No TronLink signing provider is available');
   }
 
@@ -556,3 +559,13 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export function useOptionalAuth() {
+  return useContext(AuthContext) ?? {
+    user: null,
+    isLoading: false,
+    isWaitingForApproval: false,
+    walletType: null,
+    fetchUser: async () => undefined,
+  } satisfies AuthContextType;
+}

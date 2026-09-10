@@ -5,7 +5,10 @@ import {
   legacyMarketplaceContracts,
   type LegacyTronContractName,
 } from './config';
-import { resolveTronWeb } from '@/lib/tronlink-provider';
+import {
+  isTronWebWalletSignerReady,
+  resolveTronWeb,
+} from '@/lib/tronlink-provider';
 
 type LegacyTronContractCall = {
   call: () => Promise<unknown>;
@@ -63,6 +66,7 @@ export type LegacyTronWebLike = {
     hex?: string;
   };
   setAddress?: (address: string) => unknown;
+  trx?: { sign?: (message: unknown) => Promise<unknown> };
   contract: (
     abi: unknown,
     address: string,
@@ -228,9 +232,16 @@ export async function sendLegacyTronContract(
   }
 
   beforeSend?.();
+  if (!isLegacyTronWalletSignerReady(tronWeb)) {
+    throw new Error('TRON_SIGNER_UNAVAILABLE');
+  }
   return call.send(options);
 }
 
 export function isLegacyTronWalletReady(tronWeb?: LegacyTronWebLike | null) {
   return Boolean(tronWeb?.ready && tronWeb.defaultAddress?.base58);
+}
+
+export function isLegacyTronWalletSignerReady(tronWeb?: LegacyTronWebLike | null) {
+  return isTronWebWalletSignerReady(tronWeb as Parameters<typeof isTronWebWalletSignerReady>[0]);
 }

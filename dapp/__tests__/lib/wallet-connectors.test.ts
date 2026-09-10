@@ -3,6 +3,7 @@ import {
   TOKENPOCKET_EVM_CONNECTOR_ID,
   TRONLINK_EVM_CONNECTOR_ID,
   TRUST_WALLET_EVM_CONNECTOR_ID,
+  findMetaMaskEvmProvider,
   findSafePalEvmProvider,
   findTokenPocketEvmProvider,
   findTrustWalletEvmProvider,
@@ -14,6 +15,7 @@ import {
   getPreferredWalletConnector,
   getSortedWalletConnectors,
   getVisibleWalletConnectors,
+  hasAnyEvmProvider,
   isCoinbaseWalletConnector,
   isPhantomConnector,
   isTronLinkEvmConnector,
@@ -73,6 +75,37 @@ describe('lib/wallet-connectors', () => {
 
   it('returns undefined when no connector is available', () => {
     expect(getPreferredWalletConnector([])).toBeUndefined();
+  });
+
+  it('oculta conectores configurados cuando el proveedor real no existe', () => {
+    const metaMask = connector({ id: 'metaMask', name: 'MetaMask', type: 'metaMask' });
+    const safePal = connector({ id: SAFEPAL_EVM_CONNECTOR_ID, name: 'SafePal', type: 'injected' });
+    const browserWallet = connector({ id: 'injected', name: 'Injected', type: 'injected' });
+    const coinbase = connector({ id: 'coinbaseWalletSDK', name: 'Coinbase Wallet', type: 'coinbaseWallet' });
+
+    expect(findMetaMaskEvmProvider({})).toBeUndefined();
+    expect(hasAnyEvmProvider({})).toBe(false);
+    expect(getVisibleWalletConnectors([metaMask, safePal, browserWallet, coinbase], {})).toEqual([coinbase]);
+  });
+
+  it('mantiene una sola identidad MetaMask aunque el navegador publique varias rutas', () => {
+    const metaMask = connector({ id: 'metaMask', name: 'MetaMask', type: 'metaMask' });
+    const injectedMetaMask = connector({ id: 'injected', name: 'Injected', type: 'injected' });
+    const provider = { isMetaMask: true, request: jest.fn() };
+
+    const visible = getVisibleWalletConnectors([injectedMetaMask, metaMask], { ethereum: provider });
+    expect(visible.map((item) => item.id)).toEqual(['metaMask']);
+  });
+
+  it('deduplica el inyectado genérico con proveedores móviles dedicados', () => {
+    const safePal = connector({ id: SAFEPAL_EVM_CONNECTOR_ID, name: 'SafePal', type: 'injected' });
+    const injected = connector({ id: 'injected', name: 'Injected', type: 'injected' });
+    const provider = { isSafePal: true, request: jest.fn() };
+
+    const visible = getVisibleWalletConnectors([injected, safePal], { ethereum: provider });
+
+    expect(visible.map((item) => item.id)).toEqual([SAFEPAL_EVM_CONNECTOR_ID]);
+    expect(getMobileWalletConnector([injected], 'safepal', { ethereum: provider })).toBe(injected);
   });
 
   it('detects supported connector families without relying on exact names only', () => {

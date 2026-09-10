@@ -16,7 +16,16 @@ import {
   getConnectorDescription,
   getConnectorDisplayName,
   getConnectorLogoSrc,
+  findMetaMaskEvmProvider,
+  findSafePalEvmProvider,
+  findTokenPocketEvmProvider,
+  findTrustWalletEvmProvider,
+  isMetaMaskConnector,
+  isSafePalConnector,
+  isTokenPocketConnector,
+  isTrustWalletConnector,
 } from '@/lib/wallet-connectors';
+import type { MobileWalletId } from '@/lib/wallet-connectors';
 
 type TronLinkNativeOption = {
   isInstalled: boolean;
@@ -44,7 +53,55 @@ type WalletConnectorDialogProps = {
   description?: string;
   errorMessage?: string | null;
   tronLinkNative?: TronLinkNativeOption;
+  isMobile?: boolean;
+  onSelectMobileWallet?: (walletId: MobileWalletId) => Promise<void> | void;
 };
+
+const MOBILE_WALLETS: ReadonlyArray<{
+  id: MobileWalletId;
+  label: string;
+  description: string;
+  logoSrc: string;
+}> = [
+  {
+    id: 'safepal',
+    label: 'SafePal',
+    description: 'Abrir en SafePal móvil.',
+    logoSrc: '/brand/wallets/safepal.svg',
+  },
+  {
+    id: 'trustWallet',
+    label: 'Trust Wallet',
+    description: 'Abrir en Trust Wallet móvil.',
+    logoSrc: '/brand/wallets/trust-wallet.svg',
+  },
+  {
+    id: 'metaMask',
+    label: 'MetaMask',
+    description: 'Abrir en MetaMask móvil.',
+    logoSrc: '/brand/wallets/metamask.svg',
+  },
+  {
+    id: 'tokenPocket',
+    label: 'TokenPocket',
+    description: 'Abrir en TokenPocket móvil.',
+    logoSrc: '/brand/wallets/tokenpocket.svg',
+  },
+];
+
+function belongsToMobileFamily(connector: Connector, walletId: MobileWalletId) {
+  const isGenericInjected = connector.id === 'injected' && connector.name === 'Injected';
+  switch (walletId) {
+    case 'safepal':
+      return isSafePalConnector(connector) || (isGenericInjected && Boolean(findSafePalEvmProvider()));
+    case 'trustWallet':
+      return isTrustWalletConnector(connector) || (isGenericInjected && Boolean(findTrustWalletEvmProvider()));
+    case 'metaMask':
+      return isMetaMaskConnector(connector) || (isGenericInjected && Boolean(findMetaMaskEvmProvider()));
+    case 'tokenPocket':
+      return isTokenPocketConnector(connector) || (isGenericInjected && Boolean(findTokenPocketEvmProvider()));
+  }
+}
 
 function ConnectorIcon({ connector }: { connector: Connector }) {
   const logoSrc = getConnectorLogoSrc(connector);
@@ -62,6 +119,15 @@ function ConnectorIcon({ connector }: { connector: Connector }) {
   }
 
   return <Wallet className="h-5 w-5" strokeWidth={1.8} />;
+}
+
+function connectorDescription(connector: Connector, mobile: boolean) {
+  if (mobile) return getConnectorDescription(connector);
+  if (isMetaMaskConnector(connector)) return 'Extensión de navegador para BNB Smart Chain.';
+  if (isSafePalConnector(connector)) return 'Extensión de navegador para BNB Smart Chain.';
+  if (isTrustWalletConnector(connector)) return 'Extensión de navegador para BNB Smart Chain.';
+  if (isTokenPocketConnector(connector)) return 'Extensión de navegador para BNB Smart Chain.';
+  return getConnectorDescription(connector);
 }
 
 function TronLinkLogo() {
@@ -89,6 +155,8 @@ export function WalletConnectorDialog({
   description = 'Elige como quieres conectar tu wallet.',
   errorMessage,
   tronLinkNative,
+  isMobile = false,
+  onSelectMobileWallet,
 }: WalletConnectorDialogProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const isBusy = isConnecting ||
@@ -96,6 +164,9 @@ export function WalletConnectorDialog({
     Boolean(currentWalletAction?.isLoading) ||
     Boolean(disconnectAction?.isLoading) ||
     Boolean(tronLinkNative?.isLoading);
+  const visibleConnectors = isMobile
+    ? connectors.filter((connector) => !MOBILE_WALLETS.some((wallet) => belongsToMobileFamily(connector, wallet.id)))
+    : connectors;
 
   async function handleDialogAction(action: WalletDialogAction, selectedActionId: string) {
     if (isBusy) return;
@@ -143,6 +214,47 @@ export function WalletConnectorDialog({
         </DialogHeader>
 
         <div className="grid gap-2">
+          {isMobile && onSelectMobileWallet ? (
+            <section aria-labelledby="mobile-wallet-options" className="grid gap-2">
+              <h3 id="mobile-wallet-options" className="px-1 text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
+                Wallet móvil
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {MOBILE_WALLETS.map((wallet) => (
+                  <button
+                    key={wallet.id}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void handleDialogAction({
+                      label: wallet.label,
+                      description: wallet.description,
+                      onSelect: () => onSelectMobileWallet(wallet.id),
+                    }, `mobile-${wallet.id}`)}
+                    className="grid min-h-20 gap-1 rounded-[8px] border border-white/10 bg-white/[0.035] px-2 py-2 text-left transition hover:border-[var(--uki-lilac)]/45 hover:bg-[var(--uki-lilac)]/10 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Image
+                        src={wallet.logoSrc}
+                        alt={`${wallet.label} logo`}
+                        width={24}
+                        height={24}
+                        unoptimized
+                        className="h-6 w-6 object-contain"
+                      />
+                      <span className="text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-cream)]">
+                        {wallet.label}
+                      </span>
+                    </span>
+                    <span className="text-[11px] font-semibold leading-snug text-[var(--uki-muted)]">
+                      {wallet.description}
+                    </span>
+                    {selectedId === `mobile-${wallet.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--uki-lilac)]" /> : null}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {currentWalletAction ? (
             <button
               type="button"
@@ -191,7 +303,13 @@ export function WalletConnectorDialog({
             </button>
           ) : null}
 
-          {connectors.map((connector) => {
+          {visibleConnectors.length > 0 ? (
+            <h3 className="px-1 pt-1 text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
+              {isMobile ? 'Otras opciones EVM' : 'Wallets EVM'}
+            </h3>
+          ) : null}
+
+          {visibleConnectors.map((connector) => {
             const isSelected = selectedId === connector.id;
 
             return (
@@ -202,15 +320,15 @@ export function WalletConnectorDialog({
                 onClick={() => void handleSelectConnector(connector)}
                 className="grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[8px] border border-white/10 bg-white/[0.035] px-3 py-2 text-left transition hover:border-[var(--uki-lilac)]/45 hover:bg-[var(--uki-lilac)]/10 disabled:cursor-not-allowed disabled:opacity-55"
               >
-              <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
-                <ConnectorIcon connector={connector} />
+                <span className="grid h-9 w-9 place-items-center rounded-[7px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
+                  <ConnectorIcon connector={connector} />
                 </span>
                 <span>
                   <span className="block text-sm font-black uppercase tracking-[0.08em] text-[var(--uki-cream)]">
                     {getConnectorDisplayName(connector)}
                   </span>
                   <span className="mt-0.5 block text-xs font-semibold leading-snug text-[var(--uki-muted)]">
-                    {getConnectorDescription(connector)}
+                    {connectorDescription(connector, isMobile)}
                   </span>
                 </span>
                 {isSelected ? <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" /> : null}
@@ -242,7 +360,7 @@ export function WalletConnectorDialog({
             </button>
           ) : null}
 
-          {connectors.length === 0 && !tronLinkNative ? (
+          {visibleConnectors.length === 0 && !tronLinkNative && !(isMobile && onSelectMobileWallet) ? (
             <div className="rounded-[8px] border border-[#f2c34b]/30 bg-[#2b1d08]/42 p-3 text-sm font-semibold text-[#ffe2a0]">
               No se ha detectado ningun conector de wallet compatible.
             </div>
