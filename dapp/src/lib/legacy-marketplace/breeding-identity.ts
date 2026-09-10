@@ -17,6 +17,8 @@ type IdentityRecord = {
   identityVerified?: unknown;
   ownershipVerified?: unknown;
   ownershipSource?: unknown;
+  eligibilityVerified?: unknown;
+  eligibilitySource?: unknown;
   owner?: unknown;
   ownerNormalized?: unknown;
   state?: unknown;
@@ -129,10 +131,13 @@ export function isLegacyBreedingEligibilityKnown(
   maxBreeds: number | null,
 ) {
   if (maxBreeds === null || !Number.isFinite(maxBreeds) || maxBreeds < 0) return false;
-  if (typeof record.childrenCount !== 'number' || !Number.isFinite(record.childrenCount)) {
+  if (
+    record.eligibilityVerified !== true
+    || record.eligibilitySource !== 'legacy-getNumBreedsByCukie'
+  ) {
     return false;
   }
-  if (Array.isArray(record.children) && record.children.length !== record.childrenCount) {
+  if (typeof record.childrenCount !== 'number' || !Number.isFinite(record.childrenCount)) {
     return false;
   }
   return true;

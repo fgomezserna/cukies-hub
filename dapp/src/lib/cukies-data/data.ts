@@ -39,6 +39,7 @@ import {
   legacyMarketplaceRuntime,
 } from '@/lib/legacy-marketplace/runtime';
 import {
+  readLegacyMarketplaceBreedingCount,
   readLegacyMarketplaceMaxBreeds,
   readLegacyMarketplaceOwner,
 } from '@/lib/legacy-marketplace/live-marketplace';
@@ -239,6 +240,27 @@ async function readCurrentLegacyOwners(items: LegacyMarketplaceCukiItem[]) {
   return owners;
 }
 
+async function readCurrentLegacyBreedingCounts(items: LegacyMarketplaceCukiItem[]) {
+  const counts: Array<number | null> = Array.from({ length: items.length }, () => null);
+  const readableItems = items.slice(0, MAX_CURRENT_OWNER_READS);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < readableItems.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        counts[index] = await readLegacyMarketplaceBreedingCount(readableItems[index]);
+      } catch {
+        counts[index] = null;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(8, readableItems.length) }, () => worker()),
+  );
+  return counts;
+}
+
 function getRecordValue(value: unknown, key: string) {
   return value && typeof value === 'object'
     ? (value as Record<string, unknown>)[key]
@@ -403,9 +425,7 @@ function normalizeCuki(document: CukiDocument): LegacyMarketplaceCukiItem {
     price: toNumberOrNull(document.price),
     priceOriginal: toStringOrNull(document.priceOriginal) ?? toStringOrNull(document.priceRaw),
     skills,
-    childrenCount:
-      toNumberOrNull(document.numChildren) ??
-      (children.length > 0 ? children.length : null),
+    childrenCount: toNumberOrNull(document.numChildren),
     childrenCountTron: toNumberOrNull(document.numChildrenTron),
     childrenCountBsc: toNumberOrNull(document.numChildrenBsc),
     parents: normalizeRelations(document.parents),
@@ -707,33 +727,50 @@ export async function listBreedingCandidates(
     const item = normalizeCuki(document);
     const identityKnown = isLegacyBreedingIdentity(document, identity.network);
     const ownerKnown = isLegacyBreedingOwner(document, identity.network, owner);
-    const eligibilityKnown = isLegacyBreedingEligibilityKnown(item, maxBreeds);
 
-    if (!identityKnown || !ownerKnown || !eligibilityKnown) {
+    if (!identityKnown || !ownerKnown) {
       hasUnknownEvidence = true;
       continue;
     }
     pending.push(item);
   }
 
-  const currentOwners = await readCurrentLegacyOwners(pending);
+  const [currentOwners, currentBreedingCounts] = await Promise.all([
+    readCurrentLegacyOwners(pending),
+    readCurrentLegacyBreedingCounts(pending),
+  ]);
   const items = [] as LegacyMarketplaceCukiItem[];
   pending.forEach((item, index) => {
     const currentOwner = currentOwners[index];
-    if (!currentOwner) {
+    const currentBreedingCount = currentBreedingCounts[index];
+    if (!currentOwner || currentBreedingCount === null) {
+      hasUnknownEvidence = true;
+      return;
+    }
+
+    if (
+      item.childrenCount !== null
+      && item.childrenCount !== currentBreedingCount
+    ) {
       hasUnknownEvidence = true;
       return;
     }
 
     const verifiedItem = {
       ...item,
+      childrenCount: currentBreedingCount,
       identityVerified: true,
       ownershipVerified: true,
       ownershipSource: 'legacy-ownerOf' as const,
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie' as const,
       owner: currentOwner,
       ownerNormalized: currentOwner,
     };
-    if (isLegacyBreedingCandidate(verifiedItem, identity.network, owner, maxBreeds)) {
+    if (
+      isLegacyBreedingEligibilityKnown(verifiedItem, maxBreeds)
+      && isLegacyBreedingCandidate(verifiedItem, identity.network, owner, maxBreeds)
+    ) {
       items.push(verifiedItem);
     }
   });

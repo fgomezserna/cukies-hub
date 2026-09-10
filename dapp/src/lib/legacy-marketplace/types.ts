@@ -60,6 +60,8 @@ export type LegacyMarketplaceCukiItem = {
   identityVerified?: boolean;
   ownershipVerified?: boolean;
   ownershipSource?: 'legacy-ownerOf';
+  eligibilityVerified?: boolean;
+  eligibilitySource?: 'legacy-getNumBreedsByCukie';
   network: LegacyCukiNetwork | string;
   origin: string | null;
   birthNetwork: string | null;

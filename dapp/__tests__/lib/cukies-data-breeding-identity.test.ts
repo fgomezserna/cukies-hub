@@ -3,6 +3,7 @@ jest.mock('@/lib/indexer-db/mongodb', () => ({ getIndexerDb: jest.fn() }));
 jest.mock('@/lib/legacy-marketplace/live-marketplace', () => ({
   readLegacyMarketplaceOwner: jest.fn(),
   readLegacyMarketplaceMaxBreeds: jest.fn(),
+  readLegacyMarketplaceBreedingCount: jest.fn(),
 }));
 
 import {
@@ -11,6 +12,7 @@ import {
 } from '@/lib/cukies-data/data';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import {
+  readLegacyMarketplaceBreedingCount,
   readLegacyMarketplaceMaxBreeds,
   readLegacyMarketplaceOwner,
 } from '@/lib/legacy-marketplace/live-marketplace';
@@ -19,6 +21,7 @@ import { getIndexerDb } from '@/lib/indexer-db/mongodb';
 const mockGetIndexerDb = getIndexerDb as jest.MockedFunction<typeof getIndexerDb>;
 const mockReadLegacyMarketplaceOwner = readLegacyMarketplaceOwner as jest.Mock;
 const mockReadLegacyMarketplaceMaxBreeds = readLegacyMarketplaceMaxBreeds as jest.Mock;
+const mockReadLegacyMarketplaceBreedingCount = readLegacyMarketplaceBreedingCount as jest.Mock;
 
 const wallet = '0x00000000000000000000000000000000000000aa';
 const collectionAddress = legacyMarketplaceContracts.bsc.contracts.token;
@@ -74,6 +77,7 @@ describe('identidad Legacy en lecturas de breeding', () => {
     } as never);
     mockReadLegacyMarketplaceOwner.mockClear();
     mockReadLegacyMarketplaceMaxBreeds.mockClear().mockResolvedValue(1);
+    mockReadLegacyMarketplaceBreedingCount.mockClear().mockResolvedValue(0);
     mockReadLegacyMarketplaceOwner.mockImplementation(async (item: { owner: string | null }) => {
       if (!item.owner) throw new Error('owner unavailable');
       return item.owner;
@@ -128,8 +132,9 @@ describe('identidad Legacy en lecturas de breeding', () => {
     );
   });
 
-  it('mantiene unknown cuando falta la evidencia de elegibilidad', async () => {
-    documents = [makeDocument({ numChildren: undefined, children: undefined })];
+  it('mantiene partial cuando falla el contador canónico aunque haya relaciones materializadas', async () => {
+    documents = [makeDocument({ numChildren: undefined, children: ['31'] })];
+    mockReadLegacyMarketplaceBreedingCount.mockRejectedValue(new Error('RPC unavailable'));
 
     const response = await listBreedingCandidates({
       owner: wallet,
@@ -139,7 +144,7 @@ describe('identidad Legacy en lecturas de breeding', () => {
 
     expect(response.status).toBe('partial');
     expect(response.items).toEqual([]);
-    expect(response.error).toMatch(/identidad.*Legacy/i);
+    expect(response.error).toMatch(/identidad.*Legacy|elegibilidad.*Legacy/i);
   });
 
   it('excluye la selección cuando ownerOf no aporta una observación actual', async () => {
@@ -174,8 +179,9 @@ describe('identidad Legacy en lecturas de breeding', () => {
     expect(mockReadLegacyMarketplaceOwner).not.toHaveBeenCalled();
   });
 
-  it('cierra la elegibilidad cuando el contador contradice las relaciones materializadas', async () => {
-    documents = [makeDocument({ numChildren: 0, children: ['30', '31'] })];
+  it('cierra la selección cuando el contador importado está desactualizado', async () => {
+    documents = [makeDocument({ numChildren: 0, children: [] })];
+    mockReadLegacyMarketplaceBreedingCount.mockResolvedValue(1);
 
     const response = await listBreedingCandidates({
       owner: wallet,
@@ -184,7 +190,9 @@ describe('identidad Legacy en lecturas de breeding', () => {
     });
 
     expect(response).toMatchObject({ status: 'partial', items: [] });
-    expect(mockReadLegacyMarketplaceOwner).not.toHaveBeenCalled();
+    expect(mockReadLegacyMarketplaceBreedingCount).toHaveBeenCalledWith(
+      expect.objectContaining({ tokenId: '29', network: 'BSC' }),
+    );
   });
 
   it('exige la dirección TRON Base58 exacta y no verifica un alias en mayúsculas', async () => {

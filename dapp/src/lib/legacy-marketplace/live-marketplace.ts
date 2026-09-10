@@ -262,6 +262,57 @@ export async function readLegacyMarketplaceMaxBreeds(
   }
 }
 
+/**
+ * Reads the current number of breeds recorded for one NFT by the canonical
+ * Legacy breeding contract. The indexer relations are only a projection and
+ * must not be used as the authoritative counter for eligibility.
+ */
+export async function readLegacyMarketplaceBreedingCount(
+  item: Pick<LegacyMarketplaceCukiItem, 'network' | 'tokenId'>,
+): Promise<number> {
+  let raw: unknown;
+
+  try {
+    if (item.network === 'BSC') {
+      raw = await withTimeout(
+        legacyBscPublicClient.readContract({
+          address: legacyMarketplaceContracts.bsc.contracts.breedingPoints,
+          abi: legacyMarketplaceBscAbis.breedingPoints,
+          functionName: 'getNumBreedsByCukie',
+          args: [BigInt(item.tokenId)],
+        }),
+      );
+    } else if (item.network === 'TRON') {
+      const tronWeb = new TronWeb({
+        fullHost: process.env.CUKIES_LEGACY_TRON_READ_RPC_URL?.trim()
+          || legacyMarketplaceContracts.tron.readRpcUrl,
+      });
+      tronWeb.setAddress(legacyMarketplaceContracts.tron.contracts.breedingPoints);
+      const breeding = tronWeb.contract(
+        legacyMarketplaceTronAbis.breedingPoints as unknown as Parameters<typeof tronWeb.contract>[0],
+        legacyMarketplaceContracts.tron.contracts.breedingPoints,
+      );
+      raw = await withTimeout(
+        breeding.getNumBreedsByCukie(item.tokenId).call(),
+      );
+    } else {
+      throw new Error('INVALID_LEGACY_MARKETPLACE_NETWORK');
+    }
+  } catch {
+    throw new Error('LEGACY_MARKETPLACE_BREEDING_COUNT_UNAVAILABLE');
+  }
+
+  try {
+    const value = Number(integer(raw));
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error('INVALID_LEGACY_BREEDING_COUNT');
+    }
+    return value;
+  } catch {
+    throw new Error('INVALID_LEGACY_BREEDING_COUNT');
+  }
+}
+
 async function verifyBscListings(items: LegacyMarketplaceCukiItem[]) {
   if (items.length === 0) return { items: [], paused: false };
   const paused = await legacyBscPublicClient.readContract({
