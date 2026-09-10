@@ -27,18 +27,44 @@ import {
   stableGameEconomyHash,
 } from '@/lib/uki-economy/game-economy/rules';
 import {
+  buildGameCreditReservationEvidence,
   buildGameCukieAssignmentEvidence,
   buildGameOwnCukieAssignmentEvidence,
 } from '@/lib/uki-economy/game-economy/resource-evidence';
+import type {
+  GameCukieResourcePort,
+  GameCreditResourcePort,
+  GameEconomyPorts,
+} from '@/lib/uki-economy/game-economy/ports';
+import { createNftAssetLockService } from '@/lib/nft-inventory/locks';
+import type { NftAssetLockRepository } from '@/lib/nft-inventory/lock-repository';
+import type { NftAssetLockDocument, NftAssetLockEventDocument } from '@/lib/nft-inventory/lock-types';
+import type { NormalizedNftAsset } from '@/lib/nft-inventory';
+import {
+  createCompetitionCreditService,
+  validateReservationIntegrity,
+} from '@/lib/uki-economy/credits/service';
+import {
+  createMemoryCompetitionCreditRunner,
+  MemoryCompetitionCreditRepository,
+  testCompetitionCreditRule,
+} from '@/lib/uki-economy/credits/testing';
+import type { CukieMasterSlot } from '@/lib/uki-economy/cukie-master/types';
+import { createOwnCukieService } from '@/lib/uki-economy/own-cukie/service';
+import type { OwnCukieRepository } from '@/lib/uki-economy/own-cukie/repository';
 import { TREASURE_HUNT_ECONOMY_POLICY } from '@/lib/uki-economy/game-economy/treasure-hunt-policy';
-import type { GameEconomyEvent, GameEconomySession } from '@/lib/uki-economy/game-economy/types';
+import type {
+  GameEconomyEvent,
+  GameEconomyRule,
+  GameEconomySession,
+} from '@/lib/uki-economy/game-economy/types';
 import {
   ownCukieAssignmentId,
   ownCukieEpochId,
   ownCukieQuota,
   stableOwnCukieHash,
 } from '@/lib/uki-economy/own-cukie/rules';
-import type { OwnCukieAssignment, OwnCukieEpoch, OwnCukieEvent } from '@/lib/uki-economy/own-cukie/types';
+import type { OwnCukieAssignment, OwnCukieAssetSnapshot, OwnCukieEpoch, OwnCukieEvent } from '@/lib/uki-economy/own-cukie/types';
 import {
   deterministicSeikuAssetId,
   stableCukiePoolHash,
@@ -48,8 +74,9 @@ import {
   buildNftAssetLockEvent,
   buildNftLockPayloadHash,
 } from '@/lib/nft-inventory/lock-types';
-import type { NftAssetLockDocument, NftAssetLockEventDocument } from '@/lib/nft-inventory/lock-types';
+import { createMemoryCukiePoolHarness } from '@/lib/uki-economy/cukie-pool/testing';
 import type { Db } from 'mongodb';
+import { buildGameEconomySessionEvent } from '@/lib/uki-economy/game-economy/repository';
 import {
   inspectTreasureHuntEconomyRecovery,
   treasureHuntRecoveryReplacementIdempotencyKey,
@@ -63,8 +90,13 @@ import { prisma } from '@/lib/prisma';
 import { openGameSession } from '@/lib/uki-economy/game-economy/coordinator';
 
 const WALLET = `0x${'1'.repeat(40)}`;
+const OTHER = `0x${'2'.repeat(40)}`;
 const NOW = new Date('2026-07-10T12:00:00.000Z');
 const CREATE_KEY = 'treasure-create';
+const CREDIT_CUTOFF = new Date('2026-07-10T12:00:00.000Z');
+const GAME_SESSION_TTL_MS = 10 * 60_000;
+const CREDIT_COST_CODE = 'arena:start';
+const CREDIT_RULE_VERSION = 'credits-recovery-test-v1';
 
 type Doc = Record<string, unknown>;
 
@@ -161,11 +193,16 @@ function fakeDb(collections: Record<string, Doc[]>) {
   } as unknown as Db;
 }
 
-function treasureRule() {
+function treasureRule(
+  credit: Partial<GameEconomyRule['credit']> = {},
+  overrides: Partial<GameEconomyRule> = {},
+) {
+  const defaultCredit = testGameEconomyRule().credit;
   return testGameEconomyRule({
     _id: `treasure-hunt:${TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion}`,
     gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
     version: TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
+    credit: { ...defaultCredit, ...credit },
     cukie: {
       required: true,
       consumeOnSettle: false,
@@ -174,69 +211,613 @@ function treasureRule() {
       role: 'own_or_pool',
       selectionPolicy: 'owned_bsc_quota_then_pool_v1',
     },
+    ...overrides,
   });
 }
 
-async function createRejectedSession(createKey = CREATE_KEY): Promise<GameEconomySession> {
-  const repository = new MemoryGameEconomyRepository({ rules: [treasureRule()] });
-  const ports = createMemoryGameEconomyPorts();
-  ports.resources.fail('credit', 'reserve');
-  const service = createGameEconomyService(createMemoryGameEconomyRunner(repository), ports);
+async function createRejectedSessionWithPorts(input: {
+  createKey: string;
+  gameRule: GameEconomyRule;
+  ports: GameEconomyPorts;
+  expectedRuleVersion?: string;
+}) {
+  const repository = new MemoryGameEconomyRepository({ rules: [input.gameRule] });
+  const gameEvents: GameEconomyEvent[] = [];
+  const insertSession = repository.insertSession.bind(repository);
+  repository.insertSession = async (session) => {
+    await insertSession(session);
+    gameEvents.push(buildGameEconomySessionEvent(null, session));
+  };
+  const replaceSession = repository.replaceSession.bind(repository);
+  repository.replaceSession = async (previous, next) => {
+    const replaced = await replaceSession(previous, next);
+    if (replaced) gameEvents.push(buildGameEconomySessionEvent(previous, replaced));
+    return replaced;
+  };
+  const service = createGameEconomyService(
+    createMemoryGameEconomyRunner(repository),
+    input.ports,
+  );
   await expect(service.createSession({
     walletAddress: WALLET,
     gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
     cukieAssetIds: [],
-    expectedRuleVersion: TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
-    idempotencyKey: createKey,
+    expectedRuleVersion: input.expectedRuleVersion ?? TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
+    idempotencyKey: input.createKey,
     now: NOW,
   })).rejects.toThrow();
-  return repository.state.sessions[0]!;
+  const session = repository.state.sessions[0]!;
+  recordedGameEvents.set(session.sessionId, gameEvents);
+  return session;
 }
 
-function eventFor(
-  session: GameEconomySession,
-  index: number,
-  input: Pick<GameEconomyEvent, 'toStatus' | 'creditState' | 'cukieState'>,
-): GameEconomyEvent {
-  const previous = index === 0 ? null : eventFor(session, index - 1, {
-    toStatus: index - 1 === session.revision ? session.status : 'created',
-    creditState: index - 1 >= session.revision - 2 ? 'released' : 'pending',
-    cukieState: index - 1 >= session.revision - 1 ? 'released' : 'pending',
+async function createRejectedSession(createKey = CREATE_KEY): Promise<GameEconomySession> {
+  const ports = createMemoryGameEconomyPorts();
+  ports.resources.fail('credit', 'reserve');
+  return createRejectedSessionWithPorts({
+    createKey,
+    gameRule: treasureRule(),
+    ports,
   });
-  const createdAt = session.updatedAt;
-  const eventId = stableGameEconomyHash({
-    kind: 'game-economy-session-event-id',
-    sessionId: session.sessionId,
-    toRevision: index,
-  });
-  const immutable = {
-    eventId,
-    sessionId: session.sessionId,
-    fromRevision: previous?.toRevision ?? null,
-    toRevision: index,
-    fromStatus: previous?.toStatus ?? null,
-    toStatus: input.toStatus,
-    creditState: input.creditState,
-    cukieState: input.cukieState,
-    fenceToken: index === 0 ? 0 : Math.min(session.fenceToken, index),
-    createdAt,
-  } as const;
+}
+
+function recoveryCreditSlot(walletAddress = WALLET): CukieMasterSlot {
+  const sourceBlockTimestamp = new Date(CREDIT_CUTOFF.getTime() - 60_000);
   return {
-    _id: eventId,
-    ...immutable,
-    payloadHash: stableGameEconomyHash({ kind: 'game-economy-session-event', ...immutable }),
+    _id: 'recovery-credit-slot-1',
+    walletAddress,
+    walletNormalized: walletAddress.toLowerCase(),
+    route: 'uki',
+    ordinal: 1,
+    eligibilityEpoch: 1,
+    status: 'active',
+    qualifiedSince: new Date(CREDIT_CUTOFF.getTime() - 2 * 60_000),
+    creditEligibleFrom: new Date(CREDIT_CUTOFF.getTime() - 60_000),
+    roundId: 'recovery-credit-round',
+    ruleVersion: 'cukie-master-v1',
+    sourceHash: 'a'.repeat(64),
+    sourceBlockNumber: 100,
+    sourceBlockHash: `0x${'b'.repeat(64)}`,
+    sourceBlockTimestamp,
+    revision: 1,
+    createdAt: sourceBlockTimestamp,
+    updatedAt: CREDIT_CUTOFF,
   };
 }
 
-function canonicalEvents(session: GameEconomySession): GameEconomyEvent[] {
-  return Array.from({ length: session.revision + 1 }, (_, index) => eventFor(session, index, {
-    toStatus: index === session.revision ? 'rejected' : 'created',
-    creditState: index >= session.revision - 2 ? 'released' : 'pending',
-    cukieState: index >= session.revision - 1 ? 'released' : 'pending',
-  }));
+async function openRecoveryCreditRun(
+  service: ReturnType<typeof createCompetitionCreditService>,
+) {
+  await service.refreshSourceWatermark({
+    route: 'uki',
+    expectedRuleVersion: CREDIT_RULE_VERSION,
+    now: CREDIT_CUTOFF,
+  });
+  const run = await service.createDailyRun({
+    route: 'uki',
+    cutoff: CREDIT_CUTOFF,
+    expectedRuleVersion: CREDIT_RULE_VERSION,
+    now: new Date(CREDIT_CUTOFF.getTime() + 1_000),
+  });
+  const claimed = await service.claimRun({
+    runId: run.runId,
+    workerId: 'recovery-test-worker',
+    now: new Date(CREDIT_CUTOFF.getTime() + 2_000),
+  });
+  await service.processRunBatch({
+    runId: run.runId,
+    workerId: 'recovery-test-worker',
+    fenceToken: claimed.fenceToken,
+    now: new Date(CREDIT_CUTOFF.getTime() + 3_000),
+  });
+  const opened = await service.openRun({
+    runId: run.runId,
+    workerId: 'recovery-test-worker',
+    fenceToken: claimed.fenceToken,
+    now: new Date(CREDIT_CUTOFF.getTime() + 4_000),
+  });
+  expect(opened.run.status).toBe('open');
+  return opened.run;
 }
 
-function databaseFor(session: GameEconomySession, gameEvents = canonicalEvents(session), extras: Record<string, Doc[]> = {}) {
+function recoveryCreditPort(
+  service: ReturnType<typeof createCompetitionCreditService>,
+): GameCreditResourcePort {
+  return {
+    async reserve(input) {
+      const reservation = await service.reserve({
+        walletAddress: input.walletNormalized,
+        sessionId: input.sessionId,
+        costCode: input.costCode,
+        expectedRuleVersion: input.creditRuleVersion,
+        expectedRuleConfigHash: input.creditRuleConfigHash,
+        idempotencyKey: input.idempotencyKey,
+        expiresAtCap: input.expiresAt,
+        now: new Date(input.expiresAt.getTime() - GAME_SESSION_TTL_MS),
+      });
+      return buildGameCreditReservationEvidence(validateReservationIntegrity(reservation));
+    },
+    async consume(input) {
+      if (!input.reservationId) throw new Error('credit reservation is required');
+      const reservation = await service.consumeReservation({
+        reservationId: input.reservationId,
+        idempotencyKey: input.idempotencyKey,
+        committedAt: input.committedAt,
+        now: input.now,
+      });
+      return {
+        outcome: 'consumed' as const,
+        reservation: buildGameCreditReservationEvidence(validateReservationIntegrity(reservation)),
+      };
+    },
+    async release(input) {
+      if (!input.reservationId) return { outcome: 'released' as const, reservation: null };
+      const reservation = await service.releaseReservation({
+        reservationId: input.reservationId,
+        idempotencyKey: input.idempotencyKey,
+        now: input.now,
+      });
+      return {
+        outcome: 'released' as const,
+        reservation: buildGameCreditReservationEvidence(validateReservationIntegrity(reservation)),
+      };
+    },
+  };
+}
+
+type OwnRecoveryMemoryState = {
+  assets: Map<string, OwnCukieAssetSnapshot>;
+  epochs: Map<string, OwnCukieEpoch>;
+  assignments: Map<string, OwnCukieAssignment>;
+  events: Map<string, OwnCukieEvent>;
+  locks: Map<string, NftAssetLockDocument>;
+  lockEvents: Map<string, NftAssetLockEventDocument>;
+};
+
+function ownRecoveryAsset(): OwnCukieAssetSnapshot {
+  return {
+    assetId: 'cukies:own-recovery-1',
+    tokenId: '1',
+    network: 'bsc',
+    ownerWallet: WALLET,
+    ownerNormalized: WALLET.toLowerCase(),
+    rarity: 'common',
+    generation: 'original',
+    canonicalState: 'available',
+    blockers: [],
+    activeLocks: [],
+    sourceRefs: [],
+    ownershipEventId: 'ownership:own-recovery-1',
+  };
+}
+
+function ownAssetWithLocks(
+  state: OwnRecoveryMemoryState,
+  asset: OwnCukieAssetSnapshot,
+  now: Date,
+) {
+  const locks = [...state.locks.values()].filter((lock) => (
+    lock.assetId === asset.assetId
+    && lock.status === 'active'
+    && (!lock.expiresAt || lock.expiresAt.getTime() > now.getTime())
+  ));
+  const canonicalState = locks.some((lock) => lock.reason === 'game_assignment')
+    ? 'assigned_to_game' as const
+    : locks.some((lock) => lock.reason === 'soft_stake')
+      ? 'soft_staked' as const
+      : 'available' as const;
+  return {
+    ...clone(asset),
+    canonicalState,
+    activeLocks: locks.map((lock) => ({
+      lockId: lock.lockId,
+      assetId: lock.assetId,
+      ownerNormalized: lock.ownerNormalized,
+      reason: lock.reason,
+      state: lock.reason === 'game_assignment'
+        ? 'assigned_to_game' as const
+        : lock.reason === 'soft_stake'
+          ? 'soft_staked' as const
+          : 'unknown' as const,
+      ...(lock.retainsSoftStakeEntitlement ? { retainsSoftStakeEntitlement: true as const } : {}),
+    })),
+  } satisfies OwnCukieAssetSnapshot;
+}
+
+function createMemoryOwnCukieHarness() {
+  const state: OwnRecoveryMemoryState = {
+    assets: new Map([[ownRecoveryAsset().assetId, ownRecoveryAsset()]]),
+    epochs: new Map(),
+    assignments: new Map(),
+    events: new Map(),
+    locks: new Map(),
+    lockEvents: new Map(),
+  };
+  const lockRepository: NftAssetLockRepository = {
+    findLockById: async (lockId) => {
+      const lock = state.locks.get(lockId);
+      return lock ? clone(lock) : null;
+    },
+    findLockByIdempotencyKey: async (idempotencyKey) => {
+      const lock = [...state.locks.values()].find((candidate) => candidate.idempotencyKey === idempotencyKey);
+      return lock ? clone(lock) : null;
+    },
+    findEventByIdempotencyKey: async (idempotencyKey) => {
+      const event = [...state.lockEvents.values()].find((candidate) => candidate.idempotencyKey === idempotencyKey);
+      return event ? clone(event) : null;
+    },
+    findActiveLockByAssetId: async (assetId) => {
+      const lock = [...state.locks.values()].find((candidate) => (
+        candidate.assetId === assetId && candidate.status === 'active'
+      ));
+      return lock ? clone(lock) : null;
+    },
+    findExpiredActiveLocks: async (now, limit, excludeReasons = []) => [...state.locks.values()]
+      .filter((lock) => (
+        lock.status === 'active'
+        && Boolean(lock.expiresAt)
+        && lock.expiresAt!.getTime() <= now.getTime()
+        && !excludeReasons.includes(lock.reason)
+      ))
+      .slice(0, limit)
+      .map((lock) => clone(lock)),
+    insertLock: async (lock) => {
+      state.locks.set(lock.lockId, clone(lock));
+    },
+    compareAndSetActiveLock: async (lockId, expectedFencingToken, replacement, options) => {
+      const current = state.locks.get(lockId);
+      if (
+        !current
+        || current.status !== 'active'
+        || current.fencingToken !== expectedFencingToken
+        || (
+          options?.expiresAtLte
+          && (!current.expiresAt || current.expiresAt.getTime() > options.expiresAtLte.getTime())
+        )
+        || (
+          options?.notExpiredAt
+          && current.expiresAt
+          && current.expiresAt.getTime() <= options.notExpiredAt.getTime()
+        )
+      ) return null;
+      state.locks.set(lockId, clone(replacement));
+      return clone(replacement);
+    },
+    insertEvent: async (event) => {
+      state.lockEvents.set(event.eventId, clone(event));
+    },
+    enqueueRecalculation: async () => {},
+  };
+  const repository: OwnCukieRepository = {
+    listWalletAssets: async (ownerNormalized, now) => [...state.assets.values()]
+      .filter((asset) => asset.ownerNormalized === ownerNormalized)
+      .map((asset) => ownAssetWithLocks(state, asset, now)),
+    findAsset: async (assetId, now) => {
+      const asset = state.assets.get(assetId);
+      return asset ? ownAssetWithLocks(state, asset, now) : null;
+    },
+    findEpoch: async (epochId) => {
+      const epoch = state.epochs.get(epochId);
+      return epoch ? clone(epoch) : null;
+    },
+    insertEpoch: async (epoch) => {
+      state.epochs.set(epoch.epochId, clone(epoch));
+    },
+    compareAndSetEpoch: async (current, replacement) => {
+      const stored = state.epochs.get(current.epochId);
+      if (
+        !stored
+        || stored.revision !== current.revision
+        || stored.status !== current.status
+        || stored.gamesRemaining !== current.gamesRemaining
+        || stored.assignmentSessionId !== current.assignmentSessionId
+        || stored.assignmentExpiresAt?.getTime() !== current.assignmentExpiresAt?.getTime()
+      ) return null;
+      state.epochs.set(replacement.epochId, clone(replacement));
+      return clone(replacement);
+    },
+    findAssignmentById: async (assignmentId) => {
+      const assignment = state.assignments.get(assignmentId);
+      return assignment ? clone(assignment) : null;
+    },
+    findAssignmentBySessionId: async (sessionId) => {
+      const assignment = [...state.assignments.values()].find((candidate) => candidate.sessionId === sessionId);
+      return assignment ? clone(assignment) : null;
+    },
+    findAssignmentByIdempotencyKey: async (idempotencyKey) => {
+      const assignment = [...state.assignments.values()].find((candidate) => candidate.idempotencyKey === idempotencyKey);
+      return assignment ? clone(assignment) : null;
+    },
+    insertAssignment: async (assignment) => {
+      state.assignments.set(assignment.assignmentId, clone(assignment));
+    },
+    compareAndSetAssignment: async (current, replacement) => {
+      const stored = state.assignments.get(current.assignmentId);
+      if (
+        !stored
+        || stored.revision !== current.revision
+        || stored.status !== current.status
+        || stored.lockFencingToken !== current.lockFencingToken
+      ) return null;
+      state.assignments.set(replacement.assignmentId, clone(replacement));
+      return clone(replacement);
+    },
+    findEventByIdempotencyKey: async (idempotencyKey) => {
+      const event = [...state.events.values()].find((candidate) => candidate.idempotencyKey === idempotencyKey);
+      return event ? clone(event) : null;
+    },
+    insertEvent: async (event) => {
+      state.events.set(event.eventId, clone(event));
+    },
+  };
+  const lockService = createNftAssetLockService(async (work) => work(lockRepository));
+  const service = createOwnCukieService(async (work) => work({
+    repository,
+    lockService,
+    lockRepository,
+  }));
+  return { state, service };
+}
+
+function actualOwnCukiePort(harness: ReturnType<typeof createMemoryOwnCukieHarness>): GameCukieResourcePort {
+  const finish = async (input: Parameters<NonNullable<GameCukieResourcePort['release']>>[0], consumeGame: boolean) => {
+    const assignment = await harness.service.finish({
+      sessionId: input.sessionId,
+      assignmentId: input.reservationId ?? undefined,
+      reservationIdempotencyKey: input.reservationIdempotencyKey,
+      idempotencyKey: input.idempotencyKey,
+      consumeGame,
+      reason: `game_economy_${consumeGame ? 'consumed' : 'released'}`,
+      now: input.now,
+    });
+    return {
+      outcome: consumeGame ? 'consumed' as const : 'released' as const,
+      reservation: buildGameOwnCukieAssignmentEvidence(assignment),
+    };
+  };
+  return {
+    reserve: async (input) => {
+      const assignment = await harness.service.reserve({
+        sessionId: input.sessionId,
+        walletAddress: input.walletNormalized,
+        selectionPolicy: 'owned_bsc_quota_then_pool_v1',
+        idempotencyKey: input.idempotencyKey,
+        requestHash: input.requestHash,
+        expiresAt: input.expiresAt,
+        now: new Date(input.expiresAt.getTime() - GAME_SESSION_TTL_MS),
+      });
+      if (!assignment) throw new Error('No existe un Cukie propio elegible.');
+      throw new Error('Respuesta de reserva Cukie propia perdida.');
+    },
+    consume: (input) => finish(input, true),
+    release: (input) => finish(input, false),
+  };
+}
+
+function recoveryPoolAsset(): NormalizedNftAsset {
+  return {
+    assetId: 'cukies:pool-recovery-1',
+    tokenId: '2',
+    network: 'bsc',
+    ownerWallet: WALLET,
+    ownerNormalized: WALLET.toLowerCase(),
+    rarity: 'common',
+    generation: 'original',
+    canonicalState: 'available',
+    blockers: [],
+    activeLocks: [],
+    sourceRefs: [],
+  };
+}
+
+function actualPoolCukiePort(harness: ReturnType<typeof createMemoryCukiePoolHarness>): GameCukieResourcePort {
+  const finish = async (input: Parameters<NonNullable<GameCukieResourcePort['release']>>[0], consumeGame: boolean) => {
+    const assignment = await harness.service.releaseCukiePoolAssignment({
+      sessionId: input.sessionId,
+      expectedRevision: 0,
+      consumeGame,
+      reason: `game_economy_${consumeGame ? 'consumed' : 'released'}`,
+      idempotencyKey: input.idempotencyKey,
+      now: input.now,
+    });
+    return {
+      outcome: consumeGame ? 'consumed' as const : 'released' as const,
+      reservation: buildGameCukieAssignmentEvidence(assignment),
+    };
+  };
+  return {
+    reserve: async (input) => {
+      const assignment = await harness.service.assignCukiePoolSession({
+        sessionId: input.sessionId,
+        expiresAt: input.expiresAt,
+        idempotencyKey: input.idempotencyKey,
+        now: new Date(input.expiresAt.getTime() - GAME_SESSION_TTL_MS),
+      });
+      if (!assignment) throw new Error('No existe una asignacion de pool elegible.');
+      throw new Error('Respuesta de reserva de pool perdida.');
+    },
+    consume: (input) => finish(input, true),
+    release: (input) => finish(input, false),
+  };
+}
+
+async function createRejectedSessionWithDurableCredit(
+  cukiePort?: GameCukieResourcePort,
+  createKey = 'treasure-durable-credit',
+  creditOptions: { slotWallet?: string; poolCreditsPerSlot?: number } = {},
+) {
+  const creditRule = testCompetitionCreditRule({
+    _id: `competition-credits:${CREDIT_RULE_VERSION}`,
+    version: CREDIT_RULE_VERSION,
+    costs: [{ costCode: CREDIT_COST_CODE, credits: 10, active: true }],
+  });
+  const creditSlot = recoveryCreditSlot(creditOptions.slotWallet ?? WALLET);
+  const creditRepository = new MemoryCompetitionCreditRepository({
+    rule: creditRule,
+    slots: [creditSlot],
+  });
+  const creditService = createCompetitionCreditService(
+    createMemoryCompetitionCreditRunner(creditRepository),
+  );
+  if (creditOptions.poolCreditsPerSlot !== undefined) {
+    await creditService.configurePool({
+      walletAddress: creditSlot.walletAddress,
+      slotId: creditSlot._id,
+      poolCreditsPerSlot: creditOptions.poolCreditsPerSlot,
+      idempotencyKey: `${createKey}:pool-config`,
+      now: new Date(CREDIT_CUTOFF.getTime() - 10 * 60_000),
+    });
+  }
+  await openRecoveryCreditRun(creditService);
+  const ports = createMemoryGameEconomyPorts();
+  ports.credits = recoveryCreditPort(creditService);
+  if (cukiePort) ports.cukies = cukiePort;
+  else ports.cukies.reserve = async () => {
+    throw new Error('Cukie reservation response lost');
+  };
+  const session = await createRejectedSessionWithPorts({
+    createKey,
+    gameRule: treasureRule({
+      costCode: CREDIT_COST_CODE,
+      creditRuleVersion: creditRule.version,
+      creditRuleConfigHash: creditRule.configHash,
+    }),
+    ports,
+  });
+  return { session, creditRepository, creditService };
+}
+
+function durableCreditDocuments(
+  session: GameEconomySession,
+  creditRepository: MemoryCompetitionCreditRepository,
+) {
+  const reservation = creditRepository.state.reservations.find(
+    (candidate) => candidate.sessionId === session.sessionId,
+  );
+  if (!reservation) throw new Error('No se creo la reserva durable de credito.');
+  const evidence = buildGameCreditReservationEvidence(
+    validateReservationIntegrity(reservation),
+  );
+  return {
+    game_economy_resource_bindings: [resourceBinding(
+      session,
+      'credit',
+      evidence.reservationId,
+      evidence.evidenceHash,
+    )],
+    competition_credit_reservations: creditRepository.state.reservations,
+    competition_credit_ledger: creditRepository.state.ledger,
+    competition_credit_lots: creditRepository.state.ownLots,
+    competition_credit_pool_lots: creditRepository.state.poolLots,
+  } satisfies Record<string, Doc[]>;
+}
+
+function actualOwnDocuments(
+  harness: ReturnType<typeof createMemoryOwnCukieHarness>,
+) {
+  return {
+    game_owned_cukie_assignments: [...harness.state.assignments.values()],
+    game_owned_cukie_epochs: [...harness.state.epochs.values()],
+    game_owned_cukie_events: [...harness.state.events.values()],
+    nft_asset_locks: [...harness.state.locks.values()],
+    nft_asset_lock_events: [...harness.state.lockEvents.values()],
+  } satisfies Record<string, Doc[]>;
+}
+
+function actualPoolDocuments(
+  harness: ReturnType<typeof createMemoryCukiePoolHarness>,
+) {
+  return {
+    cukie_pool_assignments: [...harness.state.assignments.values()],
+    cukie_pool_positions: [...harness.state.positions.values()],
+    cukie_pool_events: [...harness.state.events.values()],
+    nft_asset_locks: [...harness.state.locks.values()],
+    nft_asset_lock_events: [...harness.state.lockEvents.values()],
+  } satisfies Record<string, Doc[]>;
+}
+
+async function createRejectedSessionWithActualOwnCukie() {
+  const harness = createMemoryOwnCukieHarness();
+  const result = await createRejectedSessionWithDurableCredit(
+    actualOwnCukiePort(harness),
+    'treasure-durable-own-cukie',
+  );
+  return { ...result, harness };
+}
+
+async function assertActualCukieRecovery(source: 'own' | 'pool') {
+  if (source === 'own') {
+    const { session, creditRepository, harness } = await createRejectedSessionWithActualOwnCukie();
+    expect(session.cukie.reservationId).toBeTruthy();
+    const decision = await inspectTreasureHuntEconomyRecovery(
+      inspectInput(session, databaseFor(session, undefined, {
+        ...durableCreditDocuments(session, creditRepository),
+        game_economy_resource_bindings: [
+          resourceBinding(session, 'credit', session.credit.reservationId!, session.credit.evidenceHash!),
+          resourceBinding(session, 'cukie', session.cukie.reservationId!, session.cukie.evidenceHash!),
+        ],
+        ...actualOwnDocuments(harness),
+      })),
+    );
+    expect(decision.kind).toBe('restart');
+    expect([...harness.state.assignments.values()]).toEqual([
+      expect.objectContaining({ status: 'released', terminalReason: 'game_economy_released' }),
+    ]);
+    expect([...harness.state.events.values()]).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operation: 'assign' }),
+      expect.objectContaining({ operation: 'release' }),
+    ]));
+    return;
+  }
+
+  const { session, creditRepository, harness } = await createRejectedSessionWithActualPoolCukie();
+  expect(session.cukie.reservationId).toBeTruthy();
+  const decision = await inspectTreasureHuntEconomyRecovery(
+    inspectInput(session, databaseFor(session, undefined, {
+      ...durableCreditDocuments(session, creditRepository),
+      game_economy_resource_bindings: [
+        resourceBinding(session, 'credit', session.credit.reservationId!, session.credit.evidenceHash!),
+        resourceBinding(session, 'cukie', session.cukie.reservationId!, session.cukie.evidenceHash!),
+      ],
+      ...actualPoolDocuments(harness),
+    })),
+  );
+  expect(decision.kind).toBe('restart');
+  expect([...harness.state.assignments.values()]).toEqual([
+    expect.objectContaining({ status: 'released', releaseReason: 'game_economy_released' }),
+  ]);
+  expect([...harness.state.events.values()]).toEqual(expect.arrayContaining([
+    expect.objectContaining({ operation: 'assign' }),
+    expect.objectContaining({ operation: 'release' }),
+  ]));
+}
+
+async function createRejectedSessionWithActualPoolCukie() {
+  const harness = createMemoryCukiePoolHarness([recoveryPoolAsset()]);
+  await harness.service.depositCukiePoolPosition({
+    walletAddress: WALLET,
+    assetId: 'cukies:pool-recovery-1',
+    idempotencyKey: 'pool-deposit-recovery',
+    now: NOW,
+  });
+  const result = await createRejectedSessionWithDurableCredit(
+    actualPoolCukiePort(harness),
+    'treasure-durable-pool-cukie',
+  );
+  return { ...result, harness };
+}
+
+const recordedGameEvents = new Map<string, GameEconomyEvent[]>();
+
+function recordedEventsFor(session: GameEconomySession) {
+  return (recordedGameEvents.get(session.sessionId) ?? []).map((event) => clone(event));
+}
+
+function databaseFor(
+  session: GameEconomySession,
+  gameEvents = recordedEventsFor(session),
+  extras: Record<string, Doc[]> = {},
+) {
   return fakeDb({
     game_economy_sessions: [session as unknown as Doc],
     game_economy_events: gameEvents as unknown as Doc[],
@@ -444,6 +1025,212 @@ describe('Treasure Hunt economy recovery inspector', () => {
     });
   });
 
+  it.each([1, 2])('keeps recovery pending when %s orphan own epochs point at the session', async (epochCount) => {
+    const session = await createRejectedSession();
+    const first = ownReleaseDocuments(session).epoch;
+    const epochs = [
+      {
+        ...first,
+        assignmentSessionId: session.sessionId,
+        assignmentExpiresAt: session.expiresAt,
+      },
+    ];
+    if (epochCount === 2) {
+      epochs.push({
+        ...first,
+        _id: `${first._id}-orphan-2`,
+        epochId: `${first.epochId}-orphan-2`,
+        assetId: 'asset-orphan-2',
+        ownershipEventId: 'ownership-orphan-2',
+        assignmentSessionId: session.sessionId,
+        assignmentExpiresAt: session.expiresAt,
+      });
+    }
+    const db = databaseFor(session, undefined, {
+      game_owned_cukie_epochs: epochs,
+    });
+    const decision = await inspectTreasureHuntEconomyRecovery(inspectInput(session, db));
+    expect(decision).toEqual({ kind: 'pending', reason: 'underlying_compensation_unproven' });
+  });
+
+  it('authorizes first-resource compensation from a real credit reservation and ledger', async () => {
+    const { session, creditRepository } = await createRejectedSessionWithDurableCredit();
+    const reservation = creditRepository.state.reservations.find(
+      (candidate) => candidate.sessionId === session.sessionId,
+    );
+    expect(reservation).toMatchObject({ status: 'released', sessionId: session.sessionId });
+    const evidence = buildGameCreditReservationEvidence(
+      validateReservationIntegrity(reservation!),
+    );
+    const db = databaseFor(session, undefined, {
+      game_economy_resource_bindings: [resourceBinding(
+        session,
+        'credit',
+        evidence.reservationId,
+        evidence.evidenceHash,
+      )],
+      competition_credit_reservations: creditRepository.state.reservations,
+      competition_credit_ledger: creditRepository.state.ledger,
+      competition_credit_lots: creditRepository.state.ownLots,
+      competition_credit_pool_lots: creditRepository.state.poolLots,
+    });
+    const decision = await inspectTreasureHuntEconomyRecovery(inspectInput(session, db));
+    expect(decision.kind).toBe('restart');
+    expect(session.cukie.reservationId).toBeNull();
+  });
+
+  it('accepts a canonically compensated own Cukie reservation', async () => {
+    await assertActualCukieRecovery('own');
+  });
+
+  it('accepts a canonically compensated pool Cukie reservation', async () => {
+    await assertActualCukieRecovery('pool');
+  });
+
+  it('allows an active reservation from another player sharing the released pool lot', async () => {
+    const { session, creditRepository, creditService } = await createRejectedSessionWithDurableCredit(
+      undefined,
+      'treasure-shared-pool-credit',
+      { slotWallet: OTHER, poolCreditsPerSlot: 100 },
+    );
+    const creditRule = creditRepository.state.rules[0];
+    const other = await creditService.reserve({
+      walletAddress: OTHER,
+      sessionId: 'other-player-active-session',
+      costCode: CREDIT_COST_CODE,
+      expectedRuleVersion: CREDIT_RULE_VERSION,
+      expectedRuleConfigHash: creditRule.configHash,
+      idempotencyKey: 'other-player-active-credit',
+      expiresAtCap: new Date(NOW.getTime() + GAME_SESSION_TTL_MS),
+      now: NOW,
+    });
+    expect(other.status).toBe('active');
+    const target = creditRepository.state.reservations.find(
+      (candidate) => candidate.sessionId === session.sessionId,
+    )!;
+    expect(target.bucket).toBe('pool');
+    expect(other.allocations.map((allocation) => allocation.lotId)).toEqual(
+      expect.arrayContaining(target.allocations.map((allocation) => allocation.lotId)),
+    );
+    const creditDocuments = durableCreditDocuments(session, creditRepository);
+    const decision = await inspectTreasureHuntEconomyRecovery(
+      inspectInput(session, databaseFor(session, undefined, {
+        ...creditDocuments,
+        competition_credit_reservations: [
+          ...creditRepository.state.reservations,
+          other,
+        ],
+      })),
+    );
+    expect(decision.kind).toBe('restart');
+  });
+
+  it('blocks recovery when the player still has an active reservation on the released lot', async () => {
+    const { session, creditRepository } = await createRejectedSessionWithDurableCredit();
+    const target = creditRepository.state.reservations.find(
+      (candidate) => candidate.sessionId === session.sessionId,
+    )!;
+    const active = {
+      ...target,
+      status: 'active' as const,
+      revision: 0,
+      updatedAt: new Date(target.createdAt),
+    };
+    delete active.terminalAt;
+    delete active.terminalCommittedAt;
+    delete active.terminalIdempotencyKey;
+    delete active.terminalPayloadHash;
+    const creditDocuments = durableCreditDocuments(session, creditRepository);
+    const decision = await inspectTreasureHuntEconomyRecovery(
+      inspectInput(session, databaseFor(session, undefined, {
+        ...creditDocuments,
+        competition_credit_reservations: [
+          ...creditRepository.state.reservations,
+          active,
+        ],
+      })),
+    );
+    expect(decision).toEqual({ kind: 'pending', reason: 'underlying_compensation_unproven' });
+  });
+
+  it('keeps recovery pending when a durable terminal receipt is only partially present', async () => {
+    const creditScenario = await createRejectedSessionWithDurableCredit();
+    const creditDocuments = durableCreditDocuments(
+      creditScenario.session,
+      creditScenario.creditRepository,
+    );
+    const creditReservation = creditScenario.creditRepository.state.reservations.find(
+      (candidate) => candidate.sessionId === creditScenario.session.sessionId,
+    )!;
+    const partialCreditDecision = await inspectTreasureHuntEconomyRecovery(
+      inspectInput(creditScenario.session, databaseFor(creditScenario.session, undefined, {
+        ...creditDocuments,
+        competition_credit_ledger: creditScenario.creditRepository.state.ledger.filter(
+          (entry) => !(entry.reservationId === creditReservation.reservationId && entry.operation === 'release'),
+        ),
+      })),
+    );
+    expect(partialCreditDecision).toEqual({
+      kind: 'pending',
+      reason: 'underlying_compensation_unproven',
+    });
+
+    const ownScenario = await createRejectedSessionWithActualOwnCukie();
+    const ownDocuments = actualOwnDocuments(ownScenario.harness);
+    ownDocuments.game_owned_cukie_events = ownDocuments.game_owned_cukie_events.filter(
+      (event) => (event as OwnCukieEvent).operation !== 'release',
+    );
+    const partialOwnDecision = await inspectTreasureHuntEconomyRecovery(
+      inspectInput(ownScenario.session, databaseFor(ownScenario.session, undefined, {
+        ...durableCreditDocuments(ownScenario.session, ownScenario.creditRepository),
+        game_economy_resource_bindings: [
+          resourceBinding(
+            ownScenario.session,
+            'credit',
+            ownScenario.session.credit.reservationId!,
+            ownScenario.session.credit.evidenceHash!,
+          ),
+          resourceBinding(
+            ownScenario.session,
+            'cukie',
+            ownScenario.session.cukie.reservationId!,
+            ownScenario.session.cukie.evidenceHash!,
+          ),
+        ],
+        ...ownDocuments,
+      })),
+    );
+    expect(partialOwnDecision).toEqual({
+      kind: 'pending',
+      reason: 'underlying_compensation_unproven',
+    });
+  });
+
+  it('rejects recovery for a different wallet authority', async () => {
+    const session = await createRejectedSession();
+    const decision = await inspectTreasureHuntEconomyRecovery({
+      ...inspectInput(session),
+      walletNormalized: OTHER.toLowerCase(),
+    });
+    expect(decision).toEqual({ kind: 'pending', reason: 'session_authority_mismatch' });
+  });
+
+  it('keeps recovery pending when the session policy is stale', async () => {
+    const staleRule = treasureRule({}, { version: 'treasure-hunt-stale-policy' });
+    const session = await createRejectedSessionWithPorts({
+      createKey: 'treasure-stale-policy',
+      gameRule: staleRule,
+      expectedRuleVersion: staleRule.version,
+      ports: (() => {
+        const ports = createMemoryGameEconomyPorts();
+        ports.resources.fail('credit', 'reserve');
+        return ports;
+      })(),
+    });
+    const decision = await inspectTreasureHuntEconomyRecovery(inspectInput(session));
+    expect(decision).toEqual({ kind: 'pending', reason: 'session_not_pre_run_compensated' });
+  });
+
   it('propagates the real server opening path with the safe restart code', async () => {
     const authorityGameSessionId = 'parent-session-1';
     const runId = `treasure-run-${stableGameEconomyHash({
@@ -515,7 +1302,7 @@ describe('Treasure Hunt economy recovery inspector', () => {
         evidenceHash: evidence.evidenceHash,
       }),
     };
-    const db = databaseFor(session, canonicalEvents(session), {
+    const db = databaseFor(session, undefined, {
       game_economy_resource_bindings: [resourceBinding(
         session,
         'cukie',
@@ -546,7 +1333,7 @@ describe('Treasure Hunt economy recovery inspector', () => {
         evidenceHash: evidence.evidenceHash,
       }),
     };
-    const db = databaseFor(session, canonicalEvents(session), {
+    const db = databaseFor(session, undefined, {
       game_economy_resource_bindings: [resourceBinding(
         session,
         'cukie',
@@ -561,7 +1348,7 @@ describe('Treasure Hunt economy recovery inspector', () => {
     );
 
     const own = ownReleaseDocuments(session);
-    const duplicateDb = databaseFor(session, canonicalEvents(session), {
+    const duplicateDb = databaseFor(session, undefined, {
       game_economy_resource_bindings: [resourceBinding(
         session,
         'cukie',
@@ -583,14 +1370,14 @@ describe('Treasure Hunt economy recovery inspector', () => {
 
   it('fails closed when the immutable event chain is incomplete', async () => {
     const session = await createRejectedSession();
-    const events = canonicalEvents(session).slice(1);
+    const events = recordedEventsFor(session).slice(1);
     const decision = await inspectTreasureHuntEconomyRecovery(inspectInput(session, databaseFor(session, events)));
     expect(decision).toEqual({ kind: 'pending', reason: 'underlying_compensation_unproven' });
   });
 
   it('does not authorize a restart while an economy run already exists', async () => {
     const session = await createRejectedSession();
-    const db = databaseFor(session, canonicalEvents(session), {
+    const db = databaseFor(session, undefined, {
       treasure_hunt_economy_runs: [{
         authorityGameSessionId: 'parent-session-1',
         gameEconomySessionId: session.sessionId,
@@ -614,7 +1401,7 @@ describe('Treasure Hunt economy recovery inspector', () => {
         evidenceHash: evidence.evidenceHash,
       }),
     };
-    const db = databaseFor(session, canonicalEvents(session), {
+    const db = databaseFor(session, undefined, {
       game_economy_resource_bindings: [resourceBinding(
         session,
         'cukie',
@@ -633,7 +1420,7 @@ describe('Treasure Hunt economy recovery inspector', () => {
 
   it('fails closed when the canonical event payload has been altered', async () => {
     const session = await createRejectedSession();
-    const events = canonicalEvents(session);
+    const events = recordedEventsFor(session);
     events[events.length - 1] = { ...events[events.length - 1], payloadHash: '0'.repeat(64) };
     const decision = await inspectTreasureHuntEconomyRecovery(
       inspectInput(session, databaseFor(session, events)),

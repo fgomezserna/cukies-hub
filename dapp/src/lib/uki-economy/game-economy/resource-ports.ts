@@ -33,11 +33,13 @@ import type {
 } from "./ports";
 import { stableGameEconomyHash, validGameText } from "./rules";
 import {
+  buildGameCreditReservationEvidence,
   buildGameCukieAssignmentEvidence,
   buildGameOwnCukieAssignmentEvidence,
 } from "./resource-evidence";
 
 export {
+  buildGameCreditReservationEvidence,
   buildGameCukieAssignmentEvidence,
   buildGameOwnCukieAssignmentEvidence,
 } from "./resource-evidence";
@@ -265,25 +267,6 @@ async function completeTerminalBinding(binding: ResourceBinding | null, now: Dat
     );
     if (result.matchedCount !== 1) throw new StaleFenceError("CAS terminal perdido.");
   });
-}
-
-export function buildGameCreditReservationEvidence(
-  reservation: CreditReservation,
-): GameResourceReservationResult {
-  return {
-    reservationId: reservation.reservationId,
-    evidenceHash: stableGameEconomyHash({
-      kind: "game-credit-reservation-evidence",
-      reservationId: reservation.reservationId,
-      sessionId: reservation.sessionId,
-      walletNormalized: reservation.walletNormalized,
-      costCode: reservation.costCode,
-      amountCredits: reservation.amountCredits,
-      bucket: reservation.bucket,
-      expiresAt: reservation.expiresAt,
-      payloadHash: reservation.payloadHash,
-    }),
-  };
 }
 
 export type ServerSelectedCukieReservation =

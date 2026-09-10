@@ -128,6 +128,7 @@ type RecoverySnapshot = {
   gameEventsComplete: boolean;
   ownAssignments: OwnCukieAssignment[];
   ownAssignmentsComplete: boolean;
+  ownEpochs: OwnCukieEpoch[];
   ownEpoch: OwnCukieEpoch | null;
   ownEvents: OwnCukieEvent[];
   ownEventsComplete: boolean;
@@ -819,7 +820,7 @@ function assertUnattemptedCukie(
     resource.reservationResultHash !== null ||
     snapshot.cukieBinding !== null ||
     snapshot.ownAssignments.length !== 0 ||
-    snapshot.ownEpoch !== null ||
+    snapshot.ownEpochs.length !== 0 ||
     snapshot.ownEvents.length !== 0 ||
     snapshot.poolAssignments.length !== 0 ||
     snapshot.poolPositions.length !== 0 ||
@@ -831,13 +832,11 @@ function assertUnattemptedCukie(
     throw new DomainConflictError("La ausencia del recurso Cukie no es acreditable.");
   }
   // The reserve saga is strictly sequential (credit, then Cukie). A missing
-  // Cukie binding is safe to treat as never attempted only when the credit
-  // resource itself has no durable reservation and the immutable session event
-  // chain records credit compensation before the Cukie pending -> released
-  // transition. A missing binding after a successful credit reservation stays
-  // ambiguous and therefore fails closed.
+  // Cukie binding is safe to treat as never attempted when the immutable
+  // session event chain records credit compensation before the Cukie pending ->
+  // released transition. The credit binding and its terminal ledger are
+  // validated by assertReleasedCredit before this check.
   if (
-    session.credit.reservationId !== null ||
     !orderedGameEvents.some(
       (event, index) =>
         event.creditState === "released" &&
@@ -1322,6 +1321,7 @@ function assessRecovery(
       const source = resolveCukieSource(snapshot);
       if (source === "own") {
         if (
+          snapshot.ownEpochs.length !== 1 ||
           snapshot.poolAssignments.length !== 0 ||
           snapshot.poolPositions.length !== 0 ||
           snapshot.poolEvents.length !== 0 ||
@@ -1347,7 +1347,7 @@ function assessRecovery(
       } else {
         if (
           snapshot.ownAssignments.length !== 0 ||
-          snapshot.ownEpoch !== null ||
+          snapshot.ownEpochs.length !== 0 ||
           snapshot.ownEvents.length !== 0
         ) {
           throw new DomainConflictError("La fuente propia conserva efectos inesperados.");
@@ -1701,6 +1701,7 @@ async function readSnapshot(
     gameEventsComplete: gameEventsRead.complete,
     ownAssignments,
     ownAssignmentsComplete: ownAssignmentsRead.complete && ownEpochRead.complete,
+    ownEpochs: ownEpochRead.values,
     ownEpoch,
     ownEvents,
     ownEventsComplete: ownEventsRead.complete,

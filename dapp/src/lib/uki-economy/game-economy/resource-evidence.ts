@@ -1,5 +1,6 @@
 import type { GameResourceReservationResult } from './ports';
 import { stableGameEconomyHash } from './rules';
+import type { CreditReservation } from '../credits/types';
 import type { CukiePoolAssignment } from '../cukie-pool/types';
 import type { OwnCukieAssignment } from '../own-cukie/types';
 import { assertOwnCukieAssignmentIntegrity } from '../own-cukie/rules';
@@ -28,6 +29,25 @@ export function buildGameCukieAssignmentEvidence(
       assignedAt: assignment.assignedAt,
       expiresAt: assignment.expiresAt,
       requestHash: assignment.requestHash,
+    }),
+  };
+}
+
+export function buildGameCreditReservationEvidence(
+  reservation: CreditReservation,
+): GameResourceReservationResult {
+  return {
+    reservationId: reservation.reservationId,
+    evidenceHash: stableGameEconomyHash({
+      kind: 'game-credit-reservation-evidence',
+      reservationId: reservation.reservationId,
+      sessionId: reservation.sessionId,
+      walletNormalized: reservation.walletNormalized,
+      costCode: reservation.costCode,
+      amountCredits: reservation.amountCredits,
+      bucket: reservation.bucket,
+      expiresAt: reservation.expiresAt,
+      payloadHash: reservation.payloadHash,
     }),
   };
 }
