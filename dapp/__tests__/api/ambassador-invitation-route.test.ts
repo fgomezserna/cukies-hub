@@ -1,5 +1,6 @@
 import { getPublicAmbassadorInvitation } from '@/lib/uki-economy/ambassadors/public';
 import { DomainValidationError } from '@/lib/uki-economy/errors';
+import { AMBASSADOR_ELIGIBILITY_UNAVAILABLE } from '@/lib/uki-economy/ambassadors/rules';
 import { GET } from '@/app/api/economy/v1/ambassadors/invitations/[code]/route';
 
 jest.mock('@/lib/uki-economy/ambassadors/public', () => ({
@@ -77,5 +78,17 @@ describe('ambassador invitation API', () => {
       code: 'AMBASSADOR_RUNTIME_MISCONFIGURED',
     });
     expect(mockGetInvitation).not.toHaveBeenCalled();
+  });
+
+  it('conserva un estado recuperable de elegibilidad como 503 y no como enlace inválido', async () => {
+    mockGetInvitation.mockRejectedValueOnce(new TypeError(AMBASSADOR_ELIGIBILITY_UNAVAILABLE));
+
+    const response = await request('cw-123456789abc');
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      status: 'error',
+      code: AMBASSADOR_ELIGIBILITY_UNAVAILABLE,
+    });
   });
 });

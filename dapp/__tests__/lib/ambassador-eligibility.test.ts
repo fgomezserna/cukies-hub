@@ -158,6 +158,35 @@ describe("ambassador enrollment eligibility", () => {
     expect(data.ambassador_profiles).toEqual([profile]);
   });
 
+  it("trata la perdida confirmada de Cukie Master como enlace no elegible", async () => {
+    const profile = legacyProfile();
+    const { db, data } = fixture({ profiles: [profile], attributions: [confirmedAttribution()] });
+    mockGetAmbassadorEligibility.mockResolvedValue({
+      isCukieMaster: false,
+      reason: "CUKIE_MASTER_REQUIREMENT_NOT_MET",
+      sourceHash: EVIDENCE,
+      observedAt: NOW,
+    });
+
+    await expect(findMongoAmbassadorByInvitationCode(db, profile.invitationCode)).resolves.toBeNull();
+    await expect(getPublicAmbassadorInvitation(profile.invitationCode)).resolves.toBeNull();
+    expect(data.ambassador_profiles).toEqual([profile]);
+  });
+
+  it("mantiene un enlace pendiente cuando la elegibilidad es desconocida", async () => {
+    const profile = legacyProfile();
+    const { db } = fixture({ profiles: [profile], attributions: [confirmedAttribution()] });
+    mockGetAmbassadorEligibility.mockResolvedValue({
+      isCukieMaster: null,
+      reason: "CUKIE_MASTER_SOURCE_UNKNOWN",
+      sourceHash: null,
+      observedAt: NOW,
+    });
+
+    await expect(findMongoAmbassadorByInvitationCode(db, profile.invitationCode))
+      .rejects.toThrow("AMBASSADOR_ELIGIBILITY_UNAVAILABLE");
+  });
+
   it("rechaza el enlace antiguo tambien durante la aceptacion transaccional", async () => {
     const profile = legacyProfile(AMBASSADOR);
     const { collection, data } = fixture({ profiles: [profile] });
