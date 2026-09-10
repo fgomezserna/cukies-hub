@@ -710,7 +710,7 @@ describe('CukiePoolStatusPanel', () => {
     const view = render(<CukiePoolStatusPanel />);
     await openPoolTab('Aportar Cukies');
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
-    await waitFor(() => expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash }));
+    await waitFor(() => expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash, onReplaced: expect.any(Function) }));
 
     const otherWallet = '0x9999999999999999999999999999999999999999';
     accountState = { address: otherWallet, chainId: 97, isConnected: true };

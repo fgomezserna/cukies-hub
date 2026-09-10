@@ -1,13 +1,16 @@
 import { encodeAbiParameters, encodeEventTopics } from 'viem';
 
-import { cukiePoolNftVaultAbi } from '@/lib/contracts/uki-nft-vaults';
+import { cukieMasterNftVaultAbi, cukiePoolNftVaultAbi } from '@/lib/contracts/uki-nft-vaults';
 import {
   canonicalNftVaultAssetId,
   type NftVaultPendingOperation,
 } from './pending-operations';
 import {
   depositedEpochFromReceipt,
+  depositedEpochFromMasterReceipt,
+  inspectMasterDepositPosition,
   inspectPoolDepositPosition,
+  masterProjectionMatchesPendingOperation,
 } from './pending-reconciliation';
 
 const walletAddress = '0x1111111111111111111111111111111111111111';
@@ -65,6 +68,31 @@ function depositedReceipt(input: {
   };
 }
 
+function masterDepositedReceipt(input: {
+  collection?: string;
+  tokenId?: bigint;
+  beneficiary?: string;
+  depositEpoch?: bigint;
+} = {}) {
+  const topics = encodeEventTopics({
+    abi: cukieMasterNftVaultAbi,
+    eventName: 'Deposited',
+    args: {
+      collection: (input.collection ?? collectionAddress) as `0x${string}`,
+      tokenId: input.tokenId ?? BigInt(6),
+      beneficiary: (input.beneficiary ?? walletAddress) as `0x${string}`,
+    },
+  });
+  const data = encodeAbiParameters(
+    [{ type: 'uint256' }, { type: 'uint256' }],
+    [input.depositEpoch ?? BigInt(4), BigInt(100)],
+  );
+  return {
+    status: 'success',
+    logs: [{ address: vaultAddress, topics, data }],
+  };
+}
+
 describe('pending NFT vault reconciliation', () => {
   it('canonicaliza el assetId aunque el navegador conservara una etiqueta antigua', () => {
     expect(canonicalNftVaultAssetId({
@@ -86,6 +114,14 @@ describe('pending NFT vault reconciliation', () => {
     )).toBeNull();
   });
 
+  it('decodifica el evento Master con su ABI y no lo confunde con el Pool', () => {
+    expect(depositedEpochFromMasterReceipt(masterDepositedReceipt(), operation())).toBe('4');
+    expect(depositedEpochFromMasterReceipt(
+      masterDepositedReceipt({ beneficiary: '0x4444444444444444444444444444444444444444' }),
+      operation(),
+    )).toBeNull();
+  });
+
   it('acepta la posición on-chain del mismo epoch y rechaza una posición de epoch anterior', () => {
     const confirmed = {
       beneficialOwner: walletAddress,
@@ -100,5 +136,48 @@ describe('pending NFT vault reconciliation', () => {
       operation({ depositEpoch: '2' }),
       { ...confirmed, beneficialOwner: '0x0000000000000000000000000000000000000000' },
     )).toBeNull();
+  });
+
+  it('valida la posición Master por wallet y epoch aunque no tenga activationAt', () => {
+    const confirmed = {
+      beneficialOwner: walletAddress,
+      depositEpoch: BigInt(4),
+      depositedAt: BigInt(100),
+    };
+    expect(inspectMasterDepositPosition(operation({ depositEpoch: '4' }), confirmed)).toEqual({ depositEpoch: '4' });
+    expect(inspectMasterDepositPosition(operation({ depositEpoch: '3' }), confirmed)).toBeNull();
+    expect(inspectMasterDepositPosition(
+      operation({ depositEpoch: '4' }),
+      { ...confirmed, beneficialOwner: '0x0000000000000000000000000000000000000000' },
+    )).toBeNull();
+  });
+
+  it('solo acepta la proyección Master del wallet/vault/epoch exactos', () => {
+    const pending = operation({ depositEpoch: '4' });
+    const status = {
+      walletNormalized: walletAddress,
+      nftCustody: {
+        mode: 'custodial',
+        chainId: 97,
+        vaultAddress,
+        collectionAddresses: [collectionAddress],
+      },
+      nftInventory: [{
+        assetId: pending.assetId,
+        collectionAddress,
+        tokenId: pending.tokenId,
+        custody: 'cukie_master_nft_vault',
+        depositEpoch: '4',
+      }],
+    };
+    expect(masterProjectionMatchesPendingOperation(pending, status)).toBe(true);
+    expect(masterProjectionMatchesPendingOperation(pending, {
+      ...status,
+      walletNormalized: '0x4444444444444444444444444444444444444444',
+    })).toBe(false);
+    expect(masterProjectionMatchesPendingOperation(pending, {
+      ...status,
+      nftInventory: [{ ...status.nftInventory[0], depositEpoch: '3' }],
+    })).toBe(false);
   });
 });

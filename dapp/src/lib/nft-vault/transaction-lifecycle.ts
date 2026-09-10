@@ -6,6 +6,21 @@ export type NftTransactionContext = {
   vault: string;
 };
 
+export type NftTransactionReplacementReason = 'cancelled' | 'replaced' | 'repriced';
+
+export type NftTransactionReceipt = {
+  status: string;
+  transactionHash?: Hash;
+  logs?: unknown;
+};
+
+export type NftTransactionReplacement = {
+  reason: NftTransactionReplacementReason;
+  replacedHash: Hash;
+  replacementHash: Hash;
+  receipt: NftTransactionReceipt;
+};
+
 type NftTransactionContextInput = {
   wallet: string | null | undefined;
   chainId: number | null | undefined;
@@ -57,7 +72,15 @@ type NftTransactionGuard = {
 
 export type NftTransactionClient = {
   simulateContract?: (request: Record<string, unknown>) => Promise<unknown>;
-  waitForTransactionReceipt: (input: { hash: Hash }) => Promise<{ status: string }>;
+  waitForTransactionReceipt: (input: {
+    hash: Hash;
+    onReplaced?: (replacement: {
+      reason: NftTransactionReplacementReason;
+      replacedTransaction: { hash: Hash };
+      transaction: { hash: Hash };
+      transactionReceipt: NftTransactionReceipt;
+    }) => void;
+  }) => Promise<NftTransactionReceipt>;
 };
 
 export async function executeNftTransaction<TRequest extends Record<string, unknown>>({
@@ -72,6 +95,7 @@ export async function executeNftTransaction<TRequest extends Record<string, unkn
   onSubmitted,
   onReverted,
   onConfirmed,
+  onReplaced,
 }: {
   request: TRequest;
   client: NftTransactionClient;
@@ -84,6 +108,7 @@ export async function executeNftTransaction<TRequest extends Record<string, unkn
   onSubmitted: (hash: Hash, identityCurrent: boolean) => void;
   onReverted: (identityCurrent: boolean) => void;
   onConfirmed: (hash: Hash, identityCurrent: boolean) => void;
+  onReplaced?: (replacement: NftTransactionReplacement, identityCurrent: boolean) => void;
 }) {
   if (!guard.ready) {
     if (guard.reason === 'wrong_chain') await guard.switchToTarget();
@@ -106,13 +131,37 @@ export async function executeNftTransaction<TRequest extends Record<string, unkn
   }
   const hash = await write(requestWithAccount);
   onSubmitted(hash, nftTransactionContextMatches(expectedContext, currentContext()));
-  const receipt = await client.waitForTransactionReceipt({ hash });
+  let replacement: NftTransactionReplacement | null = null;
+  const receipt = await client.waitForTransactionReceipt({
+    hash,
+    onReplaced: (input) => {
+      replacement = {
+        reason: input.reason,
+        replacedHash: input.replacedTransaction.hash,
+        replacementHash: input.transaction.hash,
+        receipt: input.transactionReceipt,
+      };
+    },
+  });
   const identityCurrent = nftTransactionContextMatches(expectedContext, currentContext());
+  const replacementResult = replacement as NftTransactionReplacement | null;
+  const replacementReason = replacementResult?.reason;
+  const actualHash = receipt.transactionHash ?? replacementResult?.replacementHash ?? hash;
+  if (replacementReason) {
+    onReplaced?.(replacementResult, identityCurrent);
+    if (replacementReason !== 'repriced') {
+      onReverted(identityCurrent);
+      throw new Error(`${errorPrefix}_TRANSACTION_${replacementReason.toUpperCase()}`);
+    }
+  } else if (actualHash.toLowerCase() !== hash.toLowerCase()) {
+    onReverted(identityCurrent);
+    throw new Error(`${errorPrefix}_TRANSACTION_REPLACED`);
+  }
   if (receipt.status !== 'success') {
     onReverted(identityCurrent);
     throw new Error(`${errorPrefix}_TRANSACTION_REVERTED`);
   }
-  onConfirmed(hash, identityCurrent);
+  onConfirmed(actualHash, identityCurrent);
   if (!identityCurrent || !isReady()) throw new Error(`${errorPrefix}_CONTEXT_CHANGED_AFTER_RECEIPT`);
-  return hash;
+  return actualHash;
 }

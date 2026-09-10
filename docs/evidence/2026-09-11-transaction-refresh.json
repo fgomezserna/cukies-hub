@@ -1,0 +1,182 @@
+{
+  "status": "first-delivery-ready-for-validation",
+  "recordedAt": "2026-09-10T22:06:15.441450+00:00",
+  "scope": "Automatic UI convergence after confirmed transactions; staging only",
+  "baseCommit": "151c33bf02533963973358a2eb486cc9dc5b6087",
+  "servedBaseline": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
+  "reportedTransaction": {
+    "observedAt": "2026-09-10T21:53:35.217Z",
+    "chainId": 97,
+    "tx": "0xda2d9ce8d6a728c0ffc420f2c9c66c22381810dcff67b80b7c79c71968d9fb62",
+    "status": "0x1",
+    "block": 130260037,
+    "blockTimestamp": "2026-09-10T18:05:43.000Z",
+    "vault": "0x4482eba4d55a1df6aa102a8cc22a4fba252d7edb",
+    "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+    "tokenId": "98000002",
+    "event": {
+      "eventName": "Deposited",
+      "args": {
+        "collection": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+        "tokenId": "98000002",
+        "depositEpoch": "4",
+        "depositedAt": "1789063543",
+        "beneficiary": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      }
+    },
+    "current": [
+      {
+        "status": "fulfilled",
+        "value": [
+          "0x26789b9743d187174C3E3a87729730824a4D0C13",
+          "4",
+          "1789063543"
+        ]
+      },
+      {
+        "status": "fulfilled",
+        "value": "0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB"
+      },
+      {
+        "status": "fulfilled",
+        "value": "130290416"
+      }
+    ]
+  },
+  "indexerObservation": {
+    "observedAt": "2026-09-10T22:00:08.206Z",
+    "database": "cukieshub-new-staging",
+    "events": [
+      {
+        "attempts": 1,
+        "blockNumber": 130260037,
+        "chainId": 97,
+        "contractAddress": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+        "contractAlias": "TOKEN_V2",
+        "createdAt": "2026-09-10T18:06:22.511Z",
+        "eventName": "Transfer",
+        "status": "ignored",
+        "timestampMs": 1789063543000,
+        "updatedAt": "2026-09-10T18:06:40.972Z",
+        "projectedAt": "2026-09-10T18:06:40.972Z"
+      },
+      {
+        "attempts": 1,
+        "blockNumber": 130260037,
+        "chainId": 97,
+        "contractAddress": "0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB",
+        "contractAlias": "CUKIE_MASTER_NFT_VAULT",
+        "createdAt": "2026-09-10T18:06:37.203Z",
+        "eventName": "CukieMasterDeposited",
+        "status": "projected",
+        "timestampMs": 1789063543000,
+        "updatedAt": "2026-09-10T18:06:40.996Z",
+        "projectedAt": "2026-09-10T18:06:40.996Z"
+      }
+    ],
+    "positions": [
+      {
+        "chainId": 97,
+        "collectionAddressNormalized": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "tokenId": "98000002",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+        "vaultAddressNormalized": "0x4482eba4d55a1df6aa102a8cc22a4fba252d7edb",
+        "beneficiaryNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "depositEpoch": "1",
+        "depositedAt": "1786874260",
+        "lifecycleOpen": false,
+        "createdAt": "2026-08-16T09:58:24.812Z",
+        "updatedAt": "2026-08-16T13:51:05.900Z"
+      },
+      {
+        "chainId": 97,
+        "collectionAddressNormalized": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "tokenId": "98000002",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+        "vaultAddressNormalized": "0x4482eba4d55a1df6aa102a8cc22a4fba252d7edb",
+        "beneficiaryNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "depositEpoch": "2",
+        "depositedAt": "1786890554",
+        "lifecycleOpen": false,
+        "createdAt": "2026-08-16T14:30:08.911Z",
+        "updatedAt": "2026-09-09T07:45:17.358Z"
+      },
+      {
+        "chainId": 97,
+        "collectionAddressNormalized": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "tokenId": "98000002",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+        "vaultAddressNormalized": "0x4482eba4d55a1df6aa102a8cc22a4fba252d7edb",
+        "beneficiaryNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "depositEpoch": "3",
+        "depositedAt": "1788949948",
+        "lifecycleOpen": false,
+        "createdAt": "2026-09-09T10:33:01.112Z",
+        "updatedAt": "2026-09-09T10:36:15.580Z"
+      },
+      {
+        "chainId": 97,
+        "collectionAddressNormalized": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "tokenId": "98000002",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+        "vaultAddressNormalized": "0x4482eba4d55a1df6aa102a8cc22a4fba252d7edb",
+        "beneficiaryNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "depositEpoch": "4",
+        "depositedAt": "1789063543",
+        "lifecycleOpen": true,
+        "createdAt": "2026-09-10T18:06:40.985Z",
+        "updatedAt": "2026-09-10T18:06:40.985Z"
+      }
+    ]
+  },
+  "measuredProjectionLagSeconds": 57.996,
+  "browserObservation": {
+    "route": "/cukie-master",
+    "method": "fresh authenticated Edge page, Gestionar Cukies tab",
+    "reportedTokenAction": "Retirar inmediatamente de Cukie Master",
+    "pendingSpinnerVisible": false,
+    "limit": "Confirms current convergence after fresh mount; does not reproduce the historical delay in an already open tab."
+  },
+  "implementationAcceptance": [
+    "Confirmed per-asset chain state before slow inventory projection; no duplicate action or invented slots/credits",
+    "Wallet/network/contract/operation fencing for late asynchronous results",
+    "Automatic dependent-view refresh and bounded or backoff reconciliation",
+    "Preserve receipts and distinguish confirmation from delayed data",
+    "Retain existing runtime gates, transaction validation, tabs and sheets"
+  ],
+  "areas": {
+    "masterAndRuntime": "implemented and root-reviewed; 63 focal tests pass; full isolated validation and staging delivery pending",
+    "marketplaceAndClaims": "implementation in progress",
+    "poolRecovery": "bounded follow-up after first Master/runtime delivery",
+    "bridgeBreeding": "active legacy write paths identified; receipt and refresh follow-up pending"
+  },
+  "validation": {
+    "focal": {
+      "suites": 5,
+      "tests": 63,
+      "result": "passed",
+      "scope": "Master panel, pending operations and reconciliation, NFT lifecycle, AppRuntime provider",
+      "lint": "passed with existing Pool warning",
+      "typecheck": "passed",
+      "reportedBy": "implementation agent"
+    },
+    "full": "pending isolated first-delivery commit",
+    "public": "not deployed"
+  },
+  "transactionsSignedByAgent": false,
+  "dataMutations": false,
+  "firstDelivery": {
+    "scope": [
+      "Cukie Master NFT confirmation",
+      "shared resource refresh",
+      "NFT receipt replacement handling"
+    ],
+    "review": [
+      "Global refresh cannot hold all NFT controls after receipt",
+      "Exact asset/context/epoch proof and CAS before pending updates",
+      "Persistent storage is authoritative; memory fallback only on storage failure",
+      "Accelerated transaction uses actual hash; cancellation is not NFT success"
+    ],
+    "publicValidationLimit": "No new signed wallet transactions will be executed by the agent; deferred API/RPC states are verified in automated component tests."
+  }
+}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { usePathname } from 'next/navigation';
 import {
@@ -67,6 +67,41 @@ function RuntimeRefreshProbe() {
   const master = useAppRuntimeResource<{ value: string }>('master');
   const pool = useAppRuntimeResource<{ value: string }>('pool');
   return <><span data-testid="master-resource">{master.data?.value ?? master.state}</span><span data-testid="pool-resource">{pool.data?.value ?? pool.state}</span><button onClick={() => { void runtime.refreshAfterTransaction('pool'); void runtime.refreshAfterTransaction('master'); }}>refresh dependencies</button></>;
+}
+
+function SlowDependencyRefreshProbe() {
+  const runtime = useAppRuntime();
+  const master = useAppRuntimeResource<{ value: string }>('master');
+  const dashboard = useAppRuntimeResource<{ value: string }>('dashboard');
+  return <><span data-testid="slow-master">{master.data?.value ?? master.state}</span><span data-testid="slow-dashboard">{dashboard.data?.value ?? dashboard.state}</span><button onClick={() => void runtime.refreshAfterTransaction('master')}>refresh slow dependencies</button></>;
+}
+
+function InactiveCacheRefreshProbe() {
+  const runtime = useAppRuntime();
+  const queryClient = useQueryClient();
+  const [result, setResult] = React.useState('idle');
+  const cacheKey = React.useMemo(() => [
+    ...appRuntimeQueryKey('master', '0xaaa', 97),
+    appRuntimeEndpoint('master', '0xaaa'),
+    '',
+  ] as const, []);
+  return <><span data-testid="inactive-result">{result}</span><button onClick={async () => {
+    queryClient.setQueryData(cacheKey, { value: 'cached' });
+    await runtime.refreshAfterTransaction('master');
+    setResult(queryClient.getQueryState(cacheKey)?.isInvalidated ? 'invalidated' : 'not-invalidated');
+  }}>refresh inactive cache</button></>;
+}
+
+function AccountSummaryRefreshProbe() {
+  const runtime = useAppRuntime();
+  const requested = React.useRef(false);
+  const [done, setDone] = React.useState(false);
+  React.useEffect(() => {
+    if (requested.current) return;
+    requested.current = true;
+    runtime.requestAccountSummary();
+  }, [runtime]);
+  return <><span data-testid="account-refresh">{done ? 'done' : runtime.accountSummary.data?.uki?.balance ?? runtime.accountSummary.state}</span><button onClick={async () => { await runtime.refreshAfterTransaction('master'); setDone(true); }}>refresh account summary</button></>;
 }
 
 function ProjectionSyncProbe() {
@@ -441,6 +476,63 @@ describe('AppRuntimeProvider shared resource contract', () => {
     await waitFor(() => expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-pool'))).toHaveLength(1));
     expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('runtime-status'))).toHaveLength(1);
     expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-master'))).toHaveLength(1);
+  });
+
+  it('refresca Master aunque la consulta Dashboard posterior quede pendiente', async () => {
+    let masterCalls = 0;
+    let dashboardCalls = 0;
+    let resolveDashboard: ((value: Response) => void) | undefined;
+    mockFetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return response(runtimeStatus);
+      if (url.includes('cukie-master')) {
+        masterCalls += 1;
+        return response({ status: 'ok', data: { value: masterCalls === 1 ? 'old' : 'new' } });
+      }
+      if (url.includes('dashboard')) {
+        dashboardCalls += 1;
+        if (dashboardCalls === 1) return response({ status: 'ok', data: { value: 'dashboard-old' } });
+        return new Promise<Response>((resolve) => { resolveDashboard = resolve; });
+      }
+      return response({ status: 'ok', data: { value: 'other' } });
+    });
+    render(<Shell><SlowDependencyRefreshProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('slow-master')).toHaveTextContent('old'));
+    await waitFor(() => expect(screen.getByTestId('slow-dashboard')).toHaveTextContent('dashboard-old'));
+
+    fireEvent.click(screen.getByText('refresh slow dependencies'));
+    await waitFor(() => expect(masterCalls).toBe(2));
+    expect(screen.getByTestId('slow-master')).toHaveTextContent('new');
+    expect(dashboardCalls).toBe(2);
+    await act(async () => resolveDashboard?.(response({ status: 'ok', data: { value: 'dashboard-new' } })));
+  });
+
+  it('invalida una cache inactiva fuera de ruta sin iniciar lecturas ocultas', async () => {
+    configureWallet('0xaaa', '/');
+    mockFetch.mockResolvedValue(response(runtimeStatus));
+    render(<Shell><InactiveCacheRefreshProbe /></Shell>);
+
+    fireEvent.click(screen.getByText('refresh inactive cache'));
+    await waitFor(() => expect(screen.getByTestId('inactive-result')).toHaveTextContent('invalidated'));
+    expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-master'))).toHaveLength(0);
+  });
+
+  it('refresca account-summary activo aunque la ruta pública mantenga el menú montado', async () => {
+    configureWallet('0xaaa', '/');
+    let accountCalls = 0;
+    mockFetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/api/account/v1/summary')) {
+        accountCalls += 1;
+        return response({ status: 'ok', data: accountSummaryPayload('0xaaa', String(accountCalls)) });
+      }
+      return response(runtimeStatus);
+    });
+    render(<Shell><AccountSummaryRefreshProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('account-refresh')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByText('refresh account summary'));
+    await waitFor(() => expect(accountCalls).toBe(2));
+    expect(screen.getByTestId('account-refresh')).toHaveTextContent('done');
   });
 
   it('waits for a pre-transaction GET before issuing the post-transaction read', async () => {
