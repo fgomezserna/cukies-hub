@@ -1,0 +1,57 @@
+{
+  "recordedAt": "2026-09-10T12:36:04.332831+00:00",
+  "scope": "Restore an existing signed wallet session when EVM and TronLink hydrate in either order. No automatic signing.",
+  "candidate": "183672a5e668979a23a67b7d1f6228d89c45da3f",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/384",
+  "mergeCommit": "3da2ad9fdf5733bd8b21d85d37b9075528890100",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34476524018",
+  "workflowConclusion": "success",
+  "applicationId": 32,
+  "deploymentUuid": "psskkgwsc4k08ok4gokcwss8",
+  "finishedAt": "2026-09-10T12:32:36.535Z",
+  "health": {
+    "httpStatus": 200,
+    "body": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "staging",
+      "gitSha": "3da2ad9fdf5733bd8b21d85d37b9075528890100",
+      "gitRef": "staging",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "fqdn": null
+      }
+    }
+  },
+  "containers": {
+    "before": 92,
+    "after": 92,
+    "preservedIds": 91,
+    "replacedServices": [
+      "app32 dapp"
+    ]
+  },
+  "reusedImageCount": 7,
+  "validation": {
+    "lint": "pass",
+    "typecheck": "pass",
+    "build97": "pass",
+    "testSuites": 248,
+    "tests": 2024
+  },
+  "publicUi": {
+    "browser": "Edge",
+    "before": "Connect wallet prompt despite connected EVM and TronLink slots.",
+    "after": "Reload restored the signed account and ambassador screen; menu shows EVM/BSC and TRON/TronLink connected independently. Navigation to /cukies retains the account.",
+    "wallet": "0x2678…0c13",
+    "signatureRequested": false,
+    "relationshipChanged": false,
+    "confirmedSponsorPreserved": true
+  },
+  "limits": [
+    "Unknown or expired sessions still require an explicit user signature.",
+    "The account already has a confirmed sponsor; staging new-sponsor confirmation was not exercised.",
+    "No withdrawal, stake, sale, game or other on-chain transaction was signed."
+  ]
+}

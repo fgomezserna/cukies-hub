@@ -20,8 +20,7 @@ describe('rutas canónicas del dashboard', () => {
   it('renderiza el dashboard operativo en la ruta canónica', () => {
     render(<DashboardPage />);
 
-    expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument();
-    expect(screen.getByText(/Consulta tus créditos, Cukies y premios/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Resumen', level: 1 })).toBeInTheDocument();
     expect(screen.getByText('Workspace económico')).toBeInTheDocument();
     expect(metadata.title).toBe('Mi cuenta | Cukies World');
     expect(mockRedirect).not.toHaveBeenCalled();

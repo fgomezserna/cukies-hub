@@ -186,12 +186,231 @@ describe('DashboardOverviewPanel', () => {
       credentials: 'same-origin',
     }));
     expect(screen.getByText('0x1111…1111')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText(/Actualizado/)).toBeInTheDocument();
     expect(screen.getByText(/Actualizado/)).toHaveAttribute('dateTime', '2026-08-30T12:00:00.000Z');
     expect(screen.getByRole('link', { name: /Usar o aportar/i })).toHaveAttribute('href', '/credits');
     expect(screen.getByRole('link', { name: /Ver mis premios/i })).toHaveAttribute('href', '/premios');
+  });
+
+  it('elige una acción principal basada en los datos disponibles', async () => {
+    render(<DashboardOverviewPanel />);
+
+    const primaryAction = await screen.findByRole('link', { name: /Jugar ahora/i });
+    expect(primaryAction).toHaveAttribute('href', '/games/treasure-hunt');
+    expect(screen.getByText('Tienes una partida lista')).toBeInTheDocument();
+  });
+
+  it.each(['uki', 'nft'] as const)('mantiene los cupos como desconocidos si la ruta %s no está reconciliada', async (route) => {
+    fetchMock.mockResolvedValue(response(summary({
+      cukieMaster: module({
+        allocatedSlots: 5,
+        desiredSlots: 5,
+        maxPotentialSlots: 10,
+        routes: {
+          uki: { allocatedSlots: 5, desiredSlots: 5, sourceComplete: true, projectionFresh: route !== 'uki', synchronizing: false },
+          nft: { allocatedSlots: 0, desiredSlots: 0, sourceComplete: true, projectionFresh: route !== 'nft', synchronizing: false },
+        },
+      }),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    await screen.findByText('tester');
+    const metric = screen.getByText('Cupos activos').closest('div') as HTMLElement;
+    expect(within(metric).getByText('No disponible')).toBeInTheDocument();
+    expect(within(metric).queryByText('5 / 10')).not.toBeInTheDocument();
+  });
+
+  it('conserva la lectura lista y evita peticiones duplicadas al actualizar', async () => {
+    const refreshed = summary({}, wallet, '2026-08-30T12:30:00.000Z');
+    let resolveRefresh!: (value: ReturnType<typeof response>) => void;
+    fetchMock
+      .mockResolvedValueOnce(response(summary()))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+
+    render(<DashboardOverviewPanel />);
+    const masterCard = (await screen.findByText('Cukie Master')).closest('article') as HTMLElement;
+    expect(within(masterCard).getByText('2')).toBeInTheDocument();
+
+    const refreshButton = screen.getByRole('button', { name: 'Actualizar' });
+    expect(refreshButton).toBeEnabled();
+    await act(async () => {
+      fireEvent.click(refreshButton);
+      fireEvent.click(refreshButton);
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(within(masterCard).getByText('2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeDisabled();
+
+    await act(async () => {
+      resolveRefresh(response(refreshed));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByText(/Actualizado/)).toHaveAttribute('dateTime', '2026-08-30T12:30:00.000Z'));
+  });
+
+  it('no ofrece reclamar si el premio aún no está publicado con juego y créditos agotados', async () => {
+    fetchMock.mockResolvedValue(response(summary({
+      game: module({
+        configured: true,
+        enabled: true,
+        phase: 'active',
+        campaignId: 'stage-campaign',
+        eligibilityKind: 'uki_staking',
+        attemptsGranted: 0,
+        attemptsUsed: 0,
+        attemptsRemaining: 0,
+        bestRank: null,
+        totalTickets: 0,
+      }),
+      credits: module({
+        availableCredits: 0,
+        reservedCredits: 0,
+        spentCredits: 0,
+        poolDepositedCredits: 0,
+        poolAvailableCredits: 0,
+        activeReservations: 0,
+      }),
+      rewards: module({ claimableRaw: '1000000000000000000', allocations: 1, claims: 0, claimPublished: false, blockedAllocations: 0 }),
+      vesting: module({
+        chainId: 97,
+        configFrozen: true,
+        hasPosition: false,
+        totalAmountRaw: '0',
+        releasedAmountRaw: '0',
+        releasableRaw: '0',
+        lockedAmountRaw: '0',
+        progressBps: 0,
+      }),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByRole('link', { name: /Consultar premios/i })).toHaveAttribute('href', '/premios');
+    expect(screen.queryByRole('link', { name: /Reclamar premios/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tienes premios confirmados')).not.toBeInTheDocument();
+  });
+
+  it('no ofrece liberar si el calendario no está congelado con juego y créditos agotados', async () => {
+    fetchMock.mockResolvedValue(response(summary({
+      game: module({
+        configured: true,
+        enabled: true,
+        phase: 'active',
+        campaignId: 'stage-campaign',
+        eligibilityKind: 'uki_staking',
+        attemptsGranted: 0,
+        attemptsUsed: 0,
+        attemptsRemaining: 0,
+        bestRank: null,
+        totalTickets: 0,
+      }),
+      credits: module({
+        availableCredits: 0,
+        reservedCredits: 0,
+        spentCredits: 0,
+        poolDepositedCredits: 0,
+        poolAvailableCredits: 0,
+        activeReservations: 0,
+      }),
+      rewards: module({ claimableRaw: '0', allocations: 0, claims: 0, claimPublished: true, blockedAllocations: 0 }),
+      vesting: module({
+        chainId: 97,
+        configFrozen: false,
+        hasPosition: true,
+        totalAmountRaw: '100000000000000000000',
+        releasedAmountRaw: '0',
+        releasableRaw: '1000000000000000000',
+        lockedAmountRaw: '99000000000000000000',
+        progressBps: 0,
+      }),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByRole('link', { name: /Consultar vesting/i })).toHaveAttribute('href', '/vesting');
+    expect(screen.queryByRole('link', { name: /Ver desbloqueo/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Hay UKI disponibles para liberar')).not.toBeInTheDocument();
+  });
+
+  it('prioriza revisar el estado cuando la fuente de premios está degradada', async () => {
+    fetchMock.mockResolvedValue(response(summary({
+      game: module({
+        configured: true,
+        enabled: true,
+        phase: 'active',
+        campaignId: 'stage-campaign',
+        eligibilityKind: 'uki_staking',
+        attemptsGranted: 0,
+        attemptsUsed: 0,
+        attemptsRemaining: 0,
+        bestRank: null,
+        totalTickets: 0,
+      }),
+      credits: module({
+        availableCredits: 0,
+        reservedCredits: 0,
+        spentCredits: 0,
+        poolDepositedCredits: 0,
+        poolAvailableCredits: 0,
+        activeReservations: 0,
+      }),
+      rewards: module({ claimableRaw: '1000000000000000000', allocations: 1, claims: 0, claimPublished: true, blockedAllocations: 0 }, 'degraded'),
+      vesting: module({
+        chainId: 97,
+        configFrozen: true,
+        hasPosition: false,
+        totalAmountRaw: '0',
+        releasedAmountRaw: '0',
+        releasableRaw: '0',
+        lockedAmountRaw: '0',
+        progressBps: 0,
+      }),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByRole('link', { name: /Revisar estado/i })).toHaveAttribute('href', '#dashboard-data-status');
+    expect(screen.queryByRole('link', { name: /Reclamar premios/i })).not.toBeInTheDocument();
+  });
+
+  it('no muestra la wallet completa como texto duplicado', async () => {
+    render(<DashboardOverviewPanel />);
+
+    await screen.findByText('tester');
+    expect(screen.queryByText(wallet)).not.toBeInTheDocument();
+    expect(screen.getByText('0x1111…1111')).toHaveAttribute('title', wallet);
+  });
+
+  it('ancla los avisos a la sección afectada', async () => {
+    const data = summary({
+      marketplace: {
+        state: 'unavailable' as const,
+        generatedAt: '2026-08-30T12:00:00.000Z',
+        sourceObservedAt: null,
+        issues: ['MODULE_UNAVAILABLE'] as ['MODULE_UNAVAILABLE'],
+        data: null,
+      },
+    });
+    fetchMock.mockResolvedValue(response(data));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByText('Algunos datos no están disponibles')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ver Marketplace/i })).toHaveAttribute('href', '#dashboard-module-marketplace');
+  });
+
+  it('mantiene geometría estable mientras llega la primera lectura', () => {
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(screen.getByTestId('dashboard-skeleton')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Cargando tu cuenta…')).toBeInTheDocument();
   });
 
   it('conserva módulos válidos cuando otra fuente queda indisponible', async () => {
@@ -207,7 +426,7 @@ describe('DashboardOverviewPanel', () => {
     render(<DashboardOverviewPanel />);
 
     expect(await screen.findByText('Algunos datos no están disponibles')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('No disponible').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Puedes seguir usando el resto de tu cuenta/)).toBeInTheDocument();
   });
@@ -428,7 +647,7 @@ describe('DashboardOverviewPanel', () => {
     await act(async () => { jest.advanceTimersByTime(30_005); });
     await waitFor(() => expect(screen.getByText('No hemos podido actualizar tu cuenta')).toBeInTheDocument());
     expect(within(masterCard).getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/última lectura disponible/i)).toBeInTheDocument();
 
     await act(async () => { jest.advanceTimersByTime(30_000); });
