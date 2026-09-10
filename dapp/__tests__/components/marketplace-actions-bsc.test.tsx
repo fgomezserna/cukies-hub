@@ -119,7 +119,17 @@ describe('MarketplaceActions · compra BSC', () => {
     currentChainId = 1;
     currentAddress = buyer;
     jest.clearAllMocks();
-    (globalThis.fetch as jest.Mock) = jest.fn(async () => ({ ok: true }));
+    (globalThis.fetch as jest.Mock) = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        status: 'ok',
+        data: {
+          item: { ...cuki, owner: buyer, state: 'available' },
+          changed: true,
+          paused: false,
+        },
+      }),
+    }));
   });
 
   it('cambia a BNB Smart Chain antes de enviar una única compra', async () => {

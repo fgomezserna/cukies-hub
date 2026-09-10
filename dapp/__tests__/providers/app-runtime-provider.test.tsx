@@ -535,6 +535,34 @@ describe('AppRuntimeProvider shared resource contract', () => {
     expect(screen.getByTestId('account-refresh')).toHaveTextContent('done');
   });
 
+  it('refresca el account-summary al recibir eventos de cobros y marketplace', async () => {
+    configureWallet('0xaaa', '/');
+    let accountCalls = 0;
+    mockFetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/api/account/v1/summary')) {
+        accountCalls += 1;
+        return response({ status: 'ok', data: accountSummaryPayload('0xaaa', String(accountCalls)) });
+      }
+      return response(runtimeStatus);
+    });
+    render(<Shell><AccountSummaryRefreshProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('account-refresh')).toHaveTextContent('1'));
+
+    let expectedCalls = 1;
+    for (const eventName of [
+      'cukies:legacy-marketplace:refresh',
+      'cukies:uki-marketplace:refresh',
+      'cukies:rewards:refresh',
+      'cukies:vesting:refresh',
+    ]) {
+      expectedCalls += 1;
+      act(() => window.dispatchEvent(new Event(eventName)));
+      await waitFor(() => expect(accountCalls).toBe(expectedCalls));
+    }
+    expect(accountCalls).toBe(5);
+  });
+
   it('waits for a pre-transaction GET before issuing the post-transaction read', async () => {
     let resolveOld: ((value: Response) => void) | undefined;
     let masterCalls = 0;

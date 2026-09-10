@@ -801,6 +801,24 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener('cukies:cukie-master:refresh', refreshMaster);
   }, [refreshAfterTransaction]);
 
+  useEffect(() => {
+    const refreshAccountSummary = () => {
+      // Transaction receipts stay authoritative in their caller. This is a
+      // background cache refresh for the mounted account-summary only.
+      void refreshAfterTransaction('account-summary');
+    };
+    const events = [
+      'cukies:legacy-marketplace:refresh',
+      'cukies:uki-marketplace:refresh',
+      'cukies:rewards:refresh',
+      'cukies:vesting:refresh',
+    ] as const;
+    events.forEach((event) => window.addEventListener(event, refreshAccountSummary));
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, refreshAccountSummary));
+    };
+  }, [refreshAfterTransaction]);
+
   const value = useMemo<RuntimeContextValue>(() => ({
     address,
     walletType,

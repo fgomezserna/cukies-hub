@@ -30,7 +30,6 @@ import {
   captureTronActionContext,
   isSameEvmWallet,
   isSameTronWallet,
-  reconcileConfirmedMarketplaceAction,
   type LegacyTronActionContext,
 } from '@/lib/legacy-marketplace/action-safety';
 import { getLegacyMarketplaceCollection } from '@/lib/legacy-marketplace/identity';
@@ -42,6 +41,13 @@ import {
 } from '@/lib/legacy-marketplace/tron';
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
 import type { MyCukieCollectionItem } from '@/lib/cukies-data/my-collection-types';
+import {
+  isTransactionRefreshAborted,
+  retryTransactionRefresh,
+  TransactionReplacementError,
+  TransactionReplacementPendingError,
+  waitForConfirmedEvmTransaction,
+} from '@/lib/transaction-refresh';
 
 import { formatLegacyPrice, shortWallet } from './format';
 
@@ -95,6 +101,8 @@ function getErrorMessage(error: unknown) {
   if (message.includes('insufficient funds') || message.includes('insufficient balance')) return 'La wallet no tiene saldo suficiente para las comisiones de red.';
   if (message.includes('transaction_id_unavailable')) return 'La wallet no devolvió el identificador de la transacción. Actualiza la ficha antes de volver a intentarlo.';
   if (message.includes('transaction_pending')) return 'La wallet recibió la operación, pero aún no se ha podido verificar la confirmación. No la repitas; actualiza la ficha en unos instantes.';
+  if (message.includes('transaction_cancelled')) return 'La transacción fue cancelada en la wallet. No se ha completado esta operación.';
+  if (message.includes('transaction_replaced')) return 'La transacción fue reemplazada por otra operación. No se ha completado esta acción.';
   if (message.includes('transaction_reverted') || message.includes('execution reverted') || message.includes('contractret') && message.includes('revert')) return 'El contrato rechazó la operación. Actualiza la ficha y vuelve a intentarlo.';
   return 'La operación no se pudo completar. Vuelve a validar la red, el saldo y el estado del anuncio.';
 }
@@ -217,12 +225,28 @@ function isTronRevertedError(error: unknown) {
     || message.includes('out_of_time');
 }
 
+function isBscRevertedError(error: unknown) {
+  const message = transactionMessage(error);
+  return message.includes('transaction_reverted')
+    || message.includes('execution reverted')
+    || message.includes('reverted');
+}
+
 type ActionLabel = 'Compra' | 'Operación';
+type LegacyActionKind = 'buy' | 'cancel' | 'change';
 
 type PendingTronAction = {
   hash: string;
   context: LegacyTronActionContext;
   actionLabel: ActionLabel;
+  actionKind: LegacyActionKind;
+};
+
+type PendingBscAction = {
+  hash: `0x${string}`;
+  wallet: string;
+  actionLabel: ActionLabel;
+  actionKind: LegacyActionKind;
 };
 
 export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
@@ -262,9 +286,21 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   const [isPreparingBuy, setIsPreparingBuy] = useState(false);
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
   const actionLockRef = useRef(false);
+  const mountedRef = useRef(true);
+  const refreshAbortRef = useRef<AbortController | null>(null);
+  const pendingBscActionRef = useRef<PendingBscAction | null>(null);
+  const [pendingBscAction, setPendingBscAction] = useState<PendingBscAction | null>(null);
   const pendingTronActionRef = useRef<PendingTronAction | null>(null);
   const [pendingTronAction, setPendingTronAction] = useState<PendingTronAction | null>(null);
   const hasMounted = useHasMounted();
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshAbortRef.current?.abort();
+    };
+  }, []);
 
   const tokenId = useMemo(() => BigInt(cuki.tokenId), [cuki.tokenId]);
   const isBsc = cuki.network === 'BSC';
@@ -414,7 +450,43 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         collection,
       }),
     });
-    if (!response.ok) throw new Error('LEGACY_RECONCILIATION_UNAVAILABLE');
+    if (!response.ok || typeof response.json !== 'function') {
+      throw new Error('LEGACY_RECONCILIATION_UNAVAILABLE');
+    }
+    const payload = await response.json() as {
+      status?: string;
+      data?: {
+        item?: LegacyMarketplaceCukiItem;
+        changed?: boolean;
+        paused?: boolean;
+      };
+    };
+    if (payload.status !== 'ok' || !payload.data?.item) {
+      throw new Error('LEGACY_RECONCILIATION_UNAVAILABLE');
+    }
+    return {
+      item: payload.data.item,
+      changed: payload.data.changed === true,
+      paused: payload.data.paused === true,
+    };
+  }
+
+  function reconciliationMatches(
+    result: Awaited<ReturnType<typeof reconcileListing>>,
+    actionKind: LegacyActionKind,
+    walletAddress: string,
+  ) {
+    const item = result.item;
+    const ownerMatches = cuki.network === 'TRON'
+      ? item.owner === walletAddress
+      : isSameEvmWallet(item.owner, walletAddress);
+    if (actionKind === 'buy') {
+      return ownerMatches && item.state !== 'onSale';
+    }
+    if (actionKind === 'cancel') {
+      return item.state !== 'onSale';
+    }
+    return result.changed && item.state === 'onSale' && ownerMatches;
   }
 
   async function inspectBsc(walletAddress: string) {
@@ -465,38 +537,95 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     label: string,
     request: (walletAddress: string) => Promise<`0x${string}`>,
     actionLabel: ActionLabel = 'Operación',
+    actionKind: LegacyActionKind = 'change',
   ) {
-    if (actionLockRef.current || !isBsc || !publicClient) return;
+    if (actionLockRef.current || pendingBscActionRef.current || !isBsc || !publicClient) return;
     actionLockRef.current = true;
     setIsBscPending(true);
     setStatus(label);
+    refreshAbortRef.current?.abort();
+    const refreshController = new AbortController();
+    refreshAbortRef.current = refreshController;
+    let receiptConfirmed = false;
+    let backgroundRefresh = false;
     try {
       const walletAddress = await ensureBsc();
       if (!walletAddress) return;
       const hash = await request(walletAddress);
+      const pending = { hash, wallet: walletAddress, actionLabel, actionKind } satisfies PendingBscAction;
+      pendingBscActionRef.current = pending;
+      if (mountedRef.current) setPendingBscAction(pending);
       setStatus('Transacción enviada. Esperando confirmación en BNB Smart Chain…');
-      const confirmation = await reconcileConfirmedMarketplaceAction(
-        async () => {
-          const receipt = await publicClient.waitForTransactionReceipt({ hash });
-          if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
-          return receipt;
-        },
-        reconcileListing,
-      );
-      if (confirmation.reconciled) {
-        setStatus(`${actionLabel} confirmada en BNB Smart Chain. Tu colección ya está actualizada.`);
-      } else {
-        setStatus(`${actionLabel} confirmada en BNB Smart Chain. Actualizando tu colección… No repitas la transacción.`);
+      let receipt;
+      let confirmedHash = hash;
+      try {
+        const confirmed = await waitForConfirmedEvmTransaction(publicClient, hash);
+        receipt = confirmed.receipt;
+        confirmedHash = confirmed.hash;
+      } catch (reason) {
+        if (reason instanceof TransactionReplacementPendingError) {
+          const updated = { ...pending, hash: reason.hash };
+          pendingBscActionRef.current = updated;
+          if (mountedRef.current) setPendingBscAction(updated);
+          throw reason;
+        }
+        if (reason instanceof TransactionReplacementError) throw reason;
+        const pendingError = new Error('TRANSACTION_PENDING');
+        pendingError.cause = reason;
+        throw pendingError;
       }
+      if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+      receiptConfirmed = true;
+      assertCurrentBscContext(walletAddress);
+      pendingBscActionRef.current = null;
+      if (mountedRef.current) setPendingBscAction(null);
+      if (mountedRef.current) setIsBscPending(false);
+      setStatus(`${actionLabel} confirmada en BNB Smart Chain. Actualizando tu colección… No repitas la transacción.`);
+      window.dispatchEvent(new CustomEvent('cukies:legacy-marketplace:refresh', { detail: { hash: confirmedHash } }));
       router.refresh();
+      backgroundRefresh = true;
+      void retryTransactionRefresh(
+        async () => {
+          assertCurrentBscContext(walletAddress);
+          try {
+            const result = await reconcileListing();
+            return reconciliationMatches(result, actionKind, walletAddress);
+          } catch {
+            return false;
+          }
+        },
+      { signal: refreshController.signal },
+      ).then((reconciled) => {
+        if (!mountedRef.current) return;
+        setStatus(reconciled
+          ? `${actionLabel} confirmada en BNB Smart Chain. Tu colección ya está actualizada.`
+          : `${actionLabel} confirmada en BNB Smart Chain. La colección se actualizará cuando el servicio esté disponible.`);
+      }).catch((reason) => {
+        if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
+      }).finally(() => {
+        if (refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
+      });
     } catch (error) {
-      setStatus(getErrorMessage(error));
+      if (!mountedRef.current || isTransactionRefreshAborted(error)) return;
+      if (error instanceof TransactionReplacementError) {
+        pendingBscActionRef.current = null;
+        setPendingBscAction(null);
+      } else if (isBscRevertedError(error)) {
+        pendingBscActionRef.current = null;
+        setPendingBscAction(null);
+      }
+      if (receiptConfirmed && transactionMessage(error).includes('wallet_context_changed')) {
+        setStatus('La operación ya fue confirmada en BNB Smart Chain, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para actualizarla.');
+      } else {
+        setStatus(getErrorMessage(error));
+      }
       if (error instanceof Error && error.message.includes('LISTING_PRICE_CHANGED')) {
         router.refresh();
       }
     } finally {
+      if (!backgroundRefresh && refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
       actionLockRef.current = false;
-      setIsBscPending(false);
+      if (mountedRef.current) setIsBscPending(false);
     }
   }
 
@@ -518,7 +647,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         args: [tokenId],
         value: live.price,
       });
-    }, 'Compra');
+    }, 'Compra', 'buy');
   }
 
   async function cancelBscSale() {
@@ -537,7 +666,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         args: [tokenId],
         value: live.feeCancelPrice,
       });
-    });
+    }, 'Operación', 'cancel');
   }
 
   async function changeBscPrice() {
@@ -556,7 +685,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         args: [tokenId, parsedBscPrice()],
         value: live.feeChangePrice,
       });
-    });
+    }, 'Operación', 'change');
   }
 
   async function ensureTron() {
@@ -610,46 +739,143 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     }
   }
 
+  async function recheckPendingBscAction() {
+    const pending = pendingBscActionRef.current;
+    if (!pending || actionLockRef.current || !publicClient) return;
+    actionLockRef.current = true;
+    setIsBscPending(true);
+    setStatus('Comprobando la transacción pendiente en BNB Smart Chain…');
+    const refreshController = new AbortController();
+    refreshAbortRef.current = refreshController;
+    let receiptConfirmed = false;
+    let backgroundRefresh = false;
+    try {
+      assertCurrentBscContext(pending.wallet);
+      const confirmed = await waitForConfirmedEvmTransaction(publicClient, pending.hash);
+      const receipt = confirmed.receipt;
+      if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+      receiptConfirmed = true;
+      pending.hash = confirmed.hash;
+      assertCurrentBscContext(pending.wallet);
+      pendingBscActionRef.current = null;
+      setPendingBscAction(null);
+      setIsBscPending(false);
+      setStatus(`${pending.actionLabel} confirmada en BNB Smart Chain. Actualizando tu colección… No repitas la transacción.`);
+      window.dispatchEvent(new CustomEvent('cukies:legacy-marketplace:refresh', { detail: { hash: confirmed.hash } }));
+      router.refresh();
+      backgroundRefresh = true;
+      void retryTransactionRefresh(
+        async () => {
+          assertCurrentBscContext(pending.wallet);
+          try {
+            const result = await reconcileListing();
+            return reconciliationMatches(result, pending.actionKind, pending.wallet);
+          } catch {
+            return false;
+          }
+        },
+        { signal: refreshController.signal },
+      ).then((reconciled) => {
+        if (!mountedRef.current) return;
+        setStatus(reconciled
+          ? `${pending.actionLabel} confirmada en BNB Smart Chain. Tu colección ya está actualizada.`
+          : `${pending.actionLabel} confirmada en BNB Smart Chain. La colección se actualizará cuando el servicio esté disponible.`);
+      }).catch((reason) => {
+        if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
+      }).finally(() => {
+        if (refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
+      });
+    } catch (error) {
+      if (!mountedRef.current || isTransactionRefreshAborted(error)) return;
+      if (error instanceof TransactionReplacementPendingError) {
+        pending.hash = error.hash;
+        pendingBscActionRef.current = pending;
+        setPendingBscAction(pending);
+      } else if (error instanceof TransactionReplacementError || isBscRevertedError(error)) {
+        pendingBscActionRef.current = null;
+        setPendingBscAction(null);
+      }
+      setStatus(receiptConfirmed
+        ? transactionMessage(error).includes('wallet_context_changed')
+          ? 'La operación ya fue confirmada en BNB Smart Chain, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para actualizarla.'
+          : `${pending.actionLabel} confirmada en BNB Smart Chain. La colección se actualizará cuando el servicio esté disponible.`
+        : getErrorMessage(error));
+    } finally {
+      if (!backgroundRefresh && refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
+      actionLockRef.current = false;
+      if (mountedRef.current) setIsBscPending(false);
+    }
+  }
+
   async function recheckPendingTronAction() {
     const pending = pendingTronActionRef.current;
     if (!pending || actionLockRef.current) return;
     actionLockRef.current = true;
     setIsTronPending(true);
     setStatus('Comprobando la transacción pendiente en TRON Mainnet…');
+    refreshAbortRef.current?.abort();
+    const refreshController = new AbortController();
+    refreshAbortRef.current = refreshController;
+    let receiptConfirmed = false;
+    let backgroundRefresh = false;
     try {
       const tronWeb = getLegacyTronWeb();
       if (!tronWeb) throw new Error('TRON_NOT_READY');
       assertTronActionContext(tronWeb, pending.context);
       await waitForTronReceipt(pending.hash);
+      receiptConfirmed = true;
       const currentTronWeb = getLegacyTronWeb();
       if (!currentTronWeb) throw new Error('TRON_NOT_READY');
       assertTronActionContext(currentTronWeb, pending.context);
-      let reconciled = false;
-      try {
-        await reconcileListing();
-        reconciled = true;
-      } catch {
-        // The receipt is already confirmed; indexer reconciliation may catch up later.
-      }
       pendingTronActionRef.current = null;
-      setPendingTronAction(null);
-      setStatus(reconciled
-        ? `${pending.actionLabel} confirmada en TRON Mainnet. Tu colección ya está actualizada.`
-        : `${pending.actionLabel} confirmada en TRON Mainnet. Actualizando tu colección… No repitas la transacción.`);
+      if (mountedRef.current) setPendingTronAction(null);
+      setIsTronPending(false);
+      setStatus(`${pending.actionLabel} confirmada en TRON Mainnet. Actualizando tu colección… No repitas la transacción.`);
+      window.dispatchEvent(new CustomEvent('cukies:legacy-marketplace:refresh', { detail: { hash: pending.hash } }));
       router.refresh();
+      backgroundRefresh = true;
+      void retryTransactionRefresh(
+        async () => {
+          const current = getLegacyTronWeb();
+          if (!current) throw new Error('TRON_NOT_READY');
+          assertTronActionContext(current, pending.context);
+          try {
+            const result = await reconcileListing();
+            return reconciliationMatches(result, pending.actionKind, pending.context.address);
+          } catch {
+            return false;
+          }
+        },
+        { signal: refreshController.signal },
+      ).then((reconciled) => {
+        if (!mountedRef.current) return;
+        setStatus(reconciled
+          ? `${pending.actionLabel} confirmada en TRON Mainnet. Tu colección ya está actualizada.`
+          : `${pending.actionLabel} confirmada en TRON Mainnet. La colección se actualizará cuando el servicio esté disponible.`);
+      }).catch((reason) => {
+        if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
+      }).finally(() => {
+        if (refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
+      });
     } catch (error) {
+      if (!mountedRef.current || isTransactionRefreshAborted(error)) return;
       if (isTronRevertedError(error)) {
         pendingTronActionRef.current = null;
         setPendingTronAction(null);
       }
-      setStatus(isTronPendingError(error)
-        ? 'La transacción sigue pendiente. Puedes comprobarla de nuevo sin firmar otra vez.'
-        : transactionMessage(error).includes('wallet_context_changed')
-          ? 'La transacción ya fue enviada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para comprobarla.'
-          : getErrorMessage(error));
+      setStatus(receiptConfirmed
+        ? transactionMessage(error).includes('wallet_context_changed')
+          ? 'La operación ya fue confirmada en TRON Mainnet, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para actualizarla.'
+          : `${pending.actionLabel} confirmada en TRON Mainnet. La colección se actualizará cuando el servicio esté disponible.`
+        : isTronPendingError(error)
+          ? 'La transacción sigue pendiente. Puedes comprobarla de nuevo sin firmar otra vez.'
+          : transactionMessage(error).includes('wallet_context_changed')
+            ? 'La transacción ya fue enviada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para comprobarla.'
+            : getErrorMessage(error));
     } finally {
+      if (!backgroundRefresh && refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
       actionLockRef.current = false;
-      setIsTronPending(false);
+      if (mountedRef.current) setIsTronPending(false);
     }
   }
 
@@ -658,40 +884,65 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     label: string,
     actionLabel: ActionLabel = 'Operación',
     actionContext: LegacyTronActionContext,
+    actionKind: LegacyActionKind,
   ) {
     if (actionLockRef.current || pendingTronActionRef.current) return;
     actionLockRef.current = true;
     setIsTronPending(true);
     setStatus(label);
+    refreshAbortRef.current?.abort();
+    const refreshController = new AbortController();
+    refreshAbortRef.current = refreshController;
+    let backgroundRefresh = false;
     try {
-      const confirmation = await reconcileConfirmedMarketplaceAction(
-        async () => {
-          const result = await action();
-          assertTronSendResult(result);
-          // `shouldPollResponse:false` returns the broadcast txid before any receipt polling.
-          const txId = tronTransactionId(result);
-          if (!txId) throw new Error('TRANSACTION_ID_UNAVAILABLE');
-          const pending = { hash: txId, context: actionContext, actionLabel };
-          pendingTronActionRef.current = pending;
-          setPendingTronAction(pending);
-          setStatus('Transacción enviada. Esperando confirmación en TRON Mainnet…');
-          await waitForTronReceipt(txId);
-          const currentTronWeb = getLegacyTronWeb();
-          if (!currentTronWeb) throw new Error('TRON_NOT_READY');
-          assertTronActionContext(currentTronWeb, actionContext);
-          return result;
-        },
-        reconcileListing,
-      );
+      const result = await action();
+      assertTronSendResult(result);
+      // `shouldPollResponse:false` returns the broadcast txid before any receipt polling.
+      const txId = tronTransactionId(result);
+      if (!txId) throw new Error('TRANSACTION_ID_UNAVAILABLE');
+      const pending = { hash: txId, context: actionContext, actionLabel, actionKind } satisfies PendingTronAction;
+      pendingTronActionRef.current = pending;
+      if (mountedRef.current) setPendingTronAction(pending);
+      setStatus('Transacción enviada. Esperando confirmación en TRON Mainnet…');
+      await waitForTronReceipt(txId);
+      const currentTronWeb = getLegacyTronWeb();
+      if (!currentTronWeb) throw new Error('TRON_NOT_READY');
+      assertTronActionContext(currentTronWeb, actionContext);
+      const confirmedHash = (pendingTronActionRef.current as PendingTronAction | null)?.hash;
       pendingTronActionRef.current = null;
-      setPendingTronAction(null);
-      if (confirmation.reconciled) {
-        setStatus(`${actionLabel} confirmada en TRON Mainnet. Tu colección ya está actualizada.`);
-      } else {
-        setStatus(`${actionLabel} confirmada en TRON Mainnet. Actualizando tu colección… No repitas la transacción.`);
+      if (mountedRef.current) {
+        setPendingTronAction(null);
+        setIsTronPending(false);
       }
+      setStatus(`${actionLabel} confirmada en TRON Mainnet. Actualizando tu colección… No repitas la transacción.`);
+      window.dispatchEvent(new CustomEvent('cukies:legacy-marketplace:refresh', { detail: { hash: confirmedHash } }));
       router.refresh();
+      backgroundRefresh = true;
+      void retryTransactionRefresh(
+        async () => {
+          const current = getLegacyTronWeb();
+          if (!current) throw new Error('TRON_NOT_READY');
+          assertTronActionContext(current, actionContext);
+          try {
+            const result = await reconcileListing();
+            return reconciliationMatches(result, actionKind, actionContext.address);
+          } catch {
+            return false;
+          }
+        },
+        { signal: refreshController.signal },
+      ).then((reconciled) => {
+        if (!mountedRef.current) return;
+        setStatus(reconciled
+          ? `${actionLabel} confirmada en TRON Mainnet. Tu colección ya está actualizada.`
+          : `${actionLabel} confirmada en TRON Mainnet. La colección se actualizará cuando el servicio esté disponible.`);
+      }).catch((reason) => {
+        if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
+      }).finally(() => {
+        if (refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
+      });
     } catch (error) {
+      if (!mountedRef.current || isTransactionRefreshAborted(error)) return;
       const pending = pendingTronActionRef.current;
       if (pending) {
         if (isTronRevertedError(error)) {
@@ -710,8 +961,9 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         }
       }
     } finally {
+      if (!backgroundRefresh && refreshAbortRef.current === refreshController) refreshAbortRef.current = null;
       actionLockRef.current = false;
-      setIsTronPending(false);
+      if (mountedRef.current) setIsTronPending(false);
     }
   }
 
@@ -748,6 +1000,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
       'Comprobando el anuncio y el precio en TRON Mainnet…',
       'Compra',
       actionContext,
+      'buy',
     );
   }
 
@@ -784,7 +1037,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         },
         () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
       );
-    }, 'Retirando el anuncio...', 'Operación', actionContext);
+    }, 'Retirando el anuncio...', 'Operación', actionContext, 'cancel');
   }
 
   async function changeTronPrice() {
@@ -820,7 +1073,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         },
         () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
       );
-    }, 'Validando el anuncio antes de cambiar el precio…', 'Operación', actionContext);
+    }, 'Validando el anuncio antes de cambiar el precio…', 'Operación', actionContext, 'change');
   }
 
   async function prepareBuy() {
@@ -849,7 +1102,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   const walletActionBusy = isWriting || isBscPending || evmWallet.isConnecting || isTronPending || isConnectingWallet || isPreparingBuy;
-  const disabled = walletActionBusy || Boolean(pendingTronAction);
+  const disabled = walletActionBusy || Boolean(pendingTronAction) || Boolean(pendingBscAction);
 
   return (
     <div className="rounded-[12px] border border-[var(--uki-lilac)]/20 bg-[#080712]/92 p-5 shadow-[0_0_32px_rgba(228,92,255,0.08)]">
@@ -986,10 +1239,13 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             {status}
           </div>
         )}
-        {pendingTronAction ? (
+        {pendingBscAction || pendingTronAction ? (
           <Button
             type="button"
-            onClick={() => void recheckPendingTronAction()}
+            onClick={() => {
+              if (pendingBscAction) void recheckPendingBscAction();
+              else void recheckPendingTronAction();
+            }}
             disabled={walletActionBusy}
             variant="outline"
             className="border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"

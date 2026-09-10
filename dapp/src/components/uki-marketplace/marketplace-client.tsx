@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowClockwise,
   CaretDown,
@@ -16,6 +16,7 @@ import type {
   UkiMarketplaceOrderView,
   UkiMarketplaceOrdersResponse,
 } from '@/lib/uki-marketplace';
+import { retryTransactionRefresh } from '@/lib/transaction-refresh';
 
 const PAGE_LIMIT = 24;
 
@@ -24,6 +25,28 @@ type FeedState =
   | { kind: 'ready'; orders: UkiMarketplaceOrderView[] }
   | { kind: 'unavailable' }
   | { kind: 'error' };
+
+function stableOrderSignature(order: UkiMarketplaceOrderView) {
+  return [
+    order.orderId,
+    order.collectionAddress,
+    order.tokenId,
+    order.seller,
+    order.buyer,
+    order.status,
+    order.ukiPriceRaw,
+    order.paymentAmountRaw,
+  ];
+}
+
+function targetOrderSignature(
+  orders: UkiMarketplaceOrderView[] | null,
+  orderId: string | null,
+) {
+  if (!orderId) return null;
+  const target = (orders ?? []).find((order) => order.orderId.toLowerCase() === orderId);
+  return target ? JSON.stringify(stableOrderSignature(target)) : 'missing';
+}
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -157,10 +180,15 @@ export function UkiMarketplaceClient() {
   const [state, setState] = useState<FeedState>({ kind: 'loading' });
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const eventRefreshAbortRef = useRef<AbortController | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ kind: 'loading' });
+    eventRefreshAbortRef.current?.abort();
+    const previousState = stateRef.current;
+    if (previousState.kind !== 'ready') setState({ kind: 'loading' });
 
     fetch(`/api/marketplace/v1/orders?scope=public&limit=${PAGE_LIMIT}`, {
       cache: 'no-store',
@@ -170,11 +198,11 @@ export function UkiMarketplaceClient() {
         const payload = await response.json() as UkiMarketplaceOrdersResponse;
         if (controller.signal.aborted) return;
         if (response.status === 503) {
-          setState({ kind: 'unavailable' });
+          if (previousState.kind !== 'ready') setState({ kind: 'unavailable' });
           return;
         }
         if (!response.ok || payload.status !== 'ok') {
-          setState({ kind: 'error' });
+          if (previousState.kind !== 'ready') setState({ kind: 'error' });
           return;
         }
         setState({ kind: 'ready', orders: payload.data.orders });
@@ -182,16 +210,65 @@ export function UkiMarketplaceClient() {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         if (error instanceof Error && error.name === 'AbortError') return;
-        setState({ kind: 'error' });
+        if (previousState.kind !== 'ready') setState({ kind: 'error' });
       });
 
     return () => controller.abort();
   }, [reloadKey]);
 
   useEffect(() => {
-    const refresh = () => setReloadKey((value) => value + 1);
+    let active = true;
+    const refresh = (event: Event) => {
+      eventRefreshAbortRef.current?.abort();
+      const controller = new AbortController();
+      eventRefreshAbortRef.current = controller;
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as { hash?: string; orderId?: string }
+        : null;
+      const hasExpectedChange = Boolean(detail?.hash);
+      const targetOrderId = typeof detail?.orderId === 'string' ? detail.orderId.toLowerCase() : null;
+      const baselineTarget = targetOrderSignature(
+        stateRef.current.kind === 'ready' ? stateRef.current.orders : null,
+        targetOrderId,
+      );
+      void retryTransactionRefresh(
+        async () => {
+          if (!active || controller.signal.aborted) return true;
+          try {
+            const response = await fetch(`/api/marketplace/v1/orders?scope=public&limit=${PAGE_LIMIT}`, {
+              cache: 'no-store',
+              signal: controller.signal,
+            });
+            const payload = await response.json() as UkiMarketplaceOrdersResponse;
+            if (!active || controller.signal.aborted) return true;
+            if (!response.ok || payload.status !== 'ok') return false;
+            const nextOrders = payload.data.orders;
+            setState({ kind: 'ready', orders: nextOrders });
+            if (!hasExpectedChange) return true;
+            if (targetOrderId) {
+              return targetOrderSignature(nextOrders, targetOrderId) !== baselineTarget;
+            }
+            // A hash without an affected order cannot prove that a different
+            // row in the feed is the transaction's projection. Keep polling
+            // through the bounded window instead of declaring convergence.
+            return false;
+          } catch (reason) {
+            if (!active || controller.signal.aborted) return true;
+            if (reason instanceof Error && reason.name === 'AbortError') return true;
+            return false;
+          }
+        },
+        { signal: controller.signal },
+      ).catch(() => {
+        // Unmount or a newer transaction event cancels the refresh loop.
+      });
+    };
     window.addEventListener('cukies:uki-marketplace:refresh', refresh);
-    return () => window.removeEventListener('cukies:uki-marketplace:refresh', refresh);
+    return () => {
+      active = false;
+      eventRefreshAbortRef.current?.abort();
+      window.removeEventListener('cukies:uki-marketplace:refresh', refresh);
+    };
   }, []);
 
   return (

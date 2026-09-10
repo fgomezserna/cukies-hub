@@ -19,6 +19,7 @@ let allowance = BigInt(0);
 let purchased = false;
 let walletAddress = buyer;
 let nativePaymentsAllowed = true;
+let deliveryReadFailure = false;
 
 const readContract = jest.fn(async (input: {
   address: string;
@@ -29,6 +30,7 @@ const readContract = jest.fn(async (input: {
     case 'orders':
       return [seller, collection, BigInt(73), price, expiry, BigInt(1), 1_000, 1];
     case 'orderState':
+      if (deliveryReadFailure && purchased) throw new Error('INDEXER_LAG');
       return purchased ? 2 : 1;
     case 'activeOrderIds':
       return orderId;
@@ -43,6 +45,7 @@ const readContract = jest.fn(async (input: {
     case 'wrappedNative':
       return wbnb;
     case 'ownerOf':
+      if (deliveryReadFailure && purchased) throw new Error('INDEXER_LAG');
       return purchased ? buyer : seller;
     case 'getApproved':
       return marketplace;
@@ -166,6 +169,7 @@ describe('checkout comprador marketplace UKI', () => {
     purchased = false;
     walletAddress = buyer;
     nativePaymentsAllowed = true;
+    deliveryReadFailure = false;
     ukiMarketplacePublicConfig.ukiPaymentReady = true;
     ukiMarketplacePublicConfig.bnbPaymentReady = true;
     ukiMarketplacePublicConfig.usdtPaymentReady = true;
@@ -287,5 +291,53 @@ describe('checkout comprador marketplace UKI', () => {
     const button = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
     expect(button).toBeDisabled();
     expect(screen.getByText(/Esta orden pertenece a tu wallet/)).toBeInTheDocument();
+  });
+
+  it('conserva el éxito del receipt aunque la lectura posterior llegue tarde', async () => {
+    deliveryReadFailure = true;
+    const onPurchased = jest.fn();
+    render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={onPurchased} />);
+
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
+    fireEvent.click(await screen.findByRole('button', { name: 'Autorizar UKI y comprar' }));
+
+    await waitFor(() => expect(screen.getByText('Compra y entrega verificadas')).toBeInTheDocument());
+    expect(onPurchased).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite comprobar una autorización pendiente sin firmar la compra todavía', async () => {
+    waitForTransactionReceipt.mockRejectedValueOnce(new Error('RPC timeout'));
+    render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
+
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
+    fireEvent.click(await screen.findByRole('button', { name: 'Autorizar UKI y comprar' }));
+    expect(await screen.findByText('La autorización fue enviada. Comprueba su confirmación sin firmar otra vez.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar transacción' }));
+    await waitFor(() => expect(screen.getByText(/Autorización confirmada/)).toBeInTheDocument());
+    expect(screen.queryByText('Compra y entrega verificadas')).not.toBeInTheDocument();
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('permite comprobar una compra pendiente y conserva la entrega confirmada', async () => {
+    allowance = BigInt('2000000000000000000000');
+    waitForTransactionReceipt.mockRejectedValueOnce(new Error('RPC timeout'));
+    const onPurchased = jest.fn();
+    render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={onPurchased} />);
+
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar compra con UKI' }));
+    expect(await screen.findByText('La compra fue enviada. Comprueba su confirmación sin firmar otra vez.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar transacción' }));
+    await waitFor(() => expect(screen.getByText('Compra y entrega verificadas')).toBeInTheDocument());
+    expect(onPurchased).toHaveBeenCalledTimes(1);
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
   });
 });

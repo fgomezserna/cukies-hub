@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { MarketplaceClient } from '@/components/legacy-marketplace/marketplace-client';
 
@@ -18,6 +18,30 @@ const emptyResponse = {
   offset: 0,
   limit: 24,
   facets: { states: [], networks: [], types: [], generations: [] },
+};
+
+const baseUkiOrder = {
+  orderId: `0x${'7'.repeat(64)}`,
+  chainId: 97 as const,
+  marketplaceAddress: '0x0000000000000000000000000000000000001001',
+  collectionAddress: '0x0000000000000000000000000000000000001002',
+  tokenId: '73',
+  seller: '0x00000000000000000000000000000000000000aa',
+  ukiPriceRaw: '1000000000000000000000',
+  expiresAt: '2026-09-15T14:00:00.000Z',
+  nonceRaw: '1',
+  feeBps: 1_000,
+  status: 'active' as const,
+  attentionReason: null,
+  buyer: null,
+  paymentToken: null,
+  paymentAmountRaw: null,
+  feeAmountRaw: null,
+  listedAt: '2026-08-30T10:00:00.000Z',
+  soldAt: null,
+  cancelledAt: null,
+  expiredAt: null,
+  invalidatedAt: null,
 };
 
 describe('marketplace publico', () => {
@@ -199,5 +223,140 @@ describe('marketplace publico', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('MARKETPLACE_CATALOG_UNAVAILABLE')).not.toBeInTheDocument();
     expect(screen.queryByText('Failed to fetch internal catalog details')).not.toBeInTheDocument();
+  });
+
+  it('mantiene filtros y catálogo visible mientras la reconciliación tarda y corta el retry al cambiar los datos', async () => {
+    const order = {
+      orderId: `0x${'7'.repeat(64)}`,
+      chainId: 97,
+      marketplaceAddress: '0x0000000000000000000000000000000000001001',
+      collectionAddress: '0x0000000000000000000000000000000000001002',
+      tokenId: '73',
+      seller: '0x00000000000000000000000000000000000000aa',
+      ukiPriceRaw: '1000000000000000000000',
+      expiresAt: '2026-09-15T14:00:00.000Z',
+      nonceRaw: '1',
+      feeBps: 1_000,
+      status: 'active',
+      attentionReason: null,
+      buyer: null,
+      paymentToken: null,
+      paymentAmountRaw: null,
+      feeAmountRaw: null,
+      listedAt: '2026-08-30T10:00:00.000Z',
+      soldAt: null,
+      cancelledAt: null,
+      expiredAt: null,
+      invalidatedAt: null,
+    };
+    let resolveRefresh!: (value: unknown) => void;
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'ok',
+          data: {
+            items: [{ source: 'uki', item: order }],
+            cursors: { legacyOffset: 0, ukiCursor: null },
+            hasMore: false,
+            legacyFacets: { states: [], networks: [], types: [], generations: [] },
+            sources: { legacy: 'ready', uki: 'ready' },
+          },
+        }),
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }));
+
+    render(<MarketplaceClient />);
+    await waitFor(() => expect(screen.getByText('Cukie #73')).toBeInTheDocument());
+    jest.useFakeTimers();
+    try {
+    act(() => {
+      window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+        detail: { hash: `0x${'8'.repeat(64)}`, orderId: order.orderId },
+      }));
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Cukie #73')).toBeInTheDocument();
+    expect(screen.queryByText('Cargando Cukies…')).not.toBeInTheDocument();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(2_500);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    resolveRefresh({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'ok',
+        data: {
+          items: [],
+          cursors: { legacyOffset: 0, ukiCursor: null },
+          hasMore: false,
+          legacyFacets: { states: [], networks: [], types: [], generations: [] },
+          sources: { legacy: 'ready', uki: 'ready' },
+        },
+      }),
+    });
+    await waitFor(() => expect(screen.getByText('No hay Cukies que coincidan con estos filtros.')).toBeInTheDocument());
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(62_500);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('no detiene la reconciliación por un anuncio ajeno al orderId confirmado', async () => {
+    const order = baseUkiOrder;
+    const otherOrder = {
+      ...order,
+      orderId: `0x${'9'.repeat(64)}`,
+      tokenId: '74',
+    };
+    const unrelatedChanged = {
+      ...otherOrder,
+      ukiPriceRaw: '2000000000000000000000',
+    };
+    const targetChanged = {
+      ...order,
+      status: 'sold' as 'active',
+    };
+    const payload = (items: (typeof order)[]) => ({
+      status: 'ok',
+      data: {
+        items: items.map((item) => ({ source: 'uki' as const, item })),
+        cursors: { legacyOffset: 0, ukiCursor: null },
+        hasMore: false,
+        legacyFacets: { states: [], networks: [], types: [], generations: [] },
+        sources: { legacy: 'ready' as const, uki: 'ready' as const },
+      },
+    });
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload([order, otherOrder]) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload([order, unrelatedChanged]) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => payload([targetChanged, unrelatedChanged]) });
+
+    render(<MarketplaceClient />);
+    await waitFor(() => expect(screen.getAllByText('Cukie #73')).toHaveLength(1));
+    jest.useFakeTimers();
+    try {
+      act(() => {
+        window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+          detail: { hash: `0x${'4'.repeat(64)}`, orderId: order.orderId },
+        }));
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(500);
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

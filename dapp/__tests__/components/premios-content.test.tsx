@@ -312,6 +312,7 @@ describe('PremiosContent', () => {
     );
     expect(waitForTransactionReceipt).toHaveBeenCalledWith({
       hash: transactionHash,
+      onReplaced: expect.any(Function),
     });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
@@ -327,6 +328,22 @@ describe('PremiosContent', () => {
       'El cobro no se ha completado',
     );
     expect(screen.queryByText('Cobro confirmado')).not.toBeInTheDocument();
+  });
+
+  it('conserva hash y ofrece comprobar de nuevo cuando el receipt llega tarde', async () => {
+    waitForTransactionReceipt
+      .mockRejectedValueOnce(new Error('timeout'))
+      .mockResolvedValueOnce({ status: 'success' });
+    render(<PremiosContent />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cobrar 1 UKI' }));
+    expect(await screen.findByText(/Cobro enviado/)).toBeInTheDocument();
+    const recheck = screen.getByRole('button', { name: /Comprobar cobro enviado/ });
+    fireEvent.click(recheck);
+    await waitFor(() => expect(screen.getByText('Cobro confirmado. Los UKI ya están en tu wallet.')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Comprobar cobro enviado' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cobrar 1 UKI' })).not.toBeInTheDocument();
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
   });
 
   it('falla con un mensaje de cliente si el servicio no responde', async () => {
@@ -549,6 +566,7 @@ describe('PremiosContent', () => {
     await waitFor(() =>
       expect(waitForTransactionReceipt).toHaveBeenCalledWith({
         hash: transactionHash,
+        onReplaced: expect.any(Function),
       }),
     );
   });

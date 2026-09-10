@@ -59,6 +59,13 @@ import {
 } from '@/lib/uki-marketplace/abi';
 import { ukiMarketplacePublicConfig } from '@/lib/uki-marketplace/public-config';
 import type { MyCukieCollectionItem } from '@/lib/cukies-data/my-collection-types';
+import {
+  isTransactionRefreshAborted,
+  TransactionReplacementError,
+  TransactionReplacementPendingError,
+  waitForConfirmedEvmTransaction,
+  waitForTransactionRefresh,
+} from '@/lib/transaction-refresh';
 import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 type SaleSurface = 'legacy-bsc' | 'legacy-tron' | 'uki';
@@ -351,6 +358,12 @@ function userError(reason: unknown) {
   if (message.includes('transaction_pending')) {
     return 'La transacción sigue pendiente. Puedes comprobarla sin firmar otra vez.';
   }
+  if (message.includes('transaction_cancelled')) {
+    return 'La wallet canceló la transacción. No se ha publicado el Cukie.';
+  }
+  if (message.includes('transaction_replaced')) {
+    return 'La transacción fue reemplazada por otra operación. No se ha publicado el Cukie.';
+  }
   if (message.includes('wallet_not_ready') || message.includes('bsc_not_ready')) {
     return 'Conecta la wallet en la red indicada para continuar.';
   }
@@ -505,6 +518,8 @@ export function CukieSaleDialog({
   const inspectionIdRef = useRef(0);
   const pendingListingRef = useRef<PendingListing | null>(null);
   const pendingApprovalRef = useRef<PendingApproval | null>(null);
+  const reconcileAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
   const latestOperationContextRef = useRef<SaleOperationContext>({
     assetId: cuki.assetId,
     surface,
@@ -714,6 +729,14 @@ export function CukieSaleDialog({
   }, [cuki.tokenId, collectionAddress, evmChain, identityError, marketplaceAddress, publicClient, surface, wagmiConfig]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      reconcileAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     setSurface(openingSurface);
     setPrice('');
@@ -780,18 +803,27 @@ export function CukieSaleDialog({
     input: Parameters<typeof writeContractAsync>[0],
     options: { preserveBroadcast?: boolean } = {},
   ) {
-      if (!publicClient) throw new Error('SALE_UI:No podemos comprobar la confirmación de esta red.');
+    if (!publicClient) throw new Error('SALE_UI:No podemos comprobar la confirmación de esta red.');
     const hash = await writeContractAsync(input);
     setLatestTxHash(hash);
+    let confirmedHash = hash;
     let receipt;
     try {
-      receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const confirmed = await waitForConfirmedEvmTransaction(publicClient, hash);
+      receipt = confirmed.receipt;
+      confirmedHash = confirmed.hash;
+      if (confirmedHash !== hash) setLatestTxHash(confirmedHash);
     } catch (reason) {
+      if (reason instanceof TransactionReplacementError) throw reason;
+      if (reason instanceof TransactionReplacementPendingError) {
+        if (options.preserveBroadcast) throw new BroadcastPendingError(reason.hash, reason);
+        throw reason;
+      }
       if (options.preserveBroadcast) throw new BroadcastPendingError(hash, reason);
       throw reason;
     }
     if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
-    return hash;
+    return confirmedHash;
   }
 
   function beginOperation(next: Exclude<TransactionPhase, 'idle' | 'syncing'>, context: SaleOperationContext) {
@@ -811,23 +843,32 @@ export function CukieSaleDialog({
   }
 
   async function reconcilePublishedListing(context: SaleOperationContext, wallet: string) {
+    reconcileAbortRef.current?.abort();
+    const controller = new AbortController();
+    reconcileAbortRef.current = controller;
     const delays = [0, 350, 750, 1_200];
     let latest: Inspection | null = null;
-    for (let index = 0; index < delays.length; index += 1) {
-      if (delays[index] > 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, delays[index]));
-      }
-      assertOperationContext(context);
-      try {
-        const result = await inspectSurface(wallet);
+    try {
+      for (let index = 0; index < delays.length; index += 1) {
+        if (delays[index] > 0) {
+          await waitForTransactionRefresh(delays[index], controller.signal);
+        }
+        if (!mountedRef.current) return latest;
         assertOperationContext(context);
-        latest = result;
-        if (result.activeListing) return result;
-      } catch (reason) {
-        if (transactionMessage(reason).includes('wallet_context_changed')) throw reason;
+        try {
+          const result = await inspectSurface(wallet);
+          assertOperationContext(context);
+          latest = result;
+          if (result.activeListing) return result;
+        } catch (reason) {
+          if (isTransactionRefreshAborted(reason)) throw reason;
+          if (transactionMessage(reason).includes('wallet_context_changed')) throw reason;
+        }
       }
+      return latest;
+    } finally {
+      if (reconcileAbortRef.current === controller) reconcileAbortRef.current = null;
     }
-    return latest;
   }
 
   function rememberPendingListing(context: SaleOperationContext, hash: string | null, wallet: string) {
@@ -864,8 +905,17 @@ export function CukieSaleDialog({
         if (!publicClient) throw new Error('SALE_UI:No podemos comprobar la confirmación de esta red.');
         let receipt;
         try {
-          receipt = await publicClient.waitForTransactionReceipt({ hash: pending.hash as `0x${string}` });
-        } catch {
+          const confirmed = await waitForConfirmedEvmTransaction(publicClient, pending.hash as `0x${string}`);
+          receipt = confirmed.receipt;
+          pending.hash = confirmed.hash;
+          setLatestTxHash(confirmed.hash);
+        } catch (reason) {
+          if (reason instanceof TransactionReplacementPendingError) {
+            pending.hash = reason.hash;
+            setLatestTxHash(reason.hash);
+            throw reason;
+          }
+          if (reason instanceof TransactionReplacementError) throw reason;
           throw new Error('TRANSACTION_PENDING');
         }
         assertOperationContext(pending.context);
@@ -884,7 +934,19 @@ export function CukieSaleDialog({
           : 'El contrato ya tiene permiso para este Cukie. Ya puedes publicar el anuncio.'
         : `Aprobación confirmada en ${signatureNetwork}. El permiso actual ha cambiado; revísalo antes de publicar.`);
     } catch (reason) {
-      if (isPendingReason(reason)) {
+      if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
+      if (reason instanceof TransactionReplacementPendingError) {
+        pending.hash = reason.hash;
+        setLatestTxHash(reason.hash);
+        setApprovalState('pending');
+        setError(null);
+        setNotice('La aprobación fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.');
+      } else if (reason instanceof TransactionReplacementError) {
+        pendingApprovalRef.current = null;
+        setApprovalState('required');
+        setLatestTxHash(null);
+        setError(userError(reason));
+      } else if (isPendingReason(reason)) {
         setApprovalState('pending');
         setNotice('La aprobación sigue pendiente. Puedes volver a comprobarla sin firmar otra vez.');
       } else if (isRevertedReason(reason)) {
@@ -933,8 +995,17 @@ export function CukieSaleDialog({
         if (!publicClient) throw new Error('SALE_UI:No podemos comprobar la confirmación de esta red.');
         let receipt;
         try {
-          receipt = await publicClient.waitForTransactionReceipt({ hash: pending.hash as `0x${string}` });
-        } catch {
+          const confirmed = await waitForConfirmedEvmTransaction(publicClient, pending.hash as `0x${string}`);
+          receipt = confirmed.receipt;
+          pending.hash = confirmed.hash;
+          setLatestTxHash(confirmed.hash);
+        } catch (reason) {
+          if (reason instanceof TransactionReplacementPendingError) {
+            pending.hash = reason.hash;
+            setLatestTxHash(reason.hash);
+            throw reason;
+          }
+          if (reason instanceof TransactionReplacementError) throw reason;
           throw new Error('TRANSACTION_PENDING');
         }
         assertOperationContext(pending.context);
@@ -955,10 +1026,22 @@ export function CukieSaleDialog({
       setNotice(result.activeListing
         ? `Venta publicada en ${signatureNetwork}. Actualizando la ficha y el catálogo…`
         : `Publicación confirmada en ${signatureNetwork}. El estado actual del anuncio ya está actualizado.`);
-      window.dispatchEvent(new Event(pending.context.surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
+      window.dispatchEvent(new CustomEvent(pending.context.surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh', { detail: pending.hash ? { hash: pending.hash } : undefined }));
       onCompleted?.();
     } catch (reason) {
-      if (reason instanceof Error && reason.message === 'TRANSACTION_PENDING') {
+      if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
+      if (reason instanceof TransactionReplacementPendingError) {
+        pending.hash = reason.hash;
+        setLatestTxHash(reason.hash);
+        setListingState('pending');
+        setError(null);
+        setNotice('La publicación fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.');
+      } else if (reason instanceof TransactionReplacementError) {
+        pendingListingRef.current = null;
+        setListingState('idle');
+        setLatestTxHash(null);
+        setError(userError(reason));
+      } else if (reason instanceof Error && reason.message === 'TRANSACTION_PENDING') {
         setListingState('pending');
         setNotice('La transacción sigue pendiente. Puedes volver a comprobarla sin firmar otra publicación.');
       } else if (isRevertedReason(reason)) {
@@ -971,7 +1054,7 @@ export function CukieSaleDialog({
         setListingState('confirmed');
         setError(null);
         setNotice(`Publicación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
-        window.dispatchEvent(new Event(pending.context.surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
+        window.dispatchEvent(new CustomEvent(pending.context.surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh', { detail: pending.hash ? { hash: pending.hash } : undefined }));
         onCompleted?.();
       } else if (receiptConfirmed) {
         setListingState('pending');
@@ -1076,6 +1159,7 @@ export function CukieSaleDialog({
         ? `Aprobación confirmada en ${signatureNetwork}. Ya puedes publicar el anuncio.`
         : `Aprobación confirmada en ${signatureNetwork}. El permiso actual ha cambiado; revísalo antes de publicar.`);
     } catch (reason) {
+      if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
       const broadcastHash = reason instanceof BroadcastPendingError ? reason.hash : approvalHash;
       const reverted = isRevertedReason(reason);
       const contextChanged = transactionMessage(reason).includes('wallet_context_changed');
@@ -1165,7 +1249,7 @@ export function CukieSaleDialog({
         setNotice(reconciled?.activeListing
           ? 'Venta publicada en TRON Mainnet. Actualizando la ficha y el catálogo…'
           : 'Publicación confirmada en TRON Mainnet. El estado actual del anuncio ya está actualizado.');
-        window.dispatchEvent(new Event('cukies:legacy-marketplace:refresh'));
+        window.dispatchEvent(new CustomEvent('cukies:legacy-marketplace:refresh', { detail: listingHash ? { hash: listingHash } : undefined }));
         onCompleted?.();
         return;
       }
@@ -1222,9 +1306,10 @@ export function CukieSaleDialog({
         setListingState('confirmed');
         setNotice(`Publicación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
       }
-      window.dispatchEvent(new Event(surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
+      window.dispatchEvent(new CustomEvent(surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh', { detail: listingHash ? { hash: listingHash } : undefined }));
       onCompleted?.();
     } catch (reason) {
+      if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
       const broadcastHash = reason instanceof BroadcastPendingError ? reason.hash : listingHash;
       const pending = pendingListingRef.current;
       const reverted = isRevertedReason(reason);
@@ -1239,7 +1324,7 @@ export function CukieSaleDialog({
         setListingState('confirmed');
         setError(null);
         setNotice(`Publicación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
-        window.dispatchEvent(new Event(surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
+        window.dispatchEvent(new CustomEvent(surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh', { detail: listingHash ? { hash: listingHash } : undefined }));
         onCompleted?.();
       } else if (activeContext?.wallet && (broadcastHash || pending)) {
         if (broadcastHash) rememberPendingListing(activeContext, broadcastHash, activeContext.wallet);

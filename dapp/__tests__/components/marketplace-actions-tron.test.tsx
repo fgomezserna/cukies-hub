@@ -114,7 +114,17 @@ const cuki: LegacyMarketplaceCukiItem = {
 describe('MarketplaceActions · compra TRON', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (globalThis.fetch as jest.Mock) = jest.fn(async () => ({ ok: true }));
+    (globalThis.fetch as jest.Mock) = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        status: 'ok',
+        data: {
+          item: { ...cuki, owner: buyer, state: 'available' },
+          changed: true,
+          paused: false,
+        },
+      }),
+    }));
   });
 
   it('conserva el txid devuelto tras el broadcast y no vuelve a firmar', async () => {
