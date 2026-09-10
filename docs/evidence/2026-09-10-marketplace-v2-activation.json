@@ -1,5 +1,4 @@
 {
-  "observedAt": "2026-09-10T13:52:10.207Z",
   "chainId": 97,
   "address": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
   "blockNumber": 130226230,
@@ -16,8 +15,7 @@
     "nativePaymentAllowed": false,
     "collectionAllowed": true
   },
-  "status": "prepared-not-yet-published",
-  "reason": "Blank public/runtime marketplace addresses and UKI_MARKETPLACE alias absent in web32 and indexer28",
+  "status": "published-uki-direct-purchase-smoke-pending",
   "publicConfigChangedKeys": [
     "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS",
     "NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS",
@@ -28,14 +26,210 @@
     28
   ],
   "alternativePaymentsEnabled": false,
-  "currentStageSha": "f9685b93fd841f0eaa6c61ad1e7860d63879087d",
+  "currentStageSha": "fab7910329fe06c8917e729774cb1d6cbcfb9fda",
   "productionChanged": false,
   "verification": {
     "onchainIdentity": "passed",
-    "localMarketplaceGate": "passed"
+    "localMarketplaceGate": "passed",
+    "publicHealthExactSha": "passed",
+    "publicCatalogAfterList": "1 UKI active",
+    "publicCatalogAfterReprice": "2 UKI active",
+    "publicCatalogAfterCancel": "ready, zero active test orders",
+    "indexerCreatedAndCancelledProjection": "passed",
+    "signedPurchase": "not executed"
   },
   "limits": [
-    "No signed purchase/list/cancel smoke performed yet",
-    "Indexer source activation and public deployment pending"
-  ]
+    "Signed purchase pending: dedicated operator holds no test UKI; no user wallet signature or asset used",
+    "Alternative payments remain disabled; direct UKI does not require PancakeSwap pools",
+    "Next real worker rollout must verify Coolify raw mode path and exact release SHA",
+    "Marketplace UX source f81b0ec+153cf2e reviewed; separate integration pending"
+  ],
+  "onchainIdentityObservedAt": "2026-09-10T13:52:10.207Z",
+  "observedAt": "2026-09-10T14:33:33.431601+00:00",
+  "rootCause": "Blank public/runtime marketplace addresses and UKI_MARKETPLACE alias absent in web32 and indexer28",
+  "pullRequest": 388,
+  "release": {
+    "commit": "fab7910329fe06c8917e729774cb1d6cbcfb9fda",
+    "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+    "deploymentUuid": "fowgko8skogc88oo0swos88o",
+    "gameDeploymentUuid": "y88wswsoo4wc88gksck40ssg",
+    "webCommit": "fab7910329fe06c8917e729774cb1d6cbcfb9fda",
+    "gameCommit": "fab7910329fe06c8917e729774cb1d6cbcfb9fda",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34486524384",
+    "finishedAt": "2026-09-10T14:15:17.675Z"
+  },
+  "indexer": {
+    "observedAt": "2026-09-10T14:32:06.525Z",
+    "sourceSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+    "imageDigest": "sha256:202d1c85528c3c6cd8f16ded63948e0949c09f90092ae60bbd24f49ab6281344",
+    "containerId": "16ce77f6be307e2d17fc29f46363f227c6615cc150c798275f56933292e10a6d",
+    "eventCursorCount": 15,
+    "allBootstrapVerified": true,
+    "allStartedAtDeployment": true,
+    "allAtSafeBlock": true,
+    "minimumProcessedThroughBlock": 130231513,
+    "projectedEvents": [
+      {
+        "event": "UkiMarketplaceOrderCancelled",
+        "txHash": "0x4f5224b0429d193dae5c8dca05ac52f1f72c5a81bf5bb2d6d7ff9d28d933a3b9",
+        "blockNumber": 130231271,
+        "status": "projected"
+      },
+      {
+        "event": "UkiMarketplaceOrderCreated",
+        "txHash": "0x9e55deead7227a53bf967f44d03da25c5ba8e34e502fc6507ac375329b5538a5",
+        "blockNumber": 130230807,
+        "status": "projected"
+      },
+      {
+        "event": "UkiMarketplaceOrderCancelled",
+        "txHash": "0xb4d68d141b5b4e08eadb572c5622eafd4efbc326669482b769fea9774ad5663e",
+        "blockNumber": 130230796,
+        "status": "projected"
+      },
+      {
+        "event": "UkiMarketplaceOrderCreated",
+        "txHash": "0x1d92ecdb829be6c34187b39359073d4b13b7c93463777da57d60d7719f669fc0",
+        "blockNumber": 130229260,
+        "status": "projected"
+      },
+      {
+        "event": "CollectionAllowedUpdated",
+        "txHash": "0x71646ee5bb420aade8b6c91a7be229b4209bb56def66fc67cfd23abce46b0933",
+        "blockNumber": 130192592,
+        "status": "projected"
+      },
+      {
+        "event": "OwnershipTransferred",
+        "txHash": "0x5c850912acfeef75d8dcb032466ef37386887784849fa0fa79db664604d5d1d9",
+        "blockNumber": 130192587,
+        "status": "projected"
+      }
+    ]
+  },
+  "signedSellerSmoke": {
+    "chainId": 97,
+    "tokenId": "98009010",
+    "transactions": [
+      {
+        "step": "mint-dedicated-fixture",
+        "hash": "0x1a29ddc413ae995df91793dfc07ad8931c0d6a4edc2d00e4e1f9ac3f909e672e",
+        "blockNumber": 130229240
+      },
+      {
+        "step": "approve-dedicated-fixture",
+        "hash": "0xc25d32392bd1d707cd14b99568467b86c657d1db17ce800d9950e719d7b3c62c",
+        "blockNumber": 130229250
+      },
+      {
+        "step": "list-1-UKI",
+        "hash": "0x1d92ecdb829be6c34187b39359073d4b13b7c93463777da57d60d7719f669fc0",
+        "blockNumber": 130229260
+      },
+      {
+        "step": "cancel-before-reprice",
+        "hash": "0xb4d68d141b5b4e08eadb572c5622eafd4efbc326669482b769fea9774ad5663e",
+        "blockNumber": 130230796
+      },
+      {
+        "step": "list-2-UKI",
+        "hash": "0x9e55deead7227a53bf967f44d03da25c5ba8e34e502fc6507ac375329b5538a5",
+        "blockNumber": 130230807
+      },
+      {
+        "step": "cancel-final",
+        "hash": "0x4f5224b0429d193dae5c8dca05ac52f1f72c5a81bf5bb2d6d7ff9d28d933a3b9",
+        "blockNumber": 130231271
+      },
+      {
+        "step": "revoke-dedicated-approval",
+        "hash": "0x55a30c2b1d81f6c623de6c124bf46d110b97efd21bc4c4a3e94f405b73ba611a",
+        "blockNumber": 130231281
+      }
+    ],
+    "operator": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+    "collection": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+    "marketplace": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
+    "updatedAt": "2026-09-10T14:30:06.248Z",
+    "initialOrderId": "0x7a0f35740aeff532be792ea963f618aea2d3aa52703da00f6e332172841c4cac",
+    "priceUki": "2",
+    "purchaseExecuted": false,
+    "purchaseLimitation": "Dedicated operator has zero test UKI; no user wallet or user NFT used.",
+    "repricedOrderId": "0x04e7937952f7185490e20086d892f7d6b29ef65556e4738b4df94e583f0da8df",
+    "finalState": {
+      "activeOrderId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "owner": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+      "approved": "0x0000000000000000000000000000000000000000"
+    }
+  },
+  "browserCheckout": {
+    "signed": false,
+    "tokenId": "98009010",
+    "sellerPriceUki": "1",
+    "paymentToken": "UKI",
+    "feeUki": "0.05",
+    "maximumUki": "1.05",
+    "observedButtons": [
+      "Comprar",
+      "Revisar y confirmar compra"
+    ],
+    "displayedPaymentTokens": [
+      "UKI"
+    ],
+    "userWalletTransactionPerformed": false
+  },
+  "workersDeliveryRepair": {
+    "failedDeployment": "fwwowo888kw8ooo0kscc4g0o",
+    "failedQueue": 1508,
+    "failure": "Coolify raw mode false reloaded Git Compose with inactive World image requirements",
+    "recovery": "Only chain-indexer recreated with unchanged immutable image and updated Marketplace source environment; other nine Stage worker containers preserved",
+    "permanentConfiguration": {
+      "observedAt": "2026-09-10T14:29:57+00:00",
+      "mode": "apply",
+      "change": {
+        "applicationId": 28,
+        "uuid": "u4s804o4wwcckowgk0woo4wg",
+        "branch": "staging",
+        "pinnedSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+        "before": {
+          "rawMode": false,
+          "rawLength": 40263,
+          "rawHash": "775435ce002f8f2fe481d00785b037de55802765d509e340303343511622fe64"
+        },
+        "desired": {
+          "rawMode": true,
+          "rawLength": 35320,
+          "rawHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+        },
+        "observedAfter": {
+          "rawMode": true,
+          "rawLength": 35320,
+          "rawHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+        }
+      },
+      "protectedApplications": [
+        12,
+        13,
+        31,
+        32
+      ],
+      "protectedUnchanged": true,
+      "deploymentTriggered": false
+    },
+    "fullWorkersRolloutAfterRawModeChange": "not yet verified"
+  },
+  "containerComparison": {
+    "hostBaselineCount": 92,
+    "hostAfterCount": 92,
+    "preservedIds": 88,
+    "scopeReplacements": [
+      "web32",
+      "game31",
+      "chain-indexer28"
+    ],
+    "unrelatedReplacementObserved": "fogo0wscwccg44ss0wosks8k was already replaced independently; not changed by this operation",
+    "productionContainersPreserved": true,
+    "otherNineStageWorkerContainersPreserved": true,
+    "newWorldRuntimeEnabled": false
+  }
 }
