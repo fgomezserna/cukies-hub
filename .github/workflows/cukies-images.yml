@@ -21,13 +21,59 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Setup pnpm 10.19.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10.19.0 --activate
+          pnpm --version
+      - name: Detect World image-affecting changes
+        id: world
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "${{ github.event.pull_request.base.sha }}"...HEAD)"
+          if printf '%s\n' "$changed" | grep -E '^(packages/world-|infrastructure/world/|Dockerfile\.ci$|\.dockerignore$|\.npmrc$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|nx\.json$|docker-compose\.(coolify|images|workers)\.yml$|infrastructure/ci/components\.json$|scripts/ci/(build-images|world-runtime-smoke|generate-images-compose|release-plan|release-delivery-plan|release-state|deliver-release|coolify-release|image-ref)\.mjs$|\.github/workflows/cukies-images\.yml$)' >/dev/null; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install World graph
+        if: steps.world.outputs.changed == 'true'
+        shell: bash
+        run: pnpm --filter nextn --filter "@cukies/world-api..." --filter "@cukies/world-matchmaking..." install --frozen-lockfile --ignore-scripts
+      - name: Validate World packages
+        if: steps.world.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm build:world
+          pnpm typecheck:world
+          pnpm test:world
+          node --test infrastructure/world/tests/compose-profile.test.mjs
       - name: Verify deployment invariants
         run: |
           node scripts/ci/generate-images-compose.mjs --check
           node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs scripts/docker-start-game-ci.test.mjs
+      - name: Build both World images and run local smoke
+        if: steps.world.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 --file Dockerfile.ci --target world-api --tag "cukies-world-api-ci:${GITHUB_SHA}" --build-arg "IMAGE_REVISION=${GITHUB_SHA}" .
+          docker build --platform linux/amd64 --file Dockerfile.ci --target world-matchmaking --tag "cukies-world-matchmaking-ci:${GITHUB_SHA}" --build-arg "IMAGE_REVISION=${GITHUB_SHA}" .
+          WORLD_API_IMAGE="cukies-world-api-ci:${GITHUB_SHA}" \
+          WORLD_MATCHMAKING_IMAGE="cukies-world-matchmaking-ci:${GITHUB_SHA}" \
+          WORLD_API_SOURCE_SHA="$GITHUB_SHA" \
+          WORLD_MATCHMAKING_SOURCE_SHA="$GITHUB_SHA" \
+          WORLD_SMOKE_SKIP_PULL=true \
+          node scripts/ci/world-runtime-smoke.mjs
 
   build-push-deploy:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
@@ -101,6 +147,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm --filter nextn install --frozen-lockfile --ignore-scripts
+          pnpm --filter "@cukies/world-api..." --filter "@cukies/world-matchmaking..." install --frozen-lockfile --ignore-scripts
           pnpm exec nx --version
 
       - name: Validate public build environment
@@ -125,9 +172,20 @@ jobs:
             --output "$CUKIES_RUN_DIR/plan.json"
           node -e 'const fs=require("fs"); const plan=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); fs.appendFileSync(process.env.GITHUB_OUTPUT,`dapp=${plan.build.includes("dapp")}\n`)' "$CUKIES_RUN_DIR/plan.json"
           node -e 'const fs=require("fs"); const plan=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); fs.appendFileSync(process.env.GITHUB_OUTPUT,`game=${plan.build.includes("treasure-hunt")}\n`)' "$CUKIES_RUN_DIR/plan.json"
+          node -e 'const fs=require("fs"); const plan=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); const world=plan.build.includes("world-api")||plan.build.includes("world-matchmaking"); fs.appendFileSync(process.env.GITHUB_OUTPUT,`world=${world}\n`)' "$CUKIES_RUN_DIR/plan.json"
 
       - name: Verify deployment invariants
         run: node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs scripts/docker-start-game-ci.test.mjs
+
+      - name: Validate World packages and local contracts
+        if: steps.plan.outputs.world == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm build:world
+          pnpm typecheck:world
+          pnpm test:world
+          node --test infrastructure/world/tests/compose-profile.test.mjs
 
       - name: Validate affected web application
         if: steps.plan.outputs.dapp == 'true'
@@ -173,6 +231,21 @@ jobs:
             --config-hash "$CUKIES_BUILD_ENV_HASH" \
             --build-env-json "$CUKIES_RUN_DIR/build-env.json" \
             --manifest "$CUKIES_RUN_DIR/manifest.json"
+
+      - name: Run World runtime smoke for a World image change
+        if: steps.plan.outputs.world == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_image="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).components['world-api'].image)" "$CUKIES_RUN_DIR/manifest.json")"
+          matchmaking_image="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).components['world-matchmaking'].image)" "$CUKIES_RUN_DIR/manifest.json")"
+          api_sha="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).components['world-api'].sourceSha)" "$CUKIES_RUN_DIR/manifest.json")"
+          matchmaking_sha="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).components['world-matchmaking'].sourceSha)" "$CUKIES_RUN_DIR/manifest.json")"
+          WORLD_API_IMAGE="$api_image" \
+          WORLD_MATCHMAKING_IMAGE="$matchmaking_image" \
+          WORLD_API_SOURCE_SHA="$api_sha" \
+          WORLD_MATCHMAKING_SOURCE_SHA="$matchmaking_sha" \
+          node scripts/ci/world-runtime-smoke.mjs
 
       - name: Revalidate branch tip before deploy
         if: env.CUKIES_IMAGE_DEPLOY_ENABLED == 'true'

@@ -375,3 +375,85 @@ LABEL coolify.managed="true" \
 
 EXPOSE 3000
 CMD ["node", "/app/scripts/docker-start-game-ci.mjs"]
+
+# World is deliberately isolated from the existing image stages. Adding or
+# changing these stages must not invalidate the web, game, or worker targets.
+FROM base AS world-deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY nx.json Dockerfile.ci .dockerignore ./
+COPY scripts/assert-staging-only.mjs scripts/assert-production.mjs scripts/assert-legacy-indexer.mjs scripts/docker-start.sh scripts/docker-start-ci.sh ./scripts/
+COPY packages/world-api/package.json packages/world-api/package.json
+COPY packages/world-matchmaking/package.json packages/world-matchmaking/package.json
+COPY packages/world-shared/package.json packages/world-shared/package.json
+
+RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile --filter nextn --filter "@cukies/world-api..." --filter "@cukies/world-matchmaking..."
+
+FROM world-deps AS world-api-build
+
+COPY packages/world-api packages/world-api
+COPY packages/world-shared packages/world-shared
+
+RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
+    --mount=type=cache,id=cukies-world-nx-state,target=/app/.nx,sharing=locked \
+    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false \
+    pnpm exec nx run @cukies/world-api:build \
+ && rm -rf /out \
+ && pnpm --filter @cukies/world-api deploy --prod --legacy /out \
+ && find /out -mindepth 1 -maxdepth 1 ! -name dist ! -name node_modules ! -name package.json -exec rm -rf {} +
+
+FROM world-deps AS world-matchmaking-build
+
+COPY packages/world-matchmaking packages/world-matchmaking
+COPY packages/world-shared packages/world-shared
+
+RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
+    --mount=type=cache,id=cukies-world-nx-state,target=/app/.nx,sharing=locked \
+    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false \
+    pnpm exec nx run @cukies/world-matchmaking:build \
+ && rm -rf /out \
+ && pnpm --filter @cukies/world-matchmaking deploy --prod --legacy /out \
+ && find /out -mindepth 1 -maxdepth 1 ! -name dist ! -name node_modules ! -name package.json -exec rm -rf {} +
+
+FROM base AS world-api
+
+ARG IMAGE_REVISION
+
+ENV NODE_ENV=production \
+    WORLD_RUNTIME_ENABLED=false \
+    WORLD_GAME_WRITES_ENABLED=false
+
+WORKDIR /app
+COPY --from=world-api-build /out /app/packages/world-api
+COPY infrastructure/world/entrypoint.sh /usr/local/bin/world-entrypoint
+COPY infrastructure/world/readiness.mjs /usr/local/lib/world/readiness.mjs
+RUN chmod 0755 /usr/local/bin/world-entrypoint
+
+LABEL coolify.managed="true" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}"
+
+USER node
+EXPOSE 3010
+ENTRYPOINT ["/usr/local/bin/world-entrypoint"]
+
+FROM base AS world-matchmaking
+
+ARG IMAGE_REVISION
+
+ENV NODE_ENV=production \
+    WORLD_RUNTIME_ENABLED=false \
+    WORLD_GAME_WRITES_ENABLED=false
+
+WORKDIR /app
+COPY --from=world-matchmaking-build /out /app/packages/world-matchmaking
+COPY infrastructure/world/entrypoint.sh /usr/local/bin/world-entrypoint
+COPY infrastructure/world/readiness.mjs /usr/local/lib/world/readiness.mjs
+RUN chmod 0755 /usr/local/bin/world-entrypoint
+
+LABEL coolify.managed="true" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}"
+
+USER node
+EXPOSE 3011
+ENTRYPOINT ["/usr/local/bin/world-entrypoint"]

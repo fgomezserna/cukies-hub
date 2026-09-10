@@ -4,7 +4,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { requireValue } from './cli-args.mjs';
 import { assertEnvironmentMetadata, resolveDeploymentEnvironment } from './deployment-environment.mjs';
-import { assertImmutableImageEntry, CI_COMPONENTS } from './image-ref.mjs';
+import { assertImmutableImageEntry, CI_COMPONENTS, WORLD_COMPONENTS } from './image-ref.mjs';
+import { withoutWorldRuntime } from './generate-images-compose.mjs';
 
 export const COMPONENTS = CI_COMPONENTS;
 
@@ -15,6 +16,8 @@ const IMAGE_ENV = Object.freeze({
   schedulers: 'CUKIES_IMAGE_SCHEDULERS',
   'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
   'treasure-hunt': 'CUKIES_IMAGE_TREASURE_HUNT',
+  'world-api': 'CUKIES_IMAGE_WORLD_API',
+  'world-matchmaking': 'CUKIES_IMAGE_WORLD_MATCHMAKING',
 });
 
 const PROJECT_COMPONENT = Object.freeze({
@@ -28,7 +31,13 @@ const PROJECT_COMPONENT = Object.freeze({
   'sybil-slayer': 'treasure-hunt',
   '@cukies/sybil-slayer': 'treasure-hunt',
   'treasure-hunt': 'treasure-hunt',
+  '@cukies/world-api': 'world-api',
+  'world-api': 'world-api',
+  '@cukies/world-matchmaking': 'world-matchmaking',
+  'world-matchmaking': 'world-matchmaking',
 });
+
+const SHARED_WORLD_PROJECTS = new Set(['@cukies/world-shared', 'world-shared']);
 
 const ALL_REASON = 'first-run-or-invalid-base';
 const ORCHESTRATION_ONLY_PATHS = new Set([
@@ -48,6 +57,8 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/game-lane.test.mjs',
   'scripts/ci/game-cache-contract.test.mjs',
   'scripts/ci/image-ref.mjs',
+  'scripts/ci/generate-images-compose.mjs',
+  'scripts/ci/world-integration.test.mjs',
 ]);
 
 const DAPP_DOCKERFILE_REFINEMENT_REASON = 'dockerfile-ci-final-dapp-stage-only';
@@ -60,7 +71,17 @@ function unique(values) {
   return [...new Set(values)].filter((value) => COMPONENTS.includes(value));
 }
 
+function worldAffectedForPath(path) {
+  if (path === 'scripts/ci/world-runtime-smoke.mjs') return [...WORLD_COMPONENTS];
+  if (path.startsWith('packages/world-api/')) return ['world-api'];
+  if (path.startsWith('packages/world-matchmaking/')) return ['world-matchmaking'];
+  if (path.startsWith('packages/world-shared/') || path.startsWith('infrastructure/world/')) return [...WORLD_COMPONENTS];
+  return [];
+}
+
 export function componentForPath(path) {
+  const world = worldAffectedForPath(path);
+  if (world.length > 0) return world;
   if (path === 'scripts/docker-dapp-server.mjs') return ['dapp', 'treasure-hunt'];
   if (path === 'scripts/docker-start-game-ci.mjs') return ['treasure-hunt'];
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|\.npmrc|\.dockerignore|Dockerfile\.ci|docker-compose\.coolify\.yml|docker-compose\.images\.yml|scripts\/docker-start(?:-ci)?\.sh|scripts\/assert-.*\.mjs)$/.test(path)) return [...COMPONENTS];
@@ -77,7 +98,9 @@ export function componentForPath(path) {
 export function mapNxProjects(projectNames) {
   const result = [];
   for (const name of projectNames) {
-    const component = PROJECT_COMPONENT[name.trim()];
+    const normalized = name.trim();
+    if (SHARED_WORLD_PROJECTS.has(normalized)) result.push(...WORLD_COMPONENTS);
+    const component = PROJECT_COMPONENT[normalized];
     if (component) result.push(component);
     if (name.trim().toLowerCase().includes('scheduler')) result.push('schedulers');
   }
@@ -120,7 +143,209 @@ function canRefineDappOnly({ changedFiles, dockerfileBefore, dockerfileAfter }) 
     && isDappFinalStageOnlyChange(dockerfileBefore, dockerfileAfter);
 }
 
-export function chooseReleasePlan({ state, head, configHash, environment, changedFiles = [], nxProjects = [], nxAvailable = true, baseAncestor = true, dockerfileBefore = null, dockerfileAfter = null }) {
+const WORLD_DOCKER_STAGES = new Set([
+  'world-deps',
+  'world-api-build',
+  'world-matchmaking-build',
+  'world-api',
+  'world-matchmaking',
+]);
+
+export function isWorldDockerfileOnlyChange(baseDockerfile, headDockerfile) {
+  if (typeof baseDockerfile !== 'string' || typeof headDockerfile !== 'string') return false;
+  const stageNames = (source) => [...source.matchAll(/^FROM\s+[^\n]+\s+AS\s+([a-z0-9-]+)\s*$/gim)].map((match) => match[1]);
+  const baseStages = stageNames(baseDockerfile);
+  const headStages = stageNames(headDockerfile);
+  const baseNonWorld = baseStages.filter((stage) => !WORLD_DOCKER_STAGES.has(stage));
+  const headNonWorld = headStages.filter((stage) => !WORLD_DOCKER_STAGES.has(stage));
+  if (JSON.stringify(baseNonWorld) !== JSON.stringify(headNonWorld)) return false;
+  if (!headDockerfile.includes('FROM base AS world-deps')) return false;
+  const baseWorldStages = baseStages.filter((stage) => stage.startsWith('world-'));
+  const headWorldStages = headStages.filter((stage) => stage.startsWith('world-'));
+  if (headWorldStages.some((stage) => !WORLD_DOCKER_STAGES.has(stage))) return false;
+  if (headWorldStages.some((stage, index, all) => all.indexOf(stage) !== index)) return false;
+  if (baseWorldStages.length > 0 && JSON.stringify(baseWorldStages) !== JSON.stringify(headWorldStages)) return false;
+  const knownWorldStages = headStages.filter((stage) => WORLD_DOCKER_STAGES.has(stage));
+  if (knownWorldStages.length === 0) return false;
+  const baseWithoutWorld = baseDockerfile.replace(/^FROM\s+[^\n]+\s+AS\s+world-[\s\S]*$/gim, '');
+  const headWithoutWorld = headDockerfile.replace(/^FROM\s+[^\n]+\s+AS\s+world-[\s\S]*$/gim, '');
+  if (baseWithoutWorld !== headWithoutWorld && !headDockerfile.startsWith(baseDockerfile)) return false;
+  const worldText = headDockerfile.slice(Math.max(0, headDockerfile.indexOf('FROM base AS world-deps')));
+  return !/(?:^|\n)\s*FROM\s+[^\n]+\s+AS\s+(?!world-)/i.test(worldText)
+    && !/(?:^|\n)\s*COPY\s+--from=(?!world-(?:api|matchmaking)-build)/i.test(worldText);
+}
+
+/**
+ * build-images is an orchestration entry point, so arbitrary edits keep the
+ * conservative all-image invalidation. The only safe refinement is the
+ * catalog delta that adds or edits the two World targets while every other
+ * line remains byte-for-byte stable.
+ */
+export function isWorldBuildImagesOnlyChange(baseSource, headSource) {
+  if (typeof baseSource !== 'string' || typeof headSource !== 'string') return false;
+  const worldTarget = /^[ \t]*['"]world-(?:api|matchmaking)['"][ \t]*:[ \t]*[^,\n]+,[ \t]*\r?\n?/gm;
+  const stripWorldTargets = (source) => source.replace(worldTarget, '');
+  if (stripWorldTargets(baseSource) !== stripWorldTargets(headSource)) return false;
+  return /['"]world-api['"]\s*:\s*['"]world-api['"]/m.test(headSource)
+    && /['"]world-matchmaking['"]\s*:\s*['"]world-matchmaking['"]/m.test(headSource);
+}
+
+function jsonWithoutWorldScripts(value) {
+  const parsed = JSON.parse(value);
+  const scripts = { ...(parsed.scripts ?? {}) };
+  delete scripts['build:world'];
+  delete scripts['typecheck:world'];
+  delete scripts['test:world'];
+  return { ...parsed, scripts };
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return value.map(stableJson);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableJson(value[key])]));
+  }
+  return value;
+}
+
+export function isWorldPackageOnlyChange(packageBefore, packageAfter) {
+  if (typeof packageBefore !== 'string' || typeof packageAfter !== 'string') return false;
+  try {
+    const before = jsonWithoutWorldScripts(packageBefore);
+    const after = jsonWithoutWorldScripts(packageAfter);
+    return JSON.stringify(stableJson(before)) === JSON.stringify(stableJson(after));
+  } catch {
+    return false;
+  }
+}
+
+function lockSectionBlocks(source, section) {
+  if (typeof source !== 'string') return null;
+  const lines = source.replace(/\r\n/g, '\n').split('\n');
+  const marker = lines.findIndex((line) => line === `${section}:`);
+  if (marker === -1) return null;
+  const nextSection = lines.slice(marker + 1).findIndex((line) => /^[A-Za-z][A-Za-z0-9_-]*:$/.test(line));
+  const end = nextSection === -1 ? lines.length : marker + 1 + nextSection;
+  const blocks = new Map();
+  let start = null;
+  for (let index = marker + 1; index < end; index += 1) {
+    // A lockfile block can be an inline empty mapping (`key: {}`), so only
+    // indentation, rather than a trailing colon, identifies its boundary.
+    if (/^  \S/.test(lines[index])) {
+      if (start !== null) {
+        const key = lines[start].slice(2).replace(/:.*$/, '').replace(/^['"]|['"]$/g, '');
+        blocks.set(key, lines.slice(start, index).join('\n'));
+      }
+      start = index;
+    }
+  }
+  if (start !== null) {
+    const key = lines[start].slice(2).replace(/:.*$/, '').replace(/^['"]|['"]$/g, '');
+    blocks.set(key, lines.slice(start, end).join('\n'));
+  }
+  return blocks;
+}
+
+function lockPreamble(source) {
+  const marker = source.indexOf('importers:');
+  return marker === -1 ? null : source.slice(0, marker);
+}
+
+export function isWorldLockOnlyChange(lockBefore, lockAfter) {
+  if (typeof lockBefore !== 'string' || typeof lockAfter !== 'string') return false;
+  if (lockPreamble(lockBefore) !== lockPreamble(lockAfter)) return false;
+  for (const section of ['importers', 'packages', 'snapshots']) {
+    const before = lockSectionBlocks(lockBefore, section);
+    const after = lockSectionBlocks(lockAfter, section);
+    if (!before || !after) return false;
+    for (const [key, block] of before) {
+      if (after.get(key) !== block) return false;
+    }
+    if (section === 'importers') {
+      for (const key of after.keys()) {
+        if (!before.has(key) && !['packages/world-api', 'packages/world-matchmaking', 'packages/world-shared'].includes(key)) return false;
+      }
+    }
+  }
+  return true;
+}
+
+const WORLD_ROOT_FILES = new Set([
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'nx.json',
+  'Dockerfile.ci',
+  'docker-compose.coolify.yml',
+  'docker-compose.images.yml',
+  'docker-compose.workers.yml',
+  '.github/workflows/cukies-images.yml',
+]);
+
+function isWorldRefinementPath(path) {
+  if (path === 'scripts/ci/world-runtime-smoke.mjs') return true;
+  if (path === 'scripts/ci/build-images.mjs') return true;
+  if (WORLD_ROOT_FILES.has(path)) return true;
+  if (worldAffectedForPath(path).length > 0) return true;
+  if (path.startsWith('docs/')) return true;
+  if (path.startsWith('infrastructure/ci/')) return /^(infrastructure\/ci\/components\.json|infrastructure\/ci\/[^/]+\.test\.sh|infrastructure\/ci\/[^/]+\.md)$/.test(path);
+  if (path.startsWith('scripts/ci/')) return ORCHESTRATION_ONLY_PATHS.has(path)
+    || ['scripts/ci/release-state.mjs', 'scripts/ci/release-delivery-plan.mjs', 'scripts/ci/deliver-release.mjs', 'scripts/ci/coolify-release.mjs'].includes(path);
+  return path === 'AGENTS.md';
+}
+
+export function canRefineWorldOnly({
+  changedFiles,
+  packageBefore,
+  packageAfter,
+  lockBefore,
+  lockAfter,
+  workspaceBefore,
+  workspaceAfter,
+  nxBefore,
+  nxAfter,
+  dockerfileBefore,
+  dockerfileAfter,
+  composeBefore,
+  composeAfter,
+  imagesComposeBefore,
+  imagesComposeAfter,
+  workersComposeBefore,
+  workersComposeAfter,
+  buildImagesBefore,
+  buildImagesAfter,
+}) {
+  const sharedRuntimeChanged = changedFiles.some((path) => path.startsWith('packages/world-shared/') || path.startsWith('infrastructure/world/'));
+  const worldDockerChanged = changedFiles.includes('Dockerfile.ci')
+    && isWorldDockerfileOnlyChange(dockerfileBefore, dockerfileAfter);
+  const worldBuildCatalogChanged = changedFiles.includes('scripts/ci/build-images.mjs')
+    && isWorldBuildImagesOnlyChange(buildImagesBefore, buildImagesAfter);
+  const integrationRootChanged = changedFiles.some((path) => WORLD_ROOT_FILES.has(path)) || worldDockerChanged || worldBuildCatalogChanged;
+  if ((!sharedRuntimeChanged && !worldDockerChanged && !worldBuildCatalogChanged) || !integrationRootChanged) return false;
+  if (!changedFiles.every(isWorldRefinementPath)) return false;
+  if (changedFiles.includes('scripts/ci/build-images.mjs')
+    && !isWorldBuildImagesOnlyChange(buildImagesBefore, buildImagesAfter)) return false;
+  if (changedFiles.includes('package.json') && !isWorldPackageOnlyChange(packageBefore, packageAfter)) return false;
+  if (changedFiles.includes('pnpm-lock.yaml') && !isWorldLockOnlyChange(lockBefore, lockAfter)) return false;
+  for (const [before, after] of [[workspaceBefore, workspaceAfter], [nxBefore, nxAfter]]) {
+    if (before !== undefined || after !== undefined) {
+      if (typeof before !== 'string' || typeof after !== 'string' || before !== after) return false;
+    }
+  }
+  if (changedFiles.includes('Dockerfile.ci') && !isWorldDockerfileOnlyChange(dockerfileBefore, dockerfileAfter)) return false;
+  for (const [before, after] of [
+    [composeBefore, composeAfter],
+    [imagesComposeBefore, imagesComposeAfter],
+    [workersComposeBefore, workersComposeAfter],
+  ]) {
+    if (before !== undefined || after !== undefined) {
+      if (typeof before !== 'string' || typeof after !== 'string') return false;
+      if (withoutWorldRuntime(after) !== withoutWorldRuntime(before)) return false;
+    }
+  }
+  return true;
+}
+
+export function chooseReleasePlan({ state, head, configHash, environment, changedFiles = [], nxProjects = [], nxAvailable = true, baseAncestor = true, dockerfileBefore = null, dockerfileAfter = null, packageBefore, packageAfter, lockBefore, lockAfter, workspaceBefore, workspaceAfter, nxBefore, nxAfter, composeBefore, composeAfter, imagesComposeBefore, imagesComposeAfter, workersComposeBefore, workersComposeAfter, buildImagesBefore, buildImagesAfter }) {
   const deployment = resolveDeploymentEnvironment(environment);
   if (state) assertEnvironmentMetadata(state, deployment, { allowLegacy: deployment.environment === 'staging', context: 'release state' });
   const previousCommit = state?.commit ?? state?.deployedSha ?? null;
@@ -129,8 +354,9 @@ export function chooseReleasePlan({ state, head, configHash, environment, change
   const configChanged = Boolean(state && state.configHash !== configHash);
   const firstOrInvalid = !hasUsableBase;
   const refinedDappOnly = !firstOrInvalid && canRefineDappOnly({ changedFiles, dockerfileBefore, dockerfileAfter });
-  const pathAffected = refinedDappOnly ? ['dapp'] : changedFiles.flatMap(componentForPath);
-  const effectiveNxAffected = refinedDappOnly ? [] : nxAffected;
+  const refinedWorldOnly = !firstOrInvalid && !refinedDappOnly && canRefineWorldOnly({ changedFiles, packageBefore, packageAfter, lockBefore, lockAfter, workspaceBefore, workspaceAfter, nxBefore, nxAfter, dockerfileBefore, dockerfileAfter, composeBefore, composeAfter, imagesComposeBefore, imagesComposeAfter, workersComposeBefore, workersComposeAfter, buildImagesBefore, buildImagesAfter });
+  const pathAffected = refinedDappOnly ? ['dapp'] : refinedWorldOnly ? [...WORLD_COMPONENTS] : changedFiles.flatMap(componentForPath);
+  const effectiveNxAffected = refinedDappOnly || refinedWorldOnly ? [] : nxAffected;
   const affected = firstOrInvalid
     ? [...COMPONENTS]
     : unique([...pathAffected, ...effectiveNxAffected, ...(configChanged ? ['dapp', 'treasure-hunt'] : [])]);
@@ -152,6 +378,8 @@ export function chooseReleasePlan({ state, head, configHash, environment, change
     ? ALL_REASON
     : refinedDappOnly
       ? DAPP_DOCKERFILE_REFINEMENT_REASON
+      : refinedWorldOnly
+        ? 'world-integration-only'
       : configChanged
         ? 'build-config-changed'
         : 'component-changes';
@@ -167,6 +395,9 @@ export function chooseReleasePlan({ state, head, configHash, environment, change
     refinement: refinedDappOnly ? {
       reason: DAPP_DOCKERFILE_REFINEMENT_REASON,
       detail: 'Dockerfile.ci solo cambia el stage final dapp; se ignoran los Nx afectados globales y se reutilizan los otros cuatro componentes.',
+    } : refinedWorldOnly ? {
+      reason: 'world-integration-only',
+      detail: 'El registro World solo añade sus paquetes, imágenes y perfil opt-in; la proyección efectiva conserva web, juego y workers existentes.',
     } : null,
     configHash,
     nx: { available: nxAvailable, projects: nxProjects, affected: effectiveNxAffected },
@@ -258,7 +489,19 @@ async function main() {
     ? await gitShowFile(baseForDiff, 'Dockerfile.ci')
     : null;
   const dockerfileAfter = dockerfileBefore === null ? null : await gitShowFile(head, 'Dockerfile.ci');
-  const plan = chooseReleasePlan({ state, head, configHash, environment: deployment.environment, changedFiles: files, nxProjects: nx.projects, nxAvailable: nx.available, baseAncestor: ancestor, dockerfileBefore, dockerfileAfter });
+  const pair = async (path) => {
+    if (!baseForDiff || !files.includes(path)) return [undefined, undefined];
+    return [await gitShowFile(baseForDiff, path), await gitShowFile(head, path)];
+  };
+  const [packageBefore, packageAfter] = await pair('package.json');
+  const [lockBefore, lockAfter] = await pair('pnpm-lock.yaml');
+  const [workspaceBefore, workspaceAfter] = await pair('pnpm-workspace.yaml');
+  const [nxBefore, nxAfter] = await pair('nx.json');
+  const [composeBefore, composeAfter] = await pair('docker-compose.coolify.yml');
+  const [imagesComposeBefore, imagesComposeAfter] = await pair('docker-compose.images.yml');
+  const [workersComposeBefore, workersComposeAfter] = await pair('docker-compose.workers.yml');
+  const [buildImagesBefore, buildImagesAfter] = await pair('scripts/ci/build-images.mjs');
+  const plan = chooseReleasePlan({ state, head, configHash, environment: deployment.environment, changedFiles: files, nxProjects: nx.projects, nxAvailable: nx.available, baseAncestor: ancestor, dockerfileBefore, dockerfileAfter, packageBefore, packageAfter, lockBefore, lockAfter, workspaceBefore, workspaceAfter, nxBefore, nxAfter, composeBefore, composeAfter, imagesComposeBefore, imagesComposeAfter, workersComposeBefore, workersComposeAfter, buildImagesBefore, buildImagesAfter });
   plan.nx.stderr = nx.stderr ?? null;
   await writeFile(outputPath, `${JSON.stringify(plan, null, 2)}\n`);
   console.log(JSON.stringify({ base: plan.base, baseReason: plan.baseReason, build: plan.build, reuse: plan.reuse.map((entry) => entry.component) }));

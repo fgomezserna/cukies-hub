@@ -11,7 +11,7 @@ import { resolveCoolifyTargets } from './coolify-targets.mjs';
 const sha = 'a'.repeat(40), hash = 'b'.repeat(64), digest = 'sha256:' + 'c'.repeat(64);
 const compose = 'services:\n  chain-indexer:\n    image: fixture\n';
 const manifest = () => ({ environment: 'staging', chainId: '97', commit: sha, configHash: hash,
-  components: Object.fromEntries(CI_COMPONENTS.map((c) => [c, { image: `registry:5000/cukies-hub/${c}:${sha}-${hash}@${digest}`, digest, sourceSha: sha, configHash: hash }])) });
+  components: Object.fromEntries(CI_COMPONENTS.map((c) => [c, { image: `registry:5000/cukies-hub/${c}:${sha}-${hash}@${digest}`, digest, sourceSha: sha, configHash: hash, environment: 'staging', chainId: '97' }])) });
 const previous = () => ({ ...manifest(), deliveryMode: 'rolling', workersComposeHash: chooseDelivery({ manifest: manifest(), compose }).workersComposeHash });
 
 test('a docs-only release neither restarts services nor advances the served SHA', async () => {

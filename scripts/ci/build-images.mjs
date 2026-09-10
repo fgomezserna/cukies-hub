@@ -15,6 +15,8 @@ const TARGETS = Object.freeze({
   schedulers: 'schedulers',
   'cukies-bridge-relayer': 'cukies-bridge-relayer',
   'treasure-hunt': 'treasure-hunt',
+  'world-api': 'world-api',
+  'world-matchmaking': 'world-matchmaking',
 });
 
 function run(command, args, { capture = false } = {}) {

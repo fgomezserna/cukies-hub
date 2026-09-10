@@ -1,0 +1,164 @@
+{
+  "observedAt": "2026-09-10T03:11:17.235391+00:00",
+  "scope": "World port preservation and common-CI integration; runtime and writes remain disabled",
+  "source": {
+    "pr": 346,
+    "branch": "codex/world-stack-integration",
+    "commit": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
+    "deltaFiles": 205,
+    "inventory": "infrastructure/world/integration/inventory-20260910.json"
+  },
+  "integration": {
+    "frozenCandidate": "09401296ae6732f6d80014c6619159662f6728bd",
+    "productBase": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+    "reconciledStaging": "9d3e72858466a47bc6fe11b9475bd2e7ff96f454",
+    "mergeCommit": "73dc4dbdcc287b453a500f1ca1d288c07311f47d",
+    "mergeTree": "50e1e786b2322b156b9c5d0ae0549d2e7a32963d",
+    "worldComponents": [
+      "world-api",
+      "world-matchmaking"
+    ],
+    "catalogComponents": 8,
+    "worldRuntimeEnabled": false,
+    "worldGameWritesEnabled": false,
+    "worldExcludedFromDeliveredCompose": true,
+    "identityCorrectionSource": "a9ee0e8e3f1ae0746e657360283ccb91d990bc5a",
+    "identityCorrectionIntegrated": "cfeab56281450e220a5948e14f1a9374440c2c9d"
+  },
+  "preservation": {
+    "originalImportedPaths": 200,
+    "originalBlobsAndModesMatched": 199,
+    "intentionalOriginalDocOverlay": [
+      {
+        "path": "infrastructure/world/README.md",
+        "originalBlob": "82fc1d3d1ca69719bae0dd1e7be94ce0ad9d3e83",
+        "currentBlob": "b0d9c3d8546afdbbf99ca97426cab47bc8dc30b6",
+        "reason": "Documentation aligned with current common CI; source code unchanged"
+      }
+    ],
+    "integrationHandoffOverlay": "infrastructure/world/integration/handoff-20260910.md marked as historical and linked to canonical tracking",
+    "protectedSha256": {
+      "packages/world-shared/world-port-provenance.json": "57b4c5cf20e387aa673269334f2566a6bc760c903f0e57059cb421ef46754ff2",
+      "docs/legacy-marketplace/evidence/2026-09-09-world-stack-port.json": "eca232d269ecc65ddd633b0f75d4a47db599756830df01b7ffe103b6ffc76760"
+    },
+    "priorLockEntriesPreserved": 4224,
+    "newLockEntries": 327,
+    "dappAndGameDiffFromReconciledStaging": []
+  },
+  "preReviewGates": {
+    "candidateSha": "09401296ae6732f6d80014c6619159662f6728bd",
+    "ciTests": {
+      "passed": 125,
+      "failed": 0
+    },
+    "worldBuild": "PASS",
+    "worldTypecheck": "PASS",
+    "worldTests": "PASS - implementer outputs",
+    "composeCheck": "PASS",
+    "builder": {
+      "platform": "linux/amd64",
+      "memory": "9g",
+      "maxParallelism": 1
+    },
+    "dockerfile": {
+      "path": "Dockerfile.ci",
+      "sha256": "e78c2a9ce8faec2cfb73ad83e4976e48e2998a7d91a50f30bafd92bda75beb1f",
+      "canonicalSyntax": "docker/dockerfile:1.7"
+    },
+    "frozenInstall": {
+      "command": "pnpm --filter nextn --filter \"@cukies/world-api...\" --filter \"@cukies/world-matchmaking...\" install --frozen-lockfile --ignore-scripts",
+      "result": "pass"
+    },
+    "localImages": {
+      "world-api": {
+        "tag": "cukies-world-api-verify:09401296ae6732f6d80014c6619159662f6728bd",
+        "digest": "sha256:481619d37febac6cad88b29fa70ab404ee7e3d04ffd59c2304d8aa2d4f756ae0",
+        "platform": "linux/amd64",
+        "ociRevision": "09401296ae6732f6d80014c6619159662f6728bd",
+        "user": "node",
+        "entrypoint": [
+          "/usr/local/bin/world-entrypoint"
+        ],
+        "exposedPort": 3010,
+        "runtimeDefaults": {
+          "WORLD_RUNTIME_ENABLED": "false",
+          "WORLD_GAME_WRITES_ENABLED": "false"
+        },
+        "runtimeContract": "/app/packages/world-api/dist/main.js"
+      },
+      "world-matchmaking": {
+        "tag": "cukies-world-matchmaking-verify:09401296ae6732f6d80014c6619159662f6728bd",
+        "digest": "sha256:09a271d6e376670da3f8584b7caca29a97176623caa8cec59c15de1c4bef18ae",
+        "platform": "linux/amd64",
+        "ociRevision": "09401296ae6732f6d80014c6619159662f6728bd",
+        "user": "node",
+        "entrypoint": [
+          "/usr/local/bin/world-entrypoint"
+        ],
+        "exposedPort": 3011,
+        "runtimeDefaults": {
+          "WORLD_RUNTIME_ENABLED": "false",
+          "WORLD_GAME_WRITES_ENABLED": "false"
+        },
+        "runtimeContract": "/app/packages/world-matchmaking/dist/main.js"
+      }
+    },
+    "smoke": {
+      "result": "PASS",
+      "data": "synthetic Mongo8/Redis7",
+      "authAndWriteGuards": true,
+      "dependencyReadinessAndRecovery": true,
+      "resourcesRemoved": true,
+      "registryPush": false,
+      "liveMutation": false
+    }
+  },
+  "independentReview": {
+    "role": "Astra Max, bounded independent review",
+    "result": "P2-01 resolved in a9ee0e8 and reviewed by root; remaining publication gates pending",
+    "finding": "A legacy state without verified served gameCommit must not infer it from aggregate commit or image sourceSha",
+    "scenariosPassed": [
+      "DApp source",
+      "game source",
+      "indexer source",
+      "public config",
+      "DApp Docker final",
+      "common Docker"
+    ],
+    "currentState": {
+      "webCommit": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+      "gameCommit": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc"
+    },
+    "reportSha256": "ce3e5057bb5c07c2674eecde7824112d7ada171c002bf64e557f9cc059147c3e",
+    "resolution": "Require valid existing webCommit and gameCommit; preserve them literally. Missing or invalid identity rejects before state/result/journal writes, with no aggregate commit or image sourceSha inference.",
+    "correctionGates": {
+      "focalPassed": 23,
+      "ciSuitePassed": 126,
+      "failed": 0,
+      "sourceSha": "a9ee0e8e3f1ae0746e657360283ccb91d990bc5a",
+      "evidence": "INFRA delivery report and committed regression; root reviewed the complete correction diff",
+      "dockerRebuilt": false,
+      "reason": "Runtime/Docker/package code unchanged from tested frozen candidate"
+    }
+  },
+  "publication": {
+    "status": "root-reviewed; PR and publication gates pending",
+    "registryImagesPublished": false,
+    "worldActivated": false
+  },
+  "remainingMigration": [
+    "World delivery activation and operational image/readiness validation",
+    "Reconciled data and IDs",
+    "Verified Hub to World identity issuer",
+    "Learn/Ludo and legacy auth/GraphQL consumers",
+    "Unreal/Agones integration",
+    "Single writer and drained traffic before retiring legacy services"
+  ],
+  "documentationValidation": {
+    "relativeLinks": "PASS",
+    "json": "PASS",
+    "diffWhitespace": "PASS",
+    "globalAndRepoInstructionBytes": 31016,
+    "productGatesNotRepeatedForDocs": true
+  }
+}

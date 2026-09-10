@@ -5,8 +5,9 @@ import { requireValue } from './cli-args.mjs';
 import { createCoolifyReleaseClient, buildImageEnvironment, assertPinnedApplication } from './coolify-release.mjs';
 import { deployRollingWeb } from './coolify-rolling-web.mjs';
 import { resolveCoolifyTargets } from './coolify-targets.mjs';
-import { chooseDelivery } from './release-delivery-plan.mjs';
-import { readReleaseState, createSuccessfulState, writeReleaseStateAtomic } from './release-state.mjs';
+import { assertWorldDisabled, chooseDelivery } from './release-delivery-plan.mjs';
+import { withoutWorldRuntime } from './generate-images-compose.mjs';
+import { readReleaseState, createSuccessfulState, createNoopState, writeReleaseStateAtomic } from './release-state.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -18,6 +19,8 @@ export function assertWorkerTarget(application, target) {
 }
 
 export async function deployWorkers({ client, targets, manifest, compose, sleepImpl = sleep, timeoutMs = 30 * 60 * 1000 }) {
+  assertWorldDisabled(manifest, process.env);
+  compose = withoutWorldRuntime(compose);
   const target = targets.workers;
   assertWorkerTarget(await client.getApplication(target.resourceUuid), target);
   await client.patchEnvs(target.resourceUuid, [
@@ -45,8 +48,10 @@ export async function deployWorkers({ client, targets, manifest, compose, sleepI
 }
 
 export async function deliverRelease({ client, manifest, previous, compose, targets = resolveCoolifyTargets(manifest.environment), webDeploy = deployRollingWeb, gameDeploy = deployRollingWeb, workerDeploy = deployWorkers, recordProgress = async () => {}, sleepImpl = sleep }) {
-  const decision = chooseDelivery({ manifest, previous, compose });
-  if (decision.skip) return { status: 'skipped', reason: 'images-and-workers-compose-unchanged', servedSha: previous.commit, decision };
+  assertWorldDisabled(manifest, previous, process.env);
+  const effectiveCompose = withoutWorldRuntime(compose);
+  const decision = chooseDelivery({ manifest, previous, compose: effectiveCompose });
+  if (decision.skip) return { status: 'skipped', reason: 'images-and-workers-compose-unchanged', servedSha: previous?.webCommit ?? previous?.commit ?? null, decision };
   if (decision.web && !targets.web) throw new Error(`El recurso web de ${manifest.environment} todavía no está configurado.`);
   if (decision.game && !targets.game) throw new Error(`El recurso game de ${manifest.environment} todavía no está configurado.`);
   await recordProgress({ phase: decision.web ? 'web-starting' : decision.game ? 'game-starting' : 'workers-starting', commit: manifest.commit, environment: manifest.environment, webResourceUuid: targets.web?.resourceUuid ?? null, gameResourceUuid: targets.game?.resourceUuid ?? null, workersResourceUuid: targets.workers?.resourceUuid ?? null });
@@ -61,7 +66,7 @@ export async function deliverRelease({ client, manifest, previous, compose, targ
     if (previous?.deliveryMode !== 'rolling') await sleepImpl(60_000);
     await recordProgress({ phase: 'workers-starting' });
   }
-  const workers = decision.workers ? await workerDeploy({ client, targets, manifest, compose }) : null;
+  const workers = decision.workers ? await workerDeploy({ client, targets, manifest, compose: effectiveCompose }) : null;
   await recordProgress({ phase: 'delivery-verified', web, game, workers });
   Object.assign(manifest, {
     deliveryMode: 'rolling',
@@ -103,6 +108,13 @@ async function main() {
     await writeReleaseStateAtomic(journalPath, journal);
   };
   const result = await deliverRelease({ client: createCoolifyReleaseClient(), manifest, previous, compose, recordProgress });
+  if (result.status === 'skipped') {
+    const state = createNoopState({ previous, ...manifest, head: manifest.commit, workersComposeHash: result.decision.workersComposeHash });
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    await writeReleaseStateAtomic(statePath, state);
+    result.stateCommit = state.commit;
+    result.servedSha = state.webCommit ?? state.commit;
+  }
   await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   if (result.status === 'finished') {
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

@@ -20,6 +20,8 @@ function entry(component, sourceSha = SHA_A, digest = DIGEST_A) {
     digest,
     sourceSha,
     configHash: HASH,
+    environment: 'staging',
+    chainId: '97',
   };
 }
 

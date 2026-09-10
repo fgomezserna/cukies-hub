@@ -2,7 +2,7 @@
 
 Estado: topología activa y checklist operativo.
 Issue: #166 `UKI-090.4`.
-Última comprobación documental: 2026-09-09.
+Última comprobación documental: 2026-09-10.
 
 ## Decisión y alcance
 
@@ -17,7 +17,7 @@ mientras se estabiliza una release.
 
 | Scope | Recurso y rama | Ruta de despliegue | Datos y dominio |
 | --- | --- | --- | --- |
-| Stage / Hub | Web app32 `rwwsc4kkwc0ck84cgk40s8kk`; workers app28 `u4s804o4wwcckowgk0woo4wg`; rama `staging` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201`. El plan de seis componentes puede actualizar web32 y `docker-compose.workers.yml` en app28, o la lane `treasure-hunt` de app31; app31 sigue fuera del Compose de workers. Autodeploy Git: **OFF**. `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
+| Stage / Hub | Web app32 `rwwsc4kkwc0ck84cgk40s8kk`; workers app28 `u4s804o4wwcckowgk0woo4wg`; rama `staging` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201`. El catálogo contiene ocho imágenes (seis componentes activos y dos World desactivados); el plan puede actualizar web32 y `docker-compose.workers.yml` en app28, o la lane `treasure-hunt` de app31; app31 sigue fuera del Compose de workers. Autodeploy Git: **OFF**. `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
 | Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`; app12 sigue sirviendo `main`/`4475baa` mientras la migración de registry de PR361 permanece inactiva. | BSC mainnet y datos de producción; `https://cukies.world`. |
 | Stage / Treasure Hunt | App31 `game-treasurehunt-staging`, `staging`, UUID `lc04cw8gs4koo4swwws0c4ss` | Docker Image `treasure-hunt` activo por digest en el mismo CI/registry, fuera del Compose de workers. Bootstrap servido y reemplazo aislado verificados en `dc4c21e`; el fallo inicial de metadata y su recuperación se conservan en la evidencia INFRA. | `https://cukieshub.eurekand.com/treasurehunt-game`, `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y origen dapp de staging. |
 | Main / Treasure Hunt | App13 `game-treasurehunt`, `main`, UUID `tkkggwcosc4gksckcc480cwg` | Nixpacks/e6e136b sigue sirviendo tráfico; el target Docker Image de PR361 está preparado pero la migración por registry/CI permanece inactiva. | `https://treasurehunt.cukies.world`, basePath vacío; parent/origins exclusivos de producción. |
@@ -26,6 +26,14 @@ En staging publican las imágenes del registry de web32 y Treasure Hunt app31; e
 Treasure Hunt app13 (`e6e136b`). App33 es el nuevo recurso web preparado, aún sin
 arrancar. Workers y schedulers son internos; app31 es un recurso independiente fuera
 del Compose, aunque su lane pertenece al workflow común.
+World API y matchmaking comparten CI, Nx, constructor y manifiesto con el Hub.
+Su perfil incluye Redis privado, sin puertos públicos; la entrega vigente
+excluye World del Compose efectivo. Publicar esas imágenes puede limitarse a
+registrar ocho referencias preservando los seis digests activos y los SHAs
+servidos independientes de web/juego. No habilita runtime, escrituras, datos
+ni tráfico. La activación requiere una entrega revisada y los gates de
+[World](../infrastructure/world/README.md); flags/profile solos no bastan.
+
 Las tres bases de Stage (`cukies-hub-staging`, `cukies-legacy-staging` y
 `cukieshub-new-staging`) están fuera del Compose operativo y viven en el Mongo
 dedicado de LXC2007, servicio `mongod-cukies-staging`, `192.168.1.221:27018`,

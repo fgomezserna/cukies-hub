@@ -1,0 +1,19 @@
+{
+  "base": "ddb60f8bb5e62fe3a0886bac9ccb2fef49b4c930",
+  "source": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
+  "worldSourceAgainstCurrentGenerator": "service world-redis no tiene una imagen CI definida.",
+  "affectedPathMapping": {
+    "packages/world-api/src/main.ts": [],
+    "packages/world-matchmaking/src/main.ts": [],
+    "packages/world-shared/src/auth.ts": [],
+    "infrastructure/world/entrypoint.sh": []
+  },
+  "affectedProjectMapping": [],
+  "rootScripts": {
+    "build:world": null,
+    "typecheck:world": null,
+    "test:world": null
+  },
+  "worldLockImporters": [],
+  "repositoryFilesMutated": false
+}

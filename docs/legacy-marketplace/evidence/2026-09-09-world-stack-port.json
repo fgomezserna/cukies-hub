@@ -1,0 +1,143 @@
+{
+  "recordedAt": "2026-09-09T11:46:57.779Z",
+  "scope": "Local port and unified deployment definition for World Game API and matchmaking; no runtime activation or data migration",
+  "branch": "codex/world-stack-integration",
+  "integrationBase": "53088a33fcdca428a2f6d11967b63c69d1e4fccb",
+  "legacy": {
+    "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+    "trackedDirtyFiles": 72,
+    "sourceWorkingTreePreserved": true,
+    "provenance": "packages/world-shared/world-port-provenance.json",
+    "filesWithDestinationHashes": 178,
+    "hashSemantics": "sourceObservedHash and destinationHash are final observed hashes; they do not prove an atomic copy or historical equality"
+  },
+  "routes": [
+    {
+      "service": "world-api",
+      "sourceDeclarations": 135,
+      "targetDeclarations": 135,
+      "missing": [],
+      "added": []
+    },
+    {
+      "service": "world-matchmaking",
+      "sourceDeclarations": 9,
+      "targetDeclarations": 9,
+      "missing": [],
+      "added": []
+    }
+  ],
+  "checks": [
+    {
+      "command": "pnpm install --frozen-lockfile --filter '@cukies/world-api...' --filter '@cukies/world-matchmaking...' --ignore-scripts",
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build:world",
+      "result": "passed",
+      "note": "Matchmaking compiled again after Redis recovery fix in the final Docker image"
+    },
+    {
+      "command": "pnpm --filter @cukies/world-shared test",
+      "result": "passed",
+      "suites": 4,
+      "tests": 15
+    },
+    {
+      "command": "pnpm --filter @cukies/world-api test",
+      "result": "passed",
+      "suites": 6,
+      "tests": 85
+    },
+    {
+      "command": "pnpm --filter @cukies/world-matchmaking test",
+      "result": "passed",
+      "suites": 2,
+      "tests": 37,
+      "note": "Includes final Redis recovery correction"
+    },
+    {
+      "command": "pnpm --filter @cukies/world-matchmaking typecheck",
+      "result": "passed",
+      "note": "After final Redis correction"
+    },
+    {
+      "command": "node --test infrastructure/world/tests/*.test.mjs",
+      "result": "passed",
+      "tests": 3
+    },
+    {
+      "command": "node --test scripts/docker-compose-coolify.test.mjs",
+      "result": "passed",
+      "tests": 37
+    },
+    {
+      "command": "docker build -f infrastructure/world/Dockerfile --build-arg WORLD_PACKAGE=<world-api|world-matchmaking> -t <image> .",
+      "result": "passed",
+      "images": [
+        {
+          "tags": [
+            "cukies-world-api:local-review"
+          ],
+          "id": "sha256:0487b4523ed36597b1c3f907881ebd9a12638c0ac3eb4278993375a7ad854c62",
+          "createdAt": "2026-09-09T11:34:39.870909589Z"
+        },
+        {
+          "tags": [
+            "cukies-world-matchmaking:local-review"
+          ],
+          "id": "sha256:4ded244f3f4ff4cf1d4b541eff1d5060e4cda3da228257df4917ae249c22fdcf",
+          "createdAt": "2026-09-09T11:42:42.497756715Z"
+        }
+      ]
+    },
+    {
+      "command": "WORLD_API_IMAGE=cukies-world-api:local-review WORLD_MATCHMAKING_IMAGE=cukies-world-matchmaking:local-review node infrastructure/world/tests/runtime-smoke.mjs",
+      "result": "passed",
+      "observedAtApprox": "2026-09-09T11:43:00Z",
+      "reportedBy": "world_redis_runtime_fix verifier",
+      "stdout": "World Docker smoke OK: dependencias sintéticas, auth, write gate y readiness verificados.",
+      "cases": [
+        "API and matchmaking readiness 200 with synthetic Mongo 8/Redis 7",
+        "Anonymous and expired sessions rejected with 401",
+        "Generic admin CRUD rejected with 403",
+        "API writes rejected with 503 while gated off",
+        "Redis stopped: matchmaking readiness 503; Redis restarted: readiness 200",
+        "Mongo stopped: both readiness endpoints 503"
+      ],
+      "logFile": null,
+      "note": "Success reported directly in verifier output. The earlier /tmp smoke log records a pre-fix failure."
+    },
+    {
+      "command": "Existing lockfile importer and dependency-edge comparison against integration base",
+      "result": "passed",
+      "changedExistingImporters": [],
+      "changedExistingDependencies": []
+    },
+    {
+      "command": "Destination hashes versus provenance manifest",
+      "result": "passed",
+      "files": 178
+    }
+  ],
+  "safety": {
+    "runtimeProfile": "world-runtime",
+    "defaultEnabled": false,
+    "publicPorts": false,
+    "legacyRepositoryModified": false,
+    "otherWorktreesModified": false,
+    "liveDataAccessed": false,
+    "stagingDeployed": false,
+    "productionDeployed": false
+  },
+  "limitations": [
+    "HTTP declaration parity is a static comparison; it is not full game behavior or client compatibility verification.",
+    "Legacy working tree includes uncommitted and untracked game changes; provenance records observed bytes, not an atomic copy or a clean legacy release.",
+    "No public Hub-to-World session issuer or verified identity migration is implemented in this slice.",
+    "World databases need explicit data/ID reconciliation and index provisioning before activation; startup performs no data import.",
+    "Generic administrative CRUD stays denied and API writes default to disabled.",
+    "Learn, legacy auth/GraphQL, Unreal server/Agones deployment and blockchain contract migration are outside this port.",
+    "No merge, deploy, production traffic cutover or legacy service retirement is evidenced here.",
+    "Shared tracking documentation was updated on the latest staging base; other workers may continue advancing that branch."
+  ]
+}
