@@ -208,6 +208,7 @@ describe('competition credit public status conflicts', () => {
 
     expect(status.routes.uki.grants).toMatchObject({ healthy: false, openIncidents: 1 });
     expect(status.grants.healthy).toBe(false);
+    expect(status.balance.blocked).toBe(true);
   });
 
   it('applies wallet/global route filters while keeping route status independent', async () => {
@@ -242,6 +243,40 @@ describe('competition credit public status conflicts', () => {
     }, expect.objectContaining({ projection: expect.any(Object) }));
     expect(status.routes.uki.grants).toMatchObject({ healthy: true, openIncidents: 0 });
     expect(status.routes.nft.grants).toMatchObject({ healthy: false, openIncidents: 1 });
+  });
+
+  it('blocks public availability for an open incident without a recognized route', async () => {
+    const rule = testCompetitionCreditRule();
+    const { db, collections } = mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_source_watermarks: freshWatermarks(),
+    });
+    db.collection('competition_credit_incidents');
+    collections.competition_credit_incidents.countDocuments.mockImplementation(
+      (filter: Record<string, unknown>) => filter.$and ? 1 : 0,
+    );
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.balance.blocked).toBe(true);
+    expect(status.grants).toMatchObject({ healthy: false, openIncidents: 1 });
+  });
+
+  it('blocks public availability when an account in another period is blocked', async () => {
+    const rule = testCompetitionCreditRule();
+    const { db, collections } = mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_source_watermarks: freshWatermarks(),
+    });
+    db.collection('competition_credit_account_periods');
+    collections.competition_credit_account_periods.countDocuments.mockImplementation(
+      (filter: Record<string, unknown>) => filter.blocked === true ? 1 : 0,
+    );
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.balance.blocked).toBe(true);
+    expect(status.grants).toMatchObject({ healthy: true, openIncidents: 0 });
   });
 
   it('keeps a contained incident blocked when its source watermark is stale', async () => {
