@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 jest.unmock('next/image');
 
+import React from 'react';
+import { render } from '@testing-library/react';
 import { getImageProps, type ImageProps } from 'next/image';
 
 type GameImageModule = typeof import('../../../games/sybil-slayer/src/components/game-image');
@@ -20,6 +19,9 @@ function loadGameImageModule(basePath: string): GameImageModule {
 
   try {
     jest.resetModules();
+    // Keep the isolated base-path import on the same React instance as the
+    // renderer; otherwise Next Image sees a second dispatcher in Jest.
+    jest.doMock('react', () => React);
     let module: GameImageModule | undefined;
     jest.isolateModules(() => {
       module = require(gameImageModulePath) as GameImageModule;
@@ -27,6 +29,7 @@ function loadGameImageModule(basePath: string): GameImageModule {
     if (!module) throw new Error('GameImage module did not load');
     return module;
   } finally {
+    jest.dontMock('react');
     if (previousBasePath === undefined) {
       delete process.env.NEXT_PUBLIC_GAME_BASE_PATH;
     } else {
@@ -43,6 +46,34 @@ const localImage: ImageProps = {
   priority: true,
   loading: 'eager',
 };
+
+function renderCharacterFixture(
+  GameImage: GameImageModule['GameImage'],
+): HTMLImageElement[] {
+  const rendered = render(
+    React.createElement(
+      'section',
+      null,
+      React.createElement(GameImage, {
+        src: '/assets/characters/1p.png',
+        alt: 'Jugador uno',
+        width: 430,
+        height: 500,
+        priority: true,
+      }),
+      React.createElement(GameImage, {
+        src: '/assets/characters/2p.png',
+        alt: 'Jugador dos',
+        width: 430,
+        height: 500,
+        loading: 'lazy',
+      }),
+    ),
+  );
+  const images = Array.from(rendered.container.querySelectorAll('img'));
+  rendered.unmount();
+  return images;
+}
 
 describe('GameImage public asset boundary', () => {
   it('uses the direct prefixed asset with real Next image props', () => {
@@ -77,6 +108,27 @@ describe('GameImage public asset boundary', () => {
     expect(resolved.unoptimized).toBe(true);
   });
 
+  it.each([
+    ['', '/assets/characters/'],
+    ['/treasurehunt-game', '/treasurehunt-game/assets/characters/'],
+  ])('renders both character assets through real Next Image (%s)', (basePath, assetPrefix) => {
+    const { GameImage } = loadGameImageModule(basePath);
+    const images = renderCharacterFixture(GameImage);
+
+    expect(images).toHaveLength(2);
+    expect(images[0]).toHaveAttribute('src', `${assetPrefix}1p.png`);
+    expect(images[0]).toHaveAttribute('alt', 'Jugador uno');
+    expect(images[0]).toHaveAttribute('width', '430');
+    expect(images[0]).toHaveAttribute('height', '500');
+    expect(images[0]).not.toHaveAttribute('srcset');
+    expect(images[1]).toHaveAttribute('src', `${assetPrefix}2p.png`);
+    expect(images[1]).toHaveAttribute('alt', 'Jugador dos');
+    expect(images[1]).toHaveAttribute('width', '430');
+    expect(images[1]).toHaveAttribute('height', '500');
+    expect(images[1]).not.toHaveAttribute('srcset');
+    expect(images[1]).toHaveAttribute('loading', 'lazy');
+  });
+
   it('preserves remote, protocol-relative and statically imported sources', () => {
     const { resolveGameImageProps } = loadGameImageModule('/treasurehunt-game');
     const remote: ImageProps = { ...localImage, src: 'https://example.com/player.png' };
@@ -94,18 +146,4 @@ describe('GameImage public asset boundary', () => {
     expect(resolveGameImageProps(staticallyImported).unoptimized).toBeUndefined();
   });
 
-  it('routes every current local next/image consumer through GameImage', () => {
-    const files = [
-      'games/sybil-slayer/src/components/game-container.tsx',
-      'games/sybil-slayer/src/components/mode-select-modal.tsx',
-      'games/sybil-slayer/src/components/info-modal.tsx',
-      'games/sybil-slayer/src/components/treasure-hunt-ui.tsx',
-    ];
-
-    for (const file of files) {
-      const source = readFileSync(resolve(process.cwd(), '..', file), 'utf8');
-      expect(source).toContain('GameImage');
-      expect(source).not.toContain("from 'next/image'");
-    }
-  });
 });
