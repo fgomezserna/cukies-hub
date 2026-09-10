@@ -159,6 +159,7 @@ function statusStateFor(status: AppRuntimeStatus | null): 'ready' | 'syncing' | 
 // bounded so a receipt never turns into a burst of requests or a false success.
 const PROJECTION_SYNC_BACKOFF_MS = [2_000, 5_000, 10_000, 15_000, 30_000, 50_000] as const;
 const PROJECTION_SYNC_DEADLINE_MS = 120_000;
+const ACCOUNT_SUMMARY_STALE_TIME = 15_000;
 
 function waitForProjectionRetry(delayMs: number, signal: AbortSignal) {
   if (signal.aborted) return Promise.resolve(false);
@@ -370,9 +371,53 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
   const [accountSummaryRequestedFor, setAccountSummaryRequestedFor] = useState<string | null>(null);
   const accountSummaryRequested = accountSummaryIdentity !== null
     && accountSummaryRequestedFor === accountSummaryIdentity;
+  const accountSummaryEndpoint = appRuntimeEndpoint('account-summary', address);
+  const accountSummaryQueryKey = useMemo(
+    () => [
+      ...appRuntimeQueryKey('account-summary', address, accountSummaryChainId),
+      accountSummaryEndpoint,
+      '',
+    ] as const,
+    [accountSummaryChainId, accountSummaryEndpoint, address],
+  );
   const requestAccountSummary = useCallback(() => {
-    if (accountSummaryIdentity) setAccountSummaryRequestedFor(accountSummaryIdentity);
-  }, [accountSummaryIdentity]);
+    if (!accountSummaryIdentity) return;
+
+    // The menu stays mounted across routes, so opening it again does not
+    // remount the query. Revalidate only this wallet/chain key when its
+    // cached result is stale, invalidated, or errored; the first request is
+    // enabled by the state transition below and is therefore fetched once.
+    if (accountSummaryRequested) {
+      const queryState = queryClient.getQueryState(accountSummaryQueryKey);
+      const isFetching = queryState?.fetchStatus === 'fetching';
+      const hasExpired = Boolean(
+        queryState
+        && queryState.dataUpdatedAt > 0
+        && Date.now() - queryState.dataUpdatedAt >= ACCOUNT_SUMMARY_STALE_TIME,
+      );
+      const needsRefresh = Boolean(
+        queryState
+        && !isFetching
+        && (
+          queryState.isInvalidated
+          || queryState.status === 'error'
+          || Boolean(queryState.error)
+          || hasExpired
+        ),
+      );
+      if (needsRefresh) {
+        void queryClient.invalidateQueries({
+          queryKey: accountSummaryQueryKey,
+          exact: true,
+          refetchType: 'active',
+        });
+      }
+    }
+
+    setAccountSummaryRequestedFor((current) => (
+      current === accountSummaryIdentity ? current : accountSummaryIdentity
+    ));
+  }, [accountSummaryIdentity, accountSummaryQueryKey, accountSummaryRequested, queryClient]);
 
   useEffect(() => {
     const onlineHandler = () => setOnline(true);
@@ -432,13 +477,8 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     refetchInterval: runtimeRouteActive ? 60_000 : false,
   });
 
-  const accountSummaryEndpoint = appRuntimeEndpoint('account-summary', address);
   const accountSummaryQuery = useQuery<AccountSummary>({
-    queryKey: [
-      ...appRuntimeQueryKey('account-summary', address, accountSummaryChainId),
-      accountSummaryEndpoint,
-      '',
-    ],
+    queryKey: accountSummaryQueryKey,
     queryFn: async ({ signal }) => {
       if (!address) throw new Error('ACCOUNT_SUMMARY_WALLET_REQUIRED');
       const { response, body } = await fetchRuntime<{ status?: string; data?: unknown }>(accountSummaryEndpoint, signal);
@@ -454,7 +494,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       return body.data;
     },
     enabled: accountSummaryRequested && !authLoading && online,
-    staleTime: 15_000,
+    staleTime: ACCOUNT_SUMMARY_STALE_TIME,
     gcTime: 5 * 60_000,
     retry: (failureCount: number) => failureCount < 1,
     refetchOnWindowFocus: true,

@@ -13,6 +13,7 @@ import {
   useGuardedOperation,
 } from '@/providers/app-runtime-provider';
 import { useAuth } from '@/providers/auth-provider';
+import { UKI_PRESALE_CHAIN_ID } from '@/components/landing/sale-config';
 
 jest.mock('wagmi');
 jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
@@ -123,6 +124,38 @@ function TransactionRefreshProbe() {
 function ResourceKeyProbe() {
   const query = useAppRuntimeResource<{ value: string }>('credits');
   return <span data-testid="resource-key">{String(query.queryKey[3])}</span>;
+}
+
+function AccountSummaryProbe() {
+  const runtime = useAppRuntime();
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <span data-testid="account-summary-value">{runtime.accountSummary.data?.uki?.balance ?? runtime.accountSummary.state}</span>
+      <button
+        type="button"
+        onClick={() => {
+          const nextOpen = !open;
+          setOpen(nextOpen);
+          if (nextOpen) runtime.requestAccountSummary();
+        }}
+      >
+        toggle account menu
+      </button>
+    </>
+  );
+}
+
+function accountSummaryPayload(walletAddress: string, balance: string) {
+  const chainId = UKI_PRESALE_CHAIN_ID === 97 ? 97 : 56;
+  return {
+    walletNormalized: walletAddress.toLowerCase(),
+    chainId,
+    network: { chainId, label: 'BNB Smart Chain' },
+    uki: { balance, balanceRaw: '0', decimals: 18, symbol: 'UKI', source: 'wallet' },
+    credits: null,
+    cukies: null,
+  };
 }
 
 function ManualRefreshProbe() {
@@ -286,6 +319,66 @@ describe('AppRuntimeProvider shared resource contract', () => {
     render(<Shell><DualResourceProbe /></Shell>);
     await waitFor(() => expect(screen.getAllByTestId('resource')[0]).toHaveTextContent('shared'));
     expect(mockFetch.mock.calls.filter(([input]) => String(input).includes('cukie-master'))).toHaveLength(1);
+  });
+
+  it('revalida el resumen al reabrir el menú después de que expire su TTL', async () => {
+    const startedAt = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(startedAt);
+    let accountCalls = 0;
+    mockFetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return response(runtimeStatus);
+      if (url.includes('/api/account/v1/summary')) {
+        accountCalls += 1;
+        return response({ status: 'ok', data: accountSummaryPayload('0xaaa', String(accountCalls)) });
+      }
+      return response({ status: 'ok', data: { value: 'other' } });
+    });
+
+    try {
+      render(<Shell><AccountSummaryProbe /></Shell>);
+      fireEvent.click(screen.getByRole('button', { name: 'toggle account menu' }));
+      await waitFor(() => expect(screen.getByTestId('account-summary-value')).toHaveTextContent('1'));
+      expect(accountCalls).toBe(1);
+
+      fireEvent.click(screen.getByRole('button', { name: 'toggle account menu' }));
+      nowSpy.mockReturnValue(startedAt + 15_001);
+      fireEvent.click(screen.getByRole('button', { name: 'toggle account menu' }));
+
+      await waitFor(() => expect(accountCalls).toBe(2));
+      await waitFor(() => expect(screen.getByTestId('account-summary-value')).toHaveTextContent('2'));
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('descarta el resumen anterior cuando cambia la identidad de la cuenta', async () => {
+    let accountCalls = 0;
+    mockFetch.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return response(runtimeStatus);
+      if (url.includes('/api/account/v1/summary')) {
+        accountCalls += 1;
+        const wallet = url.includes('0xbbb') ? '0xbbb' : '0xaaa';
+        return response({ status: 'ok', data: accountSummaryPayload(wallet, wallet === '0xbbb' ? 'B' : 'A') });
+      }
+      return response({ status: 'ok', data: { value: 'other' } });
+    });
+
+    const view = render(<Shell><AccountSummaryProbe /></Shell>);
+    fireEvent.click(screen.getByRole('button', { name: 'toggle account menu' }));
+    await waitFor(() => expect(screen.getByTestId('account-summary-value')).toHaveTextContent('A'));
+    fireEvent.click(screen.getByRole('button', { name: 'toggle account menu' }));
+
+    mockUseAuth.mockReturnValue({ user: { walletAddress: '0xbbb', username: 'alice' }, walletType: 'evm', isLoading: false } as never);
+    mockUseAccount.mockReturnValue({ address: '0xbbb', isConnected: true, chainId: 97 } as never);
+    view.rerender(<Shell><AccountSummaryProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('account-summary-value')).toHaveTextContent('idle'));
+    expect(screen.getByTestId('account-summary-value')).not.toHaveTextContent('A');
+
+    fireEvent.click(screen.getByRole('button', { name: 'toggle account menu' }));
+    await waitFor(() => expect(screen.getByTestId('account-summary-value')).toHaveTextContent('B'));
+    expect(accountCalls).toBe(2);
   });
 
   it('does not publish a late A response after wagmi moves to B while auth remains A', async () => {

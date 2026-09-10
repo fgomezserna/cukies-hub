@@ -59,4 +59,21 @@ describe('components/landing/WalletConnectorDialog', () => {
     expect(screen.getByText('Extensión de navegador para BNB Smart Chain.')).toBeInTheDocument();
     expect(screen.queryByText(/deep link oficial/i)).not.toBeInTheDocument();
   });
+
+  it('mantiene los conectores móviles cuando no hay tarjetas móviles disponibles', () => {
+    const metaMask = connector({ id: 'metaMask', name: 'MetaMask' });
+
+    render(
+      <WalletConnectorDialog
+        open
+        onOpenChange={jest.fn()}
+        connectors={[metaMask]}
+        onSelectConnector={jest.fn()}
+        isMobile
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /MetaMask/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Wallet móvil' })).not.toBeInTheDocument();
+  });
 });

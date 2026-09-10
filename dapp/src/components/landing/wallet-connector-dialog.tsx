@@ -164,7 +164,8 @@ export function WalletConnectorDialog({
     Boolean(currentWalletAction?.isLoading) ||
     Boolean(disconnectAction?.isLoading) ||
     Boolean(tronLinkNative?.isLoading);
-  const visibleConnectors = isMobile
+  const showMobileWalletCards = isMobile && Boolean(onSelectMobileWallet);
+  const visibleConnectors = showMobileWalletCards
     ? connectors.filter((connector) => !MOBILE_WALLETS.some((wallet) => belongsToMobileFamily(connector, wallet.id)))
     : connectors;
 
@@ -360,7 +361,7 @@ export function WalletConnectorDialog({
             </button>
           ) : null}
 
-          {visibleConnectors.length === 0 && !tronLinkNative && !(isMobile && onSelectMobileWallet) ? (
+          {visibleConnectors.length === 0 && !tronLinkNative && !showMobileWalletCards ? (
             <div className="rounded-[8px] border border-[#f2c34b]/30 bg-[#2b1d08]/42 p-3 text-sm font-semibold text-[#ffe2a0]">
               No se ha detectado ningun conector de wallet compatible.
             </div>
