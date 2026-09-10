@@ -30,6 +30,30 @@ export function getAvatarFallback(username: string | null | undefined, walletAdd
   return walletValue ? walletValue.slice(-2).toUpperCase() : 'CW';
 }
 
+type UkiBalanceView = {
+  balance: string;
+  balanceRaw: string;
+};
+
+function formatUkiBalance(value: UkiBalanceView | null | undefined) {
+  if (!value || !/^(0|[1-9][0-9]*)$/.test(value.balanceRaw)) return null;
+
+  try {
+    const raw = BigInt(value.balanceRaw);
+    const decimals = BigInt(10) ** BigInt(18);
+    const integer = raw / decimals;
+    const fraction = (raw % decimals).toString().padStart(18, '0');
+    const visibleFraction = fraction.slice(0, 4).replace(/0+$/, '');
+    const groupedInteger = integer.toLocaleString('es-ES');
+
+    if (visibleFraction) return `${groupedInteger},${visibleFraction}`;
+    if (raw > BigInt(0) && integer === BigInt(0)) return '<0,0001';
+    return groupedInteger;
+  } catch {
+    return null;
+  }
+}
+
 interface HeaderProps {
   hideDisconnectedWalletTrigger?: boolean;
   variant?: 'default' | 'game-overlay';
@@ -61,6 +85,7 @@ export default function Header({
   const accountSummaryRefreshing = accountSummary.state === 'stale';
   const accountSummaryReady = accountSummary.state === 'ready';
   const cukiesSummaryReady = accountSummaryReady && summary?.cukies?.coverage === 'complete';
+  const ukiBalanceLabel = formatUkiBalance(summary?.uki);
   const accountSummaryPendingLabel = accountSummaryLoading
     ? 'Cargando…'
     : accountSummaryRefreshing
@@ -159,9 +184,12 @@ export default function Header({
                   {walletType === 'evm' ? (
                     <div className="grid gap-1.5 text-xs">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-muted-foreground">UKI disponible</span>
-                        <span className="font-mono font-bold text-lilac-200">
-                          {accountSummaryReady ? formatResource(summary?.uki?.balance, ' UKI') : accountSummaryPendingLabel}
+                        <span className="whitespace-nowrap text-muted-foreground">UKI disponible</span>
+                        <span
+                          className="min-w-0 whitespace-nowrap text-right font-mono font-bold tabular-nums text-lilac-200"
+                          title={accountSummaryReady && summary?.uki ? `${summary.uki.balance} UKI` : undefined}
+                        >
+                          {accountSummaryReady ? (ukiBalanceLabel ? <>{ukiBalanceLabel}&nbsp;UKI</> : 'No disponible') : accountSummaryPendingLabel}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3">
