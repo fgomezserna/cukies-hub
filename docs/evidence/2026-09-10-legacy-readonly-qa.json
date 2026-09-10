@@ -1,0 +1,53 @@
+{
+  "observedAt": "2026-09-10T02:16:47.358380+00:00",
+  "status": "reviewed_and_validated_candidate_pending_delivery",
+  "sourceCandidate": "12140c417292733daeeec9cce6ecf954e35df2af",
+  "sourceCommits": [
+    "17cff24dcbeb4e3dad3036a7d89542c617cbad98",
+    "12140c417292733daeeec9cce6ecf954e35df2af"
+  ],
+  "integrationProductHead": "babb05369fcee30e093ac970d44d7dc660e469a9",
+  "base": "0cf0019742373364da5cb0811c3252d1a1cbd007",
+  "scope": [
+    "Separate Cukie Points TRON read provider from wallet transport and retain partial or unknown results",
+    "Read BSC breeding on chain56 independently of wallet97",
+    "Allow candidate selection and manual read retry without enabling writes"
+  ],
+  "rootReview": {
+    "initialFindings": "R1 read actions still tied to signing network; R2 internal copy",
+    "correctionReviewed": "12140c417292733daeeec9cce6ecf954e35df2af",
+    "result": "PASS within stated scope",
+    "productFiles": 3,
+    "testFiles": 3
+  },
+  "reportedValidation": {
+    "task": "01a08727-0cdb-7993-bbab-6829bcf3d333",
+    "productHead": "babb05369fcee30e093ac970d44d7dc660e469a9",
+    "sixFilesExactlyMatchOriginal": true,
+    "install": "pnpm install --frozen-lockfile --offline",
+    "lockfileUnchanged": true,
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "testCommand": "pnpm dapp test --runInBand",
+    "suitesPassed": 239,
+    "testsPassed": 1931,
+    "build": "PASS",
+    "generatedPages": 92,
+    "buildNetworkRetriesRecovered": true,
+    "diffCheck": "PASS",
+    "discardedInvocation": "pnpm dapp test -- --runInBand treated the flag as a test pattern; corrected invocation above passed"
+  },
+  "protected": {
+    "creditHotfix369": true,
+    "worldSourceF4cae5e": true,
+    "worldPortCandidate1661ecaa": true,
+    "ciComposeDockerDependenciesUnchanged": true,
+    "mainAndProductionUnchanged": true,
+    "legacyWritesDisabled": true
+  },
+  "limits": [
+    "Pending staging delivery and browser QA",
+    "No mainnet writes, signatures or wallet network changes",
+    "No claim of full Legacy event, cursor, contract or UX parity"
+  ]
+}
