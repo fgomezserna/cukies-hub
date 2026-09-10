@@ -1,0 +1,182 @@
+{
+  "observedAt": "2026-09-10T17:36:38.179166+00:00",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/394",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34508285315",
+  "release": {
+    "schemaVersion": 1,
+    "environment": "staging",
+    "chainId": "97",
+    "commit": "4de6cf1679a7319a0fea9af078380e1479d1b5dd",
+    "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+    "deploymentUuid": "s8s04w4owo4cwso08cgcg00c",
+    "deliveryMode": "rolling",
+    "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+    "webResourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+    "workersResourceUuid": "u4s804o4wwcckowgk0woo4wg",
+    "gameResourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+    "gameDeploymentUuid": "koccwkw8o8kk8sw08ksw8ow0",
+    "components": {
+      "dapp": {
+        "image": "192.168.1.207:5000/cukies-hub/dapp:4de6cf1679a7319a0fea9af078380e1479d1b5dd-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:8d1e5f2708f61142887a3e70d58ca36c2de7bb5c6098e047db817054974cf65f",
+        "digest": "sha256:8d1e5f2708f61142887a3e70d58ca36c2de7bb5c6098e047db817054974cf65f",
+        "tag": "4de6cf1679a7319a0fea9af078380e1479d1b5dd-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "4de6cf1679a7319a0fea9af078380e1479d1b5dd",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "chain-indexer": {
+        "image": "192.168.1.207:5000/cukies-hub/chain-indexer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "digest": "sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cuki-card-worker": {
+        "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "digest": "sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "schedulers": {
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "digest": "sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cukies-bridge-relayer": {
+        "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "digest": "sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "treasure-hunt": {
+        "image": "192.168.1.207:5000/cukies-hub/treasure-hunt:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "digest": "sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-api": {
+        "image": "192.168.1.207:5000/cukies-hub/world-api:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "digest": "sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-matchmaking": {
+        "image": "192.168.1.207:5000/cukies-hub/world-matchmaking:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "digest": "sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      }
+    },
+    "webCommit": "4de6cf1679a7319a0fea9af078380e1479d1b5dd",
+    "gameCommit": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+    "previousCommit": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+    "updatedAt": "2026-09-10T17:35:41.174Z"
+  },
+  "health": {
+    "status": "ok",
+    "app": "cukies-hub",
+    "environment": "staging",
+    "gitSha": "4de6cf1679a7319a0fea9af078380e1479d1b5dd",
+    "gitRef": "staging",
+    "buildTime": null,
+    "coolify": {
+      "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+      "fqdn": null
+    }
+  },
+  "readyHttpStatus": 200,
+  "journal": "clean",
+  "web": [
+    {
+      "id": "6a08e5d46fb522c5a2acbced4dfbb9cbc6dfa36baeddb3c3b08502ea33f27d04",
+      "name": "rwwsc4kkwc0ck84cgk40s8kk-173500106746",
+      "image": "192.168.1.207:5000/cukies-hub/dapp@sha256:8d1e5f2708f61142887a3e70d58ca36c2de7bb5c6098e047db817054974cf65f",
+      "imageId": "sha256:ca7f93135ce17da67f4ab5eada79e4cf780145ba7ab4b7a604f2161746ffeab7",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0
+    }
+  ],
+  "workerCount": 10,
+  "workersRunningNoRestarts": true,
+  "protected": {
+    "total": 25,
+    "preserved": 25,
+    "changed": []
+  },
+  "ui": {
+    "observedAt": "2026-09-10T17:40:56.088057+00:00",
+    "browser": "Edge existing signed session",
+    "accountSummary": {
+      "ukiDisplayed": "1,092 UKI",
+      "ownCredits": 30,
+      "cukiesTotal": 12,
+      "cukiesInWallet": 5,
+      "rankXpRemoved": true,
+      "evmAndTronSessionsPreserved": true
+    },
+    "anonymousSummary": {
+      "status": 401,
+      "code": "WALLET_SESSION_REQUIRED",
+      "cacheControl": "private, no-store, max-age=0"
+    },
+    "legacyTronPurchase": {
+      "tokenId": "2000000004314",
+      "priceTrx": 3333,
+      "reached": "Confirmar compra",
+      "walletReady": true,
+      "internalStageCopyAbsent": true,
+      "signatureRequested": false
+    },
+    "saleModal": {
+      "tokenId": "98000002",
+      "openedFromCard": true,
+      "priceInput": "12,5",
+      "sellerAmountUki": "12.5",
+      "buyerFeePercent": 5,
+      "approveEnabled": true,
+      "publishEnabled": false,
+      "closedWithoutOperation": true
+    },
+    "walletSelector": "Local synthetic responsive and dedup coverage; did not disconnect real wallets for this check"
+  },
+  "signedTransactions": "not_executed",
+  "workflowConclusion": "success",
+  "validation": {
+    "productSha": "7fd47d32293a5c9c94b8d2b5a01caf043fe4a538",
+    "lint": "pass",
+    "typecheck": "pass",
+    "tests": {
+      "suites": 261,
+      "tests": 2127,
+      "result": "pass"
+    },
+    "build": {
+      "result": "pass",
+      "staticPages": 92
+    },
+    "signedPurchase": "not verified; no user funds or signatures used"
+  }
+}
