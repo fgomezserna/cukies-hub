@@ -389,6 +389,7 @@ test('World integration refinement rejects global npmrc changes', async () => {
     ...files,
     'scripts/ci/build-images.mjs',
     'scripts/ci/world-runtime-smoke.mjs',
+    'scripts/ci/world-runtime-smoke.test.mjs',
     'scripts/ci/world-integration.test.mjs',
     'scripts/ci/ci.test.mjs',
   ];
