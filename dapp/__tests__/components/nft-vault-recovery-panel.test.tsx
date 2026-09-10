@@ -136,10 +136,16 @@ function openPoolLink(
   collection = collectionAddress,
   recoveryVault = poolVaultAddress,
 ) {
+  const params = new URLSearchParams({
+    tokenId,
+    collection,
+    recoveryVault,
+    chainId: String(mutableVaultConfig.chainId ?? 97),
+  });
   window.history.replaceState(
     {},
     '',
-    `/cukie-hodler/recuperar?tokenId=${tokenId}&collection=${collection}&recoveryVault=${recoveryVault}`,
+    `/cukie-hodler/recuperar?${params.toString()}`,
   );
 }
 
@@ -222,7 +228,7 @@ describe('NftVaultRecoveryPanel', () => {
     fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '7' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
-    const withdrawButton = await screen.findByRole('button', { name: 'Retirar Cukie ahora' });
+    const withdrawButton = await screen.findByRole('button', { name: 'Retirar de Cukie Master' });
     expect(withdrawButton).toBeEnabled();
     expect(screen.getByText(/ya no admite depósitos/i)).toBeInTheDocument();
     fireEvent.click(withdrawButton);
@@ -261,7 +267,7 @@ describe('NftVaultRecoveryPanel', () => {
     fireEvent.change(screen.getByLabelText('Número del Cukie (Token ID)'), { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
-    expect(await screen.findByRole('button', { name: 'Retirar Cukie ahora' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Retirar de Cukie Master' })).toBeEnabled();
     expect(readContract).toHaveBeenNthCalledWith(1, expect.objectContaining({
       functionName: 'collectionAllowed',
       args: [historicalCollectionAddress],
@@ -291,8 +297,7 @@ describe('NftVaultRecoveryPanel', () => {
     openPoolLink('8');
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
     openRecoveryPanel('cukie_pool');
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar retirada' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Solicitar salida del Cukie Pool' }));
 
     await waitFor(() => expect(screen.getByText(/Salida confirmada en BSC/i)).toBeInTheDocument());
     expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -300,7 +305,7 @@ describe('NftVaultRecoveryPanel', () => {
       functionName: 'requestExit',
       args: [collectionAddress, BigInt(8)],
     }));
-    expect(screen.queryByRole('button', { name: 'Solicitar retirada' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Solicitar salida del Cukie Pool' })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -353,9 +358,9 @@ describe('NftVaultRecoveryPanel', () => {
 
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
     openRecoveryPanel('cukie_pool');
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
-
     expect(await screen.findByText(/Propietario verificado/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Comprobar posición' })).not.toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalled();
     expect(readContract).toHaveBeenNthCalledWith(1, expect.objectContaining({
       functionName: 'collectionAllowed',
       args: [historicalCollectionAddress],
@@ -381,8 +386,6 @@ describe('NftVaultRecoveryPanel', () => {
 
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
     openRecoveryPanel('cukie_pool');
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
-
     expect(await screen.findByText(/Propietario verificado/i)).toBeInTheDocument();
     expect(readContract).toHaveBeenNthCalledWith(1, expect.objectContaining({
       address: poolVaultAddress,
@@ -412,8 +415,7 @@ describe('NftVaultRecoveryPanel', () => {
     openPoolLink('9');
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
     openRecoveryPanel('cukie_pool');
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Retirar Cukie' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Retirar del Cukie Pool' }));
 
     await waitFor(() => expect(screen.getByText(/Retirada confirmada en BSC/i)).toBeInTheDocument());
     expect(getBlock).toHaveBeenCalledTimes(3);
@@ -440,12 +442,10 @@ describe('NftVaultRecoveryPanel', () => {
     openPoolLink('10');
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
     openRecoveryPanel('cukie_pool');
-    fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
-
     await screen.findByText(/Retirable desde/i);
     expect(screen.getByText(/El plazo se fijó al solicitar la salida/i)).toBeInTheDocument();
     expect(screen.getByText(/podrás retirarlo desde la fecha indicada/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Retirar Cukie' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retirar del Cukie Pool' })).not.toBeInTheDocument();
     expect(writeContractAsync).not.toHaveBeenCalled();
   });
 
@@ -465,7 +465,7 @@ describe('NftVaultRecoveryPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
     expect(await screen.findByText(/pertenece a otra wallet/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Retirar Cukie ahora' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retirar de Cukie Master' })).not.toBeInTheDocument();
     expect(writeContractAsync).not.toHaveBeenCalled();
   });
 

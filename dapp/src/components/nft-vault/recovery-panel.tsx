@@ -54,6 +54,7 @@ type RequestedPoolLink = {
   tokenId: string | null;
   collection: string | null;
   recoveryVault: string | null;
+  chainId: number | null;
 };
 
 const ZERO_ADDRESS = zeroAddress.toLowerCase();
@@ -191,17 +192,22 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     tokenId: null,
     collection: null,
     recoveryVault: null,
+    chainId: null,
   });
   const [manualOpen, setManualOpen] = useState(false);
+  const autoInspectKeyRef = useRef<string | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTokenId = params.get('tokenId');
     const requestedRecoveryVault = params.get('recoveryVault');
     const requestedCollection = params.get('collection');
+    const rawChainId = params.get('chainId');
+    const parsedChainId = rawChainId === '56' || rawChainId === '97' ? Number(rawChainId) : null;
     setRequestedPoolLink({
       tokenId: requestedTokenId,
       collection: requestedCollection,
       recoveryVault: requestedRecoveryVault,
+      chainId: parsedChainId,
     });
     setRequestedTokenId(null);
     setTokenIdInput('');
@@ -296,6 +302,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     requestedPoolLink.tokenId
     && /^\d+$/.test(requestedPoolLink.tokenId)
     && requestedPoolLink.collection
+    && (!requestedPoolLink.chainId || requestedPoolLink.chainId === ukiNftVaults.chainId)
     && selectedCollection
     && sameAddress(requestedPoolLink.collection, selectedCollection)
     && (requestedActivePoolVault || requestedPreviousPoolVault)
@@ -314,10 +321,12 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     && correctChain
     && selectedCollection
     && tokenIdValid
+    && (!requestedPoolLink.chainId || requestedPoolLink.chainId === ukiNftVaults.chainId)
     && linkedPoolPosition
     && publicClient
     && phase === 'idle',
   );
+  const hasKnownIdentity = Boolean(requestedTokenId && tokenIdValid);
 
   useEffect(() => {
     if (configuredCollections.some((collection) => sameAddress(collection, collectionInput))) return;
@@ -411,6 +420,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   }, [pendingContext]);
 
   useEffect(() => {
+    autoInspectKeyRef.current = null;
     setResult({ kind: 'idle' });
     setPhase('idle');
     setNotice(null);
@@ -551,6 +561,25 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       setPhase('idle');
     }
   }
+
+  useEffect(() => {
+    if (!hasKnownIdentity || !canInspect || !selectedCollection || !requestedTokenId || phase !== 'idle') return;
+    const autoInspectKey = [
+      kind,
+      address ?? '',
+      chainId ?? '',
+      vaultAddress ?? '',
+      selectedCollection.toLowerCase(),
+      requestedTokenId,
+      selectedPending?.txHash ?? '',
+    ].join(':');
+    if (autoInspectKeyRef.current === autoInspectKey) return;
+    autoInspectKeyRef.current = autoInspectKey;
+    void inspectPosition();
+    // The key ref prevents duplicate reads under Strict Mode and while the
+    // requested card settles its wallet/configuration context.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, canInspect, chainId, hasKnownIdentity, kind, phase, requestedTokenId, selectedCollection, selectedPending?.txHash, vaultAddress]);
 
   async function execute(operation: 'request_exit' | 'withdraw') {
     const currentGuard = operationGuardRef.current;
@@ -733,9 +762,9 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
         <span>
-          <span className="uki-label">{kind === 'cukie_pool' ? 'Retirar Cukie' : 'Posición existente'}</span>
+          <span className="uki-label">{kind === 'cukie_pool' ? 'Salida del Cukie Pool' : 'Posición existente'}</span>
           <span className="mt-2 block font-headline text-lg font-black uppercase text-[var(--uki-cream)]">
-            {kind === 'cukie_master' ? 'Gestionar un Cukie depositado' : 'Retirar Cukie'}
+            {kind === 'cukie_master' ? 'Gestionar un Cukie de Cukie Master' : 'Retirar del Cukie Pool'}
           </span>
         </span>
         <span aria-hidden="true" className="text-xl font-black text-[var(--uki-lilac)] transition-transform group-open:rotate-45">
@@ -803,29 +832,39 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
             </select>
           </label>
         )}
-        <label className="grid gap-1.5 text-xs font-black uppercase text-[var(--uki-muted)]">
-          Número del Cukie (Token ID)
-          <input
-            aria-label="Número del Cukie (Token ID)"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
-            value={tokenIdInput}
-            readOnly={kind === 'cukie_pool'}
-            disabled={!publicConfigReady || phase !== 'idle'}
-            onChange={(event) => setTokenIdInput(event.target.value.trim())}
-            className="h-11 rounded-[7px] border border-white/15 bg-black/40 px-3 text-sm font-semibold normal-case text-[var(--uki-text)] disabled:opacity-50"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={!canInspect}
-          onClick={() => void inspectPosition()}
-          className="h-11 rounded-[7px] border border-[var(--uki-lilac-border)] px-4 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:opacity-50"
-        >
-          {phase === 'checking' ? 'Comprobando…' : 'Comprobar posición'}
-        </button>
+        {hasKnownIdentity ? (
+          <div className="sm:col-span-2 flex min-h-11 items-center rounded-[7px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] px-3 text-sm font-semibold text-[var(--uki-text)]" role="status" aria-live="polite">
+            {phase === 'checking' || result.kind === 'idle'
+              ? 'Consultando automáticamente esta posición…'
+              : 'Posición cargada desde tu Cukie seleccionado.'}
+          </div>
+        ) : (
+          <>
+            <label className="grid gap-1.5 text-xs font-black uppercase text-[var(--uki-muted)]">
+              Número del Cukie (Token ID)
+              <input
+                aria-label="Número del Cukie (Token ID)"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                value={tokenIdInput}
+                readOnly={kind === 'cukie_pool'}
+                disabled={!publicConfigReady || phase !== 'idle'}
+                onChange={(event) => setTokenIdInput(event.target.value.trim())}
+                className="h-11 rounded-[7px] border border-white/15 bg-black/40 px-3 text-sm font-semibold normal-case text-[var(--uki-text)] disabled:opacity-50"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={!canInspect}
+              onClick={() => void inspectPosition()}
+              className="h-11 rounded-[7px] border border-[var(--uki-lilac-border)] px-4 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:opacity-50"
+            >
+              {phase === 'checking' ? 'Comprobando…' : 'Comprobar posición'}
+            </button>
+          </>
+        )}
       </div>
       )}
 
@@ -863,7 +902,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 onClick={() => void execute('withdraw')}
                 className="rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
               >
-                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar Cukie ahora'}
+                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar de Cukie Master'}
               </button>
             ) : !exitRequested ? (
               <button
@@ -872,7 +911,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 onClick={() => void execute('request_exit')}
                 className="rounded-[7px] border border-white/15 px-4 py-2 text-xs font-black uppercase text-[var(--uki-text)] disabled:opacity-50"
               >
-                {phase === 'requesting_exit' ? 'Solicitando…' : 'Solicitar retirada'}
+                {phase === 'requesting_exit' ? 'Solicitando…' : 'Solicitar salida del Cukie Pool'}
               </button>
             ) : withdrawalReady ? (
               <button
@@ -881,7 +920,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 onClick={() => void execute('withdraw')}
                 className="rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
               >
-                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar Cukie'}
+                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar del Cukie Pool'}
               </button>
             ) : (
               <div className="max-w-xs text-right text-xs text-amber-300">
@@ -907,7 +946,9 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
             <p key={pending.assetId}>
               Cukie #{pending.tokenId}: operación enviada y bloqueada hasta comprobar su resultado.
               {' '}<a href={getNftVaultExplorerTxUrl(pending.txHash) ?? '#'} target="_blank" rel="noreferrer" className="font-black text-[var(--uki-lilac)] underline">Ver transacción</a>.
-              {' '}Introduce ese Token ID y pulsa «Comprobar posición» para reconciliarla.
+              {' '}{hasKnownIdentity && pending.tokenId === requestedTokenId
+                ? 'Esta posición se volverá a comprobar automáticamente.'
+                : 'Introduce ese Token ID y pulsa «Comprobar posición» para reconciliarla.'}
             </p>
           ))}
         </div>

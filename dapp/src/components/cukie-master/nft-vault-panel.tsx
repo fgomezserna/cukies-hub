@@ -664,7 +664,7 @@ export function CukieMasterNftVaultPanel() {
                   ) : asset.canWithdraw ? (
                     <button type="button" disabled={!identityReady || !pendingHydrated || Boolean(activeAssetId)} onClick={() => void mutate(asset, 'withdraw')} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-white/15 px-3 text-xs font-black uppercase text-[var(--uki-text)] disabled:cursor-not-allowed disabled:opacity-50">
                       {working ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Unlock className="h-4 w-4" aria-hidden="true" />}
-                      {working ? 'Retirando' : 'Retirar inmediatamente'}
+                      {working ? 'Retirando' : 'Retirar inmediatamente de Cukie Master'}
                     </button>
                   ) : (
                     <p className="mt-4 flex min-h-11 w-full items-center justify-center rounded-[7px] border border-white/10 px-3 text-center text-xs font-black text-[var(--uki-muted)]">
