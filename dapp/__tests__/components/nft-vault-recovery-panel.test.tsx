@@ -135,13 +135,14 @@ function openPoolLink(
   tokenId = '8',
   collection = collectionAddress,
   recoveryVault = poolVaultAddress,
+  chainId: string | null = String(mutableVaultConfig.chainId ?? 97),
 ) {
   const params = new URLSearchParams({
     tokenId,
     collection,
     recoveryVault,
-    chainId: String(mutableVaultConfig.chainId ?? 97),
   });
+  if (chainId !== null) params.set('chainId', chainId);
   window.history.replaceState(
     {},
     '',
@@ -340,6 +341,67 @@ describe('NftVaultRecoveryPanel', () => {
     expect(screen.queryByText(historicalCollectionAddress)).not.toBeInTheDocument();
   });
 
+  it('permite reintentar la lectura automática sin volver al formulario técnico', async () => {
+    const readContract = jest.fn()
+      .mockRejectedValueOnce(new Error('RPC unavailable'))
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(poolPosition());
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn().mockResolvedValue({ request: {} }),
+      readContract,
+      getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    openPoolLink('16');
+
+    render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    openRecoveryPanel('cukie_pool');
+
+    expect(await screen.findByText(/No se pudo cargar esta posición/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reintentar consulta' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Número del Cukie (Token ID)')).not.toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar consulta' }));
+
+    expect(await screen.findByText(/Propietario verificado/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reintentar consulta' })).not.toBeInTheDocument();
+    expect(readContract).toHaveBeenCalledTimes(3);
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('descarta una lectura diferida cuando cambia la wallet durante la consulta', async () => {
+    let resolveAllowed: (value: boolean) => void = () => undefined;
+    const allowedPromise = new Promise<boolean>((resolve) => {
+      resolveAllowed = resolve;
+    });
+    const readContract = jest.fn().mockReturnValueOnce(allowedPromise);
+    mockUsePublicClient.mockReturnValue({
+      readContract,
+      getBlock: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    openPoolLink('18');
+
+    const view = render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    openRecoveryPanel('cukie_pool');
+    await waitFor(() => expect(readContract).toHaveBeenCalledTimes(1));
+
+    mockUseAccount.mockReturnValue({
+      address: otherWallet,
+      chainId: 97,
+      isConnected: false,
+    } as unknown as ReturnType<typeof useAccount>);
+    view.rerender(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    resolveAllowed(true);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/conecta la wallet/i));
+    expect(screen.getByText(/Esperando que conectes la wallet propietaria/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Propietario verificado/i)).not.toBeInTheDocument();
+    expect(readContract).toHaveBeenCalledTimes(1);
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
   it('consume la colección válida del enlace aunque no sea la primera configurada', async () => {
     mutableVaultConfig.recoveryCollectionAddresses = [
       collectionAddress,
@@ -354,7 +416,7 @@ describe('NftVaultRecoveryPanel', () => {
       getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
       waitForTransactionReceipt: jest.fn(),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
-    openPoolLink('14', historicalCollectionAddress, poolVaultAddress);
+    openPoolLink('14', historicalCollectionAddress, poolVaultAddress, null);
 
     render(<NftVaultRecoveryPanel kind="cukie_pool" />);
     openRecoveryPanel('cukie_pool');
@@ -369,6 +431,24 @@ describe('NftVaultRecoveryPanel', () => {
       functionName: 'positionOf',
       args: [historicalCollectionAddress, BigInt(14)],
     }));
+  });
+
+  it('bloquea un enlace del Pool con una chainId explícita inválida', () => {
+    const readContract = jest.fn();
+    mockUsePublicClient.mockReturnValue({
+      readContract,
+      getBlock: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    openPoolLink('17', collectionAddress, poolVaultAddress, '1');
+
+    render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+    openRecoveryPanel('cukie_pool');
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/no identifica una red BSC válida/i);
+    expect(readContract).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Comprobar posición' })).not.toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalled();
   });
 
   it('valida un enlace explícito al Pool activo aunque no haya vaults previos configurados', async () => {
