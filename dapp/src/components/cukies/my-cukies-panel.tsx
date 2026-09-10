@@ -113,13 +113,13 @@ function stateLabel(cukie: MyCukieCollectionItem) {
 
 function itemAction(cukie: MyCukieCollectionItem) {
   if (cukie.custody === 'cukie_pool_recovery') {
-    const query = new URLSearchParams({ tokenId: cukie.tokenId });
+    const query = new URLSearchParams({ tokenId: cukie.tokenId, chainId: String(cukie.chainId) });
     if (cukie.recoveryVaultAddress) query.set('recoveryVault', cukie.recoveryVaultAddress);
     if (cukie.collectionAddress) query.set('collection', cukie.collectionAddress);
     return { href: `/cukie-hodler/recuperar?${query.toString()}#pool-recovery`, label: recoveryActionLabel(cukie) };
   }
   if (cukie.custody === 'cukie_pool') {
-    return { href: '/cukie-hodler#mis-cukies-aportados', label: 'Gestionar en el pool' };
+    return { href: '/cukie-hodler#mis-cukies-aportados', label: 'Gestionar en el pool · Cukie Pool' };
   }
   if (cukie.custody === 'cukie_master') {
     return { href: '/cukie-master#cukie-master-nft-staking', label: 'Gestionar Cukie Master' };
@@ -133,14 +133,14 @@ function itemAction(cukie: MyCukieCollectionItem) {
 function recoveryActionLabel(cukie: MyCukieCollectionItem) {
   if (!recoveryTimestamp(cukie.recoveryExitRequestedAt)) {
     return recoveryTimestamp(cukie.recoveryWithdrawableAt)
-      ? 'Consultar posición'
-      : 'Solicitar retirada';
+      ? 'Consultar salida del Cukie Pool'
+      : 'Solicitar salida del Cukie Pool';
   }
   const withdrawableAt = recoveryTimestamp(cukie.recoveryWithdrawableAt);
-  if (!withdrawableAt) return 'Consultar posición';
+  if (!withdrawableAt) return 'Consultar salida del Cukie Pool';
   return withdrawableAt.seconds <= BigInt(Math.floor(Date.now() / 1_000))
-    ? 'Retirar Cukie'
-    : 'Ver retirada';
+    ? 'Retirar del Cukie Pool'
+    : 'Ver salida del Cukie Pool';
 }
 
 function itemActionDescription(cukie: MyCukieCollectionItem) {
@@ -148,8 +148,8 @@ function itemActionDescription(cukie: MyCukieCollectionItem) {
     const state = collectionState(cukie);
     return typeof state === 'string' ? state : state.detail;
   }
-  if (cukie.custody === 'cukie_pool') return 'Consulta o retira la aportación al pool.';
-  if (cukie.custody === 'cukie_master') return 'Gestiona la posición depositada en Cukie Master.';
+  if (cukie.custody === 'cukie_pool') return 'Consulta la posición o solicita la salida del Cukie Pool.';
+  if (cukie.custody === 'cukie_master') return 'Gestiona o retira la posición depositada en Cukie Master.';
   if (cukie.state === 'available') return 'Puedes aportarlo al pool cuando quieras.';
   return 'Revisa identidad, estado y actividad del Cukie.';
 }
@@ -170,9 +170,9 @@ function hasActionsField(cukie: MyCukieCollectionItem) {
 function actionLabel(action: MyCukieAction) {
   return ({
     cancel_sale: 'Cancelar venta',
-    request_pool_exit: 'Solicitar devolución',
-    withdraw_pool: 'Retirar del Pool',
-    withdraw_master: 'Retirar staking',
+    request_pool_exit: 'Solicitar salida del Cukie Pool',
+    withdraw_pool: 'Retirar del Cukie Pool',
+    withdraw_master: 'Retirar de Cukie Master',
     deposit_pool: 'Aportar al Pool',
     sell: 'Vender',
     stake_master: 'Hacer staking Master',
@@ -186,19 +186,28 @@ function actionHref(cukie: MyCukieCollectionItem, action: MyCukieAction) {
       : legacyMarketplaceHref(cukie);
   }
   if (action === 'request_pool_exit' || action === 'withdraw_pool') {
-    return `/cukie-hodler?tokenId=${encodeURIComponent(cukie.tokenId)}#pool-cukie-${encodeURIComponent(cukie.tokenId)}`;
+    return custodyHref(cukie, '/cukie-hodler', `pool-cukie-${cukie.tokenId}`);
   }
   if (action === 'withdraw_master' || action === 'stake_master') {
-    return `/cukie-master?tokenId=${encodeURIComponent(cukie.tokenId)}#cukie-master-cukie-${encodeURIComponent(cukie.tokenId)}`;
+    return custodyHref(cukie, '/cukie-master', `cukie-master-cukie-${cukie.tokenId}`);
   }
   if (action === 'deposit_pool') {
-    return `/cukie-hodler?tokenId=${encodeURIComponent(cukie.tokenId)}#pool-available-${encodeURIComponent(cukie.tokenId)}`;
+    return custodyHref(cukie, '/cukie-hodler', `pool-available-${cukie.tokenId}`);
   }
   return cukie.marketplaceSurface === 'legacy'
     ? legacyMarketplaceHref(cukie)
     : cukie.marketplaceSurface === 'uki'
       ? ukiMarketplaceHref(cukie)
       : null;
+}
+
+function custodyHref(cukie: MyCukieCollectionItem, pathname: string, targetId: string) {
+  const query = new URLSearchParams({
+    tokenId: cukie.tokenId,
+    collection: cukie.collectionAddress,
+    chainId: String(cukie.chainId),
+  });
+  return `${pathname}?${query.toString()}#${encodeURIComponent(targetId)}`;
 }
 
 function legacyMarketplaceHref(cukie: MyCukieCollectionItem) {

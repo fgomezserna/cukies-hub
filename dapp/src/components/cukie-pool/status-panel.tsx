@@ -1354,7 +1354,7 @@ export function CukiePoolStatusPanel() {
                               className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] border border-white/15 px-4 text-xs font-black text-[var(--uki-text)] transition-colors hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] active:scale-[0.99] disabled:opacity-50"
                             >
                               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
-                              {pending ? pendingLabel(pending) : position.status === 'pending' ? 'Cancelar aportación' : 'Solicitar devolución'}
+                              {pending ? pendingLabel(pending) : position.status === 'pending' ? 'Cancelar aportación al Cukie Pool' : 'Solicitar devolución del Cukie Pool'}
                             </button>
                           )
                         ) : position.lifecycleOpen && position.status === 'withdrawable' ? (
@@ -1365,7 +1365,7 @@ export function CukiePoolStatusPanel() {
                             className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-[var(--uki-lilac)] px-4 text-xs font-black uppercase text-black transition-transform active:scale-[0.98] disabled:opacity-50"
                           >
                             {working || pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
-                            {pending ? pendingLabel(pending) : working ? 'Confirmando retirada' : 'Retirar a mi wallet'}
+                            {pending ? pendingLabel(pending) : working ? 'Confirmando retirada' : 'Retirar a mi wallet desde el Cukie Pool'}
                           </button>
                         ) : null}
                         {pending?.txHash && ukiNftVaults.explorerBaseUrl ? (

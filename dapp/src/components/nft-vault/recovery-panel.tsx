@@ -54,9 +54,12 @@ type RequestedPoolLink = {
   tokenId: string | null;
   collection: string | null;
   recoveryVault: string | null;
+  chainId: number | null;
+  chainIdInvalid: boolean;
 };
 
 const ZERO_ADDRESS = zeroAddress.toLowerCase();
+const READ_CONTEXT_CHANGED = 'RECOVERY_READ_CONTEXT_CHANGED';
 
 function sameAddress(left: string | null | undefined, right: string | null | undefined) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -191,17 +194,25 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     tokenId: null,
     collection: null,
     recoveryVault: null,
+    chainId: null,
+    chainIdInvalid: false,
   });
   const [manualOpen, setManualOpen] = useState(false);
+  const autoInspectKeyRef = useRef<string | null>(null);
+  const readGenerationRef = useRef(0);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedTokenId = params.get('tokenId');
     const requestedRecoveryVault = params.get('recoveryVault');
     const requestedCollection = params.get('collection');
+    const rawChainId = params.get('chainId');
+    const parsedChainId = rawChainId === '56' || rawChainId === '97' ? Number(rawChainId) : null;
     setRequestedPoolLink({
       tokenId: requestedTokenId,
       collection: requestedCollection,
       recoveryVault: requestedRecoveryVault,
+      chainId: parsedChainId,
+      chainIdInvalid: rawChainId !== null && parsedChainId === null,
     });
     setRequestedTokenId(null);
     setTokenIdInput('');
@@ -296,6 +307,8 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     requestedPoolLink.tokenId
     && /^\d+$/.test(requestedPoolLink.tokenId)
     && requestedPoolLink.collection
+    && !requestedPoolLink.chainIdInvalid
+    && (!requestedPoolLink.chainId || requestedPoolLink.chainId === ukiNftVaults.chainId)
     && selectedCollection
     && sameAddress(requestedPoolLink.collection, selectedCollection)
     && (requestedActivePoolVault || requestedPreviousPoolVault)
@@ -314,10 +327,28 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     && correctChain
     && selectedCollection
     && tokenIdValid
+    && !requestedPoolLink.chainIdInvalid
+    && (!requestedPoolLink.chainId || requestedPoolLink.chainId === ukiNftVaults.chainId)
     && linkedPoolPosition
     && publicClient
     && phase === 'idle',
   );
+  const hasKnownIdentity = Boolean(requestedTokenId && tokenIdValid);
+  const readContextKey = [
+    kind,
+    address ?? '',
+    isConnected ? 'connected' : 'disconnected',
+    chainId ?? '',
+    ukiNftVaults.chainId ?? '',
+    vaultAddress ?? '',
+    selectedCollection?.toLowerCase() ?? '',
+    tokenIdInput,
+    requestedPoolLink.tokenId ?? '',
+    requestedPoolLink.collection?.toLowerCase() ?? '',
+    requestedPoolLink.recoveryVault?.toLowerCase() ?? '',
+    requestedPoolLink.chainId ?? '',
+    requestedPoolLink.chainIdInvalid ? 'invalid-chain' : '',
+  ].join(':');
 
   useEffect(() => {
     if (configuredCollections.some((collection) => sameAddress(collection, collectionInput))) return;
@@ -411,12 +442,19 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
   }, [pendingContext]);
 
   useEffect(() => {
+    readGenerationRef.current += 1;
+    autoInspectKeyRef.current = null;
     setResult({ kind: 'idle' });
     setPhase('idle');
     setNotice(null);
     setLatestTxHash(null);
     setChainTimeVerified(false);
-  }, [address, chainId, collectionInput, kind, tokenIdInput, vaultAddress]);
+  }, [readContextKey]);
+
+  useEffect(() => () => {
+    readGenerationRef.current += 1;
+    autoInspectKeyRef.current = null;
+  }, []);
 
   const withdrawableAt = result.kind === 'position'
     ? result.position.withdrawableAt
@@ -442,14 +480,19 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     return () => window.clearTimeout(timer);
   }, [kind, nowSeconds, publicClient, withdrawableAt]);
 
-  async function readPosition(identity: { collection: Address; tokenId: bigint }) {
+  async function readPosition(
+    identity: { collection: Address; tokenId: bigint },
+    isCurrent: () => boolean = () => true,
+  ) {
     if (!publicClient || !vaultAddress) throw new Error('CLIENT_NOT_READY');
+    if (!isCurrent()) throw new Error(READ_CONTEXT_CHANGED);
     const allowed = await publicClient.readContract({
       address: vaultAddress,
       abi: vaultAbi,
       functionName: 'collectionAllowed',
       args: [identity.collection],
     });
+    if (!isCurrent()) throw new Error(READ_CONTEXT_CHANGED);
     if (typeof allowed !== 'boolean') throw new Error('INVALID_ALLOWLIST_RESPONSE');
 
     const rawPosition = await publicClient.readContract({
@@ -458,6 +501,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       functionName: 'positionOf',
       args: [identity.collection, identity.tokenId],
     });
+    if (!isCurrent()) throw new Error(READ_CONTEXT_CHANGED);
     const position = parsePosition(
       kind,
       identity.collection,
@@ -470,16 +514,19 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     if (typeof publicClient.getBlock === 'function') {
       try {
         const block = await publicClient.getBlock({ blockTag: 'latest' });
+        if (!isCurrent()) throw new Error(READ_CONTEXT_CHANGED);
         const blockSeconds = Number(block.timestamp);
         if (Number.isSafeInteger(blockSeconds)) {
           setNowSeconds(blockSeconds);
           setChainTimeVerified(true);
         }
       } catch {
+        if (!isCurrent()) throw new Error(READ_CONTEXT_CHANGED);
         setNowSeconds(Math.floor(Date.now() / 1_000));
         setChainTimeVerified(false);
       }
     } else {
+      if (!isCurrent()) throw new Error(READ_CONTEXT_CHANGED);
       setNowSeconds(Math.floor(Date.now() / 1_000));
       setChainTimeVerified(false);
     }
@@ -500,7 +547,10 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
 
   async function inspectPosition() {
     if (!canInspect || !selectedCollection || !tokenIdValid) return;
+    const readGeneration = readGenerationRef.current;
+    const isCurrentRead = () => readGenerationRef.current === readGeneration;
     const identity = { collection: selectedCollection, tokenId: BigInt(tokenIdInput) };
+    if (!isCurrentRead()) return;
     setPhase('checking');
     setNotice(null);
     setLatestTxHash(selectedPending?.txHash ?? null);
@@ -509,6 +559,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       if (pending?.phase === 'awaiting_receipt') {
         try {
           const receipt = await publicClient!.getTransactionReceipt({ hash: pending.txHash });
+          if (!isCurrentRead()) return;
           if (receipt.status === 'reverted') {
             clearPending(pending.assetId);
             pending = null;
@@ -524,10 +575,12 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
             }) ?? pending;
           }
         } catch {
+          if (!isCurrentRead()) return;
           setNotice('La transacción sigue pendiente o aún no tiene recibo. No repitas la operación.');
         }
       }
-      const position = await readPosition(identity);
+      const position = await readPosition(identity, isCurrentRead);
+      if (!isCurrentRead()) return;
       applyPosition(position);
       if (pending) {
         const reflected = pending.action === 'withdraw'
@@ -543,13 +596,53 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         }
       }
     } catch (caught) {
+      if (!isCurrentRead()) return;
       setResult({
         kind: 'error',
         message: 'No se pudo validar la posición directamente en el contrato. No se habilita ninguna firma.',
       });
     } finally {
-      setPhase('idle');
+      if (isCurrentRead()) setPhase('idle');
     }
+  }
+
+  const autoInspectKey = [
+    kind,
+    address ?? '',
+    chainId ?? '',
+    vaultAddress ?? '',
+    selectedCollection?.toLowerCase() ?? '',
+    requestedTokenId ?? '',
+    selectedPending?.txHash ?? '',
+  ].join(':');
+
+  useEffect(() => {
+    if (!hasKnownIdentity || !canInspect || !selectedCollection || !requestedTokenId || phase !== 'idle') return;
+    if (autoInspectKeyRef.current === autoInspectKey) return;
+    autoInspectKeyRef.current = autoInspectKey;
+    void inspectPosition();
+    // The key ref prevents duplicate reads under Strict Mode and while the
+    // requested card settles its wallet/configuration context.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, autoInspectKey, canInspect, hasKnownIdentity, phase, requestedTokenId, selectedCollection]);
+
+  function retryKnownPosition() {
+    if (!hasKnownIdentity || !canInspect) return;
+    autoInspectKeyRef.current = autoInspectKey;
+    void inspectPosition();
+  }
+
+  function knownPositionRefreshButton(label: string) {
+    return (
+      <button
+        type="button"
+        disabled={!canInspect || phase !== 'idle'}
+        onClick={retryKnownPosition}
+        className="min-h-9 rounded-[7px] border border-[var(--uki-lilac-border)] px-3 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:opacity-50"
+      >
+        {label}
+      </button>
+    );
   }
 
   async function execute(operation: 'request_exit' | 'withdraw') {
@@ -679,7 +772,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
         const position = await readPosition({
           collection: result.position.collection,
           tokenId: result.position.tokenId,
-        });
+        }, identityMatches);
         if (!identityMatches()) throw new Error('RECOVERY_OPERATION_CONTEXT_CHANGED');
         applyPosition(position);
         const reflected = operation === 'withdraw'
@@ -733,9 +826,9 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
         <span>
-          <span className="uki-label">{kind === 'cukie_pool' ? 'Retirar Cukie' : 'Posición existente'}</span>
+          <span className="uki-label">{kind === 'cukie_pool' ? 'Salida del Cukie Pool' : 'Posición existente'}</span>
           <span className="mt-2 block font-headline text-lg font-black uppercase text-[var(--uki-cream)]">
-            {kind === 'cukie_master' ? 'Gestionar un Cukie depositado' : 'Retirar Cukie'}
+            {kind === 'cukie_master' ? 'Gestionar un Cukie de Cukie Master' : 'Retirar del Cukie Pool'}
           </span>
         </span>
         <span aria-hidden="true" className="text-xl font-black text-[var(--uki-lilac)] transition-transform group-open:rotate-45">
@@ -748,7 +841,11 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
           Comprueba el estado de una posición depositada y solicita su salida o retírala cuando esté disponible.
         </p>
 
-      {!publicConfigReady ? (
+      {requestedPoolLink.chainIdInvalid ? (
+        <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">
+          Este enlace no identifica una red BSC válida. Vuelve a abrir la posición desde Mis Cukies.
+        </p>
+      ) : !publicConfigReady ? (
         <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">
           No podemos verificar esta posición o la red. La operación permanece bloqueada.
         </p>
@@ -763,9 +860,11 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
       ) : null}
 
       {kind === 'cukie_pool' && !linkedPoolPosition ? (
-        <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">
-          Abre esta pantalla desde la ficha del Cukie en Mis Cukies para consultar su posición.
-        </p>
+        requestedPoolLink.chainIdInvalid ? null : (
+          <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">
+            Abre esta pantalla desde la ficha del Cukie en Mis Cukies para consultar su posición.
+          </p>
+        )
       ) : (
       <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.65fr)_auto] sm:items-end">
         {kind === 'cukie_pool' ? (
@@ -803,29 +902,69 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
             </select>
           </label>
         )}
-        <label className="grid gap-1.5 text-xs font-black uppercase text-[var(--uki-muted)]">
-          Número del Cukie (Token ID)
-          <input
-            aria-label="Número del Cukie (Token ID)"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
-            value={tokenIdInput}
-            readOnly={kind === 'cukie_pool'}
-            disabled={!publicConfigReady || phase !== 'idle'}
-            onChange={(event) => setTokenIdInput(event.target.value.trim())}
-            className="h-11 rounded-[7px] border border-white/15 bg-black/40 px-3 text-sm font-semibold normal-case text-[var(--uki-text)] disabled:opacity-50"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={!canInspect}
-          onClick={() => void inspectPosition()}
-          className="h-11 rounded-[7px] border border-[var(--uki-lilac-border)] px-4 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:opacity-50"
-        >
-          {phase === 'checking' ? 'Comprobando…' : 'Comprobar posición'}
-        </button>
+        {hasKnownIdentity ? (
+          <div className="sm:col-span-2 flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-[7px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] px-3 py-2 text-sm font-semibold text-[var(--uki-text)]" role="status" aria-live="polite">
+            {phase === 'checking' ? (
+              <span>Consultando automáticamente esta posición…</span>
+            ) : result.kind === 'idle' && requestedPoolLink.chainIdInvalid ? (
+              <span>El enlace no identifica una red BSC válida.</span>
+            ) : result.kind === 'idle' && !publicConfigReady ? (
+              <span>Esperando una configuración pública válida para consultar.</span>
+            ) : result.kind === 'idle' && !connectedWalletReady ? (
+              <span>Esperando que conectes la wallet propietaria.</span>
+            ) : result.kind === 'idle' && !correctChain ? (
+              <span>Esperando que cambies a la red BSC configurada.</span>
+            ) : result.kind === 'idle' ? (
+              <span>Preparando la consulta automática de esta posición…</span>
+            ) : result.kind === 'error' ? (
+              <>
+                <span>No se pudo cargar esta posición.</span>
+                {knownPositionRefreshButton('Reintentar consulta')}
+              </>
+            ) : result.kind === 'not_found' ? (
+              <>
+                <span>No hay una posición abierta para este Cukie.</span>
+                {knownPositionRefreshButton('Actualizar posición')}
+              </>
+            ) : result.kind === 'wrong_owner' ? (
+              <>
+                <span>La posición está vinculada a otra wallet.</span>
+                {knownPositionRefreshButton('Actualizar posición')}
+              </>
+            ) : (
+              <>
+                <span>Posición cargada desde tu Cukie seleccionado.</span>
+                {knownPositionRefreshButton('Actualizar posición')}
+              </>
+            )}
+          </div>
+        ) : (
+          <>
+            <label className="grid gap-1.5 text-xs font-black uppercase text-[var(--uki-muted)]">
+              Número del Cukie (Token ID)
+              <input
+                aria-label="Número del Cukie (Token ID)"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                value={tokenIdInput}
+                readOnly={kind === 'cukie_pool'}
+                disabled={!publicConfigReady || phase !== 'idle'}
+                onChange={(event) => setTokenIdInput(event.target.value.trim())}
+                className="h-11 rounded-[7px] border border-white/15 bg-black/40 px-3 text-sm font-semibold normal-case text-[var(--uki-text)] disabled:opacity-50"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={!canInspect}
+              onClick={() => void inspectPosition()}
+              className="h-11 rounded-[7px] border border-[var(--uki-lilac-border)] px-4 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:opacity-50"
+            >
+              {phase === 'checking' ? 'Comprobando…' : 'Comprobar posición'}
+            </button>
+          </>
+        )}
       </div>
       )}
 
@@ -848,7 +987,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
             <div>
               <p className="font-bold text-[var(--uki-cream)]">Cukie #{result.position.tokenId.toString()}</p>
               <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                Propietario verificado · epoch {result.position.depositEpoch.toString()}
+                Propietario verificado
               </p>
               {!result.position.collectionCurrentlyAllowed ? (
                 <p className="mt-1 text-xs font-semibold text-amber-300">
@@ -863,7 +1002,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 onClick={() => void execute('withdraw')}
                 className="rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
               >
-                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar Cukie ahora'}
+                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar de Cukie Master'}
               </button>
             ) : !exitRequested ? (
               <button
@@ -872,7 +1011,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 onClick={() => void execute('request_exit')}
                 className="rounded-[7px] border border-white/15 px-4 py-2 text-xs font-black uppercase text-[var(--uki-text)] disabled:opacity-50"
               >
-                {phase === 'requesting_exit' ? 'Solicitando…' : 'Solicitar retirada'}
+                {phase === 'requesting_exit' ? 'Solicitando…' : 'Solicitar salida del Cukie Pool'}
               </button>
             ) : withdrawalReady ? (
               <button
@@ -881,7 +1020,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 onClick={() => void execute('withdraw')}
                 className="rounded-[7px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black disabled:opacity-50"
               >
-                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar Cukie'}
+                {phase === 'withdrawing' ? 'Retirando…' : 'Retirar del Cukie Pool'}
               </button>
             ) : (
               <div className="max-w-xs text-right text-xs text-amber-300">
@@ -907,7 +1046,9 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
             <p key={pending.assetId}>
               Cukie #{pending.tokenId}: operación enviada y bloqueada hasta comprobar su resultado.
               {' '}<a href={getNftVaultExplorerTxUrl(pending.txHash) ?? '#'} target="_blank" rel="noreferrer" className="font-black text-[var(--uki-lilac)] underline">Ver transacción</a>.
-              {' '}Introduce ese Token ID y pulsa «Comprobar posición» para reconciliarla.
+              {' '}{hasKnownIdentity && pending.tokenId === requestedTokenId
+                ? 'Esta posición se volverá a comprobar automáticamente.'
+                : 'Introduce ese Token ID y pulsa «Comprobar posición» para reconciliarla.'}
             </p>
           ))}
         </div>

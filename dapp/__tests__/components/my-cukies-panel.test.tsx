@@ -48,6 +48,8 @@ function item(overrides: Record<string, unknown> = {}) {
     state: 'available',
     custody: 'wallet',
     poolStatus: null,
+    chainId: 97,
+    collectionAddress: '0x3333333333333333333333333333333333333333',
     marketplaceSurface: 'uki',
     ...overrides,
   };
@@ -157,6 +159,10 @@ describe('MyCukiesPanel', () => {
       `/marketplace/98000005?source=legacy&network=BSC&collection=${legacyMarketplaceContracts.bsc.contracts.token}`,
     );
     expect(screen.getByRole('link', { name: 'Hacer staking Master' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Hacer staking Master' })).toHaveAttribute(
+      'href',
+      '/cukie-master?tokenId=98000006&collection=0x3333333333333333333333333333333333333333&chainId=97#cukie-master-cukie-98000006',
+    );
     fireEvent.change(screen.getByRole('combobox', { name: 'Filtrar colección' }), { target: { value: 'listed' } });
     expect(screen.getByRole('heading', { name: 'Cukie #98000005' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Cukie #98000006' })).not.toBeInTheDocument();
@@ -243,9 +249,9 @@ describe('MyCukiesPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Cukie #98000001' })).toBeInTheDocument();
     expect(screen.getAllByText('Estado pendiente de confirmar')).not.toHaveLength(0);
     expect(screen.queryByText('Retirada disponible')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Consultar posición/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Consultar salida del Cukie Pool/i })).toHaveAttribute(
       'href',
-      '/cukie-hodler/recuperar?tokenId=98000001&recoveryVault=0x4444444444444444444444444444444444444444&collection=0x3333333333333333333333333333333333333333#pool-recovery',
+      '/cukie-hodler/recuperar?tokenId=98000001&chainId=97&recoveryVault=0x4444444444444444444444444444444444444444&collection=0x3333333333333333333333333333333333333333#pool-recovery',
     );
   });
 
@@ -264,7 +270,7 @@ describe('MyCukiesPanel', () => {
 
     expect((await screen.findAllByText('Depósito en el Pool')).length).toBeGreaterThan(0);
     expect(screen.getByText(/Este Cukie sigue depositado en el Pool/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Solicitar retirada' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Solicitar salida del Cukie Pool' })).toBeInTheDocument();
   });
 
   it('distingue una salida solicitada y muestra la fecha verificable', async () => {
@@ -283,7 +289,7 @@ describe('MyCukiesPanel', () => {
 
     expect((await screen.findAllByText('Salida solicitada')).length).toBeGreaterThan(0);
     expect(screen.getByText(/Podrás retirarlo desde/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Ver retirada' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver salida del Cukie Pool' })).toBeInTheDocument();
   });
 
   it('solo marca la retirada disponible cuando hay solicitud y fecha ya vencida', async () => {
@@ -301,6 +307,6 @@ describe('MyCukiesPanel', () => {
 
     expect((await screen.findAllByText('Retirada disponible')).length).toBeGreaterThan(0);
     expect(screen.getByText(/Puedes retirarlo desde/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Retirar Cukie' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Retirar del Cukie Pool' })).toBeInTheDocument();
   });
 });
