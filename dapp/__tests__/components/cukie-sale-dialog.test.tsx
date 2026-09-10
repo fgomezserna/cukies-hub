@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const wallet = '0x2222222222222222222222222222222222222222';
@@ -94,14 +95,6 @@ jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
 jest.mock('@/components/ui/button', () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
 }));
-jest.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ open, children }: { open: boolean; children: React.ReactNode }) => open ? <div role="dialog">{children}</div> : null,
-  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-  DialogFooter: ({ children }: { children: React.ReactNode }) => <footer>{children}</footer>,
-  DialogHeader: ({ children }: { children: React.ReactNode }) => <header>{children}</header>,
-  DialogTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
-}));
 jest.mock('lucide-react', () => {
   const Icon = () => null;
   return {
@@ -112,6 +105,7 @@ jest.mock('lucide-react', () => {
     Network: Icon,
     ShieldCheck: Icon,
     Store: Icon,
+    X: Icon,
   };
 });
 
@@ -163,6 +157,21 @@ describe('CukieSaleDialog', () => {
     jest.clearAllMocks();
   });
 
+  it('devuelve el foco al botón de venta al cerrar el sheet', async () => {
+    function SaleFlow() {
+      const [open, setOpen] = useState(false);
+      return <><button onClick={() => setOpen(true)}>Vender este Cukie</button><CukieSaleDialog cuki={cuki} open={open} onOpenChange={setOpen} /></>;
+    }
+    render(<SaleFlow />);
+    const trigger = screen.getByRole('button', { name: 'Vender este Cukie' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(await screen.findByRole('dialog', { name: 'Vender Cukie #4314' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
   it('muestra identidad, valida precio y mantiene la publicación bloqueada hasta aprobar', async () => {
     renderDialog();
 
@@ -174,10 +183,10 @@ describe('CukieSaleDialog', () => {
     const price = screen.getByLabelText('Precio de venta en BNB');
     fireEvent.change(price, { target: { value: '0' } });
     expect(screen.getByText('Introduce un precio válido mayor que cero.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Poner en la tienda' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Poner en la tienda' })).not.toBeInTheDocument();
 
     fireEvent.change(price, { target: { value: '0,195' } });
-    expect(screen.getByRole('button', { name: 'Poner en la tienda' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Poner en la tienda' })).not.toBeInTheDocument();
   });
 
   it('separa approve y listing, espera recibos y reconcilia el anuncio', async () => {
@@ -191,8 +200,9 @@ describe('CukieSaleDialog', () => {
       args: [legacyMarketplaceContracts.bsc.contracts.marketplace, BigInt(4314)],
     })));
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprobar Cukie' })).not.toBeInTheDocument());
 
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Poner en la tienda' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Poner en la tienda' }));
     await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
       functionName: 'putTokenOnSale',
@@ -207,7 +217,8 @@ describe('CukieSaleDialog', () => {
     approved = true;
     renderDialog();
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprobar Cukie' })).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Poner en la tienda' })).toBeDisabled();
     expect(writeContractAsync).not.toHaveBeenCalled();
   });
 
@@ -236,7 +247,7 @@ describe('CukieSaleDialog', () => {
       functionName: 'approve',
       args: [legacyMarketplaceContracts.bsc.contracts.marketplace, BigInt(4314)],
     })));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprobar Cukie' })).not.toBeInTheDocument());
   });
 
   it('bloquea un Cukie depositado y no permite publicar', async () => {
@@ -256,14 +267,14 @@ describe('CukieSaleDialog', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('bloqueado');
     expect(screen.getByRole('button', { name: 'Aprobar Cukie' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Poner en la tienda' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Poner en la tienda' })).not.toBeInTheDocument();
   });
 
   it('mantiene bloqueada la publicación tras un timeout y permite reconsultarla', async () => {
     approved = true;
     publicClient.waitForTransactionReceipt.mockRejectedValueOnce(new Error('Timed out while waiting for receipt'));
     renderDialog();
-    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprobar Cukie' })).not.toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Precio de venta en BNB'), { target: { value: '0,195' } });
     fireEvent.click(screen.getByRole('button', { name: 'Poner en la tienda' }));
 
@@ -279,7 +290,7 @@ describe('CukieSaleDialog', () => {
     approved = true;
     deactivateListingAfterBroadcast = true;
     renderDialog();
-    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprobar Cukie' })).not.toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Precio de venta en BNB'), { target: { value: '0,195' } });
     fireEvent.click(screen.getByRole('button', { name: 'Poner en la tienda' }));
 
@@ -294,7 +305,7 @@ describe('CukieSaleDialog', () => {
     approved = true;
     failListingRefreshReads = true;
     renderDialog();
-    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprobar Cukie' })).not.toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Precio de venta en BNB'), { target: { value: '0,195' } });
     fireEvent.click(screen.getByRole('button', { name: 'Poner en la tienda' }));
 

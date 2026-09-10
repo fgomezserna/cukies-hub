@@ -22,13 +22,14 @@ import { useAccount, useConfig, usePublicClient, useWriteContract } from 'wagmi'
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useTronLink } from '@/hooks/use-tronlink';
 import {
   legacyMarketplaceBscAbis,
@@ -500,6 +501,7 @@ export function CukieSaleDialog({
   const [latestTxHash, setLatestTxHash] = useState<string | null>(null);
   const [inspectState, setInspectState] = useState<'idle' | 'checking' | 'ready' | 'needs_wallet' | 'error'>('idle');
   const operationLockRef = useRef(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const inspectionIdRef = useRef(0);
   const pendingListingRef = useRef<PendingListing | null>(null);
   const pendingApprovalRef = useRef<PendingApproval | null>(null);
@@ -1277,30 +1279,83 @@ export function CukieSaleDialog({
     && !inspection.activeListing
     && feeVerified
     && (surface === 'uki' ? validation.valid : price.trim().length > 0);
+  const isMobile = useIsMobile();
+  const dismissBlocked = busy || listingState === 'pending' || approvalState === 'pending';
+  const listingDone = listingState === 'confirmed' || listingState === 'published';
+  const listingPending = listingState === 'pending';
+  const approvalActionLabel = approvalState === 'pending'
+    ? 'Aprobación pendiente'
+    : phase === 'approving'
+      ? 'Esperando confirmación…'
+      : phase === 'checking'
+        ? 'Comprobando…'
+        : 'Aprobar Cukie';
+  const listingActionLabel = listingPending
+    ? 'Publicación pendiente'
+    : phase === 'listing'
+      ? 'Esperando confirmación…'
+      : phase === 'checking'
+        ? 'Comprobando…'
+        : 'Poner en la tienda';
+  const approvalStepCopy = approvalDone
+    ? 'Permiso confirmado; ya puedes publicar.'
+    : approvalState === 'pending'
+      ? 'Firma enviada; todavía no está confirmada.'
+      : 'Autoriza solo este Cukie; aún no se publica.';
+  const listingStepCopy = listingDone
+    ? listingState === 'published'
+      ? 'Anuncio activo en el marketplace.'
+      : 'Recibo confirmado; el catálogo terminará de actualizarse.'
+    : listingPending
+      ? 'Firma enviada; todavía no está confirmada.'
+      : approvalDone
+        ? 'Revisa el precio y confirma el anuncio.'
+        : 'Se habilita después de aprobar.';
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!busy && listingState !== 'pending' && approvalState !== 'pending') onOpenChange(next);
+        if (!dismissBlocked) onOpenChange(next);
       }}
     >
-      <DialogContent className="grid max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl border border-[var(--uki-lilac)]/30 bg-[#09060f] p-0 text-[var(--uki-cream)] shadow-[0_0_80px_rgba(228,92,255,0.18)] sm:max-h-[calc(100dvh-3rem)]">
-        <DialogHeader className="border-b border-white/10 px-5 py-5 pr-12 text-left sm:px-7 sm:py-6">
+      <SheetContent
+        side={isMobile ? 'bottom' : 'right'}
+        onOpenAutoFocus={() => {
+          returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          if (returnFocusRef.current?.isConnected) {
+            event.preventDefault();
+            returnFocusRef.current.focus({ preventScroll: true });
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (dismissBlocked) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          if (dismissBlocked) event.preventDefault();
+        }}
+        className={`uki-theme grid w-full motion-reduce:animate-none motion-reduce:transition-none [&>button:last-child]:right-2 [&>button:last-child]:top-2 [&>button:last-child]:grid [&>button:last-child]:h-11 [&>button:last-child]:w-11 [&>button:last-child]:place-items-center grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-[var(--uki-lilac-border)] bg-[var(--uki-bg)] p-0 text-[var(--uki-cream)] shadow-[0_0_80px_rgba(228,92,255,0.18)] ${isMobile
+          ? 'max-h-[calc(100dvh-0.5rem)] max-w-none rounded-t-2xl sm:max-w-none'
+          : 'h-full max-h-full rounded-l-2xl sm:max-w-[35rem]'
+        }`}
+      >
+        <SheetHeader className="border-b border-white/10 px-5 py-5 pr-14 text-left sm:px-7 sm:py-6">
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">
             <Store className="h-4 w-4" aria-hidden="true" /> Publicar en marketplace
           </div>
-          <DialogTitle className="mt-2 font-headline text-2xl font-black tracking-[-0.025em] text-[var(--uki-cream)] sm:text-3xl">
+          <SheetTitle className="mt-2 font-headline text-2xl font-black tracking-[-0.025em] text-[var(--uki-cream)] sm:text-3xl">
             Vender Cukie #{cuki.tokenId}
-          </DialogTitle>
-          <DialogDescription className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+          </SheetTitle>
+          <SheetDescription className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
             Indica el precio y revisa cuánto recibirás. Después aprueba el Cukie y confirma el anuncio.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
           <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-4 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-5">
-            <div className="relative aspect-square overflow-hidden rounded-xl border border-white/10 bg-[#0d0914]">
+            <div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--uki-lilac-border)] bg-[var(--uki-bg-2)]">
               <CukiImage
                 src={cuki.imageUrl}
                 alt={`Cukie #${cuki.tokenId}`}
@@ -1310,7 +1365,7 @@ export function CukieSaleDialog({
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 px-2.5 py-1 text-xs font-black text-[var(--uki-lilac)]">
+                <span className="rounded-full border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] px-2.5 py-1 text-xs font-black text-[var(--uki-lilac)]">
                   {surfaceLabel(surface)}
                 </span>
               </div>
@@ -1345,14 +1400,14 @@ export function CukieSaleDialog({
                   setNotice(null);
                 }}
                 disabled={busy || listingState === 'pending' || approvalState === 'pending'}
-                className="min-h-11 rounded-xl border border-white/15 bg-black/30 px-3 text-sm font-bold text-[var(--uki-text)] outline-none transition focus:border-[var(--uki-lilac)]/60 disabled:opacity-60"
+                className="min-h-11 rounded-xl border border-white/15 bg-black/30 px-3 text-sm font-bold text-[var(--uki-text)] outline-none transition focus:border-[var(--uki-lilac)] disabled:opacity-60"
               >
                 {surfaces.map((option) => <option key={option} value={option}>{surfaceLabel(option)}</option>)}
               </select>
             </label>
           ) : null}
 
-          <div className="mt-5 grid gap-4 rounded-xl border border-[var(--uki-lilac)]/20 bg-[var(--uki-lilac)]/[0.06] p-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-end">
+          <div className="mt-5 grid gap-4 rounded-xl border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
             <label className="grid gap-2 text-sm font-black text-[var(--uki-cream)]">
               Precio de venta ({surfaceCurrency(surface)})
               <input
@@ -1363,7 +1418,7 @@ export function CukieSaleDialog({
                 onChange={(event) => setPrice(event.target.value)}
                 placeholder={surface === 'legacy-tron' ? '3333' : surface === 'legacy-bsc' ? '0,195' : '1250'}
                 disabled={busy || listingState === 'pending' || approvalState === 'pending'}
-                className="min-h-12 rounded-xl border border-white/15 bg-black/30 px-3 font-mono text-lg font-bold text-[var(--uki-cream)] outline-none transition placeholder:text-white/30 focus:border-[var(--uki-lilac)]/65 disabled:opacity-60"
+                className="min-h-12 rounded-xl border border-white/15 bg-black/30 px-3 font-mono text-lg font-bold text-[var(--uki-cream)] outline-none transition placeholder:text-white/30 focus:border-[var(--uki-lilac)] disabled:opacity-60"
               />
               {surface === 'uki' && !validation.valid && price ? <span className="text-xs font-semibold text-amber-200">{validation.priceError ?? validation.expiryError}</span> : null}
               {surface !== 'uki' && price && (() => {
@@ -1376,104 +1431,111 @@ export function CukieSaleDialog({
                 }
               })()}
             </label>
-            <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs">
-              <p className="font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Vendedor</p>
-              <p className="mt-1 font-semibold text-[var(--uki-cream)]">{sellerAmountCopy}</p>
+            <div className="rounded-lg border border-[rgba(242,195,75,0.35)] bg-[rgba(242,195,75,0.08)] p-3 text-xs">
+              <p className="font-black uppercase tracking-[0.1em] text-[var(--uki-gold)]">Recibes</p>
+              <p className="mt-1 font-headline text-lg font-black leading-tight text-[var(--uki-gold)]"><span className="sr-only">Recibes </span>{sellerAmountCopy.replace(/^Recibes\s/, '')}</p>
             </div>
           </div>
 
           <div className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-black/20 p-4 text-sm">
             <div className="flex items-start gap-3">
-              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
+              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-gold)]" aria-hidden="true" />
               <p className="leading-6 text-[var(--uki-text)]">{feeCopy}</p>
             </div>
             {surface === 'uki' ? <p className="pl-7 text-xs font-semibold leading-5 text-[var(--uki-muted)]">El anuncio estará disponible durante 7 días.</p> : <p className="pl-7 text-xs font-semibold leading-5 text-[var(--uki-muted)]">La wallet mostrará el coste de red antes de firmar.</p>}
           </div>
 
           {inspectState === 'needs_wallet' ? (
-            <p role="status" className="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm font-semibold text-amber-100">Conecta o cambia la wallet a {signatureNetwork} para comprobar propiedad y aprobación.</p>
+            <p role="status" className="mt-4 rounded-xl border border-[rgba(242,195,75,0.3)] bg-[rgba(242,195,75,0.08)] p-3 text-sm font-semibold text-[#ffe2a0]">Conecta o cambia la wallet a {signatureNetwork} para comprobar propiedad y aprobación.</p>
           ) : null}
           {inspectState === 'checking' ? (
-            <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-[var(--uki-muted)]"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Preparando la venta…</p>
+            <p role="status" className="mt-4 flex items-center gap-2 text-sm font-semibold text-[var(--uki-muted)]"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> Preparando la venta…</p>
           ) : null}
-          {error ? <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300/25 bg-amber-300/10 p-3 text-sm font-semibold leading-6 text-amber-100"><CircleAlert className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" /> {error}</p> : null}
-          {notice ? <p role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-3 text-sm font-semibold leading-6 text-emerald-100"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" /> {notice}</p> : null}
+          {error ? <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-[rgba(242,195,75,0.3)] bg-[rgba(242,195,75,0.08)] p-3 text-sm font-semibold leading-6 text-[#ffe2a0]"><CircleAlert className="mt-1 h-4 w-4 shrink-0 text-[var(--uki-gold)]" aria-hidden="true" /> {error}</p> : null}
+          {notice ? <p role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-[rgba(242,195,75,0.3)] bg-[rgba(242,195,75,0.08)] p-3 text-sm font-semibold leading-6 text-[#ffe9a4]"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-[var(--uki-gold)]" aria-hidden="true" /> {notice}</p> : null}
           {latestTxHash ? <p className="mt-2 break-all text-xs font-mono text-[var(--uki-muted)]">Última transacción: {latestTxHash}</p> : null}
 
-          <ol aria-label="Pasos para publicar el Cukie" className="mt-5 grid gap-3">
-            <li className={`rounded-xl border p-4 ${approvalDone ? 'border-emerald-300/25 bg-emerald-300/[0.06]' : 'border-white/10 bg-black/20'}`}>
-              <div className="flex items-start gap-3">
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-black ${approvalDone ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100' : 'border-white/20 text-[var(--uki-muted)]'}`}>
-                  {approvalDone ? <Check className="h-4 w-4" aria-hidden="true" /> : '1'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-black text-[var(--uki-cream)]">Aprobar Cukie</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--uki-muted)]">Permiso limitado a este Cukie y a este marketplace. La aprobación no publica el anuncio.</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void approveCukie()}
-                    disabled={busy || approvalDone || approvalState === 'pending' || Boolean(identityError)}
-                    className="mt-3 min-h-10 border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 text-[var(--uki-cream)] hover:bg-[var(--uki-lilac)]/20"
-                  >
-                    <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                    {approvalDone ? 'Aprobar Cukie · ya aprobado' : approvalState === 'pending' ? 'Aprobación pendiente…' : phase === 'approving' ? 'Esperando confirmación…' : phase === 'checking' ? 'Comprobando…' : 'Aprobar Cukie'}
-                  </Button>
-                  {approvalDone ? <p className="mt-2 text-xs font-bold text-emerald-200">Aprobación confirmada y revalidada.</p> : null}
-                  {approvalState === 'pending' ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void recheckPendingApproval()}
-                      disabled={busy}
-                      className="mt-2 min-h-10 border-amber-200/35 bg-amber-200/10 text-amber-100 hover:bg-amber-200/20"
-                    >
-                      Comprobar aprobación
-                    </Button>
-                  ) : null}
-                </div>
+          <ol aria-label="Pasos para publicar el Cukie" className="mt-5 grid gap-2">
+            <li
+              aria-current={!approvalDone ? 'step' : undefined}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${approvalDone ? 'border-[rgba(242,195,75,0.35)] bg-[rgba(242,195,75,0.07)]' : approvalState === 'pending' ? 'border-[rgba(242,195,75,0.35)] bg-[rgba(242,195,75,0.05)]' : 'border-white/10 bg-black/20'}`}
+            >
+              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-black ${approvalDone ? 'border-[rgba(242,195,75,0.6)] bg-[rgba(242,195,75,0.15)] text-[var(--uki-gold)]' : approvalState === 'pending' ? 'border-[rgba(242,195,75,0.5)] bg-[rgba(242,195,75,0.1)] text-[var(--uki-gold)]' : 'border-white/20 text-[var(--uki-muted)]'}`}>
+                {approvalDone ? <Check className="h-4 w-4" aria-hidden="true" /> : approvalState === 'pending' ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : '1'}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-black text-[var(--uki-cream)]"><span className="text-[var(--uki-muted)]">Paso 1 · </span>Aprobar Cukie</p>
+                <p className={`mt-0.5 text-xs font-semibold leading-5 ${approvalDone || approvalState === 'pending' ? 'text-[var(--uki-gold)]' : 'text-[var(--uki-muted)]'}`}>{approvalStepCopy}</p>
               </div>
+              {approvalState === 'pending' ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void recheckPendingApproval()}
+                  disabled={busy}
+                  aria-label="Comprobar aprobación"
+                  className="min-h-11 shrink-0 border-[rgba(242,195,75,0.35)] bg-[rgba(242,195,75,0.1)] px-2.5 text-xs text-[#ffe2a0] hover:bg-[rgba(242,195,75,0.2)]"
+                >
+                  Comprobar
+                </Button>
+              ) : null}
             </li>
-            <li className={`rounded-xl border p-4 ${listingState === 'pending' || listingState === 'confirmed' || listingState === 'published' ? 'border-emerald-300/25 bg-emerald-300/[0.06]' : 'border-white/10 bg-black/20'}`}>
-              <div className="flex items-start gap-3">
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-black ${listingState === 'pending' || listingState === 'confirmed' || listingState === 'published' ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100' : 'border-white/20 text-[var(--uki-muted)]'}`}>
-                  {listingState === 'pending' || listingState === 'confirmed' || listingState === 'published' ? <Check className="h-4 w-4" aria-hidden="true" /> : '2'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-black text-[var(--uki-cream)]">Poner en la tienda</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--uki-muted)]">Después de confirmar la aprobación, firma una segunda transacción para crear el anuncio.</p>
-                  <Button
-                    type="button"
-                    onClick={() => void publishCukie()}
-                    disabled={!canPublish}
-                    className="mt-3 min-h-10 bg-[var(--uki-lilac)] text-[#09060f] hover:bg-[#f19bff]"
-                  >
-                    <Store className="h-4 w-4" aria-hidden="true" />
-                    {listingState === 'published' ? 'Anuncio publicado' : listingState === 'confirmed' ? 'Publicación confirmada' : listingState === 'pending' ? 'Publicación pendiente…' : phase === 'listing' ? 'Esperando confirmación…' : 'Poner en la tienda'}
-                  </Button>
-                  {listingState === 'pending' ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void recheckPendingListing()}
-                      disabled={busy}
-                      className="mt-2 min-h-10 border-amber-200/35 bg-amber-200/10 text-amber-100 hover:bg-amber-200/20"
-                    >
-                      Comprobar publicación
-                    </Button>
-                  ) : null}
-                </div>
+            <li
+              aria-current={approvalDone && !listingDone ? 'step' : undefined}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${listingDone ? 'border-[rgba(242,195,75,0.35)] bg-[rgba(242,195,75,0.07)]' : listingPending ? 'border-[rgba(242,195,75,0.35)] bg-[rgba(242,195,75,0.05)]' : 'border-white/10 bg-black/20'}`}
+            >
+              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-black ${listingDone ? 'border-[rgba(242,195,75,0.6)] bg-[rgba(242,195,75,0.15)] text-[var(--uki-gold)]' : listingPending ? 'border-[rgba(242,195,75,0.5)] bg-[rgba(242,195,75,0.1)] text-[var(--uki-gold)]' : 'border-white/20 text-[var(--uki-muted)]'}`}>
+                {listingDone ? <Check className="h-4 w-4" aria-hidden="true" /> : listingPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : '2'}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-black text-[var(--uki-cream)]"><span className="text-[var(--uki-muted)]">Paso 2 · </span>Poner en la tienda</p>
+                <p className={`mt-0.5 text-xs font-semibold leading-5 ${listingDone || listingPending ? 'text-[var(--uki-gold)]' : 'text-[var(--uki-muted)]'}`}>{listingStepCopy}</p>
               </div>
+              {listingPending ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void recheckPendingListing()}
+                  disabled={busy}
+                  aria-label="Comprobar publicación"
+                  className="min-h-11 shrink-0 border-[rgba(242,195,75,0.35)] bg-[rgba(242,195,75,0.1)] px-2.5 text-xs text-[#ffe2a0] hover:bg-[rgba(242,195,75,0.2)]"
+                >
+                  Comprobar
+                </Button>
+              ) : null}
             </li>
           </ol>
 
           <p className="mt-4 flex items-start gap-2 text-xs font-semibold leading-5 text-[var(--uki-muted)]"><Network className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" /> Comprobaremos de nuevo la información antes de pedir cada firma. Si cambias de cuenta o red, el precio se conserva.</p>
         </div>
 
-        <DialogFooter className="border-t border-white/10 px-5 py-4 sm:px-7">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy || listingState === 'pending' || approvalState === 'pending'} className="min-h-11 border-white/15 bg-white/[0.03] text-[var(--uki-cream)]">Cerrar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <SheetFooter className="flex-col border-t border-white/10 px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-7">
+          <div className="flex w-full items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={dismissBlocked} className="min-h-11 shrink-0 border-white/15 bg-white/[0.03] px-3 text-xs text-[var(--uki-cream)] sm:mr-auto">Cerrar</Button>
+            {!approvalDone ? (
+              <Button
+                type="button"
+                onClick={() => void approveCukie()}
+                disabled={busy || approvalState === 'pending' || Boolean(identityError)}
+                className="min-h-11 flex-1 bg-[var(--uki-lilac)] text-[#100516] hover:bg-[#f19bff]"
+              >
+                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                {approvalActionLabel}
+              </Button>
+            ) : !listingDone ? (
+              <Button
+                type="button"
+                onClick={() => void publishCukie()}
+                disabled={!canPublish}
+                className="min-h-11 flex-1 bg-[var(--uki-lilac)] text-[#100516] hover:bg-[#f19bff]"
+              >
+                <Store className="h-4 w-4" aria-hidden="true" />
+                {listingActionLabel}
+              </Button>
+            ) : null}
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -1,0 +1,122 @@
+{
+  "mobile": {
+    "viewport": [
+      390,
+      844
+    ],
+    "documentWidth": 390,
+    "sheet": {
+      "width": 390,
+      "scrollWidth": 390,
+      "height": 836
+    },
+    "palette": {
+      "lila": "#e45cff",
+      "gold": "#f2c34b",
+      "cta": [
+        {
+          "background": "rgb(228, 92, 255)",
+          "height": 44
+        }
+      ],
+      "inputOutline": "rgb(228, 92, 255)"
+    },
+    "buttons": [
+      {
+        "name": "Cerrar",
+        "height": 44
+      },
+      {
+        "name": "Aprobar Cukie",
+        "height": 44
+      },
+      {
+        "name": "Close",
+        "height": 44
+      }
+    ],
+    "label": "Vender Cukie #98000001"
+  },
+  "small": {
+    "viewport": [
+      320,
+      568
+    ],
+    "documentWidth": 320,
+    "sheetWidth": 320,
+    "inputRect": {
+      "x": 37,
+      "y": 427.25,
+      "width": 251.5,
+      "height": 48,
+      "top": 427.25,
+      "right": 288.5,
+      "bottom": 475.25,
+      "left": 37
+    },
+    "buttons": [
+      {
+        "name": "Cerrar",
+        "rect": {
+          "x": 20,
+          "y": 512,
+          "width": 62.6875,
+          "height": 44,
+          "top": 512,
+          "right": 82.6875,
+          "bottom": 556,
+          "left": 20
+        }
+      },
+      {
+        "name": "Aprobar Cukie",
+        "rect": {
+          "x": 90.6875,
+          "y": 512,
+          "width": 209.3125,
+          "height": 44,
+          "top": 512,
+          "right": 300,
+          "bottom": 556,
+          "left": 90.6875
+        }
+      },
+      {
+        "name": "Close",
+        "rect": {
+          "x": 268,
+          "y": 17,
+          "width": 44,
+          "height": 44,
+          "top": 17,
+          "right": 312,
+          "bottom": 61,
+          "left": 268
+        }
+      }
+    ]
+  },
+  "focus": {
+    "open": false,
+    "focus": "Vender",
+    "focusTag": "A"
+  },
+  "approved": {
+    "buttons": [
+      {
+        "name": "Cerrar",
+        "disabled": false
+      },
+      {
+        "name": "Poner en la tienda",
+        "disabled": false
+      },
+      {
+        "name": "Close",
+        "disabled": false
+      }
+    ],
+    "amount": "RecibesRecibes 12.5 UKI exactos.Comisión al comprador: 5%. Tú recib",
+    "label": "Vender Cukie #98000001"
+  }
+}
