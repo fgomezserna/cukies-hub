@@ -186,12 +186,55 @@ describe('DashboardOverviewPanel', () => {
       credentials: 'same-origin',
     }));
     expect(screen.getByText('0x1111…1111')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText(/Actualizado/)).toBeInTheDocument();
     expect(screen.getByText(/Actualizado/)).toHaveAttribute('dateTime', '2026-08-30T12:00:00.000Z');
     expect(screen.getByRole('link', { name: /Usar o aportar/i })).toHaveAttribute('href', '/credits');
     expect(screen.getByRole('link', { name: /Ver mis premios/i })).toHaveAttribute('href', '/premios');
+  });
+
+  it('elige una acción principal basada en los datos disponibles', async () => {
+    render(<DashboardOverviewPanel />);
+
+    const primaryAction = await screen.findByRole('link', { name: /Jugar ahora/i });
+    expect(primaryAction).toHaveAttribute('href', '/games/treasure-hunt');
+    expect(screen.getByText('Tienes una partida lista')).toBeInTheDocument();
+  });
+
+  it('no muestra la wallet completa como texto duplicado', async () => {
+    render(<DashboardOverviewPanel />);
+
+    await screen.findByText('tester');
+    expect(screen.queryByText(wallet)).not.toBeInTheDocument();
+    expect(screen.getByText('0x1111…1111')).toHaveAttribute('title', wallet);
+  });
+
+  it('ancla los avisos a la sección afectada', async () => {
+    const data = summary({
+      marketplace: {
+        state: 'unavailable' as const,
+        generatedAt: '2026-08-30T12:00:00.000Z',
+        sourceObservedAt: null,
+        issues: ['MODULE_UNAVAILABLE'] as ['MODULE_UNAVAILABLE'],
+        data: null,
+      },
+    });
+    fetchMock.mockResolvedValue(response(data));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByText('Algunos datos no están disponibles')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ver Marketplace/i })).toHaveAttribute('href', '#dashboard-module-marketplace');
+  });
+
+  it('mantiene geometría estable mientras llega la primera lectura', () => {
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(screen.getByTestId('dashboard-skeleton')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Cargando tu cuenta…')).toBeInTheDocument();
   });
 
   it('conserva módulos válidos cuando otra fuente queda indisponible', async () => {
@@ -207,7 +250,7 @@ describe('DashboardOverviewPanel', () => {
     render(<DashboardOverviewPanel />);
 
     expect(await screen.findByText('Algunos datos no están disponibles')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('No disponible').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Puedes seguir usando el resto de tu cuenta/)).toBeInTheDocument();
   });
@@ -428,7 +471,7 @@ describe('DashboardOverviewPanel', () => {
     await act(async () => { jest.advanceTimersByTime(30_005); });
     await waitFor(() => expect(screen.getByText('No hemos podido actualizar tu cuenta')).toBeInTheDocument());
     expect(within(masterCard).getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/última lectura disponible/i)).toBeInTheDocument();
 
     await act(async () => { jest.advanceTimersByTime(30_000); });

@@ -34,6 +34,7 @@ type RequestState =
   | { state: 'idle'; summary: null }
   | { state: 'loading'; summary: DashboardSummary | null }
   | { state: 'ready'; summary: DashboardSummary }
+  | { state: 'stale'; summary: DashboardSummary }
   | { state: 'unavailable'; summary: DashboardSummary | null };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -210,6 +211,120 @@ const MODULE_LABELS: Record<DashboardModuleId, string> = {
   game: 'Juego y ranking',
 };
 
+const MODULE_ANCHORS: Record<DashboardModuleId, string> = {
+  cukieMaster: 'dashboard-module-cukie-master',
+  credits: 'dashboard-module-credits',
+  cukiePool: 'dashboard-module-cukie-pool',
+  rewards: 'dashboard-module-rewards',
+  marketplace: 'dashboard-module-marketplace',
+  vesting: 'dashboard-module-vesting',
+  game: 'dashboard-module-game',
+};
+
+function formatUpdatedAt(value: string) {
+  return new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+}
+
+function hasPositiveRaw(value: string | null | undefined) {
+  return typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value) && BigInt(value) > BigInt(0);
+}
+
+function moduleStateLabel(state: DashboardModule<DashboardModuleId>['state']) {
+  if (state === 'ready') return 'Listo';
+  if (state === 'degraded') return 'Revisar';
+  return 'No disponible';
+}
+
+function moduleStateClass(state: DashboardModule<DashboardModuleId>['state']) {
+  if (state === 'ready') return 'border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]';
+  if (state === 'degraded') return 'border-amber-300/35 bg-amber-300/10 text-amber-200';
+  return 'border-red-300/35 bg-red-300/10 text-red-200';
+}
+
+function moduleAttention<K extends DashboardModuleId>(module: DashboardModule<K>, data: DashboardModulePayloads[K] | null) {
+  if (module.state === 'unavailable') return 'No podemos consultar este dato ahora.';
+  if (module.state === 'degraded') {
+    if (module.issues.includes('SOURCE_NOT_FRESH')) return 'Lectura pendiente de actualizar.';
+    return 'Lectura parcial: revisa este apartado antes de actuar.';
+  }
+  if (module.state === 'ready' && module.issues.length > 0) return 'Hay una nota de servicio en esta lectura.';
+  if (module.state === 'ready' && data && 'configFrozen' in data && data.configFrozen === false) {
+    return 'El calendario de liberación está pendiente de confirmación.';
+  }
+  return null;
+}
+
+type PrimaryAction = {
+  href: string;
+  label: string;
+  title: string;
+  description: string;
+};
+
+function choosePrimaryAction(input: {
+  game: DashboardModulePayloads['game'] | null;
+  credits: DashboardModulePayloads['credits'] | null;
+  master: DashboardModulePayloads['cukieMaster'] | null;
+  rewards: DashboardModulePayloads['rewards'] | null;
+  vesting: DashboardModulePayloads['vesting'] | null;
+  hasPartialData: boolean;
+}) : PrimaryAction {
+  if (input.game?.enabled && input.game.attemptsRemaining !== null && input.game.attemptsRemaining > 0) {
+    return {
+      href: '/games/treasure-hunt',
+      label: 'Jugar ahora',
+      title: 'Tienes una partida lista',
+      description: `${integerLabel(input.game.attemptsRemaining)} intentos disponibles. Entra cuando quieras y revisa tus créditos antes de comenzar.`,
+    };
+  }
+  if (hasPositiveRaw(input.rewards?.claimableRaw)) {
+    return {
+      href: '/premios',
+      label: 'Reclamar premios',
+      title: 'Tienes premios confirmados',
+      description: 'Consulta el detalle y reclama solo los importes que ya estén publicados.',
+    };
+  }
+  if (input.credits && input.credits.availableCredits > 0) {
+    return {
+      href: '/credits',
+      label: 'Ver créditos',
+      title: 'Tus créditos están listos',
+      description: `${integerLabel(input.credits.availableCredits)} créditos personales disponibles para jugar. El saldo del pool se muestra por separado.`,
+    };
+  }
+  if (input.master && input.master.allocatedSlots === 0 && input.master.desiredSlots > 0) {
+    return {
+      href: '/cukie-master#mi-estado',
+      label: 'Revisar cupos',
+      title: 'Aún no tienes cupos activos',
+      description: 'Consulta las dos rutas de acceso y los recursos que necesitas para obtener un cupo.',
+    };
+  }
+  if (input.vesting && hasPositiveRaw(input.vesting.releasableRaw)) {
+    return {
+      href: '/vesting',
+      label: 'Ver desbloqueo',
+      title: 'Hay UKI disponibles para liberar',
+      description: 'Revisa el calendario y confirma el estado antes de iniciar cualquier acción.',
+    };
+  }
+  if (input.hasPartialData) {
+    return {
+      href: '#dashboard-data-status',
+      label: 'Revisar estado',
+      title: 'Algunos datos necesitan revisión',
+      description: 'Consulta los apartados afectados antes de tomar una decisión.',
+    };
+  }
+  return {
+    href: '/credits',
+    label: 'Explorar recursos',
+    title: 'Descubre cómo seguir',
+    description: 'Consulta tus recursos y las rutas disponibles para preparar tu próxima partida.',
+  };
+}
+
 export function DashboardOverviewPanel() {
   const { user, walletType, isLoading: authLoading } = useAuth();
   const runtime = useAppRuntime();
@@ -222,7 +337,8 @@ export function DashboardOverviewPanel() {
   const request = useMemo<RequestState>(() => {
     if (dashboardResource.state === 'ready') return { state: 'ready', summary: dashboardResource.data! };
     if (dashboardResource.state === 'loading') return { state: 'loading', summary: dashboardResource.data ?? null };
-    if (dashboardResource.state === 'stale' || dashboardResource.state === 'unavailable') return { state: 'unavailable', summary: dashboardResource.data ?? null };
+    if (dashboardResource.state === 'stale' && dashboardResource.data) return { state: 'stale', summary: dashboardResource.data };
+    if (dashboardResource.state === 'unavailable') return { state: 'unavailable', summary: dashboardResource.data ?? null };
     return { state: 'idle', summary: null };
   }, [dashboardResource.data, dashboardResource.state]);
 
@@ -252,151 +368,139 @@ export function DashboardOverviewPanel() {
   const marketplace = summary ? moduleData(summary.modules.marketplace) : null;
   const vesting = summary ? moduleData(summary.modules.vesting) : null;
   const game = summary ? moduleData(summary.modules.game) : null;
+  const primaryAction = summary ? choosePrimaryAction({
+    game,
+    credits,
+    master: masterDataReady ? master : null,
+    rewards,
+    vesting,
+    hasPartialData: summary.overallState === 'partial',
+  }) : null;
+  const isRefreshing = dashboardResource.isFetching;
+  const showStandaloneRefresh = hasSignedEvmSession && !summary;
 
   return (
     <section id="wallet-economy-overview" className="relative z-[2] w-full scroll-mt-24 pb-5">
-      <Panel innerClassName="p-5 sm:p-7">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="uki-label">Actividad</p>
-            <h2 className="mt-1 font-headline text-xl font-black uppercase text-[var(--uki-cream)]">
-              Datos clave
-            </h2>
-          </div>
-          {hasSignedEvmSession ? (
-            <button
-              type="button"
-              onClick={() => void dashboardResource.refresh()}
-              disabled={request.state === 'loading'}
-              className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${request.state === 'loading' ? 'animate-spin' : ''}`} />
-              Actualizar
-            </button>
-          ) : null}
-        </div>
+      {showStandaloneRefresh ? <RefreshButton isRefreshing={isRefreshing} onRefresh={() => void dashboardResource.refresh()} /> : null}
 
-        {!authLoading && !hasSignedEvmSession ? (
-          <div className="mt-6 rounded-[8px] border border-white/10 bg-black/20 p-5">
-            <p className="font-black text-[var(--uki-cream)]">
-              {walletNeedsSignature ? 'Firma tu wallet' : 'Conecta tu wallet'}
-            </p>
-            <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-              {walletNeedsSignature
-                ? 'Firma el acceso para consultar tus activos y continuar jugando.'
-                : 'Conecta tu wallet para consultar tus activos y continuar jugando.'}
-            </p>
-            <LandingWalletConnectButton
-              evmOnly
-              className="mt-4"
-              label={walletNeedsSignature ? 'Firmar wallet' : 'Conectar wallet'}
-              showCompactText={false}
-            />
-          </div>
-        ) : null}
+      {!authLoading && !hasSignedEvmSession ? (
+        <ConnectState walletNeedsSignature={walletNeedsSignature} />
+      ) : null}
 
-        {authLoading || (request.state === 'loading' && !summary) ? (
-          <p className="mt-6 flex items-center gap-2 text-sm font-semibold text-[var(--uki-muted)]">
-            <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" />
-            Cargando tu cuenta…
-          </p>
-        ) : null}
+      {authLoading || (request.state === 'loading' && !summary) ? <DashboardSkeleton /> : null}
 
-        {request.state === 'unavailable' ? (
-          <div
-            role={summary ? 'status' : 'alert'}
-            className="mt-6 rounded-[8px] border border-red-400/30 bg-red-500/10 p-5"
-          >
-            <p className="font-black text-red-200">
-              {summary ? 'No hemos podido actualizar tu cuenta' : 'No podemos cargar tu cuenta ahora'}
-            </p>
-            <p className="mt-1 text-sm font-semibold text-red-100/80">
-              {summary
-                ? 'Mostramos la última lectura disponible. Inténtalo de nuevo en unos instantes.'
-                : 'Inténtalo de nuevo en unos instantes.'}
-            </p>
-          </div>
-        ) : null}
+      {request.state === 'unavailable' && !summary ? <DashboardError /> : null}
 
-        {summary ? (
-          <>
-            <div className="mt-6 flex flex-col gap-2 rounded-[10px] border border-white/10 bg-black/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-black text-[var(--uki-cream)]">
-                {summary.identity.username || 'Tu cuenta'}
-                <span className="ml-2 font-semibold text-[var(--uki-muted)]">{shortWallet(summary.identity.walletNormalized)}</span>
-              </p>
-              <div className="flex flex-col gap-1 sm:items-end">
-                <p className="text-xs font-semibold text-[var(--uki-muted)]">BNB Smart Chain</p>
-                <time
-                  dateTime={summary.generatedAt}
-                  className="text-[11px] font-semibold text-[var(--uki-muted)]"
+      {summary ? (
+        <div className="space-y-5">
+          <header className="overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/25 bg-[radial-gradient(circle_at_84%_0%,rgba(228,92,255,0.18),transparent_32%),linear-gradient(135deg,rgba(20,10,32,0.96),rgba(7,28,34,0.92))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.22)] sm:p-7">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <p className="uki-label">Tu espacio</p>
+                <h2 className="mt-2 max-w-2xl font-headline text-3xl font-black tracking-[-0.03em] text-[var(--uki-cream)] sm:text-4xl">
+                  Hola, <span>{summary.identity.username || 'Cukie'}</span>
+                </h2>
+                <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
+                  Aquí tienes lo que puedes usar ahora y el siguiente paso más claro para continuar.
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col gap-2 lg:items-end">
+                <span
+                  title={summary.identity.walletNormalized}
+                  aria-label={`Wallet ${summary.identity.walletNormalized}`}
+                  className="inline-flex min-h-10 max-w-full items-center rounded-full border border-white/15 bg-black/20 px-3 text-xs font-bold text-[var(--uki-cream)]"
                 >
-                  Actualizado {new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(summary.generatedAt))}
+                  {shortWallet(summary.identity.walletNormalized)}
+                </span>
+                <span className="text-xs font-semibold text-[var(--uki-muted)]">BNB Smart Chain · {summary.network.environment === 'staging' ? 'Staging' : 'Producción'}</span>
+                <time dateTime={summary.generatedAt} className="text-[11px] font-semibold text-[var(--uki-muted)]">
+                  Actualizado {formatUpdatedAt(summary.generatedAt)}
                 </time>
               </div>
             </div>
 
-            {unavailableModules.length > 0 ? (
-              <div role="status" className="mt-4 rounded-[8px] border border-amber-300/25 bg-amber-400/10 p-4">
-                <p className="font-black text-amber-100">Algunos datos no están disponibles</p>
-                <p className="mt-1 text-xs font-semibold text-amber-100/75">
-                  Ahora mismo no podemos mostrar: {unavailableModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}.
-                  Puedes seguir usando el resto de tu cuenta.
-                </p>
-              </div>
-            ) : null}
-            {reviewModules.length > 0 ? (
-              <div role="status" className="mt-4 rounded-[8px] border border-amber-300/25 bg-amber-400/10 p-4">
-                <p className="font-black text-amber-100">Algunos datos requieren atención</p>
-                <p className="mt-1 text-xs font-semibold text-amber-100/75">
-                  Puedes consultar los datos de {reviewModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}.
-                  Revisa sus avisos antes de continuar.
-                </p>
-              </div>
-            ) : null}
+            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+              {primaryAction ? <PrimaryActionPanel action={primaryAction} /> : null}
+              <MetricStrip summary={summary} />
+            </div>
+          </header>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <DashboardCard
-                icon={Crown}
-                title="Cukie Master"
-                module={summary.modules.cukieMaster}
-                href="/cukie-master#mi-estado"
-                action="Gestionar cupos"
-                value={masterDataReady && master ? integerLabel(master.allocatedSlots) : null}
-                label="cupos activos"
-                details={masterDataReady && master ? [
-                  `${integerLabel(master.routes.uki.allocatedSlots)} por UKI`,
-                  `${integerLabel(master.routes.nft.allocatedSlots)} por Cukies Originales`,
-                ] : []}
-              />
-              <DashboardCard
-                icon={Coins}
-                title="Créditos"
-                module={summary.modules.credits}
-                href="/credits"
-                action="Usar o aportar"
-                value={credits ? integerLabel(credits.availableCredits) : null}
-                label="créditos disponibles"
-                details={credits ? [
-                  `${integerLabel(credits.poolAvailableCredits)} disponibles en el pool`,
-                  `${integerLabel(credits.poolDepositedCredits)} aportados · ${integerLabel(credits.spentCredits)} usados`,
-                ] : []}
-              />
-              <DashboardCard
-                icon={Layers3}
-                title="Pool de Cukies"
-                module={summary.modules.cukiePool}
-                href="/cukie-hodler#mi-cukie-pool"
-                action="Gestionar pool"
-                value={pool ? integerLabel(pool.activePositions) : null}
-                label="posiciones activas"
-                details={pool ? [
-                  `${integerLabel(pool.activePositions)} disponibles para partidas`,
-                  `${integerLabel(pool.positions)} Cukies aportados en total`,
-                ] : []}
-              />
-              <DashboardCard
-                id="rewards-summary"
+          {request.state === 'stale' ? (
+            <div role="status" className="flex flex-col gap-3 rounded-[10px] border border-amber-300/30 bg-amber-300/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-black text-amber-100">No hemos podido actualizar tu cuenta</p>
+                  <p className="mt-1 text-xs font-semibold text-amber-100/75">Mostramos la última lectura disponible. Inténtalo de nuevo en unos instantes.</p>
+                </div>
+              </div>
+              <RefreshButton isRefreshing={isRefreshing} onRefresh={() => void dashboardResource.refresh()} compact />
+            </div>
+          ) : null}
+
+          <DataHealthNotices unavailableModules={unavailableModules} reviewModules={reviewModules} />
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
+            <section id="dashboard-play" aria-labelledby="dashboard-play-title" className="min-w-0">
+              <SectionIntro titleId="dashboard-play-title" eyebrow="Ahora" title="Tu siguiente jugada" description="La disponibilidad del juego y de tus créditos se mantienen separadas para que decidas con contexto." />
+              <PlayPanel module={summary.modules.game} game={game} credits={credits} />
+            </section>
+
+            <section id="dashboard-resources" aria-labelledby="dashboard-resources-title" className="min-w-0">
+              <SectionIntro titleId="dashboard-resources-title" eyebrow="Recursos" title="Lo que tienes" description="Accede a cada fuente sin mezclar créditos personales, pool, cupos ni premios." />
+              <div className="mt-4 space-y-3">
+                <DashboardResourceRow
+                  id={MODULE_ANCHORS.cukieMaster}
+                  icon={Crown}
+                  title="Cukie Master"
+                  module={summary.modules.cukieMaster}
+                  href="/cukie-master#mi-estado"
+                  action="Gestionar cupos"
+                  value={masterDataReady && master ? integerLabel(master.allocatedSlots) : null}
+                  label="cupos activos"
+                  details={masterDataReady && master ? [
+                    `${integerLabel(master.routes.uki.allocatedSlots)} por UKI`,
+                    `${integerLabel(master.routes.nft.allocatedSlots)} por Cukies Originales`,
+                  ] : []}
+                  attention={masterDataReady ? null : 'Estamos reconciliando las dos rutas de cupos.'}
+                />
+                <DashboardResourceRow
+                  id={MODULE_ANCHORS.credits}
+                  icon={Coins}
+                  title="Créditos"
+                  module={summary.modules.credits}
+                  href="/credits"
+                  action="Usar o aportar"
+                  value={credits ? integerLabel(credits.availableCredits) : null}
+                  label="créditos personales"
+                  details={credits ? [
+                    `${integerLabel(credits.poolAvailableCredits)} disponibles en el pool`,
+                    `${integerLabel(credits.poolDepositedCredits)} aportados · ${integerLabel(credits.spentCredits)} usados`,
+                  ] : []}
+                />
+                <DashboardResourceRow
+                  id={MODULE_ANCHORS.cukiePool}
+                  icon={Layers3}
+                  title="Pool de Cukies"
+                  module={summary.modules.cukiePool}
+                  href="/cukie-hodler#mi-cukie-pool"
+                  action="Gestionar pool"
+                  value={pool ? integerLabel(pool.activePositions) : null}
+                  label="posiciones activas"
+                  details={pool ? [
+                    `${integerLabel(pool.activePositions)} disponibles para partidas`,
+                    `${integerLabel(pool.positions)} Cukies aportados en total`,
+                  ] : []}
+                />
+              </div>
+            </section>
+          </div>
+
+          <section id="dashboard-account-status" aria-labelledby="dashboard-account-status-title" className="min-w-0 border-t border-white/10 pt-5">
+            <SectionIntro titleId="dashboard-account-status-title" eyebrow="Seguimiento" title="Cobros y colección" description="Comprueba qué requiere una acción y qué está simplemente en seguimiento." />
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <DashboardResourceRow
+                id={MODULE_ANCHORS.rewards}
                 icon={Gift}
                 title="Premios"
                 module={summary.modules.rewards}
@@ -411,23 +515,8 @@ export function DashboardOverviewPanel() {
                     : 'Todavía no hay premios listos para cobrar',
                 ] : []}
               />
-              <DashboardCard
-                icon={Store}
-                title="Marketplace"
-                module={summary.modules.marketplace}
-                href="/marketplace"
-                action="Abrir marketplace"
-                value={marketplace ? integerLabel(marketplace.inventory) : null}
-                label="Cukies en tu inventario"
-                details={marketplace ? [
-                  `${integerLabel(marketplace.listingEligible)} disponibles para listar`,
-                  `${integerLabel(marketplace.activeListings)} anuncios activos`,
-                  marketplace.attentionListings > 0
-                    ? `${integerLabel(marketplace.attentionListings)} requieren atención`
-                    : 'Ningún anuncio requiere atención',
-                ] : []}
-              />
-              <DashboardCard
+              <DashboardResourceRow
+                id={MODULE_ANCHORS.vesting}
                 icon={LockKeyhole}
                 title="Vesting"
                 module={summary.modules.vesting}
@@ -439,32 +528,378 @@ export function DashboardOverviewPanel() {
                   `${ukiLabel(vesting.releasableRaw)} disponibles ahora`,
                   `${ukiLabel(vesting.lockedAmountRaw)} bloqueados`,
                   `${(vesting.progressBps / 100).toLocaleString('es-ES')}% liberado`,
-                  ...(vesting.configFrozen ? [] : ['El calendario de liberación está pendiente de confirmación']),
                 ] : []}
+                attention={vesting && !vesting.configFrozen ? 'El calendario de liberación está pendiente de confirmación' : null}
               />
-              <DashboardCard
-                icon={Gamepad2}
-                title="Juego y ranking"
-                module={summary.modules.game}
-                href="/games/treasure-hunt"
-                action="Abrir Treasure Hunt"
-                value={game ? integerLabel(game.attemptsRemaining) : null}
-                label="intentos disponibles"
-                details={game ? [
-                  game.enabled ? 'Juego disponible' : 'Juego no disponible ahora',
-                  game.bestRank === null ? 'Sin posición en ranking' : `Mejor posición: #${integerLabel(game.bestRank)}`,
-                  game.totalTickets === null ? 'Tickets no aplicables' : `${integerLabel(game.totalTickets)} tickets`,
+              <DashboardResourceRow
+                id={MODULE_ANCHORS.marketplace}
+                icon={Store}
+                title="Marketplace"
+                module={summary.modules.marketplace}
+                href="/marketplace"
+                action="Abrir marketplace"
+                value={marketplace ? integerLabel(marketplace.inventory) : null}
+                label="Cukies en tu inventario"
+                details={marketplace ? [
+                  `${integerLabel(marketplace.listingEligible)} disponibles para listar`,
+                  `${integerLabel(marketplace.activeListings)} anuncios activos`,
                 ] : []}
+                attention={marketplace && marketplace.attentionListings > 0
+                  ? `${integerLabel(marketplace.attentionListings)} anuncios requieren atención.`
+                  : null}
               />
             </div>
-          </>
-        ) : null}
-      </Panel>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function DashboardCard<K extends DashboardModuleId>({
+function RefreshButton({
+  isRefreshing,
+  onRefresh,
+  compact = false,
+}: {
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={isRefreshing}
+      className={compact
+        ? 'inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-[8px] border border-amber-200/30 px-3 text-xs font-black uppercase tracking-[0.08em] text-amber-100 transition hover:border-amber-100/60 disabled:cursor-wait disabled:opacity-60'
+        : 'mb-4 ml-auto inline-flex min-h-11 items-center gap-2 rounded-[8px] border border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 px-4 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:border-[var(--uki-lilac)]/70 hover:bg-[var(--uki-lilac)]/15 disabled:cursor-wait disabled:opacity-60'}
+      aria-label="Actualizar"
+    >
+      <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />
+      {isRefreshing ? 'Actualizando…' : 'Actualizar'}
+    </button>
+  );
+}
+
+function ConnectState({ walletNeedsSignature }: { walletNeedsSignature: boolean }) {
+  return (
+    <div className="rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[linear-gradient(135deg,rgba(20,10,32,0.94),rgba(7,28,34,0.88))] p-5 sm:p-7">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="max-w-xl">
+          <p className="uki-label">Tu espacio</p>
+          <h2 className="mt-2 font-headline text-2xl font-black text-[var(--uki-cream)] sm:text-3xl">
+            {walletNeedsSignature ? <><span>Firma tu wallet</span> para entrar</> : <>Conecta tu wallet para empezar</>}
+          </h2>
+          <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+            {walletNeedsSignature
+              ? 'La firma solo acredita tu sesión. Después podrás consultar tus activos y continuar jugando.'
+              : 'Consulta tus activos, créditos y premios desde un único lugar.'}
+          </p>
+        </div>
+        <LandingWalletConnectButton
+          evmOnly
+          className="uki-button uki-button-primary min-h-11 shrink-0 justify-center px-4"
+          label={walletNeedsSignature ? 'Firmar wallet' : 'Conectar wallet'}
+          showCompactText={false}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  const skeleton = 'rounded-[5px] bg-white/[0.08] motion-safe:animate-pulse motion-reduce:animate-none';
+  return (
+    <div data-testid="dashboard-skeleton" aria-busy="true" aria-live="polite" className="space-y-5">
+      <div className="rounded-[16px] border border-white/10 bg-black/20 p-5 sm:p-7">
+        <div className="flex flex-col gap-3">
+          <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
+            <Loader2 className="h-4 w-4 text-[var(--uki-lilac)] motion-safe:animate-spin" aria-hidden="true" />
+            Cargando tu cuenta…
+          </p>
+          <span className={`${skeleton} h-3 w-24`} />
+          <span className={`${skeleton} h-10 w-3/4 max-w-md`} />
+          <span className={`${skeleton} h-4 w-full max-w-xl`} />
+          <span className={`${skeleton} h-4 w-2/3 max-w-lg`} />
+        </div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+          <span className={`${skeleton} h-36 w-full`} />
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-white/10 bg-white/10">
+            {Array.from({ length: 4 }, (_, index) => <span key={index} className={`${skeleton} h-16 rounded-none bg-[#100b18]`} />)}
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        {Array.from({ length: 2 }, (_, index) => (
+          <div key={index} className="space-y-3">
+            <span className={`${skeleton} block h-3 w-20`} />
+            <span className={`${skeleton} block h-7 w-2/3`} />
+            <span className={`${skeleton} block h-4 w-full`} />
+            {Array.from({ length: index === 0 ? 1 : 3 }, (_, row) => <span key={row} className={`${skeleton} block h-24 w-full`} />)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DashboardError() {
+  return (
+    <div role="alert" className="rounded-[12px] border border-red-300/30 bg-red-500/10 p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-200" aria-hidden="true" />
+        <div>
+          <p className="font-black text-red-100">No podemos cargar tu cuenta ahora</p>
+          <p className="mt-1 text-sm font-semibold leading-relaxed text-red-100/75">Inténtalo de nuevo en unos instantes.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DataHealthNotices({
+  unavailableModules,
+  reviewModules,
+}: {
+  unavailableModules: DashboardSummary['alerts'];
+  reviewModules: DashboardSummary['alerts'];
+}) {
+  if (unavailableModules.length === 0 && reviewModules.length === 0) return null;
+  return (
+    <div id="dashboard-data-status" className="grid gap-3 md:grid-cols-2">
+      {unavailableModules.length > 0 ? (
+        <DataHealthNotice
+          title="Algunos datos no están disponibles"
+          tone="error"
+          description={<>Ahora mismo no podemos mostrar: {unavailableModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}. Puedes seguir usando el resto de tu cuenta.</>}
+          modules={unavailableModules}
+        />
+      ) : null}
+      {reviewModules.length > 0 ? (
+        <DataHealthNotice
+          title="Algunos datos requieren atención"
+          tone="warning"
+          description={<>Puedes consultar los datos de {reviewModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}. Revisa sus avisos antes de continuar.</>}
+          modules={reviewModules}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function DataHealthNotice({
+  title,
+  description,
+  modules,
+  tone,
+}: {
+  title: string;
+  description: ReactNode;
+  modules: DashboardSummary['alerts'];
+  tone: 'error' | 'warning';
+}) {
+  const toneClass = tone === 'error'
+    ? 'border-red-300/25 bg-red-500/[0.08] text-red-100'
+    : 'border-amber-300/25 bg-amber-400/[0.08] text-amber-100';
+  return (
+    <div role="status" className={`rounded-[10px] border p-4 ${toneClass}`}>
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="text-sm font-black">{title}</p>
+          <p className="mt-1 text-xs font-semibold leading-relaxed opacity-75">{description}</p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            {modules.map((alert) => (
+              <a
+                key={alert.module}
+                href={`#${MODULE_ANCHORS[alert.module]}`}
+                className="inline-flex min-h-8 items-center text-[11px] font-black uppercase tracking-[0.08em] underline decoration-current/40 underline-offset-2 transition hover:decoration-current"
+              >
+                Ver {MODULE_LABELS[alert.module]}
+                <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionIntro({
+  eyebrow,
+  title,
+  description,
+  titleId,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  titleId: string;
+}) {
+  return (
+    <div>
+      <p className="uki-label">{eyebrow}</p>
+      <h2 id={titleId} className="mt-1 font-headline text-xl font-black tracking-[-0.02em] text-[var(--uki-cream)] sm:text-2xl">
+        {title}
+      </h2>
+      <p className="mt-1 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{description}</p>
+    </div>
+  );
+}
+
+function PrimaryActionPanel({ action }: { action: PrimaryAction }) {
+  return (
+    <Panel className="border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/[0.08]" innerClassName="relative overflow-hidden p-5 sm:p-6">
+      <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-[var(--uki-lilac)]/15 blur-3xl" aria-hidden="true" />
+      <div className="relative">
+        <p className="uki-label">Próximo paso</p>
+        <h3 className="mt-2 font-headline text-2xl font-black text-[var(--uki-cream)]">{action.title}</h3>
+        <p className="mt-2 max-w-lg text-sm font-semibold leading-relaxed text-[var(--uki-text)]">{action.description}</p>
+        <Link href={action.href} className="uki-button uki-button-primary mt-5 min-h-11 w-fit justify-center px-4">
+          <span>{action.label}</span>
+          <span className="uki-button-icon" aria-hidden="true"><ArrowRight className="h-4 w-4" /></span>
+        </Link>
+      </div>
+    </Panel>
+  );
+}
+
+function MetricStrip({ summary }: { summary: DashboardSummary }) {
+  const game = moduleData(summary.modules.game);
+  const credits = moduleData(summary.modules.credits);
+  const master = moduleData(summary.modules.cukieMaster);
+  const rewards = moduleData(summary.modules.rewards);
+  const metrics = [
+    {
+      label: 'Para jugar',
+      value: game
+        ? game.enabled
+          ? game.attemptsRemaining === null
+            ? 'En revisión'
+            : game.attemptsRemaining > 0 ? `${integerLabel(game.attemptsRemaining)} intentos` : 'Sin intentos'
+          : 'No disponible'
+        : 'No disponible',
+      detail: game?.enabled ? 'Treasure Hunt' : 'Revisa el juego',
+    },
+    {
+      label: 'Créditos',
+      value: credits ? integerLabel(credits.availableCredits) : 'No disponible',
+      detail: 'Disponibles · personales',
+    },
+    {
+      label: 'Cupos activos',
+      value: master ? `${integerLabel(master.allocatedSlots)} / ${integerLabel(master.maxPotentialSlots)}` : 'No disponible',
+      detail: 'Rutas UKI + Originales',
+    },
+    {
+      label: 'Premios',
+      value: rewards
+        ? hasPositiveRaw(rewards.claimableRaw) && rewards.claimPublished
+          ? 'Listos para reclamar'
+          : rewards.claimPublished ? 'Sin saldo pendiente' : 'En preparación'
+        : 'No disponible',
+      detail: 'Importes confirmados',
+    },
+  ];
+  return (
+    <div className="overflow-hidden rounded-[11px] border border-white/10 bg-black/20">
+      <div className="grid grid-cols-2 divide-x divide-y divide-white/10 sm:grid-cols-4 sm:divide-y-0">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="min-w-0 px-3 py-3 sm:px-4 sm:py-4">
+            <p className="uki-label break-words leading-tight">{metric.label}</p>
+            <p className="mt-1 break-words text-sm font-black text-[var(--uki-cream)]">{metric.value}</p>
+            <p className="mt-1 text-[11px] font-semibold text-[var(--uki-muted)]">{metric.detail}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlayPanel({
+  module,
+  game,
+  credits,
+}: {
+  module: DashboardModule<'game'>;
+  game: DashboardModulePayloads['game'] | null;
+  credits: DashboardModulePayloads['credits'] | null;
+}) {
+  const attemptsKnown = game?.attemptsRemaining !== null && game?.attemptsRemaining !== undefined;
+  const canPlay = Boolean(game?.enabled && attemptsKnown && game.attemptsRemaining! > 0);
+  const gameDescription = module.state === 'unavailable'
+    ? 'La fuente del juego no está disponible ahora.'
+    : !game?.configured
+      ? 'El juego todavía no está configurado para esta cuenta.'
+      : !game.enabled
+        ? 'No hay una competición disponible ahora. Puedes revisar las reglas o volver más tarde.'
+        : !attemptsKnown
+          ? 'La disponibilidad de intentos está en revisión; no iniciamos nada hasta confirmarla.'
+          : game.attemptsRemaining! > 0
+            ? 'Tienes intentos disponibles. El consumo se confirma al terminar la partida.'
+            : 'No tienes intentos disponibles ahora. Consulta tus créditos y el pool antes de volver a jugar.';
+  return (
+    <article id={MODULE_ANCHORS.game} className="mt-4 overflow-hidden rounded-[14px] border border-[#f2c34b]/30 bg-[radial-gradient(circle_at_90%_0%,rgba(242,195,75,0.18),transparent_38%),linear-gradient(135deg,rgba(24,17,25,0.96),rgba(15,30,34,0.92))] p-5 shadow-[0_18px_55px_rgba(0,0,0,0.18)] sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] border border-[#f2c34b]/35 bg-[#f2c34b]/10 text-[#f2c34b]">
+            <Gamepad2 className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="uki-label">Treasure Hunt</p>
+            <h3 className="mt-1 font-headline text-xl font-black text-[var(--uki-cream)]">Jugar con contexto</h3>
+          </div>
+        </div>
+        <ModuleStatePill module={module} />
+      </div>
+
+      <p className="mt-4 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">{gameDescription}</p>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[9px] border border-white/10 bg-black/20 px-4 py-3">
+          <p className="uki-label">Intentos disponibles</p>
+          <p className="mt-1 text-sm font-black text-[var(--uki-cream)]">
+            {game && attemptsKnown ? `${integerLabel(game.attemptsRemaining)} intentos` : 'No disponible'}
+          </p>
+        </div>
+        <div className="rounded-[9px] border border-white/10 bg-black/20 px-4 py-3">
+          <p className="uki-label">Créditos personales</p>
+          <p className="mt-1 text-sm font-black text-[var(--uki-cream)]">
+            {credits ? `${integerLabel(credits.availableCredits)} disponibles` : 'No disponible'}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {canPlay ? (
+          <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[#f2c34b] transition hover:text-[var(--uki-cream)]">
+            Ver ranking <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        ) : (
+          <Link href="/credits" className="inline-flex min-h-10 items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:text-[var(--uki-cream)]">
+            Ver créditos <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        )}
+        <Link href="/games/treasure-hunt/rules" className="inline-flex min-h-10 items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] transition hover:text-[var(--uki-cream)]">
+          Ver reglas <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+        {game?.bestRank !== null && game?.bestRank !== undefined ? <span className="text-xs font-semibold text-[var(--uki-muted)]">Mejor posición #{integerLabel(game.bestRank)}</span> : null}
+      </div>
+    </article>
+  );
+}
+
+function ModuleStatePill<K extends DashboardModuleId>({ module }: { module: DashboardModule<K> }) {
+  return (
+    <span className={`inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border px-2.5 text-[10px] font-black uppercase tracking-[0.08em] ${moduleStateClass(module.state)}`}>
+      {module.state === 'ready' ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />}
+      {moduleStateLabel(module.state)}
+    </span>
+  );
+}
+
+function DashboardResourceRow<K extends DashboardModuleId>({
   id,
   icon: Icon,
   title,
@@ -474,50 +909,58 @@ function DashboardCard<K extends DashboardModuleId>({
   value,
   label,
   details,
+  attention,
 }: {
-  id?: string;
+  id: string;
   icon: LucideIcon;
   title: string;
   module: DashboardModule<K>;
-  href?: string;
-  action?: string;
+  href: string;
+  action: string;
   value: string | null;
   label: string;
   details: ReactNode[];
+  attention?: string | null;
 }) {
+  const data = moduleData(module);
   const available = module.state !== 'unavailable' && value !== null;
+  const note = attention ?? moduleAttention(module, data);
   return (
-    <article id={id} className="min-w-0 rounded-[10px] border border-white/10 bg-black/20 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Icon className="h-5 w-5 shrink-0 text-[var(--uki-lilac)]" />
-          <h3 className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">{title}</h3>
+    <article id={id} className="group min-w-0 rounded-[12px] border border-white/10 bg-black/20 p-4 transition duration-300 hover:border-[var(--uki-lilac)]/35 hover:bg-white/[0.025] sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.08] text-[var(--uki-lilac)]">
+            <Icon className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate font-headline text-base font-black text-[var(--uki-cream)]">{title}</h3>
+            <ModuleStatePill module={module} />
+          </div>
         </div>
-        {module.state === 'ready' ? <CheckCircle2 aria-label="Datos disponibles" className="h-4 w-4 text-[var(--uki-lilac)]" /> : null}
-        {module.state === 'degraded' ? <AlertTriangle aria-label="Datos con avisos" className="h-4 w-4 text-amber-300" /> : null}
+        <div className="shrink-0 text-right">
+          {available ? (
+            <>
+              <p className="break-words font-headline text-2xl font-black text-[var(--uki-lilac)]">{value}</p>
+              <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">{label}</p>
+            </>
+          ) : (
+            <p className="font-headline text-sm font-black uppercase text-amber-200">No disponible</p>
+          )}
+        </div>
       </div>
-      {available ? (
-        <>
-          <p className="mt-5 break-words font-headline text-3xl font-black text-[var(--uki-lilac)]">{value}</p>
-          <p className="mt-1 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">{label}</p>
-          <ul className="mt-4 space-y-2 text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-            {details.map((detail, index) => <li key={index}>{detail}</li>)}
-          </ul>
-        </>
-      ) : (
-        <div className="mt-5">
-          <p className="font-headline text-xl font-black uppercase text-amber-300">No disponible</p>
-          <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Inténtalo de nuevo más tarde.</p>
-        </div>
-      )}
-      {href && action ? (
-        <Link href={href} className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)]">
-          {action}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      ) : (
-        <p className="mt-5 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">Información</p>
-      )}
+
+      {available && details.length > 0 ? (
+        <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
+          {details.map((detail, index) => <li key={index}>{detail}</li>)}
+        </ul>
+      ) : null}
+      {!available ? <p className="mt-3 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">Inténtalo de nuevo más tarde.</p> : null}
+      {note ? <p className="mt-3 border-l-2 border-amber-300/45 pl-3 text-xs font-semibold leading-relaxed text-amber-100/80">{note}</p> : null}
+
+      <Link href={href} className="mt-4 inline-flex min-h-10 items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:text-[var(--uki-cream)]">
+        {action}
+        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </Link>
     </article>
   );
 }
