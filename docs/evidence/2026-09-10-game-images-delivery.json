@@ -1,0 +1,419 @@
+{
+  "schemaVersion": 1,
+  "scope": "J05: rutas de imagen locales del juego y postflight; no certifica economía completa ni todos los estados del juego",
+  "observedAt": "2026-09-10T08:59:46.412736+00:00",
+  "sourceSha": "4f6ac05410842b6f39fb2eed27f872d01533eba1",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/378",
+  "stagingSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+  "pipeline": {
+    "id": 34455959295,
+    "url": "https://github.com/fgomezserna/cukies-hub/actions/runs/34455959295",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "release": {
+    "updatedAt": "2026-09-10T08:43:49.138Z",
+    "deploymentUuid": "iwgkscskgo00ock8kgw8cssk",
+    "gameDeploymentUuid": "i4oc0w0ossg4kccwswc8gkk4",
+    "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+    "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+    "unchangedConfig": true,
+    "unchangedWorkersCompose": true,
+    "pendingJournalPresent": false
+  },
+  "components": {
+    "dapp": {
+      "preserved": false,
+      "sourceSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+      "digest": "sha256:47fa654120bf07dedc044e57dbd9dc4b597bd539c2abe154b1131aa77dcbb47e"
+    },
+    "chain-indexer": {
+      "preserved": true,
+      "sourceSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+      "digest": "sha256:202d1c85528c3c6cd8f16ded63948e0949c09f90092ae60bbd24f49ab6281344"
+    },
+    "cuki-card-worker": {
+      "preserved": true,
+      "sourceSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+      "digest": "sha256:9b0085867b33a1590446f3d57c01a086a36426957c76cf2e4217385cc7f20bbd"
+    },
+    "schedulers": {
+      "preserved": true,
+      "sourceSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+      "digest": "sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba"
+    },
+    "cukies-bridge-relayer": {
+      "preserved": true,
+      "sourceSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+      "digest": "sha256:b68286b9e5aa031d3af41278a84307cca84312a4c10bb26bbaae511ebd2aebb7"
+    },
+    "treasure-hunt": {
+      "preserved": false,
+      "sourceSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+      "digest": "sha256:9bafc283d0d8241a39352a4a90ef9b2b62b2334487466597a3bca6baed6de7e9"
+    },
+    "world-api": {
+      "preserved": true,
+      "sourceSha": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+      "digest": "sha256:4190866ff3933b19b7c0284821ef904b6125417ef69ab212f7c7d7017f5b8518"
+    },
+    "world-matchmaking": {
+      "preserved": true,
+      "sourceSha": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+      "digest": "sha256:dadc6fb06a5a6c0f58e29e559f7e41d6deecacbb7eb4bcca09781fdc260e62fa"
+    }
+  },
+  "containers": [
+    {
+      "name": "rwwsc4kkwc0ck84cgk40s8kk-084231591311",
+      "expectedReplacement": true,
+      "beforeId": null,
+      "afterId": "30d8f5e73f79a1a6dda2d42790b81458ab96901f57bc5a618fce1f700ac24931",
+      "sameId": null,
+      "sameImage": null,
+      "imageRef": "192.168.1.207:5000/cukies-hub/dapp@sha256:47fa654120bf07dedc044e57dbd9dc4b597bd539c2abe154b1131aa77dcbb47e",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "lc04cw8gs4koo4swwws0c4ss-084313314874",
+      "expectedReplacement": true,
+      "beforeId": null,
+      "afterId": "8e3b3fa9772d51fbb3a8576832f670c9b2a7ebd6d53cbbae8d60bce0fca10899",
+      "sameId": null,
+      "sameImage": null,
+      "imageRef": "192.168.1.207:5000/cukies-hub/treasure-hunt@sha256:9bafc283d0d8241a39352a4a90ef9b2b62b2334487466597a3bca6baed6de7e9",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "reward-batch-publisher-u4s804o4wwcckowgk0woo4wg-230547100653",
+      "expectedReplacement": false,
+      "beforeId": "0b3a2c0d017929788c37ee6d638669337f1680273d7e947f3abe7572a9d4a9a3",
+      "afterId": "0b3a2c0d017929788c37ee6d638669337f1680273d7e947f3abe7572a9d4a9a3",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/schedulers:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "weekly-ranking-scheduler-u4s804o4wwcckowgk0woo4wg-230547039158",
+      "expectedReplacement": false,
+      "beforeId": "6c28e76330726b9ec7330e45afcf74265b6276bf7a59321b05e7e44582d68b83",
+      "afterId": "6c28e76330726b9ec7330e45afcf74265b6276bf7a59321b05e7e44582d68b83",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/schedulers:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "cuki-card-worker-u4s804o4wwcckowgk0woo4wg-230547168925",
+      "expectedReplacement": false,
+      "beforeId": "d1b479527a6e563bc30b7862ea31b3178bfed8c2d68c9631f8aa1053c9e9f053",
+      "afterId": "d1b479527a6e563bc30b7862ea31b3178bfed8c2d68c9631f8aa1053c9e9f053",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/cuki-card-worker:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:9b0085867b33a1590446f3d57c01a086a36426957c76cf2e4217385cc7f20bbd",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "competition-credit-scheduler-u4s804o4wwcckowgk0woo4wg-230546952571",
+      "expectedReplacement": false,
+      "beforeId": "e70d124b40ada550057c5c8bb7e137fabb72569a94b0fbeb94a38e53b67a40fc",
+      "afterId": "e70d124b40ada550057c5c8bb7e137fabb72569a94b0fbeb94a38e53b67a40fc",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/schedulers:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "cukie-pool-scheduler-u4s804o4wwcckowgk0woo4wg-230547012663",
+      "expectedReplacement": false,
+      "beforeId": "230314f94daf259d09a32f7fa596741f19ab439b00c6971397e88765de528a33",
+      "afterId": "230314f94daf259d09a32f7fa596741f19ab439b00c6971397e88765de528a33",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/schedulers:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "game-economy-scheduler-u4s804o4wwcckowgk0woo4wg-230546980291",
+      "expectedReplacement": false,
+      "beforeId": "f1f9065eed90050ff40eec957892f6c312bacb8418491b0dbb4bbc747debc888",
+      "afterId": "f1f9065eed90050ff40eec957892f6c312bacb8418491b0dbb4bbc747debc888",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/schedulers:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "chain-indexer-u4s804o4wwcckowgk0woo4wg-230546768063",
+      "expectedReplacement": false,
+      "beforeId": "ba252581c5ccf523cb8e7a674a9f0c4a903b76230302448706057f6b533efb92",
+      "afterId": "ba252581c5ccf523cb8e7a674a9f0c4a903b76230302448706057f6b533efb92",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/chain-indexer:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:202d1c85528c3c6cd8f16ded63948e0949c09f90092ae60bbd24f49ab6281344",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "cukie-master-scheduler-u4s804o4wwcckowgk0woo4wg-230546924007",
+      "expectedReplacement": false,
+      "beforeId": "d0613c81d22dc01b036266003035a5298a03631ec1047d842f07a493ac86571f",
+      "afterId": "d0613c81d22dc01b036266003035a5298a03631ec1047d842f07a493ac86571f",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/schedulers:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "reward-accounting-scheduler-u4s804o4wwcckowgk0woo4wg-230547069871",
+      "expectedReplacement": false,
+      "beforeId": "a646ea199c65788d69cfc55a604412f268f5073b8d154b851105626fe276e506",
+      "afterId": "a646ea199c65788d69cfc55a604412f268f5073b8d154b851105626fe276e506",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/schedulers:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:3f2a655ee9a6d8ca8b9fb7a3832e57dd8a2e9279502eb5b93be0cc5f5317d1ba",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "cuki-card-worker-legacy-u4s804o4wwcckowgk0woo4wg-230547213559",
+      "expectedReplacement": false,
+      "beforeId": "b6392b46df6bb7613a8a0d02c487a391331e4d2ab124a29a7d625e459903457b",
+      "afterId": "b6392b46df6bb7613a8a0d02c487a391331e4d2ab124a29a7d625e459903457b",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies-hub/cuki-card-worker:dc4c21e4fe66b1d574046de5177367e35919d427-42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b@sha256:9b0085867b33a1590446f3d57c01a086a36426957c76cf2e4217385cc7f20bbd",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "chain-indexer-jookw8ow8woks088s44404ok-140252349537",
+      "expectedReplacement": false,
+      "beforeId": "20161bdbd70f1e89d2fcdba9e3579b3fb753148790eb87a0fbdbbd40ecedcf7a",
+      "afterId": "20161bdbd70f1e89d2fcdba9e3579b3fb753148790eb87a0fbdbbd40ecedcf7a",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "jookw8ow8woks088s44404ok-chain-indexer",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "dapp-jookw8ow8woks088s44404ok-140252201287",
+      "expectedReplacement": false,
+      "beforeId": "5caa1e7e43cb42f9de049b31c02e30662c22a9ee781e2d9aae993b7ec569d283",
+      "afterId": "5caa1e7e43cb42f9de049b31c02e30662c22a9ee781e2d9aae993b7ec569d283",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "jookw8ow8woks088s44404ok-dapp",
+      "status": "running",
+      "health": "healthy",
+      "restartCount": 0
+    },
+    {
+      "name": "tkkggwcosc4gksckcc480cwg-115513710714",
+      "expectedReplacement": false,
+      "beforeId": "96f2a7f65ae445cd445f66bb601c62e46fbe386bdf69b2eb02bff56ef4d80c43",
+      "afterId": "96f2a7f65ae445cd445f66bb601c62e46fbe386bdf69b2eb02bff56ef4d80c43",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "tkkggwcosc4gksckcc480cwg:e6e136bf567ffa85a8f9ee8ea052c774ff3afb94",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "data-rest-learn-api-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "64bb0fb054bb7c7367eb62d5611db934101e49909d0bedf96144c97acde7ef4e",
+      "afterId": "64bb0fb054bb7c7367eb62d5611db934101e49909d0bedf96144c97acde7ef4e",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_learn-data-rest:a7251b5",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "data-graphql-api-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "523744baa198de489176924cf0e4692875cc8f95058bb9fd2ea5134b4afa124a",
+      "afterId": "523744baa198de489176924cf0e4692875cc8f95058bb9fd2ea5134b4afa124a",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_world-data-graphql:security-20260820-54cbf484",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "game-api-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "0e16c93b3e22cff5e075c15a2c87f657b95c0ff71c29d520f278171ab76dd94c",
+      "afterId": "0e16c93b3e22cff5e075c15a2c87f657b95c0ff71c29d520f278171ab76dd94c",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_world-game:latest",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "matchmaking-api-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "8fda41b5c1def6987216f973905cbb0b83eceb7f3e5a4720c3f95ef9d52eec60",
+      "afterId": "8fda41b5c1def6987216f973905cbb0b83eceb7f3e5a4720c3f95ef9d52eec60",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_world-matchmaking:codex-island-20260701T065752Z-1f4d04cc-join-token",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "marketplace-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "52c91bb6a9150fd438485b99a1acdd2d77836f9d120e7fe7e04b14ebcc7a0e28",
+      "afterId": "52c91bb6a9150fd438485b99a1acdd2d77836f9d120e7fe7e04b14ebcc7a0e28",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_world-dapp:latest",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "auth-api-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "00f92935dc50eae517ce78866147a94514e33fba1b3d381e0450d35e5db3a555",
+      "afterId": "00f92935dc50eae517ce78866147a94514e33fba1b3d381e0450d35e5db3a555",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_world-auth:latest",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "data-rest-api-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "f597e18591cb5360af61083d15fb0e3692b29814e031bb1b37447db429483846",
+      "afterId": "f597e18591cb5360af61083d15fb0e3692b29814e031bb1b37447db429483846",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_world-data-rest:latest",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    },
+    {
+      "name": "data-rest-ludo-api-cukiesapistaging",
+      "expectedReplacement": false,
+      "beforeId": "91250f838b2626a28c3f75c6425ffdd495944cf56686a092f0b0f3417de9ed75",
+      "afterId": "91250f838b2626a28c3f75c6425ffdd495944cf56686a092f0b0f3417de9ed75",
+      "sameId": true,
+      "sameImage": true,
+      "imageRef": "192.168.1.207:5000/cukies/cukies_ludo-data-rest:latest",
+      "status": "running",
+      "health": null,
+      "restartCount": 0
+    }
+  ],
+  "public": {
+    "observedAt": "2026-09-10T08:53:26.592290+00:00",
+    "endpoints": [
+      {
+        "path": "/api/health",
+        "status": 200,
+        "mime": "application/json",
+        "bytes": 212,
+        "body": {
+          "status": "ok",
+          "app": "cukies-hub",
+          "environment": "staging",
+          "gitSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+          "gitRef": "staging",
+          "buildTime": null,
+          "coolify": {
+            "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+            "fqdn": null
+          }
+        }
+      },
+      {
+        "path": "/api/ready",
+        "status": 200,
+        "mime": "application/json",
+        "bytes": 204,
+        "body": {
+          "status": "ready",
+          "gitSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+          "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+          "imageSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4"
+        }
+      },
+      {
+        "path": "/treasurehunt-game/api/health",
+        "status": 200,
+        "mime": "application/json",
+        "bytes": 167,
+        "body": {
+          "status": "ok",
+          "app": "treasure-hunt",
+          "environment": "staging",
+          "gitSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+          "coolify": {
+            "resourceUuid": "lc04cw8gs4koo4swwws0c4ss"
+          }
+        }
+      },
+      {
+        "path": "/treasurehunt-game/api/ready",
+        "status": 200,
+        "mime": "application/json",
+        "bytes": 204,
+        "body": {
+          "status": "ready",
+          "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+          "imageSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+          "gitSha": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4"
+        }
+      }
+    ]
+  },
+  "visualQa": {
+    "browser": "Edge Perfil 1",
+    "route": "https://cukieshub.eurekand.com/treasurehunt-game",
+    "observed": "Selector 1P y 2P: ambos personajes se muestran en captura CUA de esta tarea. Navegación restaurada a /games/treasure-hunt.",
+    "resultState": "not_verified_live",
+    "practiceAttempt": "PRACTICAR 1P conserva el selector y muestra La sesión cambió mientras preparábamos la partida. No se inició una partida ni se usó la acción con créditos.",
+    "directAssetProbe": "Las dos URLs PNG devolvieron HTTP403 al cliente Python. La captura del navegador sí muestra ambas imágenes; no se alteraron reglas Cloudflare."
+  },
+  "limitations": [
+    "El estado de práctica impide acreditar visualmente un nuevo resultado live. Pruebas de componente y compilación están documentadas en la revisión del candidato.",
+    "No se hicieron compras, firmas, aprobaciones ni reparación de datos remotos.",
+    "No reactivar World nuevo ni cerrar incidencias de créditos con este postflight."
+  ]
+}
