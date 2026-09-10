@@ -1,0 +1,77 @@
+{
+  "recordedAt": "2026-09-10T12:54:10.616365+00:00",
+  "scope": "Dashboard hierarchy, next action, compact metrics and loading/refresh states.",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/385",
+  "candidate": "e05b4b66ca86b3ff1e8511199d665aa456b86cfc",
+  "mergeCommit": "0fc312328cc867503afb0a06f8770b367f90a883",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34477973649",
+  "workflowConclusion": "success",
+  "applicationId": 32,
+  "deploymentUuid": "k4w44kwo0480o008kswgcg4g",
+  "finishedAt": "2026-09-10T12:48:19.744Z",
+  "health": {
+    "httpStatus": 200,
+    "body": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "staging",
+      "gitSha": "0fc312328cc867503afb0a06f8770b367f90a883",
+      "gitRef": "staging",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "fqdn": null
+      }
+    }
+  },
+  "containers": {
+    "baselineCount": 92,
+    "afterCount": 93,
+    "preservedBaselineIds": 91,
+    "replacedServices": [
+      "app32 dapp"
+    ],
+    "additionalObservedContainer": "Coolify helper; no other baseline runtime container replaced"
+  },
+  "reusedImageCount": 7,
+  "validation": {
+    "lint": "pass",
+    "typecheck": "pass",
+    "build97": "pass",
+    "testSuites": 248,
+    "tests": 2034,
+    "initialFailure": "One route test expected a deliberately removed subtitle; corrected route assertion and repeated full suite successfully."
+  },
+  "publicUi": {
+    "browser": "Edge",
+    "url": "https://cukieshub.eurekand.com/dashboard",
+    "wallet": "0x2678…0c13",
+    "cssWidths": [
+      400,
+      1440
+    ],
+    "horizontalOverflow": false,
+    "refreshKeepsPreviousData": true,
+    "refreshDisablesButton": true,
+    "refreshReturnsToReady": true,
+    "gameStarted": false,
+    "signatureRequested": false
+  },
+  "findings": [
+    {
+      "id": "DASH-QA-01",
+      "status": "assigned",
+      "description": "Top rewards metric says En preparación despite 0UKI/0assigned rewards. Distinguish known zero, pending assignment and published claimable amounts."
+    },
+    {
+      "id": "DASH-QA-02",
+      "status": "assigned",
+      "description": "At1440CSS the four metrics inside the narrow hero column split a long state word. Adjust grid/word wrapping."
+    }
+  ],
+  "limits": [
+    "No new game, claim, stake or withdrawal was executed.",
+    "Marketplace and Vesting source warnings remain separate existing data/configuration concerns.",
+    "Visual QA found two minor corrections assigned to the original dashboard reviewer; this record does not claim they are already fixed."
+  ]
+}
