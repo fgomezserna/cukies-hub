@@ -53,6 +53,7 @@ import {
 } from '@/lib/nft-vault/transaction-lifecycle';
 import { useAuth } from '@/providers/auth-provider';
 import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const erc721CustodyAbi = [
   { type: 'function', name: 'ownerOf', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ name: '', type: 'address' }] },
@@ -138,6 +139,17 @@ type LegacyStatus = {
 type PoolStatus = CustodialStatus | LegacyStatus;
 type MutationPhase = 'idle' | 'approving' | 'depositing' | 'requesting_exit' | 'withdrawing' | 'syncing';
 type PendingAsset = Pick<AvailableAsset, 'assetId' | 'collectionAddress' | 'tokenId'>;
+type PoolTab = 'pool' | 'available';
+
+function poolTabFromHash(hash: string) {
+  if (hash === 'mi-cukie-pool' || hash === 'mis-cukies-aportados' || hash.startsWith('pool-cukie-')) return 'pool' as const;
+  if (hash === 'cukies-disponibles' || hash.startsWith('pool-available-')) return 'available' as const;
+  return null;
+}
+
+function poolTabHash(tab: PoolTab) {
+  return tab === 'pool' ? 'mis-cukies-aportados' : 'cukies-disponibles';
+}
 
 
 function sameAddress(left: string | undefined | null, right: string | undefined | null) {
@@ -412,7 +424,7 @@ function JourneyStep({ number, label }: { number: string; label: string }) {
   return (
     <div className="flex items-center gap-3">
       <span className="font-headline text-sm font-black text-[var(--uki-lilac)]">{number}</span>
-      <span className="h-px w-8 bg-[var(--uki-lilac)]/45" aria-hidden="true" />
+      <span className="h-px w-8 bg-[rgba(228,92,255,0.45)]" aria-hidden="true" />
       <p className="text-sm font-bold text-[var(--uki-text)]">{label}</p>
     </div>
   );
@@ -444,6 +456,12 @@ export function CukiePoolStatusPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [exitConfirmationId, setExitConfirmationId] = useState<string | null>(null);
   const [latestTxHash, setLatestTxHash] = useState<Hash | null>(null);
+  const [activeTab, setActiveTab] = useState<PoolTab>('pool');
+  const [visitedTabs, setVisitedTabs] = useState<Set<PoolTab>>(() => new Set());
+  const [navigationReady, setNavigationReady] = useState(false);
+  const [hashTarget, setHashTarget] = useState<string | null>(null);
+  const hashScrollHandledRef = useRef<string | null>(null);
+  const [requestedTokenId, setRequestedTokenId] = useState<string | null>(null);
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const operationLocksRef = useRef(new Set<string>());
@@ -485,6 +503,69 @@ export function CukiePoolStatusPanel() {
   }, [fetchedStatus, pendingByAsset]);
   const loadState = statusResource.state === 'stale' ? 'ready' : statusResource.state;
   const refreshStatusQuery = statusResource.refresh;
+
+  useEffect(() => {
+    const syncTabFromLocation = () => {
+      const target = window.location.hash.slice(1);
+      const tab = poolTabFromHash(target) ?? 'pool';
+      const tokenId = new URLSearchParams(window.location.search).get('tokenId');
+      hashScrollHandledRef.current = null;
+      setHashTarget(target || null);
+      setRequestedTokenId(tokenId);
+      if (tab) {
+        setActiveTab(tab);
+        setVisitedTabs((current) => current.has(tab) ? current : new Set([...current, tab]));
+      }
+    };
+    syncTabFromLocation();
+    const initialTarget = window.location.hash.slice(1);
+    const initialTokenId = new URLSearchParams(window.location.search).get('tokenId');
+    if (!poolTabFromHash(initialTarget) && !initialTokenId) {
+      setActiveTab('pool');
+      setVisitedTabs(new Set(['pool']));
+    }
+    setNavigationReady(true);
+    window.addEventListener('hashchange', syncTabFromLocation);
+    window.addEventListener('popstate', syncTabFromLocation);
+    return () => {
+      window.removeEventListener('hashchange', syncTabFromLocation);
+      window.removeEventListener('popstate', syncTabFromLocation);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hashTarget || hashTarget === hashScrollHandledRef.current) return;
+    let disposed = false;
+    let observer: MutationObserver | null = null;
+    const scrollToTarget = () => {
+      if (disposed) return false;
+      const target = document.getElementById(hashTarget);
+      if (!target || target.closest('[hidden]')) return false;
+      target.scrollIntoView?.({ block: 'start' });
+      hashScrollHandledRef.current = hashTarget;
+      observer?.disconnect();
+      return true;
+    };
+    if (!scrollToTarget()) {
+      observer = new MutationObserver(() => scrollToTarget());
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+    const timeout = window.setTimeout(() => observer?.disconnect(), 5_000);
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      window.clearTimeout(timeout);
+    };
+  }, [activeTab, authLoading, hashTarget, loadState, status]);
+
+  function selectTab(tab: PoolTab) {
+    setActiveTab(tab);
+    setVisitedTabs((current) => current.has(tab) ? current : new Set([...current, tab]));
+    const hash = `#${poolTabHash(tab)}`;
+    setHashTarget(hash.slice(1));
+    hashScrollHandledRef.current = hash.slice(1);
+    if (window.location.hash !== hash) window.history.pushState(window.history.state, '', hash);
+  }
 
   useEffect(() => {
     setPhase('idle');
@@ -1192,10 +1273,26 @@ export function CukiePoolStatusPanel() {
   const availableOriginalCount = custodialStatus?.availableAssets.filter((item) => item.generation === 'original').length ?? 0;
   const availableSecondGenerationCount = (custodialStatus?.availableAssets.length ?? 0) - availableOriginalCount;
 
+  useEffect(() => {
+    if (!requestedTokenId || hashTarget || !custodialStatus) return;
+    const available = custodialStatus.availableAssets.some((asset) => asset.tokenId === requestedTokenId);
+    const inPool = openPositions.some((position) => position.tokenId === requestedTokenId);
+    if (!available && !inPool) {
+      setActiveTab('pool');
+      setVisitedTabs((current) => current.has('pool') ? current : new Set([...current, 'pool']));
+      return;
+    }
+    const tab: PoolTab = available ? 'available' : 'pool';
+    const target = available ? `pool-available-${requestedTokenId}` : `pool-cukie-${requestedTokenId}`;
+    setActiveTab(tab);
+    setVisitedTabs((current) => current.has(tab) ? current : new Set([...current, tab]));
+    setHashTarget(target);
+  }, [custodialStatus, hashTarget, openPositions, requestedTokenId]);
+
   return (
     <section id="mi-cukie-pool" className="relative z-[2] w-full pb-10 pt-7">
       <JourneyStep number="01" label="Comprueba tu posición" />
-      <Panel className="mt-4" innerClassName="p-5 sm:p-7">
+      <Panel className="mt-4" innerClassName="p-4 sm:p-7">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="uki-label">Tu estado personal</p>
@@ -1310,8 +1407,8 @@ export function CukiePoolStatusPanel() {
             ) : null}
 
             <div className="grid min-w-0 gap-px overflow-hidden rounded-[12px] border border-white/10 bg-white/10 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
-              <section className="min-w-0 bg-[#120a1c] p-5 sm:p-6">
-                <div className="flex items-start gap-4">
+              <section className="min-w-0 bg-[#120a1c] p-4 sm:p-6">
+                <div className="flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:gap-4">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] text-[var(--uki-lilac)]">
                     <Gamepad2 className="h-5 w-5" aria-hidden="true" />
                   </span>
@@ -1319,7 +1416,7 @@ export function CukiePoolStatusPanel() {
                     <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
                       En el pool · {poolPositionCount} en total
                     </p>
-                    <h3 className="mt-2 text-balance font-headline text-2xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
+                    <h3 className="mt-2 min-w-0 text-balance font-headline text-xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
                       {activeCount === 0
                         ? 'Ningún Cukie puede entrar en partidas ahora'
                         : `${activeCount} ${activeCount === 1 ? 'Cukie está disponible' : 'Cukies están disponibles'} para partidas`}
@@ -1333,14 +1430,14 @@ export function CukiePoolStatusPanel() {
                 </div>
               </section>
 
-              <section className="min-w-0 bg-[#0d0914] p-5 sm:p-6">
-                <div className="flex items-start gap-4">
+              <section className="min-w-0 bg-[#0d0914] p-4 sm:p-6">
+                <div className="flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:gap-4">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.035] text-[var(--uki-lilac)]">
                     <WalletCards className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">En tu wallet</p>
-                    <h3 className="mt-2 font-headline text-2xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
+                    <h3 className="mt-2 min-w-0 font-headline text-xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
                       {status.availableAssets.length} {status.availableAssets.length === 1 ? 'Cukie para aportar' : 'Cukies para aportar'}
                     </h3>
                     <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
@@ -1351,73 +1448,24 @@ export function CukiePoolStatusPanel() {
               </section>
             </div>
 
-            <p className="text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-              Este resumen muestra solo los Cukies que puedes gestionar desde el pool: los que ya
-              aportaste y los que están disponibles en tu wallet. Los depositados en Cukie Master
-              aparecen en <Link href="/cukies" className="font-black text-[var(--uki-lilac)] underline decoration-[var(--uki-lilac)]/45 underline-offset-4">Mis Cukies</Link>.
-            </p>
+            <Tabs value={activeTab} onValueChange={(value) => selectTab(value as PoolTab)} className="mt-6 min-w-0">
+              <TabsList aria-label="Secciones del Cukie Pool" className="grid h-auto w-full min-w-0 grid-cols-2 gap-1 rounded-[10px] border border-white/10 bg-black/20 p-1">
+                <TabsTrigger
+                  value="pool"
+                  className="min-h-11 min-w-0 rounded-[8px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+                >
+                  En el pool
+                </TabsTrigger>
+                <TabsTrigger
+                  value="available"
+                  className="min-h-11 min-w-0 rounded-[8px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+                >
+                  Aportar Cukies
+                </TabsTrigger>
+              </TabsList>
 
-            <PoolMovements
-              activating={activatingCount}
-              leaving={leavingCount}
-              withdrawable={withdrawableCount}
-              confirmedWithdrawals={confirmedWithdrawalCount}
-            />
-
-            <section className="rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
-              <p className="text-xs font-black text-[var(--uki-lilac)]">Tu siguiente paso</p>
-              {withdrawableCount > 0 ? (
-                <NextAction
-                  title={`${withdrawableCount === 1 ? 'Tienes un Cukie listo' : `Tienes ${withdrawableCount} Cukies listos`} para volver a tu wallet`}
-                  description="La espera ya terminó. Retíralo desde la sección de Cukies aportados."
-                  href="#mis-cukies-aportados"
-                  label="Ir a retirar"
-                />
-              ) : confirmedWithdrawalCount > 0 ? (
-                <NextAction
-                  title={`${confirmedWithdrawalCount === 1 ? 'Retirada confirmada' : 'Retiradas confirmadas'}, actualizando colección`}
-                  description="La transacción ya está confirmada en BSC. Estamos actualizando tu colección; no tienes que volver a firmar."
-                  href="#mis-cukies-aportados"
-                  label="Ver estado"
-                />
-              ) : leavingCount > 0 ? (
-                <NextAction
-                  title="Tu salida está programada"
-                  description="No tienes que repetir la operación. En cada Cukie verás la fecha exacta desde la que podrás retirarlo."
-                  href="#mis-cukies-aportados"
-                  label="Ver la salida"
-                />
-              ) : activatingCount > 0 ? (
-                <NextAction
-                  title="Tienes Cukies preparándose para entrar"
-                  description="No necesitas hacer nada. Empezarán a estar disponibles para partidas en la fecha indicada."
-                  href="#mis-cukies-aportados"
-                  label="Ver activación"
-                />
-              ) : status.availableAssets.length > 0 ? (
-                <NextAction
-                  title={`Puedes aportar ${status.availableAssets.length === 1 ? 'un Cukie' : `${status.availableAssets.length} Cukies`}`}
-                  description="Elige uno y revisa su generación, rareza y capacidad diaria antes de confirmar el depósito."
-                  href="#cukies-disponibles"
-                  label="Elegir Cukie"
-                />
-              ) : activeCount > 0 ? (
-                <NextAction
-                  title="Tus Cukies ya están disponibles para partidas"
-                  description="Optarán al reparto de su generación cuando se utilicen en partidas válidas."
-                  href="#mis-cukies-aportados"
-                  label="Ver mis Cukies"
-                />
-              ) : (
-                <NextAction
-                  title="No tienes Cukies disponibles para aportar"
-                  description="Puedes revisar tu colección o volver a actualizar el estado de esta pantalla."
-                  href="/cukies"
-                  label="Ver mi colección"
-                />
-              )}
-            </section>
-
+              <TabsContent value="available" forceMount hidden={activeTab !== 'available'} className="min-w-0 data-[state=inactive]:hidden">
+                {navigationReady && visitedTabs.has('available') ? (
             <div id="cukies-disponibles" className="scroll-mt-24 border-t border-white/10 pt-6">
               <JourneyStep number="02" label="Elige qué Cukies quieres aportar" />
               <div className="flex items-center justify-between gap-3">
@@ -1521,6 +1569,11 @@ export function CukiePoolStatusPanel() {
               )}
             </div>
 
+                ) : null}
+              </TabsContent>
+
+              <TabsContent value="pool" forceMount hidden={activeTab !== 'pool'} className="min-w-0 data-[state=inactive]:hidden">
+                {navigationReady && visitedTabs.has('pool') ? (
             <div id="mis-cukies-aportados" className="scroll-mt-24 border-t border-white/10 pt-6">
               <JourneyStep number="03" label="Gestiona los Cukies que ya aportaste" />
               <div className="mt-4 flex items-center justify-between gap-3">
@@ -1663,6 +1716,78 @@ export function CukiePoolStatusPanel() {
                 </div>
               )}
             </div>
+
+                ) : null}
+              </TabsContent>
+            </Tabs>
+
+            <p className="text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+              Este resumen muestra solo los Cukies que puedes gestionar desde el pool: los que ya
+              aportaste y los que están disponibles en tu wallet. Los depositados en Cukie Master
+              aparecen en <Link href="/cukies" className="font-black text-[var(--uki-lilac)] underline decoration-[var(--uki-lilac)]/45 underline-offset-4">Mis Cukies</Link>.
+            </p>
+
+            <PoolMovements
+              activating={activatingCount}
+              leaving={leavingCount}
+              withdrawable={withdrawableCount}
+              confirmedWithdrawals={confirmedWithdrawalCount}
+            />
+
+            <section className="rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
+              <p className="text-xs font-black text-[var(--uki-lilac)]">Tu siguiente paso</p>
+              {withdrawableCount > 0 ? (
+                <NextAction
+                  title={`${withdrawableCount === 1 ? 'Tienes un Cukie listo' : `Tienes ${withdrawableCount} Cukies listos`} para volver a tu wallet`}
+                  description="La espera ya terminó. Retíralo desde la sección de Cukies aportados."
+                  href="#mis-cukies-aportados"
+                  label="Ir a retirar"
+                />
+              ) : confirmedWithdrawalCount > 0 ? (
+                <NextAction
+                  title={`${confirmedWithdrawalCount === 1 ? 'Retirada confirmada' : 'Retiradas confirmadas'}, actualizando colección`}
+                  description="La transacción ya está confirmada en BSC. Estamos actualizando tu colección; no tienes que volver a firmar."
+                  href="#mis-cukies-aportados"
+                  label="Ver estado"
+                />
+              ) : leavingCount > 0 ? (
+                <NextAction
+                  title="Tu salida está programada"
+                  description="No tienes que repetir la operación. En cada Cukie verás la fecha exacta desde la que podrás retirarlo."
+                  href="#mis-cukies-aportados"
+                  label="Ver la salida"
+                />
+              ) : activatingCount > 0 ? (
+                <NextAction
+                  title="Tienes Cukies preparándose para entrar"
+                  description="No necesitas hacer nada. Empezarán a estar disponibles para partidas en la fecha indicada."
+                  href="#mis-cukies-aportados"
+                  label="Ver activación"
+                />
+              ) : status.availableAssets.length > 0 ? (
+                <NextAction
+                  title={`Puedes aportar ${status.availableAssets.length === 1 ? 'un Cukie' : `${status.availableAssets.length} Cukies`}`}
+                  description="Elige uno y revisa su generación, rareza y capacidad diaria antes de confirmar el depósito."
+                  href="#cukies-disponibles"
+                  label="Elegir Cukie"
+                />
+              ) : activeCount > 0 ? (
+                <NextAction
+                  title="Tus Cukies ya están disponibles para partidas"
+                  description="Optarán al reparto de su generación cuando se utilicen en partidas válidas."
+                  href="#mis-cukies-aportados"
+                  label="Ver mis Cukies"
+                />
+              ) : (
+                <NextAction
+                  title="No tienes Cukies disponibles para aportar"
+                  description="Puedes revisar tu colección o volver a actualizar el estado de esta pantalla."
+                  href="/cukies"
+                  label="Ver mi colección"
+                />
+              )}
+            </section>
+
 
           </div>
         ) : null}

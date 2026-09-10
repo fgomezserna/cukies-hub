@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(() => ({
@@ -17,6 +17,7 @@ jest.mock('lucide-react', () => {
   return {
     ArrowRightLeft: Icon,
     Check: Icon,
+    ChevronDown: Icon,
     Loader2: Icon,
     Network: Icon,
     RefreshCcw: Icon,
@@ -103,8 +104,13 @@ describe('Bridge Legacy: estado y contexto de lecturas', () => {
   let walletAddress = 'TA';
   const fetchMock = jest.fn();
 
+  function activateTab(name: string) {
+    fireEvent.mouseDown(screen.getByRole('tab', { name }), { button: 0, ctrlKey: false });
+  }
+
   beforeEach(() => {
     walletAddress = 'TA';
+    window.history.replaceState(window.history.state, '', '/marketplace');
     setTronWallet(walletAddress);
     mockUseTronLink.mockImplementation(() => ({
       address: walletAddress,
@@ -152,6 +158,47 @@ describe('Bridge Legacy: estado y contexto de lecturas', () => {
 
     expect(await screen.findByText('Disponible')).toBeInTheDocument();
     expect(screen.getAllByText('1 TRX').length).toBeGreaterThan(0);
+  });
+
+  it('mantiene destino y estado compartido al cambiar entre preparar y seguimiento', async () => {
+    render(<BridgeClient />);
+
+    const destination = await screen.findByDisplayValue('0x00000000000000000000000000000000000000aa');
+    fireEvent.change(destination, { target: { value: '0x1111111111111111111111111111111111111111' } });
+    activateTab('Seguimiento');
+    expect(window.location.hash).toBe('#seguimiento');
+    expect(screen.getByRole('tab', { name: 'Seguimiento' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByDisplayValue('0x1111111111111111111111111111111111111111')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Bridge en curso' })).toBeInTheDocument();
+
+    activateTab('Preparar');
+    expect(window.location.hash).toBe('#bridge-preparar');
+    expect(screen.getByDisplayValue('0x1111111111111111111111111111111111111111')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Migracion TRON a BSC' })).toBeInTheDocument();
+
+    window.history.back();
+    await waitFor(() => expect(window.location.hash).toBe('#seguimiento'));
+    expect(screen.getByRole('tab', { name: 'Seguimiento' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('abre seguimiento con su hash heredado y conserva el estado sin verificar', async () => {
+    window.history.replaceState(window.history.state, '', '/marketplace#seguimiento');
+    mockUseTronLink.mockReturnValue({
+      address: null,
+      connect: jest.fn(),
+      isConnected: false,
+      isInstalled: false,
+    });
+    Object.defineProperty(window, 'tronWeb', { configurable: true, value: undefined });
+    render(<BridgeClient />);
+
+    expect(await screen.findByRole('tab', { name: 'Seguimiento' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Bridge en curso' })).toBeInTheDocument();
+    activateTab('Preparar');
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar TronLink' }));
+    expect(await screen.findByText('Instala o activa TronLink para operar bridge en TRON.')).toBeInTheDocument();
+    activateTab('Seguimiento');
+    expect(screen.getByText('Instala o activa TronLink para operar bridge en TRON.')).toBeInTheDocument();
   });
 
   it('limpia el snapshot cargado de A al entrar en B y muestra solo el de B', async () => {

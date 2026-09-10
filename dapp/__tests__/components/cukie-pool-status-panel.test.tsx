@@ -202,6 +202,10 @@ function successfulResponse(data: ReturnType<typeof poolStatus>) {
   return { ok: true, json: async () => ({ status: 'ok', data }) };
 }
 
+async function openPoolTab(tab: 'En el pool' | 'Aportar Cukies') {
+  fireEvent.mouseDown(await screen.findByRole('tab', { name: tab }));
+}
+
 function pendingDeposit(asset = availableAsset()): NftVaultPendingOperation {
   return {
     version: 1,
@@ -248,6 +252,7 @@ describe('CukiePoolStatusPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     fetchMock.mockReset();
+    window.history.replaceState(null, '', '/cukie-hodler');
     window.localStorage.clear();
     global.fetch = fetchMock;
     Object.assign(mutableVaultConfig, {
@@ -313,10 +318,42 @@ describe('CukiePoolStatusPanel', () => {
       'data-src',
       'https://example.com/cukies/7.png',
     );
+    await openPoolTab('Aportar Cukies');
     expect(screen.getByRole('img', { name: 'Cukie #8' })).toHaveAttribute(
       'data-src',
       'https://example.com/cukies/8.png',
     );
+  });
+
+  it('abre un deep link en la pestaña correcta y mantiene un único tab activo con teclado', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({ address: walletAddress, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({ readContract: jest.fn(), waitForTransactionReceipt: jest.fn() } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      availableAssets: [availableAsset('8')],
+      positions: [position({ tokenId: '7', status: 'active' })],
+    })));
+    window.history.replaceState({ marker: 'pool-deeplink' }, '', '/cukie-hodler#pool-available-8');
+
+    render(<CukiePoolStatusPanel />);
+
+    expect(await screen.findByRole('tab', { name: 'Aportar Cukies' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('aria-selected') === 'true')).toHaveLength(1);
+    const availableTab = screen.getByRole('tab', { name: 'Aportar Cukies' });
+    act(() => availableTab.focus());
+    fireEvent.keyDown(availableTab, { key: 'ArrowLeft' });
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'En el pool' })).toHaveAttribute('aria-selected', 'true'));
+    expect(window.history.state).toEqual({ marker: 'pool-deeplink' });
+    expect(screen.getAllByRole('tab').filter((tab) => tab.getAttribute('aria-selected') === 'true')).toHaveLength(1);
+
+    window.history.replaceState({ marker: 'pool-pop' }, '', '/cukie-hodler#pool-available-8');
+    fireEvent(window, new Event('popstate'));
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Aportar Cukies' })).toHaveAttribute('aria-selected', 'true'));
+    expect(window.history.state).toEqual({ marker: 'pool-pop' });
+    window.history.replaceState({ marker: 'pool-initial' }, '', '/cukie-hodler');
+    fireEvent(window, new Event('popstate'));
+    expect(screen.getByRole('tab', { name: 'En el pool' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('retains the last known Pool list while a degraded source returns empty arrays', async () => {
@@ -332,6 +369,7 @@ describe('CukiePoolStatusPanel', () => {
 
     render(<CukiePoolStatusPanel />);
     expect(await screen.findByText('1 Cukie para aportar')).toBeInTheDocument();
+    await openPoolTab('Aportar Cukies');
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
     expect(await screen.findByText(/Estamos actualizando tus Cukies/i)).toBeInTheDocument();
     expect(screen.getByText('1 Cukie para aportar')).toBeInTheDocument();
@@ -375,6 +413,7 @@ describe('CukiePoolStatusPanel', () => {
       .mockResolvedValueOnce(successfulResponse(poolStatus()));
 
     render(<CukiePoolStatusPanel />);
+    await openPoolTab('Aportar Cukies');
     expect(await screen.findByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
     expect(await screen.findByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
@@ -554,6 +593,7 @@ describe('CukiePoolStatusPanel', () => {
       .mockResolvedValueOnce(successfulResponse(poolStatus({ positions: [position({ status: 'pending' })] })));
 
     render(<CukiePoolStatusPanel />);
+    await openPoolTab('Aportar Cukies');
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
 
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
@@ -595,6 +635,7 @@ describe('CukiePoolStatusPanel', () => {
     fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
 
     render(<CukiePoolStatusPanel />);
+    await openPoolTab('Aportar Cukies');
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
 
     await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(1));
@@ -633,6 +674,7 @@ describe('CukiePoolStatusPanel', () => {
 
     const view = render(<CukiePoolStatusPanel />);
     rerenderPanel = view.rerender;
+    await openPoolTab('Aportar Cukies');
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
 
     expect(await screen.findByText(/Cambia tu wallet a la red correcta/i)).toBeInTheDocument();
@@ -666,6 +708,7 @@ describe('CukiePoolStatusPanel', () => {
     fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
 
     const view = render(<CukiePoolStatusPanel />);
+    await openPoolTab('Aportar Cukies');
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
     await waitFor(() => expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash }));
 
@@ -700,6 +743,7 @@ describe('CukiePoolStatusPanel', () => {
     fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
 
     render(<CukiePoolStatusPanel />);
+    await openPoolTab('Aportar Cukies');
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/ya no está en tu wallet/i);
@@ -727,6 +771,7 @@ describe('CukiePoolStatusPanel', () => {
     fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
 
     render(<CukiePoolStatusPanel />);
+    await openPoolTab('Aportar Cukies');
     fireEvent.click(await screen.findByRole('button', { name: /Aportar este Cukie/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no permite esta colección/i);
@@ -759,6 +804,7 @@ describe('CukiePoolStatusPanel', () => {
     })));
 
     render(<CukiePoolStatusPanel />);
+    await openPoolTab('Aportar Cukies');
 
     const firstCard = (await screen.findByText('Cukie #7')).closest('article');
     const secondCard = screen.getByText('Cukie #8').closest('article');
@@ -1047,6 +1093,7 @@ describe('CukiePoolStatusPanel', () => {
       });
 
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await openPoolTab('Aportar Cukies');
       expect(await screen.findByRole('button', { name: /Aportar este Cukie/i })).toBeEnabled();
       expect(screen.queryByText(/Los depósitos están bloqueados/i)).not.toBeInTheDocument();
     } finally {

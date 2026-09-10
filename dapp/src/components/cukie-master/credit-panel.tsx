@@ -16,6 +16,7 @@ import {
 
 import { Panel } from '@/components/landing/primitives';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CompetitionCreditHistory,
   type CreditHistoryData,
@@ -74,6 +75,19 @@ type CreditStatus = {
 };
 
 type SaveResult = 'idle' | 'saved' | 'error';
+type CreditTab = 'allocation' | 'history';
+
+function creditTabFromLocation() {
+  if (typeof window === 'undefined') return null;
+  const hashTarget = window.location.hash.slice(1);
+  if (hashTarget === 'credit-history') return 'history' as const;
+  if (hashTarget === 'competition-credits') return 'allocation' as const;
+  return null;
+}
+
+function creditTabHash(tab: CreditTab) {
+  return tab === 'history' ? 'credit-history' : 'competition-credits';
+}
 
 function utcLabel(value: string | null) {
   if (!value) return null;
@@ -123,6 +137,8 @@ export function CompetitionCreditPanel() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<SaveResult>('idle');
   const [history, setHistory] = useState<CreditHistoryData | null>(null);
+  const [activeTab, setActiveTab] = useState<CreditTab>('allocation');
+  const [hashTarget, setHashTarget] = useState<string | null>(null);
   const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState(false);
   const requestIdRef = useRef(0);
@@ -130,6 +146,7 @@ export function CompetitionCreditPanel() {
   const activeLoadRef = useRef<{ requestId: number; sequence: number } | null>(null);
   const saveOperationRef = useRef(0);
   const historyOperationRef = useRef(0);
+  const hashScrollHandledRef = useRef<string | null>(null);
   const statusRef = useRef<CreditStatus | null>(null);
   const draftsRef = useRef<Record<string, number>>({});
   const historyRef = useRef<CreditHistoryData | null>(null);
@@ -265,6 +282,56 @@ export function CompetitionCreditPanel() {
     if (statusResource.data.walletNormalized.toLowerCase() !== identityKeyRef.current) return;
     applyIncomingStatus(statusResource.data, true, true);
   }, [applyIncomingStatus, authLoading, identityMatches, statusResource.data, statusResource.dataUpdatedAt, statusResource.state]);
+
+  useEffect(() => {
+    const selectTabFromHash = () => {
+      const tab = creditTabFromLocation();
+      const target = window.location.hash.slice(1);
+      hashScrollHandledRef.current = null;
+      setActiveTab(tab ?? 'allocation');
+      setHashTarget(tab ? target : null);
+    };
+    selectTabFromHash();
+    window.addEventListener('hashchange', selectTabFromHash);
+    window.addEventListener('popstate', selectTabFromHash);
+    return () => {
+      window.removeEventListener('hashchange', selectTabFromHash);
+      window.removeEventListener('popstate', selectTabFromHash);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hashTarget || hashTarget === hashScrollHandledRef.current) return;
+    let disposed = false;
+    let observer: MutationObserver | null = null;
+    const scrollToTarget = () => {
+      if (disposed) return false;
+      const target = document.getElementById(hashTarget);
+      if (!target || target.closest('[hidden]')) return false;
+      target.scrollIntoView?.({ block: 'start' });
+      hashScrollHandledRef.current = hashTarget;
+      observer?.disconnect();
+      return true;
+    };
+    if (!scrollToTarget()) {
+      observer = new MutationObserver(() => scrollToTarget());
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+    const timeout = window.setTimeout(() => observer?.disconnect(), 5_000);
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      window.clearTimeout(timeout);
+    };
+  }, [activeTab, authLoading, hashTarget, status]);
+
+  function selectTab(tab: CreditTab) {
+    setActiveTab(tab);
+    const hash = `#${creditTabHash(tab)}`;
+    hashScrollHandledRef.current = hash.slice(1);
+    setHashTarget(hash.slice(1));
+    if (window.location.hash !== hash) window.history.pushState(window.history.state, '', hash);
+  }
 
   const routeState = useMemo(() => {
     const getRouteState = (route: 'uki' | 'nft'): 'healthy' | 'blocked' | 'unknown' => {
@@ -582,7 +649,7 @@ export function CompetitionCreditPanel() {
                 <h3 className="mt-1 text-lg font-black text-[var(--uki-cream)]">Confirmado en este periodo</h3>
               </div>
             </div>
-            <div className="mt-3 grid overflow-hidden rounded-[8px] border border-white/10 bg-black/20 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-white/10">
+            <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-[8px] border border-white/10 bg-black/20 lg:grid-cols-5 lg:divide-x lg:divide-white/10">
               <CurrentBalance label="Para jugar" value={status.balance.availableCredits} />
               <CurrentBalance label="En partidas" value={status.balance.reservedCredits} />
               <CurrentBalance label="Ya usados" value={status.balance.spentCredits} />
@@ -624,26 +691,52 @@ export function CompetitionCreditPanel() {
               </div>
             ) : null}
 
-            {status.configurations.length === 0 ? (
-              <div className="mt-6 border-t border-white/10 py-8">
-                {unknownRoutes.length > 0 ? (
-                  <>
-                    <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no podemos confirmar tus cupos</p>
-                    <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
-                      La fuente de {unknownRoutes.map(routeLabel).join(' y ')} sigue pendiente. Mostraremos la configuración cuando termine la comprobación.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no tienes cupos configurables</p>
-                    <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
-                      Cuando actives tu primer cupo podrás decidir aquí cómo usar sus créditos en cada periodo.
-                    </p>
-                  </>
-                )}
+            {changedConfigurations.length > 0 ? (
+              <div role="status" className="mt-5 flex items-center gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] px-4 py-3 text-sm font-semibold text-[var(--uki-text)]">
+                <Warning className="h-5 w-5 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
+                <span>
+                  Tienes {changedConfigurations.length} {changedConfigurations.length === 1 ? 'cambio sin guardar' : 'cambios sin guardar'} en tu reparto. Puedes revisarlos desde Reparto cuando quieras.
+                </span>
               </div>
-            ) : (
-              <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.6fr)]">
+            ) : null}
+
+            <Tabs value={activeTab} onValueChange={(value) => selectTab(value as CreditTab)} className="mt-6 min-w-0">
+              <TabsList aria-label="Secciones de créditos" className="grid h-auto w-full min-w-0 grid-cols-2 gap-1 rounded-[10px] border border-white/10 bg-black/20 p-1">
+                <TabsTrigger
+                  value="allocation"
+                  className="min-h-11 min-w-0 rounded-[8px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+                >
+                  Reparto
+                </TabsTrigger>
+                <TabsTrigger
+                  value="history"
+                  className="min-h-11 min-w-0 rounded-[8px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+                >
+                  Historial
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="allocation" forceMount hidden={activeTab !== 'allocation'} className="min-w-0 data-[state=inactive]:hidden">
+                {status.configurations.length === 0 ? (
+                  <div className="mt-6 border-t border-white/10 py-8">
+                    {unknownRoutes.length > 0 ? (
+                      <>
+                        <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no podemos confirmar tus cupos</p>
+                        <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                          La fuente de {unknownRoutes.map(routeLabel).join(' y ')} sigue pendiente. Mostraremos la configuración cuando termine la comprobación.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-lg font-black text-[var(--uki-cream)]">Todavía no tienes cupos configurables</p>
+                        <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                          Cuando actives tu primer cupo podrás decidir aquí cómo usar sus créditos en cada periodo.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.6fr)]">
                 <aside className="self-start rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-5 lg:sticky lg:top-24">
                   <p className="uki-label text-[var(--uki-lilac)]">Reparto del próximo corte</p>
                   <div className="mt-5 space-y-4">
@@ -843,25 +936,28 @@ export function CompetitionCreditPanel() {
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="history" forceMount hidden={activeTab !== 'history'} className="min-w-0 data-[state=inactive]:hidden">
+                <CompetitionCreditHistory
+                  history={history}
+                  isLoadingMore={isLoadingMoreHistory}
+                  loadMoreError={historyLoadError}
+                  onLoadMore={loadMoreHistory}
+                  onRetry={() => {
+                    const requestId = requestIdRef.current;
+                    void load(undefined, true, requestId).catch(() => {
+                      if (requestIdRef.current === requestId) setHistoryLoadError(true);
+                    });
+                  }}
+                />
+              </TabsContent>
+            </Tabs>
           </>
         ) : null}
       </Panel>
-      {state === 'ready' && status ? (
-        <CompetitionCreditHistory
-          history={history}
-          isLoadingMore={isLoadingMoreHistory}
-          loadMoreError={historyLoadError}
-          onLoadMore={loadMoreHistory}
-          onRetry={() => {
-            const requestId = requestIdRef.current;
-            void load(undefined, true, requestId).catch(() => {
-              if (requestIdRef.current === requestId) setHistoryLoadError(true);
-            });
-          }}
-        />
-      ) : null}
     </div>
   );
 }

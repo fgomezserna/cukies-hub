@@ -133,9 +133,14 @@ async function confirmSponsor() {
 let payload: ReturnType<typeof dashboardPayload>;
 
 describe('AmbassadorProgram', () => {
+  function activateTab(name: string) {
+    fireEvent.mouseDown(screen.getByRole('tab', { name }), { button: 0, ctrlKey: false });
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     sessionStorage.clear();
+    window.history.replaceState(window.history.state, '', '/ambassadors');
     payload = dashboardPayload();
     mockUseAuth.mockReturnValue(authValue());
     jest.mocked(useSignMessage).mockReturnValue({ signMessageAsync } as unknown as ReturnType<typeof useSignMessage>);
@@ -501,5 +506,34 @@ describe('AmbassadorProgram', () => {
     await act(async () => { oldSummary.resolve(response(dashboardPayload())); });
     expect(screen.queryByRole('button', { name: 'Copiar enlace' })).not.toBeInTheDocument();
     expect(screen.getByText('Confirmación de embajador pendiente')).toBeInTheDocument();
+  });
+
+  it('abre comisiones desde el hash tras cargar la wallet y conserva feedback al cambiar de pestaña', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: true });
+    window.history.replaceState(window.history.state, '', '/ambassadors#comisiones');
+    render(<AmbassadorProgram />);
+
+    expect(await screen.findByRole('heading', { name: 'Tus comisiones' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Comisiones' })).toHaveAttribute('aria-selected', 'true');
+    activateTab('Mi programa');
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar enlace' }));
+    expect(await screen.findByText('Enlace copiado.')).toBeInTheDocument();
+
+    activateTab('Invitados');
+    expect(window.location.hash).toBe('#referrals-title');
+    expect(screen.getByText('Enlace copiado.')).toBeInTheDocument();
+    activateTab('Mi programa');
+    expect(window.location.hash).toBe('#summary-title');
+    expect(screen.getByRole('button', { name: 'Copiado' })).toBeInTheDocument();
+  });
+
+  it('mantiene la confirmación pendiente fuera de los paneles operativos', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: false });
+    render(<AmbassadorProgram />);
+
+    expect(await screen.findByText('Confirmación de embajador pendiente')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Mi programa' })).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+    expect(screen.getByText('Cukies World')).toBeInTheDocument();
   });
 });

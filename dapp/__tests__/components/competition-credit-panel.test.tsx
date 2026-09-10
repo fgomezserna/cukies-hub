@@ -141,6 +141,10 @@ function statusResponse() {
   };
 }
 
+async function openCreditTab(tab: 'Reparto' | 'Historial') {
+  fireEvent.mouseDown(await screen.findByRole('tab', { name: tab }));
+}
+
 describe('CompetitionCreditPanel', () => {
   afterEach(() => {
     jest.useRealTimers();
@@ -150,6 +154,7 @@ describe('CompetitionCreditPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     fetchMock.mockReset();
+    window.history.replaceState(null, '', '/credits');
     mockUseAuth.mockReturnValue(authValue());
     mockUseAccount.mockReturnValue({ address: wallet, isConnected: true, chainId: 97 } as unknown as ReturnType<typeof useAccount>);
     mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
@@ -168,10 +173,14 @@ describe('CompetitionCreditPanel', () => {
 
     await waitFor(() => expect(screen.getByText('Confirmado en este periodo')).toBeInTheDocument());
     expect(screen.getAllByText('80').length).toBeGreaterThan(0);
+    expect(screen.getByRole('tab', { name: 'Reparto' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Historial' })).toHaveAttribute('aria-selected', 'false');
+    await openCreditTab('Historial');
     expect(screen.getByRole('heading', { name: 'Historial de créditos' })).toBeInTheDocument();
     expect(screen.getByText('Créditos recibidos')).toBeInTheDocument();
     expect(screen.getByText('Partida jugada')).toBeInTheDocument();
     expect(screen.getByText('Próxima caducidad')).toBeInTheDocument();
+    await openCreditTab('Reparto');
     const [currentPoolBalance] = screen.getAllByText('Aportados al pool');
     expect(currentPoolBalance.parentElement).toHaveTextContent('20');
     expect(screen.getAllByText('Caducados')[0].parentElement).toHaveTextContent('45');
@@ -179,6 +188,10 @@ describe('CompetitionCreditPanel', () => {
     fireEvent.click(screen.getByRole('button', {
       name: 'Aumentar aportación al pool de UKI, cupo 1',
     }));
+    expect(screen.getByRole('status')).toHaveTextContent('1 cambio sin guardar');
+    await openCreditTab('Historial');
+    expect(screen.getByRole('status')).toHaveTextContent('1 cambio sin guardar');
+    await openCreditTab('Reparto');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar 1 cambio' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
@@ -192,6 +205,24 @@ describe('CompetitionCreditPanel', () => {
     });
     expect(post[1].headers['idempotency-key']).toMatch(/^credit-config:slot-1:/);
     expect(await screen.findByText(/Reparto guardado\. Se aplicará/i)).toBeInTheDocument();
+  });
+
+  it('abre el historial desde el hash y conserva el estado al navegar entre pestañas', async () => {
+    fetchMock.mockResolvedValueOnce(statusResponse());
+    window.history.replaceState({ marker: 'credits' }, '', '/credits#credit-history');
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByRole('tab', { name: 'Historial' })).toHaveAttribute('aria-selected', 'true');
+    const preservedState = window.history.state;
+    await openCreditTab('Reparto');
+    expect(window.history.state).toEqual(preservedState);
+    window.history.replaceState({ marker: 'credits-pop' }, '', '/credits#credit-history');
+    fireEvent(window, new Event('popstate'));
+    expect(screen.getByRole('tab', { name: 'Historial' })).toHaveAttribute('aria-selected', 'true');
+    window.history.replaceState({ marker: 'credits-initial' }, '', '/credits');
+    fireEvent(window, new Event('popstate'));
+    expect(screen.getByRole('tab', { name: 'Reparto' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('shows the exact first eligible cutoff and lets qualifying slots be configured in advance', async () => {
@@ -356,7 +387,7 @@ describe('CompetitionCreditPanel', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => refreshed });
 
     render(<CompetitionCreditPanel />);
-    await screen.findByRole('heading', { name: 'Historial de créditos' });
+    await screen.findByText('Confirmado en este periodo');
     fireEvent.click(screen.getByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' }));
 
     await act(async () => { jest.advanceTimersByTime(30_000); });
@@ -394,6 +425,7 @@ describe('CompetitionCreditPanel', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => refreshed });
 
     render(<CompetitionCreditPanel />);
+    await openCreditTab('Historial');
     await screen.findByRole('button', { name: 'Cargar movimientos anteriores' });
     fireEvent.click(screen.getByRole('button', { name: 'Cargar movimientos anteriores' }));
     expect(await screen.findByText('+40')).toBeInTheDocument();
@@ -413,7 +445,7 @@ describe('CompetitionCreditPanel', () => {
       }));
 
     render(<CompetitionCreditPanel />);
-    await screen.findByRole('heading', { name: 'Historial de créditos' });
+    await screen.findByText('Confirmado en este periodo');
     await act(async () => { jest.advanceTimersByTime(30_000); });
     await act(async () => { jest.advanceTimersByTime(30_000); });
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -548,6 +580,7 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
 
+    await openCreditTab('Historial');
     fireEvent.click(await screen.findByRole('button', { name: 'Gastados' }));
 
     expect(screen.getByText('Partida jugada')).toBeInTheDocument();

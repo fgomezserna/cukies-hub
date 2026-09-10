@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import { formatUnits, type Address, type Hex } from 'viem';
 import {
   AlertCircle,
@@ -27,6 +26,7 @@ import {
 } from 'wagmi';
 
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { rewardsDistributorAbi } from '@/lib/contracts/rewards-distributor';
 import { useAuth } from '@/providers/auth-provider';
 import {
@@ -102,6 +102,29 @@ type ClaimFeedback = {
   transactionHash?: Hex;
   chainId?: 56 | 97;
 };
+
+type RewardTab = 'claimable' | 'history';
+
+function readRewardNavigation(): {
+  tab: RewardTab;
+  ambassadorOnly: boolean;
+} {
+  if (typeof window === 'undefined') {
+    return { tab: 'claimable', ambassadorOnly: false };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const category = params.get('category')?.toLowerCase();
+  const hash = window.location.hash.replace(/^#/, '').toLowerCase();
+  const historyHash = new Set(['historial-premios', 'reward-history-title']);
+
+  let tab: RewardTab = 'claimable';
+  if (hash === 'cobrar-premios') tab = 'claimable';
+  else if (historyHash.has(hash)) tab = 'history';
+  else if (category === 'ambassador') tab = 'history';
+
+  return { tab, ambassadorOnly: category === 'ambassador' };
+}
 
 function formatRaw(value: string) {
   try {
@@ -183,24 +206,6 @@ function transactionUrl(chainId: 56 | 97, hash: Hex) {
   return `${explorer}/tx/${hash}`;
 }
 
-function StepHeading({
-  number,
-  children,
-}: {
-  number: string;
-  children: string;
-}) {
-  return (
-    <div className="mb-4 flex items-center gap-4">
-      <span className="font-headline text-sm font-black text-[var(--uki-lilac)]">
-        {number}
-      </span>
-      <span className="h-px w-12 bg-[var(--uki-lilac)]/40" />
-      <p className="text-sm font-black text-[var(--uki-cream)]">{children}</p>
-    </div>
-  );
-}
-
 export function PremiosContent() {
   const { user, isLoading: authLoading } = useAuth();
   const walletAddress = user?.walletAddress ?? null;
@@ -217,12 +222,95 @@ export function PremiosContent() {
   const [claimFeedback, setClaimFeedback] = useState<ClaimFeedback | null>(
     null,
   );
-  const [ambassadorOnly, setAmbassadorOnly] = useState(false);
+  const [navigation, setNavigation] = useState<{
+    tab: RewardTab;
+    ambassadorOnly: boolean;
+  }>({ tab: 'claimable', ambassadorOnly: false });
+  const { tab: activeTab, ambassadorOnly } = navigation;
+  const [anchorToReveal, setAnchorToReveal] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setAmbassadorOnly(new URLSearchParams(window.location.search).get('category') === 'ambassador');
+    const syncNavigation = () => {
+      setNavigation(readRewardNavigation());
+      const hash = window.location.hash.slice(1);
+      setAnchorToReveal(
+        hash === 'cobrar-premios'
+          ? 'claimable-rewards-title'
+          : hash === 'historial-premios' || hash === 'reward-history-title'
+            ? 'reward-history-title'
+            : null,
+      );
+    };
+    syncNavigation();
+    window.addEventListener('popstate', syncNavigation);
+    window.addEventListener('hashchange', syncNavigation);
+    return () => {
+      window.removeEventListener('popstate', syncNavigation);
+      window.removeEventListener('hashchange', syncNavigation);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!status || !anchorToReveal) return;
+    const target = document.getElementById(anchorToReveal);
+    if (!target || target.closest('[hidden]')) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView?.({ block: 'start' });
+    setAnchorToReveal(null);
+  }, [activeTab, anchorToReveal, status]);
+
+  const updateRewardLocation = useCallback(
+    (next: { tab?: RewardTab; ambassadorOnly?: boolean }) => {
+      if (typeof window === 'undefined') return;
+      const url = new URL(window.location.href);
+      const nextTab = next.tab ?? activeTab;
+      const nextAmbassadorOnly = next.ambassadorOnly ?? ambassadorOnly;
+
+      if (nextAmbassadorOnly) url.searchParams.set('category', 'ambassador');
+      else url.searchParams.delete('category');
+      url.hash = nextTab === 'history' ? 'historial-premios' : 'cobrar-premios';
+
+      const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+      window.history.pushState(window.history.state, '', nextUrl);
+    },
+    [activeTab, ambassadorOnly],
+  );
+
+  const selectTab = useCallback(
+    (nextTab: RewardTab, options?: { scroll?: boolean }) => {
+      setNavigation((current) => ({ ...current, tab: nextTab }));
+      if (typeof window !== 'undefined') {
+        const currentNavigation = readRewardNavigation();
+        const hash =
+          nextTab === 'history' ? 'historial-premios' : 'cobrar-premios';
+        if (window.location.hash.replace(/^#/, '').toLowerCase() !== hash) {
+          updateRewardLocation({
+            tab: nextTab,
+            ambassadorOnly: currentNavigation.ambassadorOnly,
+          });
+        }
+      }
+
+      if (options?.scroll && typeof document !== 'undefined') {
+        window.setTimeout(() => {
+          const targetId =
+            nextTab === 'history' ? 'reward-history-title' : 'claimable-rewards-title';
+          const target = document.getElementById(targetId);
+          if (target && typeof target.scrollIntoView === 'function') {
+            target.focus({ preventScroll: true });
+            target.scrollIntoView({ block: 'start' });
+          }
+        }, 0);
+      }
+    },
+    [updateRewardLocation],
+  );
+
+  const clearAmbassadorFilter = useCallback(() => {
+    setNavigation((current) => ({ ...current, ambassadorOnly: false }));
+    updateRewardLocation({ ambassadorOnly: false });
+  }, [updateRewardLocation]);
 
   const load = useCallback(
     async (options?: { cursor?: string; append?: boolean }) => {
@@ -352,10 +440,17 @@ export function PremiosContent() {
         transactionHash: claim.transactionHash,
         transactionChainId: claim.chainId,
       })),
-    ].filter((item) => !ambassadorOnly || item.category === 'ambassador' || item.category === 'claim').sort(
-      (left, right) =>
-        new Date(right.date).getTime() - new Date(left.date).getTime(),
-    );
+    ]
+      .filter(
+        (item) =>
+          !ambassadorOnly ||
+          item.category === 'ambassador' ||
+          item.category === 'claim',
+      )
+      .sort(
+        (left, right) =>
+          new Date(right.date).getTime() - new Date(left.date).getTime(),
+      );
   }, [ambassadorOnly, status]);
 
   async function refreshRewards() {
@@ -434,7 +529,10 @@ export function PremiosContent() {
     }).catch((error: unknown) => {
       setClaimFeedback({
         kind: 'error',
-        message: error instanceof Error ? error.message : 'No se pudo preparar la red para cobrar.',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo preparar la red para cobrar.',
       });
     });
   }
@@ -453,79 +551,56 @@ export function PremiosContent() {
 
   if (!walletAddress) {
     return (
-      <section className="grid min-h-[34rem] overflow-hidden rounded-[20px] border border-[var(--uki-lilac)]/25 bg-[#09060f] lg:grid-cols-[1fr_0.9fr]">
-        <div className="flex flex-col justify-center p-6 sm:p-10 lg:p-14">
-          <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]">
-            <Gift className="h-4 w-4" /> Tus premios
-          </p>
-          <h1 className="mt-3 max-w-2xl text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">
-            Consulta y cobra tus recompensas
-          </h1>
-          <p className="mt-4 max-w-xl text-base font-semibold leading-relaxed text-[var(--uki-text)]">
-            Conecta tu wallet para ver lo que has ganado en partidas y pools, y
-            cobrar los premios que ya estén disponibles.
-          </p>
-          <LandingWalletConnectButton
-            evmOnly
-            className="mt-7 min-h-12 w-fit px-5"
-            label="Conectar wallet"
-            compactLabel="Conectar wallet"
-            showCompactText={false}
-          />
-        </div>
-        <div className="relative min-h-[22rem] overflow-hidden border-t border-white/10 lg:border-l lg:border-t-0">
-          <Image
-            src="/brand/generated/uki-premios-cukies-rewards-hero-v5.png"
-            alt="Cukies celebrando sus premios"
-            fill
-            priority
-            sizes="(min-width: 1024px) 45vw, 100vw"
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#09060f] via-transparent to-transparent lg:bg-gradient-to-r lg:from-[#09060f]/35 lg:via-transparent lg:to-transparent" />
-        </div>
+      <section className="mx-auto w-full max-w-[760px] rounded-[16px] border border-[var(--uki-lilac-border)] bg-[#09060f] p-6 sm:p-9">
+        <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]">
+          <Gift className="h-4 w-4" /> Tus premios
+        </p>
+        <h1 className="mt-3 max-w-2xl font-headline text-3xl font-black leading-tight tracking-[-0.03em] text-[var(--uki-cream)] sm:text-4xl">
+          Consulta y cobra tus recompensas
+        </h1>
+        <p className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
+          Conecta tu wallet para ver lo que has ganado en partidas y pools, y
+          cobrar los premios que ya estén disponibles.
+        </p>
+        <LandingWalletConnectButton
+          evmOnly
+          className="mt-6 min-h-12 w-full px-5 sm:w-fit"
+          label="Conectar wallet"
+          compactLabel="Conectar wallet"
+          showCompactText={false}
+        />
       </section>
     );
   }
 
   return (
     <div className="mx-auto w-full max-w-[1480px] pb-10">
-      <header className="grid overflow-hidden rounded-[20px] border border-[var(--uki-lilac)]/25 bg-[#09060f] lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="flex flex-col justify-center p-6 sm:p-9 lg:p-11">
-          <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]">
-            <Gift className="h-4 w-4" /> Premios
-          </p>
-          <h1 className="mt-3 text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">
-            Tus premios UKI
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-            Comprueba cuánto tienes preparado, cobra lo disponible y revisa cada
-            movimiento con todos los pasos explicados.
-          </p>
+      <header className="border-b border-white/10 pb-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]">
+              <Gift className="h-4 w-4" /> Premios
+            </p>
+            <h1 className="mt-2 text-balance font-headline text-3xl font-black leading-tight tracking-[-0.03em] text-[var(--uki-cream)] sm:text-4xl">
+              Tus premios UKI
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Comprueba tu saldo, cobra lo disponible y revisa cada movimiento.
+            </p>
+          </div>
           <button
             type="button"
             onClick={refreshRewards}
             disabled={requestState === 'loading'}
-            className="mt-6 inline-flex w-fit items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] disabled:opacity-50"
+            className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[9px] border border-[rgba(228,92,255,0.35)] px-4 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:border-[rgba(228,92,255,0.60)] hover:bg-[rgba(228,92,255,0.08)] disabled:cursor-wait disabled:opacity-50 sm:w-auto"
           >
             <RefreshCw
               className={
                 requestState === 'loading' ? 'h-4 w-4 animate-spin' : 'h-4 w-4'
               }
             />{' '}
-            Actualizar premios
+            Actualizar
           </button>
-        </div>
-        <div className="relative min-h-[16rem] overflow-hidden border-t border-white/10 lg:border-l lg:border-t-0">
-          <Image
-            src="/brand/generated/uki-premios-cukies-rewards-hero-v5.png"
-            alt="Cukies celebrando sus premios"
-            fill
-            priority
-            sizes="(min-width: 1024px) 40vw, 100vw"
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#09060f] via-transparent to-transparent lg:bg-gradient-to-r lg:from-[#09060f]/35 lg:via-transparent lg:to-transparent" />
         </div>
       </header>
 
@@ -546,7 +621,7 @@ export function PremiosContent() {
           <button
             type="button"
             onClick={refreshRewards}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-white/15 px-4 text-xs font-black uppercase tracking-[0.07em] text-[var(--uki-cream)]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-white/15 px-4 text-xs font-black uppercase tracking-[0.07em] text-[var(--uki-cream)]"
           >
             <RefreshCw className="h-4 w-4" /> Reintentar
           </button>
@@ -565,92 +640,77 @@ export function PremiosContent() {
 
       {status ? (
         <>
-          <section aria-labelledby="reward-balance-title" className="pt-9">
-            <StepHeading number="01">Comprueba tu saldo</StepHeading>
-            <div className="grid overflow-hidden rounded-[18px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.06] lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="flex flex-col justify-between p-6 sm:p-8 lg:min-h-[19rem]">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">
-                    Listo para cobrar
+          <section
+            aria-labelledby="reward-balance-title"
+            className="mt-5 overflow-hidden rounded-[16px] border border-[var(--uki-lilac-border)] bg-[rgba(228,92,255,0.06)]"
+          >
+            <h2 id="reward-balance-title" className="sr-only">Tu saldo en UKI</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4">
+              {[
+                ['Listo para cobrar', status.claimableRaw, 'Disponible ahora'],
+                [
+                  'En preparación',
+                  status.pendingRaw,
+                  'Registrado y todavía no habilitado',
+                ],
+                [
+                  'Ya cobrado',
+                  status.totalClaimedRaw,
+                  `${status.claimCount} ${
+                    status.claimCount === 1
+                      ? 'cobro confirmado'
+                      : 'cobros confirmados'
+                  }`,
+                ],
+                [
+                  'Ganado en total',
+                  status.totalAllocatedRaw,
+                  `${status.allocationCount} ${
+                    status.allocationCount === 1
+                      ? 'premio registrado'
+                      : 'premios registrados'
+                  }`,
+                ],
+              ].map(([label, value, helper], index) => (
+                <div
+                  key={label}
+                  className={`min-w-0 p-4 sm:p-5 ${
+                    index === 0 ? 'bg-[rgba(228,92,255,0.10)]' : ''
+                  } ${index % 2 === 1 ? 'border-l border-white/10' : ''} ${
+                    index > 1
+                      ? 'border-t border-white/10 sm:border-t-0 sm:border-l'
+                      : ''
+                  }`}
+                >
+                  <p className="text-[0.68rem] font-black uppercase leading-tight tracking-[0.1em] text-[var(--uki-muted)]">
+                    {label}
                   </p>
-                  <h2
-                    id="reward-balance-title"
-                    className="mt-3 font-headline text-5xl font-black tracking-[-0.04em] text-[var(--uki-cream)] sm:text-6xl"
-                  >
-                    {formatRaw(status.claimableRaw)}{' '}
-                    <span className="text-2xl text-[var(--uki-lilac)] sm:text-3xl">
-                      UKI
-                    </span>
-                  </h2>
-                  <p className="mt-4 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                    {BigInt(status.claimableRaw) > BigInt(0)
-                      ? 'Este importe ya se puede enviar a tu wallet. Cada premio mantiene visible su fecha límite.'
-                      : BigInt(status.pendingRaw) > BigInt(0)
-                      ? 'Ahora no tienes UKI para cobrar, pero ya hay premios registrados que se están preparando.'
-                      : 'Ahora mismo no tienes UKI pendientes de cobro.'}
-                  </p>
-                </div>
-                {BigInt(status.claimableRaw) > BigInt(0) ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      document
-                        .getElementById('cobrar-premios')
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }
-                    className="mt-6 inline-flex min-h-12 w-fit items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 font-headline text-sm font-black uppercase tracking-[0.07em] text-[#09060f]"
-                  >
-                    <Wallet className="h-4 w-4" /> Ver premios disponibles
-                  </button>
-                ) : null}
-              </div>
-              <div className="grid border-t border-white/10 sm:grid-cols-3 lg:grid-cols-1 lg:border-l lg:border-t-0">
-                {[
-                  [
-                    'En preparación',
-                    status.pendingRaw,
-                    'Registrado y todavía no habilitado para cobro',
-                  ],
-                  [
-                    'Ya cobrado',
-                    status.totalClaimedRaw,
-                    `${status.claimCount} ${
-                      status.claimCount === 1
-                        ? 'cobro confirmado'
-                        : 'cobros confirmados'
-                    }`,
-                  ],
-                  [
-                    'Ganado en total',
-                    status.totalAllocatedRaw,
-                    `${status.allocationCount} ${
-                      status.allocationCount === 1
-                        ? 'premio registrado'
-                        : 'premios registrados'
-                    }`,
-                  ],
-                ].map(([label, value, helper], index) => (
-                  <div
-                    key={label}
-                    className={`p-5 sm:p-6 ${
-                      index > 0
-                        ? 'border-t border-white/10 sm:border-l sm:border-t-0 lg:border-l-0 lg:border-t'
-                        : ''
+                  <p
+                    className={`mt-2 break-words font-headline text-xl font-black sm:text-2xl ${
+                      index === 0
+                        ? 'text-[var(--uki-lilac)]'
+                        : 'text-[var(--uki-gold)]'
                     }`}
                   >
-                    <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-                      {label}
-                    </p>
-                    <p className="mt-2 font-headline text-2xl font-black text-[var(--uki-lilac)]">
-                      {formatRaw(value)} UKI
-                    </p>
-                    <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
-                      {helper}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                    {formatRaw(value)} UKI
+                  </p>
+                  <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    {helper}
+                  </p>
+                </div>
+              ))}
             </div>
+            {BigInt(status.claimableRaw) > BigInt(0) ? (
+              <div className="border-t border-white/10 p-3 sm:p-4">
+                <button
+                  type="button"
+                  onClick={() => selectTab('claimable', { scroll: true })}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-4 font-headline text-sm font-black text-[#09060f] transition hover:brightness-110 sm:w-auto"
+                >
+                  <Wallet className="h-4 w-4" /> Ver premios disponibles
+                </button>
+              </div>
+            ) : null}
             {status.blockedAllocations > 0 || !status.healthy ? (
               <div className="mt-4 flex items-start gap-3 rounded-[12px] border border-amber-300/25 bg-amber-300/[0.07] p-4">
                 <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
@@ -667,41 +727,64 @@ export function PremiosContent() {
             ) : null}
           </section>
 
-          <section
-            id="cobrar-premios"
-            aria-labelledby="claimable-rewards-title"
-            className="scroll-mt-24 pt-11"
+          <Tabs
+            value={activeTab}
+            onValueChange={(value) => {
+              if (value === 'claimable' || value === 'history') {
+                selectTab(value);
+              }
+            }}
+            aria-label="Secciones de premios"
+            className="mt-5 min-w-0"
           >
-            <StepHeading number="02">Cobra lo disponible</StepHeading>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2
-                  id="claimable-rewards-title"
-                  className="font-headline text-2xl font-black text-[var(--uki-cream)] sm:text-3xl"
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <TabsList
+                aria-label="Secciones de premios"
+                className="grid h-auto w-full max-w-full grid-cols-2 gap-1 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[rgba(228,92,255,0.06)] p-1 sm:max-w-md"
+              >
+                <TabsTrigger
+                  value="claimable"
+                  className="min-h-11 min-w-0 gap-2 rounded-[8px] px-3 text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac)] data-[state=active]:text-[#09060f] sm:text-sm"
                 >
-                  Premios para tu wallet
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                  Verás el importe, desde cuándo está disponible y hasta qué día
-                  puedes cobrarlo.
-                </p>
-              </div>
-              {status.claimables.length > 0 ? (
-                <p className="text-sm font-black text-[var(--uki-lilac)]">
-                  {status.claimables.length}{' '}
-                  {status.claimables.length === 1
-                    ? 'premio disponible'
-                    : 'premios disponibles'}
-                </p>
-              ) : null}
+                  <Wallet className="h-4 w-4 shrink-0" />
+                  <span>Por cobrar</span>
+                  <span className="rounded-full bg-black/15 px-1.5 py-0.5 text-[0.65rem] tabular-nums">
+                    {status.claimables.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="history"
+                  className="min-h-11 min-w-0 gap-2 rounded-[8px] px-3 text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac)] data-[state=active]:text-[#09060f] sm:text-sm"
+                >
+                  <History className="h-4 w-4 shrink-0" />
+                  <span>Historial</span>
+                </TabsTrigger>
+              </TabsList>
+              <p className="text-xs font-semibold text-[var(--uki-muted)]">
+                {activeTab === 'claimable'
+                  ? 'Revisa y confirma los premios disponibles.'
+                  : ambassadorOnly
+                  ? 'Filtro de comisiones de embajador activo.'
+                  : 'Consulta todos tus movimientos.'}
+              </p>
             </div>
+
+            {claimingBatch ? (
+              <div
+                role="status"
+                className="mt-4 flex items-center gap-2 rounded-[12px] border border-[rgba(228,92,255,0.30)] bg-[rgba(228,92,255,0.08)] p-4 text-sm font-black text-[var(--uki-cream)]"
+              >
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" />
+                Confirmando cobro… No cierres esta pantalla.
+              </div>
+            ) : null}
 
             {claimFeedback ? (
               <div
                 role={claimFeedback.kind === 'error' ? 'alert' : 'status'}
-                className={`mt-5 rounded-[12px] border p-4 ${
+                className={`mt-4 rounded-[12px] border p-4 ${
                   claimFeedback.kind === 'success'
-                    ? 'border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac)]/10'
+                    ? 'border-[rgba(228,92,255,0.30)] bg-[rgba(228,92,255,0.10)]'
                     : 'border-amber-300/25 bg-amber-300/[0.07]'
                 }`}
               >
@@ -721,7 +804,7 @@ export function PremiosContent() {
                     )}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.07em] text-[var(--uki-lilac)] underline underline-offset-4"
+                    className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-[0.07em] text-[var(--uki-lilac)] underline underline-offset-4"
                   >
                     Ver transacción <ExternalLink className="h-3.5 w-3.5" />
                   </a>
@@ -729,313 +812,370 @@ export function PremiosContent() {
               </div>
             ) : null}
 
-            {status.claimables.length > 0 &&
-            (!isConnected || !walletMatches) ? (
-              <div className="mt-5 flex flex-col gap-4 rounded-[12px] border border-amber-300/25 bg-amber-300/[0.07] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <TabsContent
+              value="claimable"
+              forceMount
+              hidden={activeTab !== 'claimable'}
+              className="scroll-mt-24 mt-4 min-w-0"
+            >
+              <div id="cobrar-premios" className="scroll-mt-24" />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p className="font-black text-[var(--uki-cream)]">
-                    Conecta la wallet asociada a estos premios
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
-                    La wallet activa debe coincidir con{' '}
-                    {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} antes
-                    de cobrar.
+                  <h2
+                    id="claimable-rewards-title"
+                    tabIndex={-1}
+                    className="font-headline text-2xl font-black text-[var(--uki-cream)] sm:text-3xl"
+                  >
+                    Premios para tu wallet
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    Verás el importe, desde cuándo está disponible y hasta qué
+                    día puedes cobrarlo.
                   </p>
                 </div>
-                <LandingWalletConnectButton
-                  evmOnly
-                  className="min-h-11 shrink-0 px-4"
-                  label="Cambiar wallet"
-                  compactLabel="Cambiar wallet"
-                  showCompactText={false}
-                />
+                {status.claimables.length > 0 ? (
+                  <p className="text-sm font-black text-[var(--uki-lilac)]">
+                    {status.claimables.length}{' '}
+                    {status.claimables.length === 1
+                      ? 'premio disponible'
+                      : 'premios disponibles'}
+                  </p>
+                ) : null}
               </div>
-            ) : null}
 
-            {status.claimables.length > 0 ? (
-              <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                {status.claimables.map((reward) => {
-                  const wrongChain = chainId !== reward.batch.chainId;
-                  const isClaiming = claimingBatch === reward.batch.batchId;
-                  const claimDisabled =
-                    Boolean(claimingBatch) || !walletMatches || !isConnected;
-                  return (
-                    <article
-                      key={reward.batch.batchId}
-                      className="rounded-[16px] border border-[var(--uki-lilac)]/30 bg-black/25 p-5 sm:p-6"
-                    >
-                      <div className="flex items-start justify-between gap-4">
+              {status.claimables.length > 0 &&
+              (!isConnected || !walletMatches) ? (
+                <div className="mt-5 flex flex-col gap-4 rounded-[12px] border border-amber-300/25 bg-amber-300/[0.07] p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-black text-[var(--uki-cream)]">
+                      Conecta la wallet asociada a estos premios
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+                      La wallet activa debe coincidir con{' '}
+                      {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}{' '}
+                      antes de cobrar.
+                    </p>
+                  </div>
+                  <LandingWalletConnectButton
+                    evmOnly
+                    className="min-h-11 shrink-0 px-4"
+                    label="Cambiar wallet"
+                    compactLabel="Cambiar wallet"
+                    showCompactText={false}
+                  />
+                </div>
+              ) : null}
+
+              {status.claimables.length > 0 ? (
+                <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  {status.claimables.map((reward) => {
+                    const wrongChain = chainId !== reward.batch.chainId;
+                    const isClaiming = claimingBatch === reward.batch.batchId;
+                    const claimDisabled =
+                      Boolean(claimingBatch) || !walletMatches || !isConnected;
+                    return (
+                      <article
+                        key={reward.batch.batchId}
+                        className="rounded-[16px] border border-[rgba(228,92,255,0.30)] bg-black/25 p-5 sm:p-6"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.13em] text-[var(--uki-lilac)]">
+                              Disponible ahora
+                            </p>
+                            <h3 className="mt-2 font-headline text-3xl font-black text-[var(--uki-cream)]">
+                              {formatRaw(reward.batch.amountRaw)} UKI
+                            </h3>
+                            <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                              {periodLabel(reward.batch.periodId)}
+                            </p>
+                          </div>
+                          <span className="grid h-10 w-10 place-items-center rounded-full border border-[rgba(228,92,255,0.30)] bg-[rgba(228,92,255,0.10)]">
+                            <Gift className="h-5 w-5 text-[var(--uki-lilac)]" />
+                          </span>
+                        </div>
+                        <div className="mt-5 flex items-start gap-3 rounded-[10px] border border-white/10 bg-white/[0.035] p-4">
+                          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-lilac)]" />
+                          <div>
+                            <p className="text-xs font-black text-[var(--uki-cream)]">
+                              Puedes cobrarlo hasta
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+                              {formatDate(reward.batch.expiresAt)}
+                            </p>
+                          </div>
+                        </div>
+                        {wrongChain && walletMatches ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              prepareRewardNetwork(reward.batch.chainId)
+                            }
+                            disabled={
+                              switchingChain ||
+                              evmWallet.isConnecting ||
+                              Boolean(claimingBatch)
+                            }
+                            className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 font-headline text-sm font-black uppercase tracking-[0.07em] text-[#09060f] disabled:opacity-50"
+                          >
+                            <Wallet className="h-4 w-4" />{' '}
+                            {switchingChain || evmWallet.isConnecting
+                              ? 'Cambiando red…'
+                              : 'Cambiar de red para cobrar'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => claimReward(reward)}
+                            disabled={claimDisabled || wrongChain}
+                            className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 font-headline text-sm font-black uppercase tracking-[0.07em] text-[#09060f] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {isClaiming ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Wallet className="h-4 w-4" />
+                            )}{' '}
+                            {isClaiming
+                              ? 'Confirmando cobro…'
+                              : `Cobrar ${formatRaw(
+                                  reward.batch.amountRaw,
+                                )} UKI`}
+                          </button>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-[16px] border border-white/10 bg-black/25 p-7 sm:p-8">
+                  {BigInt(status.pendingRaw) > BigInt(0) ? (
+                    <Clock3 className="h-7 w-7 text-[var(--uki-lilac)]" />
+                  ) : (
+                    <Sparkles className="h-7 w-7 text-[var(--uki-lilac)]" />
+                  )}
+                  <h3 className="mt-4 font-headline text-xl font-black text-[var(--uki-cream)]">
+                    {BigInt(status.pendingRaw) > BigInt(0)
+                      ? `${formatRaw(
+                          status.pendingRaw,
+                        )} UKI se están preparando`
+                      : 'Ahora mismo no tienes premios para cobrar'}
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    {BigInt(status.pendingRaw) > BigInt(0)
+                      ? 'No tienes que hacer nada. Cuando el cobro esté habilitado aparecerá aquí con su fecha límite.'
+                      : 'Cuando ganes UKI en partidas o pools, podrás seguir su estado y cobrarlos desde esta pantalla.'}
+                  </p>
+                </div>
+              )}
+
+              {scheduledRewards.length > 0 ? (
+                <div className="mt-5 rounded-[16px] border border-white/10 bg-black/20 p-5 sm:p-6">
+                  <h3 className="flex items-center gap-2 font-headline text-xl font-black text-[var(--uki-cream)]">
+                    <Clock3 className="h-5 w-5 text-[var(--uki-lilac)]" />{' '}
+                    Próximos cobros
+                  </h3>
+                  <div className="mt-4 divide-y divide-white/10">
+                    {scheduledRewards.map((reward) => (
+                      <div
+                        key={reward.batch.batchId}
+                        className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                      >
                         <div>
-                          <p className="text-xs font-black uppercase tracking-[0.13em] text-[var(--uki-lilac)]">
-                            Disponible ahora
-                          </p>
-                          <h3 className="mt-2 font-headline text-3xl font-black text-[var(--uki-cream)]">
+                          <p className="font-black text-[var(--uki-cream)]">
                             {formatRaw(reward.batch.amountRaw)} UKI
-                          </h3>
-                          <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
                             {periodLabel(reward.batch.periodId)}
                           </p>
                         </div>
-                        <span className="grid h-10 w-10 place-items-center rounded-full border border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac)]/10">
-                          <Gift className="h-5 w-5 text-[var(--uki-lilac)]" />
-                        </span>
-                      </div>
-                      <div className="mt-5 flex items-start gap-3 rounded-[10px] border border-white/10 bg-white/[0.035] p-4">
-                        <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--uki-lilac)]" />
-                        <div>
-                          <p className="text-xs font-black text-[var(--uki-cream)]">
-                            Puedes cobrarlo hasta
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
-                            {formatDate(reward.batch.expiresAt)}
-                          </p>
-                        </div>
-                      </div>
-                      {wrongChain && walletMatches ? (
-                        <button
-                          type="button"
-                          onClick={() => prepareRewardNetwork(reward.batch.chainId)}
-                          disabled={switchingChain || evmWallet.isConnecting || Boolean(claimingBatch)}
-                          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 font-headline text-sm font-black uppercase tracking-[0.07em] text-[#09060f] disabled:opacity-50"
-                        >
-                          <Wallet className="h-4 w-4" />{' '}
-                          {switchingChain || evmWallet.isConnecting
-                            ? 'Cambiando red…'
-                            : 'Cambiar de red para cobrar'}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => claimReward(reward)}
-                          disabled={claimDisabled || wrongChain}
-                          className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[9px] bg-[var(--uki-lilac)] px-5 font-headline text-sm font-black uppercase tracking-[0.07em] text-[#09060f] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {isClaiming ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Wallet className="h-4 w-4" />
-                          )}{' '}
-                          {isClaiming
-                            ? 'Confirmando cobro…'
-                            : `Cobrar ${formatRaw(reward.batch.amountRaw)} UKI`}
-                        </button>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-[16px] border border-white/10 bg-black/25 p-7 sm:p-8">
-                {BigInt(status.pendingRaw) > BigInt(0) ? (
-                  <Clock3 className="h-7 w-7 text-[var(--uki-lilac)]" />
-                ) : (
-                  <Sparkles className="h-7 w-7 text-[var(--uki-lilac)]" />
-                )}
-                <h3 className="mt-4 font-headline text-xl font-black text-[var(--uki-cream)]">
-                  {BigInt(status.pendingRaw) > BigInt(0)
-                    ? `${formatRaw(status.pendingRaw)} UKI se están preparando`
-                    : 'Ahora mismo no tienes premios para cobrar'}
-                </h3>
-                <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                  {BigInt(status.pendingRaw) > BigInt(0)
-                    ? 'No tienes que hacer nada. Cuando el cobro esté habilitado aparecerá aquí con su fecha límite.'
-                    : 'Cuando ganes UKI en partidas o pools, podrás seguir su estado y cobrarlos desde esta pantalla.'}
-                </p>
-              </div>
-            )}
-
-            {scheduledRewards.length > 0 ? (
-              <div className="mt-5 rounded-[16px] border border-white/10 bg-black/20 p-5 sm:p-6">
-                <h3 className="flex items-center gap-2 font-headline text-xl font-black text-[var(--uki-cream)]">
-                  <Clock3 className="h-5 w-5 text-[var(--uki-lilac)]" />{' '}
-                  Próximos cobros
-                </h3>
-                <div className="mt-4 divide-y divide-white/10">
-                  {scheduledRewards.map((reward) => (
-                    <div
-                      key={reward.batch.batchId}
-                      className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="font-black text-[var(--uki-cream)]">
-                          {formatRaw(reward.batch.amountRaw)} UKI
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                          {periodLabel(reward.batch.periodId)}
+                        <p className="text-sm font-black text-[var(--uki-lilac)]">
+                          Disponible el {formatDate(reward.batch.startsAt)}
                         </p>
                       </div>
-                      <p className="text-sm font-black text-[var(--uki-lilac)]">
-                        Disponible el {formatDate(reward.batch.startsAt)}
-                      </p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : null}
-
-            {expiredRewards.length > 0 ? (
-              <div className="mt-5 rounded-[16px] border border-white/10 bg-black/20 p-5 sm:p-6">
-                <h3 className="flex items-center gap-2 font-headline text-lg font-black text-[var(--uki-cream)]">
-                  <AlertCircle className="h-5 w-5 text-[var(--uki-muted)]" />{' '}
-                  Plazos finalizados
-                </h3>
-                <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
-                  Estos premios ya no se pueden cobrar porque terminó su fecha
-                  límite.
-                </p>
-                <div className="mt-3 divide-y divide-white/10">
-                  {expiredRewards.map((reward) => (
-                    <div
-                      key={reward.batch.batchId}
-                      className="flex items-center justify-between gap-4 py-3"
-                    >
-                      <span className="text-sm font-semibold text-[var(--uki-muted)]">
-                        {periodLabel(reward.batch.periodId)}
-                      </span>
-                      <span className="font-black text-[var(--uki-cream)]">
-                        {formatRaw(reward.batch.amountRaw)} UKI
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          <section aria-labelledby="reward-history-title" className="pt-11">
-            <StepHeading number="03">Revisa tus movimientos</StepHeading>
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h2
-                  id="reward-history-title"
-                  className="font-headline text-2xl font-black text-[var(--uki-cream)] sm:text-3xl"
-                >
-                  Historial de premios
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                  Cada fila indica si el premio se registró, necesita revisión o
-                  ya llegó a tu wallet.
-                </p>
-              </div>
-              {hasActivity ? (
-                <History className="hidden h-6 w-6 text-[var(--uki-lilac)] sm:block" />
               ) : null}
-            </div>
-            {activity.length > 0 ? (
-              ambassadorOnly ? (
-                <div className="mt-5 flex flex-col gap-3 rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-black text-[var(--uki-cream)]">Mostrando comisiones de embajador</p>
-                    <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">Los cobros confirmados pueden agrupar varios tipos de premio en una misma transacción.</p>
-                  </div>
-                  <button type="button" onClick={() => setAmbassadorOnly(false)} className="text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)]">
-                    Ver todo el historial
-                  </button>
-                </div>
-              ) : null
-            ) : null}
-            {activity.length > 0 ? (
-              <div className="mt-5 overflow-hidden rounded-[14px] border border-white/10 bg-black/25">
-                <div className="divide-y divide-white/10">
-                  {activity.map((item) => (
-                    <article
-                      key={item.id}
-                      className="grid gap-4 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span
-                          className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full border ${
-                            item.kind === 'warning'
-                              ? 'border-amber-300/25 bg-amber-300/[0.07]'
-                              : 'border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.08]'
-                          }`}
-                        >
-                          {item.kind === 'claimed' ? (
-                            <CheckCircle2 className="h-4 w-4 text-[var(--uki-lilac)]" />
-                          ) : item.kind === 'warning' ? (
-                            <ShieldAlert className="h-4 w-4 text-amber-200" />
-                          ) : (
-                            <Trophy className="h-4 w-4 text-[var(--uki-lilac)]" />
-                          )}
+
+              {expiredRewards.length > 0 ? (
+                <div className="mt-5 rounded-[16px] border border-white/10 bg-black/20 p-5 sm:p-6">
+                  <h3 className="flex items-center gap-2 font-headline text-lg font-black text-[var(--uki-cream)]">
+                    <AlertCircle className="h-5 w-5 text-[var(--uki-muted)]" />{' '}
+                    Plazos finalizados
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                    Estos premios ya no se pueden cobrar porque terminó su fecha
+                    límite.
+                  </p>
+                  <div className="mt-3 divide-y divide-white/10">
+                    {expiredRewards.map((reward) => (
+                      <div
+                        key={reward.batch.batchId}
+                        className="flex items-center justify-between gap-4 py-3"
+                      >
+                        <span className="text-sm font-semibold text-[var(--uki-muted)]">
+                          {periodLabel(reward.batch.periodId)}
                         </span>
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-black text-[var(--uki-cream)]">
-                              {item.title}
-                            </h3>
-                            <span
-                              className={`rounded-full px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.08em] ${
-                                item.kind === 'warning'
-                                  ? 'bg-amber-300/10 text-amber-100'
-                                  : 'bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]'
-                              }`}
-                            >
-                              {item.state}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
-                            {item.helper} · {formatDate(item.date)}
-                          </p>
-                          {item.transactionHash && item.transactionChainId ? (
-                            <a
-                              href={transactionUrl(
-                                item.transactionChainId,
-                                item.transactionHash,
-                              )}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-2 inline-flex items-center gap-1 text-xs font-black text-[var(--uki-lilac)] underline underline-offset-4"
-                            >
-                              Ver transacción{' '}
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          ) : null}
-                        </div>
+                        <span className="font-black text-[var(--uki-cream)]">
+                          {formatRaw(reward.batch.amountRaw)} UKI
+                        </span>
                       </div>
-                      <p className="font-headline text-lg font-black text-[var(--uki-cream)]">
-                        {formatRaw(item.amountRaw)} UKI
-                      </p>
-                    </article>
-                  ))}
-                </div>
-                {status.nextCursor ? (
-                  <div className="border-t border-white/10 p-4 text-center">
-                    <button
-                      type="button"
-                      onClick={loadMoreRewards}
-                      disabled={loadingMore}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-white/15 px-4 text-xs font-black uppercase tracking-[0.07em] text-[var(--uki-cream)] disabled:opacity-50"
-                    >
-                      {loadingMore ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <History className="h-4 w-4" />
-                      )}{' '}
-                      {loadingMore ? 'Cargando…' : 'Ver más movimientos'}
-                    </button>
+                    ))}
                   </div>
+                </div>
+              ) : null}
+            </TabsContent>
+
+            <TabsContent
+              value="history"
+              forceMount
+              hidden={activeTab !== 'history'}
+              className="scroll-mt-24 mt-4 min-w-0"
+            >
+              <div id="historial-premios" className="scroll-mt-24" />
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <h2
+                    id="reward-history-title"
+                    tabIndex={-1}
+                    className="font-headline text-2xl font-black text-[var(--uki-cream)] sm:text-3xl"
+                  >
+                    Historial de premios
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    Cada fila indica si el premio se registró, necesita revisión
+                    o ya llegó a tu wallet.
+                  </p>
+                </div>
+                {hasActivity ? (
+                  <History className="hidden h-6 w-6 text-[var(--uki-lilac)] sm:block" />
                 ) : null}
               </div>
-            ) : (
-              <div className="mt-5 rounded-[14px] border border-white/10 bg-black/25 p-6">
-                <Trophy className="h-6 w-6 text-[var(--uki-lilac)]" />
-                <h3 className="mt-3 font-headline text-lg font-black text-[var(--uki-cream)]">
-                  Tu historial está vacío
-                </h3>
-                <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
-                  Aquí aparecerán tus premios de partidas y pools cuando se
-                  registren.
-                </p>
-              </div>
-            )}
-          </section>
+              {activity.length > 0 ? (
+                ambassadorOnly ? (
+                  <div className="mt-5 flex flex-col gap-3 rounded-[12px] border border-[var(--uki-lilac-border)] bg-[rgba(228,92,255,0.06)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-black text-[var(--uki-cream)]">
+                        Mostrando comisiones de embajador
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                        Los cobros confirmados pueden agrupar varios tipos de
+                        premio en una misma transacción.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearAmbassadorFilter}
+                      className="min-h-11 text-left text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)]"
+                    >
+                      Ver todo el historial
+                    </button>
+                  </div>
+                ) : null
+              ) : null}
+              {activity.length > 0 ? (
+                <div className="mt-5 overflow-hidden rounded-[14px] border border-white/10 bg-black/25">
+                  <div className="divide-y divide-white/10">
+                    {activity.map((item) => (
+                      <article
+                        key={item.id}
+                        className="grid gap-4 p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full border ${
+                              item.kind === 'warning'
+                                ? 'border-amber-300/25 bg-amber-300/[0.07]'
+                                : 'border-[var(--uki-lilac-border)] bg-[rgba(228,92,255,0.08)]'
+                            }`}
+                          >
+                            {item.kind === 'claimed' ? (
+                              <CheckCircle2 className="h-4 w-4 text-[var(--uki-lilac)]" />
+                            ) : item.kind === 'warning' ? (
+                              <ShieldAlert className="h-4 w-4 text-amber-200" />
+                            ) : (
+                              <Trophy className="h-4 w-4 text-[var(--uki-lilac)]" />
+                            )}
+                          </span>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-black text-[var(--uki-cream)]">
+                                {item.title}
+                              </h3>
+                              <span
+                                className={`rounded-full px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.08em] ${
+                                  item.kind === 'warning'
+                                    ? 'bg-amber-300/10 text-amber-100'
+                                    : 'bg-[rgba(228,92,255,0.10)] text-[var(--uki-lilac)]'
+                                }`}
+                              >
+                                {item.state}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                              {item.helper} · {formatDate(item.date)}
+                            </p>
+                            {item.transactionHash && item.transactionChainId ? (
+                              <a
+                                href={transactionUrl(
+                                  item.transactionChainId,
+                                  item.transactionHash,
+                                )}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-black text-[var(--uki-lilac)] underline underline-offset-4"
+                              >
+                                Ver transacción{' '}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+                        <p className="font-headline text-lg font-black text-[var(--uki-cream)]">
+                          {formatRaw(item.amountRaw)} UKI
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                  {status.nextCursor ? (
+                    <div className="border-t border-white/10 p-4 text-center">
+                      <button
+                        type="button"
+                        onClick={loadMoreRewards}
+                        disabled={loadingMore}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[8px] border border-white/15 px-4 text-xs font-black uppercase tracking-[0.07em] text-[var(--uki-cream)] disabled:opacity-50"
+                      >
+                        {loadingMore ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <History className="h-4 w-4" />
+                        )}{' '}
+                        {loadingMore ? 'Cargando…' : 'Ver más movimientos'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-[14px] border border-white/10 bg-black/25 p-6">
+                  <Trophy className="h-6 w-6 text-[var(--uki-lilac)]" />
+                  <h3 className="mt-3 font-headline text-lg font-black text-[var(--uki-cream)]">
+                    Tu historial está vacío
+                  </h3>
+                  <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">
+                    Aquí aparecerán tus premios de partidas y pools cuando se
+                    registren.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
 
-          <details className="group mt-10 rounded-[14px] border border-white/10 bg-black/20 p-5">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-headline text-lg font-black text-[var(--uki-cream)]">
-              Qué significa cada estado{' '}
+          <details className="group mt-6 rounded-[14px] border border-white/10 bg-black/20 p-4 sm:p-5">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 font-headline text-base font-black text-[var(--uki-cream)] sm:text-lg">
+              ¿Necesitas ayuda con un estado?{' '}
               <ChevronDown className="h-5 w-5 text-[var(--uki-lilac)] transition-transform group-open:rotate-180" />
             </summary>
-            <div className="mt-5 grid gap-3 border-t border-white/10 pt-5 md:grid-cols-3">
+            <div className="mt-4 grid gap-3 border-t border-white/10 pt-4 md:grid-cols-3">
               {[
                 [
                   'En preparación',

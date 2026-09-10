@@ -82,11 +82,40 @@ describe('CukieMasterWorkspace', () => {
     expect(screen.queryByText('Herramienta Cukies')).not.toBeInTheDocument();
     expect(screen.queryByText('Créditos propios y pool')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: /Deposita Cukies Originales/i }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Gestionar Cukies' }));
 
-    expect(screen.queryByText('Herramienta UKI')).not.toBeInTheDocument();
     expect(screen.getByText('Herramienta Cukies')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Deposita Cukies Originales/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Herramienta UKI')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Gestionar Cukies' })).toHaveAttribute('aria-selected', 'true');
+    const panels = screen.getAllByRole('tabpanel', { hidden: true });
+    expect(panels.find((panel) => panel.id.endsWith('-content-uki'))).toHaveAttribute('hidden');
+    expect(panels.find((panel) => panel.id.endsWith('-content-nft'))).not.toHaveAttribute('hidden');
+  });
+
+  it('abre la vía correcta desde hash y conserva navegación atrás/adelante', () => {
+    mockUseAuth.mockReturnValue({
+      user: { walletAddress: '0x2678a00000000000000000000000000000000c13' },
+      isLoading: false,
+    });
+    window.history.replaceState({ marker: 'master' }, '', '/cukie-master?tokenId=8#uki-staking');
+
+    render(<CukieMasterWorkspace />);
+
+    expect(screen.getByRole('tab', { name: 'Gestionar UKI' })).toHaveAttribute('aria-selected', 'true');
+    const preservedState = window.history.state;
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Gestionar Cukies' }));
+    expect(window.history.state).toEqual(preservedState);
+
+    window.history.replaceState({ marker: 'master-back' }, '', '/cukie-master?tokenId=8#cukie-master-nft-staking');
+    fireEvent(window, new Event('popstate'));
+    expect(screen.getByRole('tab', { name: 'Gestionar Cukies' })).toHaveAttribute('aria-selected', 'true');
+    window.history.replaceState({ marker: 'master-forward' }, '', '/cukie-master?tokenId=8#uki-staking');
+    fireEvent(window, new Event('hashchange'));
+    expect(screen.getByRole('tab', { name: 'Gestionar UKI' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Gestionar Cukies' }));
+    window.history.replaceState({ marker: 'master-initial' }, '', '/cukie-master');
+    fireEvent(window, new Event('popstate'));
+    expect(screen.getByRole('tab', { name: 'Gestionar UKI' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('prepara una única experiencia mientras se recupera la sesión', () => {

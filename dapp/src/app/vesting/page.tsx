@@ -6,6 +6,7 @@ import { useAccount, useReadContract, useWriteContract } from 'wagmi';
 import {
   AlertTriangle,
   CalendarClock,
+  ChevronDown,
   CheckCircle2,
   ExternalLink,
   LockKeyhole,
@@ -240,7 +241,7 @@ export default function PublicVestingPage() {
         </div>
       </section>
 
-      <section className="relative z-[2] grid w-full gap-6 pb-14 xl:grid-cols-[1.35fr_0.85fr]">
+      <section className="relative z-[2] w-full pb-14">
         <div className="rounded-[14px] border border-[var(--uki-lilac)]/22 bg-[#070817]/90 p-5 shadow-[0_0_44px_rgba(228,92,255,0.08)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -313,23 +314,31 @@ export default function PublicVestingPage() {
           ) : null}
         </div>
 
-        <aside className="rounded-[14px] border border-[var(--uki-lilac)]/18 bg-[#0d0b24]/82 p-5 shadow-[0_0_36px_rgba(228,92,255,0.07)]">
-          <h2 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">Cómo funciona tu vesting</h2>
-          <div className="mt-4 space-y-3">
-            {[
-              ['1', 'Asignación registrada', 'Los UKI sujetos a vesting quedan asociados a tu wallet.'],
-              ['2', 'Liberación gradual', 'La parte disponible aumenta según tu calendario.'],
-              ['3', 'Cobro en tu wallet', 'Cuando haya UKI disponibles, puedes reclamarlos desde esta pantalla.'],
-            ].map(([step, title, body]) => (
-              <div key={step} className="grid grid-cols-[2rem_1fr] gap-3 rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[var(--uki-lilac)] text-sm font-black text-white">{step}</div>
-                <div>
-                  <p className="font-bold text-[var(--uki-cream)]">{title}</p>
-                  <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{body}</p>
+        <aside className="mt-6">
+          <details className="group rounded-[14px] border border-[var(--uki-lilac)]/18 bg-[#0d0b24]/82 p-5 shadow-[0_0_36px_rgba(228,92,255,0.07)]">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 font-headline text-xl font-black uppercase text-[var(--uki-cream)] marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]">
+              <span>Cómo funciona tu vesting</span>
+              <span className="inline-flex items-center gap-2 text-xs font-semibold normal-case tracking-normal text-[var(--uki-muted)]">
+                3 pasos
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </span>
+            </summary>
+            <div className="mt-4 space-y-3">
+              {[
+                ['1', 'Asignación registrada', 'Los UKI sujetos a vesting quedan asociados a tu wallet.'],
+                ['2', 'Liberación gradual', 'La parte disponible aumenta según tu calendario.'],
+                ['3', 'Cobro en tu wallet', 'Cuando haya UKI disponibles, puedes reclamarlos desde esta pantalla.'],
+              ].map(([step, title, body]) => (
+                <div key={step} className="grid grid-cols-[2rem_1fr] gap-3 rounded-[10px] border border-white/10 bg-white/[0.035] p-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[var(--uki-lilac)] text-sm font-black text-white">{step}</div>
+                  <div>
+                    <p className="font-bold text-[var(--uki-cream)]">{title}</p>
+                    <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{body}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </details>
         </aside>
       </section>
 

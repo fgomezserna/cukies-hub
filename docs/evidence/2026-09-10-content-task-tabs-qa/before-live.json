@@ -1,0 +1,40 @@
+{
+  "snapshot": "staging web ea62f94895a992f4d918baacbd698aca45e736eb",
+  "viewport": [
+    1792,
+    1017
+  ],
+  "routes": [
+    {
+      "url": "https://cukieshub.eurekand.com/premios",
+      "viewport": [
+        1792,
+        1017
+      ],
+      "headings": {
+        "Tus premios UKI": 173,
+        "Premios para tu wallet": 907,
+        "Historial de premios": 1241
+      },
+      "tabs": 0,
+      "mainScrollHeight": 1587,
+      "webSha": "ea62f94895a992f4d918baacbd698aca45e736eb"
+    },
+    {
+      "route": "/credits",
+      "headingY": 128,
+      "managementHeadingY": 824,
+      "historyHeadingY": 1425,
+      "mainScrollHeight": 3876,
+      "tabs": 0
+    },
+    {
+      "route": "/cukie-hodler",
+      "headingY": 128,
+      "availableHeadingY": 1044,
+      "depositedHeadingY": 1879,
+      "mainScrollHeight": 2486,
+      "tabs": 0
+    }
+  ]
+}

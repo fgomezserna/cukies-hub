@@ -12,19 +12,19 @@ export const metadata: Metadata = {
 export default function CreditsPage() {
   return (
     <div className="uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]">
-      <header className="relative overflow-hidden border-b border-white/10 pb-7 pt-1 sm:pb-9">
-        <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full bg-[var(--uki-lilac)]/10 blur-3xl" />
-        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div className="max-w-3xl">
-            <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]">
+      <header className="relative overflow-hidden border-b border-white/10 pb-5 pt-1 sm:pb-6">
+        <div className="pointer-events-none absolute -right-16 -top-28 h-64 w-64 rounded-full bg-[rgba(228,92,255,0.1)] blur-3xl" />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--uki-lilac)]">
               <Coins className="h-4 w-4" aria-hidden="true" />
               Tus créditos
             </p>
-            <h1 className="mt-2 text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">
-              Elige cómo aprovecharlos en cada periodo
+            <h1 className="mt-2 text-balance font-headline text-3xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-4xl">
+              Créditos por periodo
             </h1>
-            <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-              Tus cupos activos generan créditos. Puedes reservarlos para jugar o aportar una parte al pool; la decisión se aplica en el siguiente corte.
+            <p className="mt-2 max-w-xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+              Consulta tu saldo, ajusta el reparto y revisa tus movimientos.
             </p>
           </div>
 

@@ -1,0 +1,84 @@
+{
+  "routes": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "scrollWidth": 1440,
+      "pageHeight": 1000,
+      "tabs": [
+        {
+          "name": "Por cobrar0",
+          "selected": "true",
+          "height": 44,
+          "top": 336.8515625,
+          "controls": true
+        },
+        {
+          "name": "Historial",
+          "selected": "false",
+          "height": 44,
+          "top": 336.8515625,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "keyboard": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "pageHeight": 1113,
+      "tabs": [
+        {
+          "name": "Por cobrar0",
+          "selected": "true",
+          "height": 44,
+          "top": 522.703125,
+          "controls": true
+        },
+        {
+          "name": "Historial",
+          "selected": "false",
+          "height": 44,
+          "top": 522.703125,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "keyboard": true
+    },
+    {
+      "width": 320,
+      "height": 700,
+      "scrollWidth": 320,
+      "pageHeight": 1192,
+      "tabs": [
+        {
+          "name": "Por cobrar0",
+          "selected": "true",
+          "height": 44,
+          "top": 574.703125,
+          "controls": true
+        },
+        {
+          "name": "Historial",
+          "selected": "false",
+          "height": 44,
+          "top": 574.703125,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "keyboard": true
+    }
+  ],
+  "ambassadorFilter": true,
+  "browserHistory": true,
+  "legacyAnchors": true,
+  "signedTransactions": false,
+  "source": "Actual PremiosContent with deterministic local data and disabled signatures"
+}
