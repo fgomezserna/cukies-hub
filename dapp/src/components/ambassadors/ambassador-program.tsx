@@ -101,6 +101,15 @@ type InvitationResponse = {
   code?: string;
 };
 
+const INVITATION_FALLBACK_COPY =
+  'La invitación ya no está disponible. Puedes confirmar Cukies World con una nueva firma.';
+
+function isCertainInvitationInvalidation(status: number, code?: string) {
+  // El servidor usa 404 cuando confirma que el código/perfil no se puede
+  // usar. El código malformado es el único 400 cierto; el resto es reintentable.
+  return status === 404 || (status === 400 && code === 'INVALID_INVITATION_CODE');
+}
+
 function formatUki(raw: string) {
   try {
     const value = Number(formatUnits(BigInt(raw), 18));
@@ -208,6 +217,8 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const invitation = resolvedInvitation?.invitationCode === pendingInvitationCode ? resolvedInvitation : null;
   const [requestState, setRequestState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [invitationState, setInvitationState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [invitationErrorCode, setInvitationErrorCode] = useState<string | null>(null);
+  const [invitationFallback, setInvitationFallback] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [consent, setConsent] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -222,6 +233,8 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
     confirmationContext.current = { key: confirmationContextKey };
   }
   const activeConfirmation = useRef<object | null>(null);
+  const pendingInvitationRef = useRef(pendingInvitationCode);
+  pendingInvitationRef.current = pendingInvitationCode;
   const currentDashboard = dashboard?.walletNormalized.toLowerCase() === walletKey ? dashboard : null;
 
   useEffect(() => {
@@ -243,6 +256,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       }
     }
     setPendingInvitationCode(code || storedInvitation());
+    setInvitationFallback(false);
   }, [initialInvitationCode]);
 
   useEffect(() => {
@@ -288,12 +302,29 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
     return () => { dashboardRequest.current += 1; };
   }, [authLoading, loadDashboard, walletKey]);
 
+  const forgetPendingInvitation = useCallback((code: string) => {
+    if (!code || pendingInvitationRef.current !== code) return;
+    try {
+      if (storedInvitation() === code) window.sessionStorage.removeItem(PENDING_INVITATION_KEY);
+    } catch {
+      // The in-memory fallback still works when browser storage is unavailable.
+    }
+    setPendingInvitationCode(null);
+    setResolvedInvitation(null);
+    setInvitationState('idle');
+    setInvitationErrorCode(null);
+    setInvitationFallback(true);
+    setConsent(false);
+  }, []);
+
   useEffect(() => {
     setResolvedInvitation(null);
+    setInvitationErrorCode(null);
     if (!pendingInvitationCode) {
       setInvitationState('idle');
       return;
     }
+    setInvitationFallback(false);
     const controller = new AbortController();
     setInvitationState('loading');
     fetch(`/api/economy/v1/ambassadors/invitations/${encodeURIComponent(pendingInvitationCode)}`, {
@@ -303,7 +334,16 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       .then(async (response) => {
         const body = await response.json() as InvitationResponse;
         if (controller.signal.aborted) return;
-        if (!response.ok || body.status !== 'ok' || !body.invitation) throw new Error(body.code);
+        if (!response.ok || body.status !== 'ok' || !body.invitation) {
+          if (isCertainInvitationInvalidation(response.status, body.code)) {
+            if (pendingInvitationRef.current === pendingInvitationCode) {
+              forgetPendingInvitation(pendingInvitationCode);
+            }
+            return;
+          }
+          setInvitationErrorCode(body.code ?? null);
+          throw new Error(body.code ?? `HTTP_${response.status}`);
+        }
         setResolvedInvitation(body.invitation);
         setInvitationState('ready');
       })
@@ -313,7 +353,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
         setInvitationState('error');
       });
     return () => controller.abort();
-  }, [pendingInvitationCode]);
+  }, [forgetPendingInvitation, pendingInvitationCode]);
 
   const invitationUrl = useMemo(() => {
     if (
@@ -389,7 +429,13 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       });
       const challenge = await challengeResponse.json() as { status: string; message?: string; code?: string };
       if (!isCurrent()) return;
-      if (!challengeResponse.ok || challenge.status !== 'ok' || !challenge.message) throw new Error(challenge.code);
+      if (!challengeResponse.ok || challenge.status !== 'ok' || !challenge.message) {
+        if (invitation && isCertainInvitationInvalidation(challengeResponse.status, challenge.code)) {
+          forgetPendingInvitation(invitation.invitationCode);
+          return;
+        }
+        throw new Error(challenge.code ?? `HTTP_${challengeResponse.status}`);
+      }
       let signature: string;
       try {
         signature = await signMessageAsync({ account: walletAddress as `0x${string}`, message: challenge.message });
@@ -406,7 +452,13 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       });
       const body = await response.json() as SummaryResponse;
       if (!isCurrent()) return;
-      if (!response.ok || body.status !== 'ok') throw new Error(body.code);
+      if (!response.ok || body.status !== 'ok') {
+        if (invitation && isCertainInvitationInvalidation(response.status, body.code)) {
+          forgetPendingInvitation(invitation.invitationCode);
+          return;
+        }
+        throw new Error(body.code ?? `HTTP_${response.status}`);
+      }
       try {
         if (storedInvitation() === pendingInvitationCode) window.sessionStorage.removeItem(PENDING_INVITATION_KEY);
       } catch {
@@ -469,13 +521,20 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 {!hasConfirmedSponsor && !pendingInvitationCode && defaultAmbassador ? (
                   <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-lilac)]">Confirmación de embajador pendiente</p>
                 ) : null}
+                {invitationFallback ? (
+                  <p role="status" className="mt-4 flex items-start gap-2 text-sm font-semibold text-amber-200">
+                    <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> {INVITATION_FALLBACK_COPY}
+                  </p>
+                ) : null}
                 {invitationState === 'loading' ? (
                   <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-[var(--uki-muted)]">
                     <SpinnerGap className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" /> Comprobando la invitación…
                   </p>
                 ) : invitationState === 'error' ? (
                   <p role="alert" className="mt-4 flex items-start gap-2 text-sm font-semibold text-amber-200">
-                    <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> Esta invitación no existe o ya no puede utilizarse.
+                    <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> {invitationErrorCode === 'AMBASSADOR_ELIGIBILITY_UNAVAILABLE'
+                      ? 'No podemos comprobar ahora si el embajador sigue disponible. Tu invitación se conserva; inténtalo más tarde.'
+                      : 'No podemos comprobar esta invitación ahora. Tu invitación se conserva; inténtalo más tarde.'}
                   </p>
                 ) : proposedAmbassador ? (
                   <div className="mt-4 flex items-center gap-3">

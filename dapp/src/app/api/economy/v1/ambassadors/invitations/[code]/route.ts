@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { getPublicAmbassadorInvitation } from "@/lib/uki-economy/ambassadors/public";
-import { assertAmbassadorRuntime } from "@/lib/uki-economy/ambassadors/rules";
+import {
+  AMBASSADOR_ELIGIBILITY_UNAVAILABLE,
+  assertAmbassadorRuntime,
+} from "@/lib/uki-economy/ambassadors/rules";
 import { UkiEconomyError } from "@/lib/uki-economy/errors";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +30,10 @@ export async function GET(
     if (error instanceof UkiEconomyError && error.code === "VALIDATION") {
       return json({ status: "error", code: "INVALID_INVITATION_CODE" }, 400);
     }
-    if (error instanceof TypeError && error.message === "AMBASSADOR_RUNTIME_MISCONFIGURED") {
+    if (
+      error instanceof TypeError &&
+      ["AMBASSADOR_RUNTIME_MISCONFIGURED", AMBASSADOR_ELIGIBILITY_UNAVAILABLE].includes(error.message)
+    ) {
       return json({ status: "error", code: error.message }, 503);
     }
     console.error("Ambassador invitation request failed", error);
