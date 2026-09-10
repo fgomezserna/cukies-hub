@@ -14,6 +14,9 @@ import { Input } from '@/components/ui/input';
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
 import type { UkiMarketplaceOrderView } from '@/lib/uki-marketplace/types';
 import { UkiMarketplaceBuyerCheckout } from '@/components/uki-marketplace/buyer-checkout';
+import {
+  retryTransactionRefresh,
+} from '@/lib/transaction-refresh';
 
 import { CukiCard } from './cuki-card';
 
@@ -44,6 +47,50 @@ type CatalogResponse = {
   code?: string;
 };
 type MarketplaceClientProps = { heading?: string; description?: string };
+
+function stableCatalogItemSignature(entry: CatalogItem) {
+  return entry.source === 'legacy'
+    ? [
+        'legacy',
+        entry.item.id,
+        entry.item.tokenId,
+        entry.item.network,
+        entry.item.collectionAddress,
+        entry.item.owner,
+        entry.item.state,
+        entry.item.price,
+        entry.item.priceOriginal,
+      ]
+    : [
+        'uki',
+        entry.item.orderId,
+        entry.item.collectionAddress,
+        entry.item.tokenId,
+        entry.item.seller,
+        entry.item.buyer,
+        entry.item.status,
+        entry.item.ukiPriceRaw,
+        entry.item.paymentAmountRaw,
+      ];
+}
+
+function targetCatalogSignature(
+  data: CatalogResponse['data'] | null,
+  target: { orderId?: string; tokenId?: string; collectionAddress?: string } | null,
+) {
+  if (!target?.orderId && !(target?.tokenId && target.collectionAddress)) return null;
+  const entry = (data?.items ?? []).find((candidate) => {
+    if (target.orderId && candidate.source === 'uki') {
+      return candidate.item.orderId.toLowerCase() === target.orderId;
+    }
+    if (target.tokenId && target.collectionAddress) {
+      return candidate.item.tokenId === target.tokenId
+        && candidate.item.collectionAddress?.toLowerCase() === target.collectionAddress;
+    }
+    return false;
+  });
+  return entry ? JSON.stringify(stableCatalogItemSignature(entry)) : 'missing';
+}
 
 function canSortByPrice(scope: MarketplaceScope, network: string) {
   return scope === 'legacy' && network !== 'all';
@@ -155,6 +202,7 @@ export function MarketplaceClient({
   const [isLoading, setIsLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const requestIdRef = useRef(0);
+  const eventRefreshAbortRef = useRef<AbortController | null>(null);
   const cursor = history[page] ?? history[0];
   const priceSortAllowed = canSortByPrice(scope, network);
   const typeOptions = useMemo(
@@ -192,10 +240,16 @@ export function MarketplaceClient({
     type,
   ]);
 
+  const queryRef = useRef(query);
+  const catalogRef = useRef(catalog);
+  queryRef.current = query;
+  catalogRef.current = catalog;
+
   useEffect(() => {
     const controller = new AbortController();
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    eventRefreshAbortRef.current?.abort();
     setIsLoading(true);
     fetch(`/api/marketplace/v1/catalog?${query}`, {
       signal: controller.signal,
@@ -225,6 +279,68 @@ export function MarketplaceClient({
       });
     return () => controller.abort();
   }, [query, reloadKey]);
+
+  useEffect(() => {
+    let active = true;
+    const refreshFromTransaction = (event: Event) => {
+      eventRefreshAbortRef.current?.abort();
+      const controller = new AbortController();
+      eventRefreshAbortRef.current = controller;
+      const requestedQuery = queryRef.current;
+      const requestId = requestIdRef.current;
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as { hash?: string; orderId?: string; tokenId?: string; collectionAddress?: string }
+        : null;
+      const hasExpectedChange = Boolean(detail?.hash);
+      const target = detail
+        ? {
+            orderId: typeof detail.orderId === 'string' ? detail.orderId.toLowerCase() : undefined,
+            tokenId: typeof detail.tokenId === 'string' ? detail.tokenId : undefined,
+            collectionAddress: typeof detail.collectionAddress === 'string' ? detail.collectionAddress.toLowerCase() : undefined,
+          }
+        : null;
+      const baselineTarget = targetCatalogSignature(catalogRef.current, target);
+      void retryTransactionRefresh(
+        async () => {
+          if (!active || controller.signal.aborted) return true;
+          try {
+            const response = await fetch(`/api/marketplace/v1/catalog?${requestedQuery}`, {
+              signal: controller.signal,
+              cache: 'no-store',
+            });
+            const payload = await response.json() as CatalogResponse;
+            if (!active || controller.signal.aborted) return true;
+            if (requestId !== requestIdRef.current || requestedQuery !== queryRef.current) return true;
+            if (!response.ok || payload.status !== 'ok' || !payload.data) return false;
+            setCatalog(payload.data);
+            setError(null);
+            if (!hasExpectedChange) return true;
+            if (target?.orderId || (target?.tokenId && target.collectionAddress)) {
+              return targetCatalogSignature(payload.data, target) !== baselineTarget;
+            }
+            // A hash without an affected item cannot prove that another row's
+            // change belongs to this operation. Keep the bounded retry window.
+            return false;
+          } catch (reason) {
+            if (!active || controller.signal.aborted) return true;
+            if (reason instanceof Error && reason.name === 'AbortError') return true;
+            return false;
+          }
+        },
+        { signal: controller.signal },
+      ).catch(() => {
+        // Unmount or a newer transaction event cancels the refresh loop.
+      });
+    };
+    window.addEventListener('cukies:legacy-marketplace:refresh', refreshFromTransaction);
+    window.addEventListener('cukies:uki-marketplace:refresh', refreshFromTransaction);
+    return () => {
+      active = false;
+      eventRefreshAbortRef.current?.abort();
+      window.removeEventListener('cukies:legacy-marketplace:refresh', refreshFromTransaction);
+      window.removeEventListener('cukies:uki-marketplace:refresh', refreshFromTransaction);
+    };
+  }, []);
 
   function resetPagination() {
     setPage(0);

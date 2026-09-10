@@ -1,9 +1,13 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'wagmi';
 
 import { NftVaultRecoveryPanel } from '@/components/nft-vault/recovery-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
+import {
+  loadPendingNftVaultOperations,
+  savePendingNftVaultOperation,
+} from '@/lib/nft-vault/pending-operations';
 import { useAuth } from '@/providers/auth-provider';
 import { usePathname } from 'next/navigation';
 
@@ -215,7 +219,20 @@ describe('NftVaultRecoveryPanel', () => {
       .mockResolvedValueOnce(masterPosition())
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(emptyMasterPosition());
-    const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    const waitForTransactionReceipt = jest.fn().mockResolvedValue({
+      status: 'success',
+      transactionHash,
+      logs: [{
+        address: masterVaultAddress,
+        eventName: 'Withdrawn',
+        args: {
+          collection: collectionAddress,
+          tokenId: BigInt(7),
+          beneficiary: walletAddress,
+          depositEpoch: BigInt(3),
+        },
+      }],
+    });
     mockUsePublicClient.mockReturnValue({
       simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract,
@@ -370,6 +387,148 @@ describe('NftVaultRecoveryPanel', () => {
     expect(writeContractAsync).not.toHaveBeenCalled();
   });
 
+  it('recupera automáticamente un fallo RPC inicial sin recargar la pantalla', async () => {
+    jest.useFakeTimers();
+    try {
+      const readContract = jest.fn()
+        .mockRejectedValueOnce(new Error('RPC unavailable'))
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(poolPosition());
+      mockUsePublicClient.mockReturnValue({
+        readContract,
+        getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
+        waitForTransactionReceipt: jest.fn(),
+      } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+      openPoolLink('19');
+
+      render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+      openRecoveryPanel('cukie_pool');
+      expect(await screen.findByText(/No se pudo cargar esta posición/i)).toBeInTheDocument();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2_000);
+      });
+
+      expect(await screen.findByText(/Propietario verificado/i)).toBeInTheDocument();
+      expect(readContract).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reintenta una posición válida pero antigua hasta que refleja la salida confirmada', async () => {
+    jest.useFakeTimers();
+    try {
+      const pending = {
+        version: 1 as const,
+        chainId: 97 as const,
+        walletAddress,
+        vaultAddress: poolVaultAddress,
+        assetId: `97:${collectionAddress}:20`,
+        collectionAddress,
+        tokenId: '20',
+        action: 'request_exit' as const,
+        phase: 'syncing_projection' as const,
+        txHash: transactionHash,
+        depositEpoch: '2',
+        createdAt: 1,
+        updatedAt: 1,
+      };
+      savePendingNftVaultOperation(localStorage, pending);
+      const oldPosition = poolPosition();
+      const finalPosition = poolPosition({ withdrawableAt: 1_775_086_400 });
+      let positionRead = 0;
+      const readContract = jest.fn().mockImplementation((request: { functionName?: string }) => (
+        request.functionName === 'collectionAllowed'
+          ? Promise.resolve(true)
+          : Promise.resolve(positionRead++ === 0 ? oldPosition : finalPosition)
+      ));
+      mockUsePublicClient.mockReturnValue({
+        readContract,
+        getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
+        waitForTransactionReceipt: jest.fn(),
+      } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+      openPoolLink('20');
+
+      render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+      openRecoveryPanel('cukie_pool');
+      expect(await screen.findByText(/estado del vault aún no refleja/i)).toBeInTheDocument();
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2_000);
+      });
+
+      expect(await screen.findByText(/Retirable desde/i)).toBeInTheDocument();
+      await waitFor(() => expect(loadPendingNftVaultOperations(localStorage, {
+        chainId: 97,
+        walletAddress,
+        vaultAddress: poolVaultAddress,
+      })).toEqual([]));
+      expect(readContract.mock.calls.length).toBeGreaterThanOrEqual(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reintenta un receipt aún no disponible junto con una posición antigua', async () => {
+    jest.useFakeTimers();
+    try {
+      const pending = {
+        version: 1 as const,
+        chainId: 97 as const,
+        walletAddress,
+        vaultAddress: poolVaultAddress,
+        assetId: `97:${collectionAddress}:21`,
+        collectionAddress,
+        tokenId: '21',
+        action: 'request_exit' as const,
+        phase: 'awaiting_receipt' as const,
+        txHash: transactionHash,
+        depositEpoch: '2',
+        createdAt: 1,
+        updatedAt: 1,
+      };
+      savePendingNftVaultOperation(localStorage, pending);
+      const oldPosition = poolPosition();
+      const finalPosition = poolPosition({ withdrawableAt: 1_775_086_400 });
+      let positionRead = 0;
+      const readContract = jest.fn().mockImplementation((request: { functionName?: string }) => (
+        request.functionName === 'collectionAllowed'
+          ? Promise.resolve(true)
+          : Promise.resolve(positionRead++ === 0 ? oldPosition : finalPosition)
+      ));
+      const getTransactionReceipt = jest.fn()
+        .mockRejectedValueOnce(new Error('receipt not indexed'))
+        .mockResolvedValue({ status: 'success' });
+      mockUsePublicClient.mockReturnValue({
+        readContract,
+        getBlock: jest.fn().mockResolvedValue({ timestamp: BigInt(1_775_030_000) }),
+        getTransactionReceipt,
+        waitForTransactionReceipt: jest.fn(),
+      } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+      openPoolLink('21');
+
+      render(<NftVaultRecoveryPanel kind="cukie_pool" />);
+      openRecoveryPanel('cukie_pool');
+      expect(await screen.findByText(/sigue pendiente o aún no tiene recibo/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Retirable desde/i)).not.toBeInTheDocument();
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2_000);
+      });
+
+      expect(await screen.findByText(/Retirable desde/i)).toBeInTheDocument();
+      await waitFor(() => expect(loadPendingNftVaultOperations(localStorage, {
+        chainId: 97,
+        walletAddress,
+        vaultAddress: poolVaultAddress,
+      })).toEqual([]));
+      expect(getTransactionReceipt).toHaveBeenCalledTimes(2);
+      expect(readContract.mock.calls.length).toBeGreaterThanOrEqual(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('descarta una lectura diferida cuando cambia la wallet durante la consulta', async () => {
     let resolveAllowed: (value: boolean) => void = () => undefined;
     const allowedPromise = new Promise<boolean>((resolve) => {
@@ -483,7 +642,20 @@ describe('NftVaultRecoveryPanel', () => {
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(emptyPoolPosition());
     const getBlock = jest.fn().mockResolvedValue({ timestamp: BigInt(blockAfterCutoff) });
-    const waitForTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    const waitForTransactionReceipt = jest.fn().mockResolvedValue({
+      status: 'success',
+      transactionHash,
+      logs: [{
+        address: poolVaultAddress,
+        eventName: 'Withdrawn',
+        args: {
+          collection: collectionAddress,
+          tokenId: BigInt(9),
+          beneficiary: walletAddress,
+          depositEpoch: BigInt(2),
+        },
+      }],
+    });
     mockUsePublicClient.mockReturnValue({
       simulateContract: jest.fn().mockResolvedValue({ request: {} }),
       readContract,

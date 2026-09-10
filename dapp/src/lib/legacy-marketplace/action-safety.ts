@@ -4,6 +4,10 @@ import {
   resolveTronChainId,
   type TronWebLike,
 } from '@/lib/tronlink-provider';
+import {
+  retryTransactionRefresh,
+  type RetryOptions,
+} from '@/lib/transaction-refresh';
 
 export function isSameEvmWallet(left?: string | null, right?: string | null) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -118,12 +122,22 @@ export function assertEvmActionContext(input: {
 export async function reconcileConfirmedMarketplaceAction<T>(
   confirm: () => Promise<T>,
   reconcile: () => Promise<void>,
+  options: RetryOptions = {},
 ) {
   const result = await confirm();
-  try {
-    await reconcile();
-    return { result, reconciled: true as const };
-  } catch {
-    return { result, reconciled: false as const };
-  }
+  const reconciled = await retryTransactionRefresh(
+    async () => {
+      try {
+        await reconcile();
+        return true;
+      } catch (reason) {
+        if (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED') {
+          throw reason;
+        }
+        return false;
+      }
+    },
+    options,
+  );
+  return { result, reconciled };
 }

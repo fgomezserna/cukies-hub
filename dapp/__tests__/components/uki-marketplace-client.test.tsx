@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 
 import { UkiMarketplaceClient } from '@/components/uki-marketplace/marketplace-client';
 
@@ -105,5 +105,102 @@ describe('Marketplace UKI público', () => {
         screen.getByText('No se pudo consultar el marketplace UKI'),
       ).toBeInTheDocument();
     });
+  });
+
+  it('mantiene el catálogo visible mientras una lectura post-receipt tarda y detiene el retry al converger', async () => {
+    let resolveRefresh!: (value: unknown) => void;
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', data: { orders: [order] } }),
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }));
+
+    render(<UkiMarketplaceClient />);
+    await waitFor(() => expect(screen.getByText('Cukie #73')).toBeInTheDocument());
+    jest.useFakeTimers();
+    try {
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+        detail: { hash: `0x${'2'.repeat(64)}`, orderId: order.orderId },
+      }));
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Cukie #73')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Cargando anuncios UKI')).not.toBeInTheDocument();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(2_500);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    resolveRefresh({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', data: { orders: [] } }),
+    });
+    await waitFor(() => expect(screen.getByText('Todavía no hay Cukies publicados en UKI')).toBeInTheDocument());
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(62_500);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('no detiene el retry por un cambio ajeno al anuncio afectado', async () => {
+    const unrelated = {
+      ...order,
+      orderId: `0x${'2'.repeat(64)}`,
+      tokenId: '74',
+    };
+    const unrelatedChanged = {
+      ...unrelated,
+      ukiPriceRaw: '2000000000000000000000',
+    };
+    const targetChanged = {
+      ...order,
+      status: 'sold' as const,
+    };
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', data: { orders: [order, unrelated] } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', data: { orders: [order, unrelatedChanged] } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'ok', data: { orders: [targetChanged, unrelatedChanged] } }),
+      });
+
+    render(<UkiMarketplaceClient />);
+    await waitFor(() => expect(screen.getByText('Cukie #73')).toBeInTheDocument());
+    jest.useFakeTimers();
+    try {
+      act(() => {
+        window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+          detail: { hash: `0x${'3'.repeat(64)}`, orderId: order.orderId },
+        }));
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(500);
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
