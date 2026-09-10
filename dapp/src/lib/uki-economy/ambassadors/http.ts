@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server';
 import { readWalletSession } from '@/lib/wallet-auth';
 import { UkiEconomyError } from '../errors';
 import { getCanonicalAmbassadorInvitationWallet } from './service';
-import { assertAmbassadorInvitationCode, getDefaultAmbassadorWallet, stableAmbassadorHash, validAmbassadorWallet } from './rules';
+import {
+  AMBASSADOR_ELIGIBILITY_UNAVAILABLE,
+  assertAmbassadorInvitationCode,
+  getDefaultAmbassadorWallet,
+  stableAmbassadorHash,
+  validAmbassadorWallet,
+} from './rules';
 import type { AmbassadorConfirmationTarget } from './confirmation';
 
 export function ambassadorJson(payload: unknown, status = 200) {
@@ -73,7 +79,7 @@ export function ambassadorErrorResponse(error: unknown) {
   }
   if (error instanceof TypeError && [
     'AMBASSADOR_ATTRIBUTION_WRITES_DISABLED', 'AMBASSADOR_DEFAULT_WALLET_NOT_CONFIGURED',
-    'AMBASSADOR_CONFIRMATION_SECRET_NOT_CONFIGURED',
+    'AMBASSADOR_CONFIRMATION_SECRET_NOT_CONFIGURED', AMBASSADOR_ELIGIBILITY_UNAVAILABLE,
   ].includes(error.message)) {
     return ambassadorJson({ status: 'error', code: error.message }, 503);
   }

@@ -8,6 +8,7 @@ import {
   buildAmbassadorAttribution,
   getDefaultAmbassadorWallet,
   stableAmbassadorHash,
+  AMBASSADOR_ELIGIBILITY_UNAVAILABLE,
   validAmbassadorWallet,
 } from "./rules";
 import type {
@@ -389,7 +390,15 @@ export async function findMongoAmbassadorByInvitationCode(
     throw new DomainConflictError("El codigo de invitacion no coincide con su embajador.");
   }
   const enrollment = await getMongoAmbassadorEnrollment(db, walletNormalized, new Date(), session);
-  if (!enrollment.canInvite) return null;
+  if (!enrollment.canInvite) {
+    // El perfil puede conservarse después de perder Cukie Master. Es una
+    // invalidación cierta para el enlace; una lectura desconocida es temporal
+    // y debe seguir siendo reintentable.
+    if (enrollment.isCukieMaster === null) {
+      throw new TypeError(AMBASSADOR_ELIGIBILITY_UNAVAILABLE);
+    }
+    return null;
+  }
   return {
     ...row,
     walletNormalized,

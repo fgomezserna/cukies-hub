@@ -11,6 +11,10 @@ import {
   type AmbassadorAttributionSource,
 } from "./types";
 
+/** Distingue una inelegibilidad confirmada de una fuente temporalmente desconocida. */
+export const AMBASSADOR_ELIGIBILITY_UNAVAILABLE =
+  "AMBASSADOR_ELIGIBILITY_UNAVAILABLE" as const;
+
 function stableValue(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(stableValue);

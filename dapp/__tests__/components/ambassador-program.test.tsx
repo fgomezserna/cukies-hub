@@ -236,6 +236,8 @@ describe('AmbassadorProgram', () => {
     payload = dashboardPayload({ presale: false });
     render(<AmbassadorProgram />);
     await confirmSponsor();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/economy/v1/ambassadors/confirmation', expect.objectContaining({ method: 'POST', body: JSON.stringify({ sponsor: 'cukies_world' }) })));
+    await waitFor(() => expect(signMessageAsync).toHaveBeenCalledWith({ account: wallet, message: 'Confirmo mi embajador. Nonce: test-nonce' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/economy/v1/ambassadors/attribution', expect.objectContaining({ method: 'POST', body: JSON.stringify({ sponsor: 'cukies_world', signature: '0xsigned-message' }) })));
     expect(await screen.findByRole('button', { name: 'Copiar enlace' })).toBeInTheDocument();
     expect(screen.getByText('Cukies World')).toBeInTheDocument();
@@ -339,15 +341,123 @@ describe('AmbassadorProgram', () => {
     expect(screen.queryByRole('button', { name: 'Copiar enlace' })).not.toBeInTheDocument();
   });
 
-  it('un enlace inválido no se sustituye por Cukies World ni se elimina', async () => {
+  it('sustituye un enlace inexistente por Cukies World y exige una nueva confirmación', async () => {
     payload = dashboardPayload({ presale: false });
     const defaultFetch = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/') ? Promise.resolve(response({ status: 'error', code: 'NOT_FOUND' }, 404)) : defaultFetch(input, init));
     render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
-    expect(await screen.findByText(/Esta invitación no existe/)).toBeInTheDocument();
+    expect(await screen.findByText(/La invitación ya no está disponible/)).toBeInTheDocument();
+    expect(screen.getByText('Cukies World')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar embajador' })).toBeInTheDocument();
+    expect(sessionStorage.getItem(pendingInvitationKey)).toBeNull();
+    expect(attributionCalls()).toHaveLength(0);
+  });
+
+  it('sustituye un enlace de un sponsor que perdió Cukie Master por Cukies World', async () => {
+    payload = dashboardPayload({ presale: false });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/')
+      ? Promise.resolve(response({ status: 'error', code: 'INVITATION_NOT_FOUND' }, 404))
+      : defaultFetch(input, init));
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText(/La invitación ya no está disponible/)).toBeInTheDocument();
+    expect(screen.getByText('Cukies World')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar embajador' })).toBeInTheDocument();
+    expect(signMessageAsync).not.toHaveBeenCalled();
+  });
+
+  it('conserva el enlace cuando la comprobación devuelve 503 y no ofrece un fallback', async () => {
+    payload = dashboardPayload({ presale: false });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/')
+      ? Promise.resolve(response({ status: 'error', code: 'AMBASSADOR_ELIGIBILITY_UNAVAILABLE' }, 503))
+      : defaultFetch(input, init));
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText(/No podemos comprobar ahora si el embajador sigue disponible/)).toBeInTheDocument();
     expect(screen.queryByText('Cukies World')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar embajador' })).not.toBeInTheDocument();
     expect(sessionStorage.getItem(pendingInvitationKey)).toBe(invitationCode);
+    expect(signMessageAsync).not.toHaveBeenCalled();
+  });
+
+  it('trata un código no canónico como enlace inválido', async () => {
+    payload = dashboardPayload({ presale: false });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/')
+      ? Promise.resolve(response({ status: 'error', code: 'INVALID_INVITATION_CODE' }, 400))
+      : defaultFetch(input, init));
+
+    render(<AmbassadorProgram initialInvitationCode="wallet-visible" />);
+
+    expect(await screen.findByText(/La invitación ya no está disponible/)).toBeInTheDocument();
+    expect(screen.getByText('Cukies World')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirmar embajador' })).toBeInTheDocument();
+  });
+
+  it('mantiene el enlace ante un 400 que no confirma una invitación inválida', async () => {
+    payload = dashboardPayload({ presale: false });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/')
+      ? Promise.resolve(response({ status: 'error', code: 'AMBASSADOR_RUNTIME_MISCONFIGURED' }, 400))
+      : defaultFetch(input, init));
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText(/No podemos comprobar esta invitación ahora/)).toBeInTheDocument();
+    expect(screen.queryByText('Cukies World')).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(pendingInvitationKey)).toBe(invitationCode);
+  });
+
+  it('no ofrece cambiar un sponsor ya confirmado aunque el enlace abierto sea inválido', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: true, isCukieMaster: true });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/')
+      ? Promise.resolve(response({ status: 'error', code: 'INVITATION_NOT_FOUND' }, 404))
+      : defaultFetch(input, init));
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText('Tus invitados')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirmar embajador' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(signMessageAsync).not.toHaveBeenCalled();
+  });
+
+  it('si el sponsor se revoca después del reto, rechaza esa firma y pide una nueva firma para Cukies World', async () => {
+    payload = dashboardPayload({ presale: false });
+    let attributionAttempts = 0;
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.endsWith('/attribution') && init?.method === 'POST') {
+        attributionAttempts += 1;
+        if (attributionAttempts === 1) return Promise.resolve(response({ status: 'error', code: 'NOT_FOUND' }, 404));
+      }
+      return defaultFetch(input, init);
+    });
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+    await confirmSponsor();
+    await waitFor(() => expect(signMessageAsync).toHaveBeenCalledTimes(1));
+
+    expect(await screen.findByText(/La invitación ya no está disponible/)).toBeInTheDocument();
+    expect(screen.getByText('Cukies World')).toBeInTheDocument();
+    expect(sessionStorage.getItem(pendingInvitationKey)).toBeNull();
+
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('button', { name: 'Confirmar embajador' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar embajador' }));
+    await waitFor(() => expect(signMessageAsync).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenCalledWith('/api/economy/v1/ambassadors/confirmation', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ sponsor: 'cukies_world' }),
+    }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/economy/v1/ambassadors/attribution', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ sponsor: 'cukies_world', signature: '0xsigned-message' }),
+    })));
   });
 
   it('descarta una firma resuelta después de cambiar la cuenta', async () => {
