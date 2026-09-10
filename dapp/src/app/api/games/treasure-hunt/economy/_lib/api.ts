@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { requireCompetitionIdentity } from "@/lib/treasure-hunt-competition/server/api";
 import { UkiEconomyError } from "@/lib/uki-economy/errors";
 import { assertTreasureHuntStagingRuntime } from "@/lib/uki-economy/game-economy/treasure-hunt-policy";
+import {
+  TREASURE_HUNT_ECONOMY_RECOVERY_PENDING_CODE,
+  TREASURE_HUNT_ECONOMY_RECOVERY_RESTART_CODE,
+} from "@/lib/uki-economy/game-economy/treasure-hunt-recovery";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -36,7 +40,21 @@ export function treasureEconomyErrorResponse(error: unknown) {
         : error.code === "SCHEMA_NOT_READY"
           ? 503
           : 400;
-    return treasureEconomyJson({ status: "error", code: error.code }, status);
+    const publicCode = error.details?.publicCode;
+    const safeCode = publicCode === TREASURE_HUNT_ECONOMY_RECOVERY_RESTART_CODE
+      || publicCode === TREASURE_HUNT_ECONOMY_RECOVERY_PENDING_CODE
+      ? publicCode
+      : error.code;
+    const replacementIdempotencyKey = error.details?.replacementIdempotencyKey;
+    return treasureEconomyJson({
+      status: "error",
+      code: safeCode,
+      ...(safeCode === TREASURE_HUNT_ECONOMY_RECOVERY_RESTART_CODE
+        && typeof replacementIdempotencyKey === "string"
+        && /^[A-Za-z0-9_-]{16,128}$/.test(replacementIdempotencyKey)
+        ? { replacementIdempotencyKey }
+        : {}),
+    }, status);
   }
   if (error && typeof error === "object" && "status" in error) {
     const status = typeof error.status === "number" ? error.status : 400;

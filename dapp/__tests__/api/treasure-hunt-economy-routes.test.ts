@@ -1,4 +1,5 @@
 import { requireCompetitionIdentity } from "@/lib/treasure-hunt-competition/server/api";
+import { DomainConflictError } from "@/lib/uki-economy/errors";
 import {
   appendTreasureHuntEconomyCheckpoint,
   finishTreasureHuntEconomyRun,
@@ -7,6 +8,7 @@ import {
 import { POST as openRun } from "@/app/api/games/treasure-hunt/economy/sessions/route";
 import { POST as checkpointRun } from "@/app/api/games/treasure-hunt/economy/sessions/[runId]/checkpoints/route";
 import { POST as finishRun } from "@/app/api/games/treasure-hunt/economy/sessions/[runId]/result/route";
+import { treasureEconomyErrorResponse } from "@/app/api/games/treasure-hunt/economy/_lib/api";
 
 jest.mock("@/lib/treasure-hunt-competition/server/api", () => ({
   requireCompetitionIdentity: jest.fn(),
@@ -170,6 +172,42 @@ describe("Treasure Hunt economy API boundaries", () => {
 
     expect(response.status).toBe(400);
     expect(mockFinish).not.toHaveBeenCalled();
+  });
+
+  it("exposes only the safe restart code and server-derived replacement key", async () => {
+    const replacementIdempotencyKey = `treasure-recovery-${"a".repeat(64)}`;
+    const response = treasureEconomyErrorResponse(new DomainConflictError(
+      "internal recovery details",
+      {
+        publicCode: "GAME_SESSION_RESTART_REQUIRED",
+        replacementIdempotencyKey,
+        reservationId: "secret-reservation-id",
+      },
+    ));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "GAME_SESSION_RESTART_REQUIRED",
+      replacementIdempotencyKey,
+    });
+  });
+
+  it("does not expose recovery details or a replacement key while evidence is pending", async () => {
+    const response = treasureEconomyErrorResponse(new DomainConflictError(
+      "internal pending details",
+      {
+        publicCode: "GAME_ECONOMY_RECOVERY_PENDING",
+        replacementIdempotencyKey: `treasure-recovery-${"b".repeat(64)}`,
+        reservationId: "secret-reservation-id",
+      },
+    ));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      status: "error",
+      code: "GAME_ECONOMY_RECOVERY_PENDING",
+    });
   });
 
 });

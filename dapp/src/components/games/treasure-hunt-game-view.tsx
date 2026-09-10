@@ -114,6 +114,7 @@ export default function TreasureHuntGameView() {
   const latestWalletUserIdRef = useRef(user?.id ?? null);
   const cleanedWalletUserIdRef = useRef(user?.id ?? null);
   const recoveredCompetitionResultsRef = useRef(new Map<string, CompletedCompetitionResult>());
+  const recoveringParentSessionsRef = useRef(new Map<string, string>());
   const notifiedGameEndIdsRef = useRef(new Set<string>());
   latestWalletUserIdRef.current = user?.id ?? null;
   if (!sessionStarterRef.current) {
@@ -205,6 +206,41 @@ export default function TreasureHuntGameView() {
     return true;
   }, [finalizeParentSessionRotation, sendSessionClear]);
 
+  const recoverParentSession = useCallback((
+    expectedSessionId: string,
+    replacementIdempotencyKey: string,
+  ) => {
+    const current = latestParentGameSessionRef.current;
+    const ownerUserId = latestWalletUserIdRef.current;
+    if (
+      !current
+      || current.sessionId !== expectedSessionId
+      || !ownerUserId
+      || current.ownerUserId !== ownerUserId
+    ) {
+      return;
+    }
+    const priorKey = recoveringParentSessionsRef.current.get(expectedSessionId);
+    if (priorKey) return;
+    recoveringParentSessionsRef.current.set(expectedSessionId, replacementIdempotencyKey);
+    sendSessionClear(expectedSessionId);
+    if (!finalizeParentSessionRotation(expectedSessionId)) {
+      recoveringParentSessionsRef.current.delete(expectedSessionId);
+      return;
+    }
+    // The server-derived key is persisted before start-session. A retry, a
+    // reload, or a second client therefore resolves the same new authority.
+    void sessionStarterRef.current
+      ?.replace(ownerUserId, expectedSessionId, replacementIdempotencyKey)
+      .then(() => {
+        recoveringParentSessionsRef.current.delete(expectedSessionId);
+      })
+      .catch(() => {
+        // The pending key remains in sessionStorage. The layout effect retries
+        // it on the next render/reload without rotating another authority.
+      });
+  }, [finalizeParentSessionRotation, sendSessionClear]);
+
   useEffect(() => {
     for (const key of Object.keys(localStorage)) {
       if (key.startsWith('session_token_')) localStorage.removeItem(key);
@@ -236,6 +272,7 @@ export default function TreasureHuntGameView() {
     sendSessionClear(latestParentGameSessionRef.current?.sessionId ?? null);
     competitionCoordinator.reset();
     recoveredCompetitionResultsRef.current.clear();
+    recoveringParentSessionsRef.current.clear();
     notifiedGameEndIdsRef.current.clear();
     // Keep opaque resume ids per owner. The server rechecks the signed wallet,
     // and switching back can still recover that wallet's pending result.
@@ -739,6 +776,30 @@ export default function TreasureHuntGameView() {
             rotateParentSession(sessionAtRequest.sessionId);
             return;
           }
+          if (errorCode === 'GAME_SESSION_RESTART_REQUIRED') {
+            const replacementIdempotencyKey = error instanceof TreasureHuntEconomyClientError
+              ? error.replacementIdempotencyKey
+              : undefined;
+            reply({
+              eligible: false,
+              practice: false,
+              reason: replacementIdempotencyKey
+                ? 'GAME_SESSION_RESTART_REQUIRED'
+                : 'GAME_ECONOMY_RECOVERY_PENDING',
+            });
+            if (replacementIdempotencyKey) {
+              recoverParentSession(sessionAtRequest.sessionId, replacementIdempotencyKey);
+            }
+            return;
+          }
+          if (errorCode === 'GAME_ECONOMY_RECOVERY_PENDING') {
+            reply({
+              eligible: false,
+              practice: false,
+              reason: 'GAME_ECONOMY_RECOVERY_PENDING',
+            });
+            return;
+          }
           reply({
             eligible: false,
             practice: false,
@@ -839,6 +900,7 @@ export default function TreasureHuntGameView() {
     finalizeParentSessionRotation,
     gameOrigin,
     onSessionEnd,
+    recoverParentSession,
     rotateParentSession,
     sendSessionHandshake,
   ]);

@@ -105,6 +105,43 @@ describe("Treasure Hunt economy browser contract", () => {
     } satisfies Partial<TreasureHuntEconomyClientError>));
   });
 
+  it("keeps the server-authorized replacement key for a rejected economy session", async () => {
+    const replacementIdempotencyKey = `treasure-recovery-${"a".repeat(64)}`;
+    const fetchImpl = jest.fn().mockResolvedValue(response({
+      status: "error",
+      code: "GAME_SESSION_RESTART_REQUIRED",
+      replacementIdempotencyKey,
+    }, false));
+
+    await expect(openTreasureHuntEconomyRun({
+      gameSessionId: "game-session-1",
+      requestId: "request-12345678",
+    }, fetchImpl)).rejects.toMatchObject({
+      code: "GAME_SESSION_RESTART_REQUIRED",
+      replacementIdempotencyKey,
+    });
+  });
+
+  it("does not turn a pending recovery response into an automatic rotation", async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(response({
+      status: "error",
+      code: "GAME_ECONOMY_RECOVERY_PENDING",
+      replacementIdempotencyKey: `treasure-recovery-${"b".repeat(64)}`,
+    }, false));
+
+    await expect(openTreasureHuntEconomyRun({
+      gameSessionId: "game-session-1",
+      requestId: "request-12345678",
+    }, fetchImpl)).rejects.toMatchObject({
+      code: "GAME_ECONOMY_RECOVERY_PENDING",
+    });
+    const error = await openTreasureHuntEconomyRun({
+      gameSessionId: "game-session-1",
+      requestId: "request-12345678",
+    }, fetchImpl).catch((value) => value as TreasureHuntEconomyClientError) as TreasureHuntEconomyClientError;
+    expect(error.replacementIdempotencyKey).toBeUndefined();
+  });
+
   it("rejects a forfeit response that exposes leaderboard eligibility", async () => {
     const fetchImpl = jest.fn().mockResolvedValue(response({
       status: "ok",

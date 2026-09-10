@@ -16,6 +16,8 @@ interface StoredParentGameSession {
   readonly ownerKey: string;
   readonly sessionId?: string;
   readonly idempotencyKey?: string;
+  /** A server-authorized recovery key must never fall back to a new random key. */
+  readonly recovery?: true;
 }
 
 interface StoredParentGameSessionCollection {
@@ -81,6 +83,7 @@ function parseStoredSession(value: unknown): StoredParentGameSession | null {
     ownerKey: value.ownerKey,
     ...(hasSessionId ? { sessionId: value.sessionId as string } : {}),
     ...(hasIdempotencyKey ? { idempotencyKey: value.idempotencyKey as string } : {}),
+    ...(hasIdempotencyKey && value.recovery === true ? { recovery: true as const } : {}),
   };
 }
 
@@ -157,7 +160,11 @@ function writeStoredSession(
 function writeStoredIdempotencyKey(
   storage: Storage | null,
   gameId: string,
-  value: { readonly ownerKey: string; readonly idempotencyKey: string },
+  value: {
+    readonly ownerKey: string;
+    readonly idempotencyKey: string;
+    readonly recovery?: true;
+  },
 ) {
   if (!IDEMPOTENCY_KEY_PATTERN.test(value.idempotencyKey)) return false;
   return writeStoredEntry(storage, gameId, value);
@@ -359,6 +366,7 @@ export function createReloadSafeGameSessionStarter(
     idempotencyKey: string,
     controller: AbortController,
     runGeneration: number,
+    preservePendingKey = false,
   ) => {
     try {
       return await requestSession(JSON.stringify({
@@ -368,6 +376,7 @@ export function createReloadSafeGameSessionStarter(
       }), controller, runGeneration);
     } catch (error) {
       if (
+        !preservePendingKey &&
         error instanceof GameSessionStartError &&
         error.status >= 400 &&
         error.status < 500
@@ -380,99 +389,185 @@ export function createReloadSafeGameSessionStarter(
     }
   };
 
-  return {
-    start(ownerKeyInput: string) {
-      const ownerKey = ownerKeyInput.trim();
-      if (!ownerKey) {
-        return Promise.reject(new GameSessionStartError('INVALID_OWNER', 400, 'Game session owner is required'));
-      }
-      if (cached?.ownerKey === ownerKey) return Promise.resolve(cached.session);
-      if (inFlight) {
-        if (inFlight.ownerKey === ownerKey) return inFlight.promise;
-        reset();
-      } else if (cached) {
-        reset();
-      }
+  const start = (ownerKeyInput: string) => {
+    const ownerKey = ownerKeyInput.trim();
+    if (!ownerKey) {
+      return Promise.reject(new GameSessionStartError('INVALID_OWNER', 400, 'Game session owner is required'));
+    }
+    if (cached?.ownerKey === ownerKey) return Promise.resolve(cached.session);
+    if (inFlight) {
+      if (inFlight.ownerKey === ownerKey) return inFlight.promise;
+      reset();
+    } else if (cached) {
+      reset();
+    }
 
-      const runGeneration = ++generation;
-      const controller = new AbortController();
-      const storedCollection = readStoredSessions(storage, options.gameId);
-      if (!storedCollection.writable) {
-        return Promise.reject(new GameSessionStartError(
-          'SESSION_STATE_UNAVAILABLE',
-          500,
-          'Reload-safe game session state is unavailable',
-        ));
+    const runGeneration = ++generation;
+    const controller = new AbortController();
+    const storedCollection = readStoredSessions(storage, options.gameId);
+    if (!storedCollection.writable) {
+      return Promise.reject(new GameSessionStartError(
+        'SESSION_STATE_UNAVAILABLE',
+        500,
+        'Reload-safe game session state is unavailable',
+      ));
+    }
+    const stored = storedCollection.entries.find(
+      (entry) => entry.ownerKey === ownerKey,
+    ) ?? null;
+    const resumeSessionId = stored?.sessionId ?? null;
+    let idempotencyKey = stored?.idempotencyKey ?? null;
+    const preservePendingKey = stored?.recovery === true;
+    if (!resumeSessionId && !idempotencyKey) {
+      try {
+        idempotencyKey = createAndPersistIdempotencyKey(ownerKey);
+      } catch (error) {
+        return Promise.reject(error);
       }
-      const stored = storedCollection.entries.find(
-        (entry) => entry.ownerKey === ownerKey,
-      ) ?? null;
-      const resumeSessionId = stored?.sessionId ?? null;
-      let idempotencyKey = stored?.idempotencyKey ?? null;
-      if (!resumeSessionId && !idempotencyKey) {
+    }
+
+    const request = (async () => {
+      await Promise.resolve();
+      assertCurrent(runGeneration, controller);
+
+      let session: ReloadSafeParentGameSession;
+      if (resumeSessionId) {
         try {
-          idempotencyKey = createAndPersistIdempotencyKey(ownerKey);
+          session = await requestSession(JSON.stringify({
+            gameId: options.gameId,
+            gameVersion: options.gameVersion,
+            resumeSessionId,
+          }), controller, runGeneration);
         } catch (error) {
-          return Promise.reject(error);
-        }
-      }
-
-      const request = (async () => {
-        await Promise.resolve();
-        assertCurrent(runGeneration, controller);
-
-        let session: ReloadSafeParentGameSession;
-        if (resumeSessionId) {
-          try {
-            session = await requestSession(JSON.stringify({
-              gameId: options.gameId,
-              gameVersion: options.gameVersion,
-              resumeSessionId,
-            }), controller, runGeneration);
-          } catch (error) {
-            if (!(error instanceof GameSessionStartError) || ![404, 409].includes(error.status)) {
-              throw error;
-            }
-            idempotencyKey = createAndPersistIdempotencyKey(ownerKey);
-            session = await requestCreatedSession(
-              ownerKey,
-              idempotencyKey,
-              controller,
-              runGeneration,
-            );
+          if (!(error instanceof GameSessionStartError) || ![404, 409].includes(error.status)) {
+            throw error;
           }
-        } else {
-          if (!idempotencyKey) {
-            throw new GameSessionStartError(
-              'IDEMPOTENCY_UNAVAILABLE',
-              500,
-              'Game session request key is unavailable',
-            );
-          }
+          idempotencyKey = createAndPersistIdempotencyKey(ownerKey);
           session = await requestCreatedSession(
             ownerKey,
             idempotencyKey,
             controller,
             runGeneration,
+            false,
           );
         }
+      } else {
+        if (!idempotencyKey) {
+          throw new GameSessionStartError(
+            'IDEMPOTENCY_UNAVAILABLE',
+            500,
+            'Game session request key is unavailable',
+          );
+        }
+        session = await requestCreatedSession(
+          ownerKey,
+          idempotencyKey,
+          controller,
+          runGeneration,
+          preservePendingKey,
+        );
+      }
 
-        assertCurrent(runGeneration, controller);
-        writeStoredSession(storage, options.gameId, { ownerKey, sessionId: session.sessionId });
-        return session;
-      })();
+      assertCurrent(runGeneration, controller);
+      writeStoredSession(storage, options.gameId, { ownerKey, sessionId: session.sessionId });
+      return session;
+    })();
 
-      let trackedPromise: Promise<ReloadSafeParentGameSession>;
-      trackedPromise = request.then((session) => {
-        assertCurrent(runGeneration, controller);
-        cached = { ownerKey, session };
-        return session;
-      }).finally(() => {
-        if (inFlight?.generation === runGeneration) inFlight = null;
-      });
-      inFlight = { ownerKey, generation: runGeneration, controller, promise: trackedPromise };
-      return trackedPromise;
-    },
+    let trackedPromise: Promise<ReloadSafeParentGameSession>;
+    trackedPromise = request.then((session) => {
+      assertCurrent(runGeneration, controller);
+      cached = { ownerKey, session };
+      return session;
+    }).finally(() => {
+      if (inFlight?.generation === runGeneration) inFlight = null;
+    });
+    inFlight = { ownerKey, generation: runGeneration, controller, promise: trackedPromise };
+    return trackedPromise;
+  };
+
+  const replace = (
+    ownerKeyInput: string,
+    expectedSessionIdInput: string,
+    replacementIdempotencyKeyInput: string,
+  ) => {
+    const ownerKey = ownerKeyInput.trim();
+    const expectedSessionId = expectedSessionIdInput.trim();
+    const replacementIdempotencyKey = replacementIdempotencyKeyInput.trim();
+    if (!ownerKey) {
+      return Promise.reject(new GameSessionStartError(
+        'INVALID_OWNER',
+        400,
+        'Game session owner is required',
+      ));
+    }
+    if (!SESSION_ID_PATTERN.test(expectedSessionId)) {
+      return Promise.reject(new GameSessionStartError(
+        'INVALID_RECOVERY_SESSION',
+        400,
+        'The recovered game session is invalid',
+      ));
+    }
+    if (!IDEMPOTENCY_KEY_PATTERN.test(replacementIdempotencyKey)) {
+      return Promise.reject(new GameSessionStartError(
+        'INVALID_RECOVERY_KEY',
+        400,
+        'The replacement game session key is invalid',
+      ));
+    }
+
+    // If another recovery already won locally, never invalidate its newer
+    // authority. A second iframe message simply observes that same session.
+    if (cached?.ownerKey === ownerKey && cached.session.sessionId !== expectedSessionId) {
+      return Promise.resolve(cached.session);
+    }
+    if (inFlight?.ownerKey === ownerKey) {
+      const running = readStoredSessions(storage, options.gameId).entries.find(
+        (entry) => entry.ownerKey === ownerKey,
+      );
+      if (running?.idempotencyKey === replacementIdempotencyKey) return inFlight.promise;
+    }
+
+    const storedCollection = readStoredSessions(storage, options.gameId);
+    if (!storedCollection.writable) {
+      return Promise.reject(new GameSessionStartError(
+        'SESSION_STATE_UNAVAILABLE',
+        500,
+        'Reload-safe game session state is unavailable',
+      ));
+    }
+    const stored = storedCollection.entries.find((entry) => entry.ownerKey === ownerKey) ?? null;
+    if (stored?.idempotencyKey === replacementIdempotencyKey) {
+      return start(ownerKey);
+    }
+    if (stored?.sessionId && stored.sessionId !== expectedSessionId) {
+      return Promise.reject(new GameSessionStartError(
+        'RECOVERY_SESSION_CHANGED',
+        409,
+        'The game session changed before recovery completed',
+      ));
+    }
+
+    // Persist the replacement in one storage write. The helper replaces only
+    // this owner's entry, so a storage failure leaves the old authority and
+    // its resume state intact while other wallets remain untouched.
+    if (!writeStoredIdempotencyKey(storage, options.gameId, {
+      ownerKey,
+      idempotencyKey: replacementIdempotencyKey,
+      recovery: true,
+    })) {
+      return Promise.reject(new GameSessionStartError(
+        'IDEMPOTENCY_PERSIST_FAILED',
+        500,
+        'Game session request key could not be persisted',
+      ));
+    }
+    reset();
+    return start(ownerKey);
+  };
+
+  return {
+    start,
+    replace,
     reset,
     forget,
   };

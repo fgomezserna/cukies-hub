@@ -48,6 +48,11 @@ import {
   createMongoGameEconomyPorts,
 } from "./resource-ports";
 import { createMongoGameEconomyService } from "./service";
+import {
+  inspectTreasureHuntEconomyRecovery,
+  TREASURE_HUNT_ECONOMY_RECOVERY_PENDING_CODE,
+  TREASURE_HUNT_ECONOMY_RECOVERY_RESTART_CODE,
+} from "./treasure-hunt-recovery";
 import { rewardAccountingService } from "../rewards/accounting-repository";
 import type { WeeklyGameResult } from "../rewards/accounting-types";
 import { resolveAppliedArenaRanking } from "../rewards/arena-ranking";
@@ -91,6 +96,14 @@ function runIdFor(input: {
   walletNormalized: string;
 }) {
   return `treasure-run-${stableGameEconomyHash(input)}`;
+}
+
+export function treasureHuntEconomyOpenIdempotencyKey(runId: string) {
+  return `treasure-open-${stableGameEconomyHash({ runId })}`;
+}
+
+export function treasureHuntEconomyOpenCreateIdempotencyKey(runId: string) {
+  return `${treasureHuntEconomyOpenIdempotencyKey(runId)}:create`;
 }
 
 function responseForRun(run: TreasureHuntEconomyRun): TreasureHuntEconomyStartResponse {
@@ -382,14 +395,50 @@ export async function openTreasureHuntEconomyRun(input: {
     }));
   }
 
-  const gameSession = await openGameSession({
-    walletAddress: walletNormalized,
-    gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
-    expectedRuleVersion: TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
-    idempotencyKey: `treasure-open-${stableGameEconomyHash({ runId })}`,
-    now,
-  });
-  const resources = await loadReservedResources(gameSession, now);
+  let gameSession: GameEconomySession | null = null;
+  let resources: Awaited<ReturnType<typeof loadReservedResources>> | null = null;
+  try {
+    gameSession = await openGameSession({
+      walletAddress: walletNormalized,
+      gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
+      expectedRuleVersion: TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
+      idempotencyKey: treasureHuntEconomyOpenIdempotencyKey(runId),
+      now,
+    });
+    resources = await loadReservedResources(gameSession, now);
+  } catch (error) {
+    const recovery = await inspectTreasureHuntEconomyRecovery({
+      db: existingDb,
+      userId: input.userId,
+      walletNormalized,
+      authorityGameSessionId,
+      runId,
+      expectedCreateIdempotencyKey: treasureHuntEconomyOpenCreateIdempotencyKey(runId),
+      session: gameSession ?? null,
+    });
+    if (recovery.kind === "restart") {
+      throw new DomainConflictError(
+        "La reserva previa fallo y sus recursos fueron compensados; hay que iniciar una nueva sesion.",
+        {
+          publicCode: TREASURE_HUNT_ECONOMY_RECOVERY_RESTART_CODE,
+          replacementIdempotencyKey: recovery.replacementIdempotencyKey,
+        },
+      );
+    }
+    if (recovery.kind === "pending") {
+      throw new DomainConflictError(
+        "La recuperacion de la reserva anterior aun no tiene evidencia completa; reintenta en unos segundos.",
+        {
+          publicCode: TREASURE_HUNT_ECONOMY_RECOVERY_PENDING_CODE,
+          retryable: true,
+        },
+      );
+    }
+    throw error;
+  }
+  if (!gameSession || !resources) {
+    throw new DomainConflictError("No se pudo completar la apertura economica.");
+  }
   const daily = getTreasureHuntDailyPeriod(gameSession.createdAt, gameSession.rule.calendar);
   const weekly = getTreasureHuntWeeklyPeriod(gameSession.createdAt, gameSession.rule.calendar);
   const quotaId = resources.credit.bucket === "pool"
