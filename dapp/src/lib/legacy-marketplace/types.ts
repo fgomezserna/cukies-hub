@@ -56,6 +56,8 @@ export type LegacyMarketplaceCukiItem = {
   collectionAddress: string | null;
   cukiNumber: number | null;
   owner: string | null;
+  ownerNormalized?: string | null;
+  identityVerified?: boolean;
   network: LegacyCukiNetwork | string;
   origin: string | null;
   birthNetwork: string | null;
@@ -122,8 +124,11 @@ export type LegacyBreedingCandidatesResponse = {
   items: LegacyMarketplaceCukiItem[];
   total: number;
   maxBreeds: number | null;
+  status?: LegacyBreedingReadStatus;
   error?: string;
 };
+
+export type LegacyBreedingReadStatus = 'verified' | 'partial' | 'unknown';
 
 export type LegacyCompletedBreedsParams = {
   wallets?: string[];
@@ -138,6 +143,7 @@ export type LegacyCompletedBreedsResponse = {
   total: number;
   offset: number;
   limit: number;
+  status?: LegacyBreedingReadStatus;
   error?: string;
 };
 
