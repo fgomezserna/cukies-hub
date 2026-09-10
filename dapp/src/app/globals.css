@@ -332,7 +332,8 @@ body {
 }
 
 @layer components {
-  .uki-landing {
+  .uki-landing,
+  .uki-theme {
     --uki-bg: #04030a;
     --uki-bg-2: #0d0b24;
     --uki-cream: #fff2dc;
@@ -345,6 +346,9 @@ body {
     --uki-lilac-strong: #e45cff;
     --uki-lilac-border-strong: rgba(228, 92, 255, 0.28);
     --uki-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .uki-landing {
     position: relative;
     font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
     font-variant-numeric: tabular-nums;
@@ -354,7 +358,7 @@ body {
       linear-gradient(180deg, #0b0810 0%, #04030a 48%, #07030a 100%);
   }
 
-  .uki-landing :where(a, button, input, select, summary):focus-visible {
+  :is(.uki-landing, .uki-theme) :where(a, button, input, select, summary):focus-visible {
     outline: 2px solid var(--uki-lilac);
     outline-offset: 3px;
   }

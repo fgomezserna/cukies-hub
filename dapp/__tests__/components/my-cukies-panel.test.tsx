@@ -15,12 +15,28 @@ jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
 jest.mock('lucide-react', () => {
   const Icon = (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />;
   return {
-    ArrowRight: Icon,
+    History: Icon,
+    ChevronRight: Icon,
+    CircleAlert: Icon,
+    CircleCheck: Icon,
+    CircleDot: Icon,
+    CircleX: Icon,
     Cookie: Icon,
+    Crown: Icon,
+    Eye: Icon,
+    Gem: Icon,
+    Hexagon: Icon,
+    Info: Icon,
     Layers3: Icon,
     Loader2: Icon,
+    LogOut: Icon,
+    Network: Icon,
     RefreshCw: Icon,
+    Sparkles: Icon,
     Store: Icon,
+    Tag: Icon,
+    Unlock: Icon,
+    Zap: Icon,
   };
 });
 
@@ -104,7 +120,8 @@ describe('MyCukiesPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Cukie #98000005' })).toBeInTheDocument();
     expect(screen.getByAltText('Cukie #98000005')).toBeInTheDocument();
     expect(screen.getAllByText('Disponible')).not.toHaveLength(0);
-    expect(screen.getByText('Original · Legendario')).toBeInTheDocument();
+    expect(screen.getByText('Original')).toBeInTheDocument();
+    expect(screen.getByText('Legendario')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Aportar al pool/i })).toEqual(expect.arrayContaining([
       expect.objectContaining({ href: expect.stringContaining('/cukie-hodler#cukies-disponibles') }),
     ]));
