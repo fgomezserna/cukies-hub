@@ -55,7 +55,18 @@
     "branch": "codex/world-stack-integration",
     "pr": 346,
     "sha": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
-    "includedInThisBatch": false
+    "includedInThisBatch": false,
+    "observedAt": "2026-09-10T00:44:25.725882+00:00",
+    "worktreeClean": true,
+    "branchHeadUnchanged": true,
+    "pullRequestOpenDraft": true,
+    "provenanceMustBePreserved": true,
+    "nextWindow": "World port owner and INFRA shared-file owner adapt against current staging after this documentary closure; no activation implied",
+    "mainCheckoutPreserved": {
+      "branch": "codex/legacy-migration-inventory",
+      "sha": "6f13b055c124661b6108887973e0c6c4827d2fd4",
+      "trackedChanges": false
+    }
   },
   "delivery": {
     "status": "verified",
@@ -200,8 +211,9 @@
     "breeding": {
       "routeVisible": true,
       "operationsDisabled": true,
-      "readsBlockedByWalletChainMismatch": true,
-      "unverifiedHeaderShowsPoints0AndMaximum1": true
+      "unverifiedHeaderShowsPoints0AndMaximum1": true,
+      "candidateListBlockedByWalletChainMismatch": true,
+      "headerReadsBsc56Independently": true
     },
     "cukiePoints": {
       "routeVisible": true,
@@ -221,7 +233,7 @@
     "transactionsSigned": false
   },
   "configurationFollowup": {
-    "status": "configured_pending_delivery",
+    "status": "delivered_and_verified",
     "key": "NEXT_PUBLIC_CUKIES_BRIDGE_MODE",
     "before": "disabled",
     "after": "legacy-readonly",
@@ -244,6 +256,169 @@
     "proposalSha256": "39c82a87a7eeae41ce046edaa319b4cb59c0d84f107ab869897de955e37c43d0",
     "configuredAt": "2026-09-10T00:22:49Z",
     "roundtrip": "PASS; all other keys/values/types unchanged",
-    "variableChangeEvidenceSha256": "b9ee1e4de2263f91559e0229ed74f64fffa8b8d07fed355a7dde2205edcc49a4"
+    "variableChangeEvidenceSha256": "b9ee1e4de2263f91559e0229ed74f64fffa8b8d07fed355a7dde2205edcc49a4",
+    "delivery": {
+      "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/367",
+      "mergeSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+      "workflowRun": "https://github.com/fgomezserna/cukies-hub/actions/runs/34421399357",
+      "workflowResult": "success",
+      "planReason": "build-config-changed",
+      "build": [
+        "dapp",
+        "treasure-hunt"
+      ],
+      "reuse": [
+        "chain-indexer",
+        "cuki-card-worker",
+        "schedulers",
+        "cukies-bridge-relayer"
+      ],
+      "decision": {
+        "deliveryMode": "rolling",
+        "web": true,
+        "workers": false,
+        "game": true,
+        "skip": false,
+        "changed": [
+          "dapp",
+          "treasure-hunt"
+        ],
+        "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+      },
+      "frontends": {
+        "web": {
+          "containerId": "5eca2ecea84f8ac94a013f4c3e68d4870298d284f61635cb4f3b0fccce8b4bb0",
+          "imageDigest": "sha256:2cbb6096448e93543e88b15d4c05e8b29b141dd0971e3d912439bd2e00a0171c",
+          "imageBytes": 610280122,
+          "deploymentUuid": "hk0wwoowk4kcks84goow4gok"
+        },
+        "game": {
+          "containerId": "41284e805a1dc2ad55ac1270f3d4022a54af6f3a858594bf9bd1bd3c6d624891",
+          "imageDigest": "sha256:2910537ca743a11d80f9bbe7aa47bf529442c3087234deffd7fb17f7b3584a1c",
+          "imageBytes": 509855221,
+          "deploymentUuid": "x0oo80800o8wkw04osgs8c8g"
+        }
+      },
+      "workersAndProductionContainersUnchanged": 13,
+      "journalClean": true,
+      "runtimeGuards": "PASS",
+      "capacity": "PASS",
+      "sourceFreeBytes": 42343301120,
+      "timingsSeconds": {
+        "total": 680.0,
+        "webValidation": 167.0,
+        "gameValidation": 19.0,
+        "buildPush": 357.0,
+        "delivery": 98.0
+      },
+      "sourceTask": "01a0859a-cf4d-77a0-a137-6db60a0a0f96",
+      "postflightEvidenceSha256": "2cf081c6d68aeb2db0d2e9b73f7dc7fff84bea8bbb867a2e544f8e42e52a4035",
+      "manifestSha256": "63f646e7f29d352a34e8eacbbb3b838ef665266677a8dcd2d2e9412eba719a0d"
+    },
+    "publicChecks": {
+      "observedAt": "2026-09-10T00:38:58.215294+00:00",
+      "client": "curl",
+      "checks": [
+        {
+          "path": "/api/health",
+          "http": 200,
+          "body": {
+            "status": "ok",
+            "app": "cukies-hub",
+            "environment": "staging",
+            "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+            "gitRef": "staging",
+            "buildTime": null,
+            "coolify": {
+              "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+              "fqdn": null
+            }
+          },
+          "curlExit": 0
+        },
+        {
+          "path": "/api/ready",
+          "http": 200,
+          "body": {
+            "status": "ready",
+            "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+            "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+            "imageSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc"
+          },
+          "curlExit": 0
+        },
+        {
+          "path": "/treasurehunt-game/api/health",
+          "http": 200,
+          "body": {
+            "status": "ok",
+            "app": "treasure-hunt",
+            "environment": "staging",
+            "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+            "coolify": {
+              "resourceUuid": "lc04cw8gs4koo4swwws0c4ss"
+            }
+          },
+          "curlExit": 0
+        },
+        {
+          "path": "/treasurehunt-game/api/ready",
+          "http": 200,
+          "body": {
+            "status": "ready",
+            "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+            "imageSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+            "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc"
+          },
+          "curlExit": 0
+        }
+      ]
+    },
+    "uiVerification": {
+      "observedAt": "2026-09-10T00:42:40.687170+00:00",
+      "url": "https://cukieshub.eurekand.com/bridge",
+      "performedBy": "Astra coordinator using CUA Edge browser APIs",
+      "viewport": {
+        "width": 1792,
+        "height": 1017,
+        "scrollWidth": 1792
+      },
+      "bridgeUnavailable": false,
+      "legacyReadonlyNoticeVisible": true,
+      "sourceNetwork": "TRON mainnet",
+      "destinationNetwork": "BNB Smart Chain (56), exact identities verified by runtime configuration",
+      "destinationWallet": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "displayedContractFee": "10 TRX",
+      "displayedContractStatus": "Disponible",
+      "approveDisabled": true,
+      "transferDisabled": true,
+      "candidateList": "UI displays no available candidates; ownership and history parity not certified",
+      "movements": "UI displays no movements for connected wallets; historical completeness not certified",
+      "walletOrNetworkChanged": false,
+      "transactionsSigned": false
+    }
+  },
+  "legacyReadFollowup": {
+    "reportedAt": "2026-09-10",
+    "performedBy": "Luna Max; code and findings reviewed by Astra",
+    "reportSha256": "8ef891a8d5e21fa65e026f43da85e088a4eaeae72d984c8ee31c73ccc88d20b1",
+    "points429": {
+      "source": "TronGrid wallet/triggerconstantcontract",
+      "provider": "wallet window.tronWeb using https://api.trongrid.io",
+      "cause": "Four concurrent reads exceed observed anonymous allowed_rps(3); Promise.all discards partial successes",
+      "existingReadProvider": "https://tron-rpc.publicnode.com",
+      "alternativeProbe": "Four concurrent constants and staging-origin CORS succeeded in one observation window; not an availability guarantee"
+    },
+    "breeding": {
+      "summaryBsc56ReadsIndependentOfSigningChain": true,
+      "points0Maximum1MatchedDirectRead": true,
+      "remainingIssue": "Candidate read readiness conflates signing chain97 with Legacy mainnet reads; label verification and source consistently"
+    },
+    "nextStep": "Existing Legacy task prepares an isolated local patch with partial/unknown states and context-race regressions; no shared infrastructure, pushes, configuration changes or transactions",
+    "owner": "01a08727-0cdb-7993-bbab-6829bcf3d333",
+    "sourcePaths": [
+      "dapp/src/components/legacy-marketplace/cukiepoints-client.tsx",
+      "dapp/src/components/legacy-marketplace/breeding-client.tsx"
+    ]
   }
 }
