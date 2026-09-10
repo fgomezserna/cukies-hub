@@ -7,7 +7,7 @@ Revision posterior: decisiones de producto sobre staking, Cukie Master, Cukie Po
 
 Este documento sustituye como referencia de producto a los documentos antiguos de `Funcionamiento`, `dudas` y `para comentar`. Si una issue o documento anterior contradice estas reglas, estas reglas prevalecen hasta que producto apruebe una version nueva.
 
-Las reglas de este documento describen el comportamiento objetivo aprobado. No implican por si solas que la funcionalidad ya este desplegada. El estado real y las diferencias respecto a la implementacion se mantienen en `docs/uki-new-economy-db-implementation-map.md`.
+Las reglas de este documento describen el comportamiento objetivo aprobado. No implican por si solas que la funcionalidad ya este desplegada. El estado real y las diferencias respecto a la implementacion se mantienen en `docs/antes-del-15-seguimiento.md`.
 
 ## Reconciliacion con `6. comprobar.docx`
 
@@ -31,6 +31,16 @@ estos puntos, cerrados posteriormente en la conversacion:
 - Los porcentajes, prioridad, cuotas, concurrencia, elegibilidad, gracia y
   rewards son reglas backend versionadas. Los contratos NFT solo fijan
   custodia y, para Cukie Pool, calendario y derecho de retirada.
+
+### Reloj de pruebas de staging
+
+La decision vigente del usuario del 10 de septiembre mantiene los ciclos de
+**30 minutos (1800 segundos)**. La propuesta de reducirlos a 15 minutos fue
+parada por el usuario y no debe reactivarse sin una nueva peticion.
+
+Los periodos derivados, contratos y cantidades conservan sus reglas actuales.
+Una futura transicion debe preservar periodos cerrados, creditos y rewards ya
+registrados, asi como la identidad, calendario y retirada de cada deposito.
 
 ### Guardarrail tecnico de emision
 
@@ -768,6 +778,11 @@ primera liquidacion. Ninguna de estas cantidades entra en un claim de usuario.
 - Se conserva la funcionalidad de los filtros legacy activos, incluidas
   habilidades y con/sin crias por red. No se mezcla numericamente BNB, TRX y
   UKI al ordenar por precio sin una moneda o conversion explicita.
+- Decision del usuario del 10 de septiembre: el marketplace nuevo arranca en **BSC Testnet
+  con una comision del 5% (500bps)**. El owner puede cambiarla mediante
+  `setFeeConfig`, hasta el 10%; el porcentaje se guarda por anuncio al publicarlo,
+  por lo que el cambio solo afecta a anuncios nuevos. No fija la comision de
+  produccion ni modifica el 5% independiente de embajadores.
 - Los anuncios legacy no se convierten automaticamente en ordenes UKI: el
   vendedor cancela y republica. El contrato UKI actual publica mediante
   transaccion `createOrder` tras approval, no mediante orden off-chain EIP-712.
@@ -783,8 +798,9 @@ La UX posterior a la reconciliacion se valida por recorrido completo:
 | --- | --- |
 | Explorar marketplace | Lista conjunta, origen Todos/Legacy/UKI, red, tipo, generacion, habilidades y crias cuando existan esos atributos; busqueda, paginacion y reset coherentes. Un atributo no disponible no se representa como cero. |
 | Comprar o gestionar anuncio | Mostrar origen, red, moneda, precio/fee y contrato exactos; approval y accion segun ABI. Legacy conserva compra, alta, cancelacion y cambio de precio. UKI conserva publicacion, cancelacion y reparacion de approval. Revalidar owner, permisos y vigencia antes de firmar. |
+| Gestionar Mis Cukies | Cada tarjeta conserva NFT/red/coleccion/custodia y ofrece venta/cancelacion en el marketplace exacto, deposito o salida del Pool y staking/retirada de Master solo cuando proceda. Si el NFT ya viene seleccionado, su posicion se consulta automaticamente y el recorrido muestra efecto, plazo y confirmacion antes de la wallet; no pide campos tecnicos ni firma al abrir un enlace. |
 | Migrar mediante bridge | Prioridad TRON -> BSC; seleccionar NFT elegible y destino, mostrar fee y seguir solicitud, confirmacion y finalizacion con ambas transacciones. Distinguir protocolos legacy/endpoint v2, pendientes y errores que requieran intervencion; no anunciar completado solo por recibir la solicitud. |
-| Consultar Cukie Points | Separar saldo ya emitido de puntos pendientes calculados en staking; explicar su procedencia y fecha. Mostrar posiciones e historial por red. No inventar una accion claim que el contrato no ofrece, ni activar conversiones con ratios aun propuestos. |
+| Consultar Cukie Points | Separar saldo ya emitido de puntos pendientes calculados en staking; explicar su procedencia y fecha. Mostrar posiciones e historial por red. Totales contractuales e historial indexado conservan procedencia y cobertura separadas: un historial aun no migrado no se presenta como ausencia de movimientos. No inventar una accion claim que el contrato no ofrece, ni activar conversiones con ratios aun propuestos. |
 | Gestionar staking legacy | Mostrar posiciones, elegibilidad y acciones stake/unstake soportadas por cada contrato, con su efecto sobre puntos; mantenerlo separado del staking UKI y Cukie Master. |
 | Gestionar crias | Padres elegibles, coste/condiciones, inicio, operacion pendiente, finalizacion e historial padre/hijo segun contrato. La UX del corte se concreta al fijar fecha y tratamiento de operaciones ya iniciadas. |
 | Navegar y entrar al dashboard | Agrupar las acciones reales de esos recorridos; mostrar operaciones pendientes, balances disponibles y accesos utiles. Tratar carga, error parcial y ausencia de datos sin presentar un fallo de lectura como saldo cero. Revisar tambien perfil, avatar y notificaciones. |

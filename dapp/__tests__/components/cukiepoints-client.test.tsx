@@ -104,4 +104,23 @@ describe('CukiePointsClient', () => {
     await waitFor(() => expect(screen.getAllByText('New activity').length).toBeGreaterThan(0));
     expect(screen.queryByText('Old activity')).not.toBeInTheDocument();
   });
+
+  it('muestra el alcance parcial del historial Legacy sin presentarlo como actividad actual completa', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ...pointsPayload('legacy-1', 'BSC', 'Mint'),
+        source: 'legacy',
+        status: 'partial',
+        coverage: 'legacy-historical',
+      }),
+    });
+
+    render(<CukiePointsClient />);
+
+    expect(await screen.findByText(
+      'Mostramos el historial disponible de Legacy. Algunos movimientos pueden faltar mientras completamos la migración.',
+    )).toBeInTheDocument();
+    expect(screen.getAllByText('Mint').length).toBeGreaterThan(0);
+  });
 });

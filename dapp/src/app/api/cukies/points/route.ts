@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { listCukiePoints } from '@/lib/cukies-data/data';
+import { listLegacyCukiePoints } from '@/lib/legacy-marketplace/data';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,11 @@ export async function GET(request: NextRequest) {
     ...(searchParams.get('wallets')?.split(',') ?? []),
   ].filter((wallet) => wallet.trim().length > 0);
 
-  const response = await listCukiePoints({
+  // The current indexer point_transactions collection is not populated for
+  // Legacy history. Use the inspected historical `points` source explicitly;
+  // the adapter marks its coverage as partial instead of presenting it as a
+  // current cross-source projection.
+  const response = await listLegacyCukiePoints({
     wallets,
     network: searchParams.get('network') ?? undefined,
     type: searchParams.get('type') ?? undefined,
