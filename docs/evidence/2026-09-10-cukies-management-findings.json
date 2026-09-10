@@ -1,0 +1,203 @@
+{
+  "schema": "cukies.management-findings.v1",
+  "date": "2026-09-10",
+  "environment": "staging",
+  "servedCommit": "2e8c4725734d3a49d9fab93c1c5e22cac9ddccb4",
+  "requests": {
+    "marketplaceV2": {
+      "feeBps": 500,
+      "approval": "Usuario: ahora podemos poner un 5%",
+      "scope": "BSC Testnet 97. Produccion sin modificar.",
+      "feeChanges": "setFeeConfig onlyOwner, max 1000 bps; cada Order conserva su feeBps al crearse.",
+      "status": "configuracion live vacia; no desplegado por esta revision"
+    },
+    "collectionActions": "Mis Cukies ofrece venta/cancelacion Legacy o UKI, staking Master y Pool/retiradas segun propiedad, identidad y custodia reales.",
+    "recovery": "Al llegar desde una tarjeta, leer la posicion automaticamente y mostrar accion/plazo/confirmacion, sin pedir token ID ni Comprobar posicion. Nunca firmar por montar una URL.",
+    "marketplaceUx": "Reducir cabecera y recuperar claridad y cobertura de filtros Legacy sin truncar etiquetas ni mezclar monedas al ordenar.",
+    "points": "Totales contractuales visibles con historial Global vacio; reconciliar procedencia y cobertura antes de interpretar ausencia como cero movimientos."
+  },
+  "marketplacePublicConfiguration": [
+    {
+      "name": "/rwwsc4kkwc0ck84cgk40s8kk-084231591311",
+      "publicConfig": {
+        "NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS": "",
+        "CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS": "",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+        "APP_ENV": "staging",
+        "NEXT_PUBLIC_APP_ENV": "staging"
+      }
+    },
+    {
+      "name": "/chain-indexer-u4s804o4wwcckowgk0woo4wg-230546768063",
+      "publicConfig": {
+        "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "",
+        "APP_ENV": "staging",
+        "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+        "NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS": "",
+        "CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS": ""
+      }
+    }
+  ],
+  "pancakeReadonlyVerification": {
+    "schema": "cukies.pancake-v2-testnet-verification.v1",
+    "network": "bscTestnet",
+    "chainId": 97,
+    "snapshot": {
+      "blockNumber": 130188729,
+      "blockHash": "0x8fdf5925d816d75d89b01971a452c66bfe6bc8af9eb1d593b58fc3dd2d6114e5",
+      "timestamp": 1789031453,
+      "timestampIso": "2026-09-10T09:10:53.000Z"
+    },
+    "pancakeV2": {
+      "factory": "0x6725F303b657a9451d8BA641348b6761A6CC7a17",
+      "router": "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+      "routerFactory": "0x6725F303b657a9451d8BA641348b6761A6CC7a17",
+      "wbnb": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
+    },
+    "tokens": {
+      "asm": {
+        "address": "0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C",
+        "name": "Test ASM",
+        "symbol": "tASM",
+        "decimals": 18
+      },
+      "uki": {
+        "address": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+        "name": "Cukies UKI",
+        "symbol": "UKI",
+        "decimals": 18
+      }
+    },
+    "pair": {
+      "address": "0x8fa397B4E1DED911161f13C128DF369cE9a95B3A",
+      "token0": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+      "token1": "0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C",
+      "reserve0Raw": "60000000000000000000",
+      "reserve1Raw": "100000000000000000",
+      "totalSupplyRaw": "2449489742783178098",
+      "blockTimestampLast": 1787821996,
+      "runtimeCodeHash": "0x3d0e7f1e341e5f6c886edc91f3b92bef13faef208182137e95420f544f024061"
+    },
+    "purchasing": {
+      "asm": {
+        "available": true,
+        "routes": [
+          {
+            "label": "ASM -> UKI",
+            "available": true,
+            "path": [
+              "0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C",
+              "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c"
+            ],
+            "amountsRaw": [
+              "1000000000000000",
+              "592883027386680924"
+            ]
+          }
+        ]
+      },
+      "bnb": {
+        "available": false,
+        "wbnbAsmPair": "0x0000000000000000000000000000000000000000",
+        "wbnbUkiPair": "0x0000000000000000000000000000000000000000",
+        "routes": [
+          {
+            "label": "WBNB -> UKI",
+            "available": false,
+            "path": [
+              "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+              "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c"
+            ],
+            "reason": "PancakeSwap V2 router rejected the route"
+          },
+          {
+            "label": "WBNB -> ASM -> UKI",
+            "available": false,
+            "path": [
+              "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+              "0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C",
+              "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c"
+            ],
+            "reason": "PancakeSwap V2 router rejected the route"
+          }
+        ]
+      },
+      "usdt": {
+        "configured": false,
+        "available": null,
+        "reason": "No canonical BSC Testnet USDT address is configured or asserted by this repository."
+      }
+    },
+    "recommendedStageEnvironment": {
+      "NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS": "0x8fa397B4E1DED911161f13C128DF369cE9a95B3A",
+      "NEXT_PUBLIC_UKI_SWAP_URL": "https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+      "NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS": "",
+      "NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL": ""
+    }
+  },
+  "pointsGlobalApi": {
+    "url": "https://cukieshub.eurekand.com/api/cukies/points?limit=5&offset=0",
+    "observedAt": "2026-09-10T09:13:02.139211+00:00",
+    "status": 200,
+    "body": {
+      "source": "mongo",
+      "items": [],
+      "total": 0,
+      "offset": 0,
+      "limit": 5,
+      "summary": {
+        "totalPoints": 0,
+        "totalTransactions": 0,
+        "facets": {
+          "networks": [],
+          "types": []
+        }
+      }
+    }
+  },
+  "pointsReadonlyCounts": {
+    "current": {
+      "db": "cukieshub-new-staging",
+      "pointTransactions": 0,
+      "pointBalances": 0,
+      "pointsEvents": 0,
+      "pointsEventsByAlias": []
+    },
+    "legacy": {
+      "db": "cukies-legacy-staging",
+      "collections": [
+        {
+          "name": "points",
+          "count": 23515
+        },
+        {
+          "name": "tx_points",
+          "count": 23529
+        },
+        {
+          "name": "txPoints",
+          "count": 0
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Una configuracion vacia no prueba ausencia de un despliegue anterior; inventariarlo antes de desplegar.",
+    "El pool ASM/UKI devuelve cotizacion con liquidez de prueba reducida; no acredita compra ASM en Marketplace ni habilita BNB/USDT/USDC.",
+    "Los conteos points y tx_points Legacy difieren; no son una reconciliacion ni se deben importar o sumar sin deduplicacion y procedencia.",
+    "No se firmaron transacciones, cambiaron contratos/configuracion ni escribieron bases de datos en esta comprobacion.",
+    "Las correcciones de wallet y Resumen siguen en implementacion aislada; este artefacto no acredita su despliegue."
+  ],
+  "dashboardReview": {
+    "candidate": "ffa285bb1b83a06796211828131288f4bf472ae3",
+    "status": "changes_required",
+    "findings": [
+      "MetricStrip muestra cupos sin aplicar la reconciliacion de rutas usada en el panel inferior.",
+      "Actualizar desaparece en ready con summary.",
+      "CTA de rewards/vesting no comprueba claimPublished/configFrozen.",
+      "Cabecera movil390x844 desplaza recursos al pie del viewport y repite copy del proceso interno."
+    ],
+    "validationReported": "lint/tipos PASS, 2suites/20tests focales; capturas locales sinteticas revisadas, sin deploy."
+  }
+}
