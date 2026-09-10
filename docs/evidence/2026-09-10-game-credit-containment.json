@@ -1,0 +1,71 @@
+{
+  "observedAt": "2026-09-10T01:57:12.210906+00:00",
+  "status": "reviewed_candidate_pending_staging_delivery",
+  "candidate": "d8559306296c532b4233154e12fd60a775fed438",
+  "base": "ddb60f8bb5e62fe3a0886bac9ccb2fef49b4c930",
+  "servedDuringDiagnosis": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+  "scope": "Align historical credit incident containment in reservation and public availability; no incident or ledger mutation",
+  "finding": {
+    "preparationCreatedAndRejectedBeforeStart": true,
+    "durableReason": "resource_reservation_failed",
+    "creditBindingCreated": true,
+    "cukieBindingCreated": false,
+    "durableCreditReservationFound": false,
+    "runOrCompetitionAttemptFound": false,
+    "creditRulePinMatched": true,
+    "costCredits": 10,
+    "containedHistoricalNftIncidents": 2,
+    "incidentCutoffs": [
+      "2026-09-08T14:00:00.000Z",
+      "2026-09-08T14:30:00.000Z"
+    ],
+    "referenceCutoff": "2026-09-10T00:30:00.000Z",
+    "allContainmentPredicatesVerified": true,
+    "incidentsMustRemainOpen": true,
+    "historicalRewardsExclusionMustRemain": true,
+    "originalHttpStatusObserved": false,
+    "historicalHttpAttribution": "Inference from code guard and durable incident state predating the attempt, not an observed HTTP response"
+  },
+  "change": {
+    "reservationUsesActiveRulePeriodCutoff": true,
+    "publicAvailabilityUsesSameBlockingPolicy": true,
+    "unknownRoutesFailClosed": true,
+    "nonContainedIncidentsRemainGlobalBlocks": true,
+    "blockedAccountsFromOtherPeriodsRemainBlocking": true,
+    "pinTtlFifoFencingAndIdempotencyPreserved": true
+  },
+  "review": {
+    "performedBy": "Astra root",
+    "productFilesReviewed": 5,
+    "testFilesReviewed": 2,
+    "result": "PASS for stated scope",
+    "reportedValidationBy": "01a0814e-0ea0-7070-877c-701f264243e7",
+    "focusedTestsPassed": 73,
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "fullJestReported": {
+      "suitesPassed": 236,
+      "testsPassed": 1922
+    },
+    "testsRepeatedByRoot": false
+  },
+  "protected": {
+    "worldSource": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
+    "worldLocalCandidate": "1661ecaab163effcae9317d8026fad8c783fa7ad",
+    "legacyLocalCandidate": "17cff24",
+    "mainAndProductionChanges": false
+  },
+  "limits": [
+    "Existing rejected authority-session recovery remains separate",
+    "J05 image optimizer and J06 gameplay remain unverified by this patch",
+    "No replay or live credit reservation was performed during diagnosis",
+    "No data, balance, incident, signer or contract changes",
+    "DApp-only release and functional verification still pending"
+  ],
+  "diagnosticEvidenceSha256": {
+    "cukies-game-entry-log-diagnostic-20260910.json": "766d6dc81524a0756c829932c63470b72b6769b91939bd3f2e003175c9dd6169",
+    "cukies-game-entry-reservation-pin-diagnostic-20260910.json": "51a29b5b4c0464841b12dc57737fc6e3eaf12c6e06bfb8047bfc8370db5c21c7",
+    "cukies-game-entry-credit-eligibility-diagnostic-20260910.json": "756eaa474b9b6f71df3db701c16321351b837fcd6f8a9b65d05d618024010f9b",
+    "cukies-game-entry-credit-containment-diagnostic-20260910.json": "66ba1a3776b0be1dd0878a07e2f22d65182cd14b4471a4b9a9472ec095aa5402"
+  }
+}
