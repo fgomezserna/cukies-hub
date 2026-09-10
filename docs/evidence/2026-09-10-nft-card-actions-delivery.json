@@ -1,0 +1,75 @@
+{
+  "recordedAt": "2026-09-10T13:11:38.039835+00:00",
+  "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/386",
+  "sourceCommits": [
+    "98d40bee5837585e771b540062bf262144fef40f",
+    "7a11ed05f7d5dd434fa8eeb990e04a1a97a86ecb"
+  ],
+  "mergeCommit": "4b6b60f572004d2d5d98d53ad53895606bf86309",
+  "environment": "staging",
+  "deploymentUuid": "jss0c088sgkc84ksks4c8gcw",
+  "deployedAt": "2026-09-10T13:06:21.507Z",
+  "workflow": {
+    "id": 34479688999,
+    "conclusion": "success"
+  },
+  "health": {
+    "httpStatus": 200,
+    "body": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "staging",
+      "gitSha": "4b6b60f572004d2d5d98d53ad53895606bf86309",
+      "gitRef": "staging",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "fqdn": null
+      }
+    }
+  },
+  "validation": {
+    "lint": "pass",
+    "typecheck": "pass",
+    "testSuites": 248,
+    "tests": 2037,
+    "build": "pass, chain97, current49publickeys",
+    "releasePlan": "dapp only, seven image references reused"
+  },
+  "containerObservation": {
+    "before": 93,
+    "after": 92,
+    "preserved": 90,
+    "expectedChange": "dapp replaced",
+    "additionalObservedChanges": [
+      "Coolify helper no longer present",
+      "one non-Cukies resource replaced during the interval; outside this release plan"
+    ],
+    "scopeLimit": "Not an assertion of whole-host immutability. Cukies game/workers and production container IDs preserved.",
+    "protectedCukiesContainersPreserved": 13
+  },
+  "publicQa": {
+    "browser": "Edge existing signed session",
+    "wallet": "0x2678…0c13",
+    "collectionItems": 12,
+    "walletItems": 5,
+    "poolItems": 7,
+    "masterItems": 0,
+    "tokenId": 98000001,
+    "entry": "Mis Cukies > Retirar del Cukie Pool",
+    "positionLoadsAutomatically": true,
+    "ownerVerified": true,
+    "withdrawalButtonEnabled": true,
+    "inputCount": 0,
+    "technicalCheckButtonPresent": false,
+    "cssViewportWidth": 1792,
+    "documentWidth": 1792,
+    "screenshot": "emitted inline in root task; no local PNG claimed"
+  },
+  "limits": [
+    "No wallet signature, withdrawal or custody change performed.",
+    "No failure injected into the public RPC; retry and stale-response guards covered locally.",
+    "Marketplace V2 activation and remaining header/filter redesign are separate pending work.",
+    "NFT source c3424a9/de02156 is not included in this PR."
+  ]
+}
