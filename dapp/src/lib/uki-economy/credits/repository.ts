@@ -396,7 +396,7 @@ export function createMongoCompetitionCreditRepository(
       reservedCredits: sumExactCredits(lots.map((lot) => lot.reservedCredits)),
       spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
       expiredCredits: sumExactCredits(lots.map((lot) => lot.expiredCredits)),
-      blocked: lots.some((lot) => lot.blocked === true),
+      blocked: lots.some((lot) => lot.blocked !== false),
     };
   }
 
@@ -419,7 +419,7 @@ export function createMongoCompetitionCreditRepository(
       reservedCredits: sumExactCredits(lots.map((lot) => lot.reservedCredits)),
       spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
       expiredCredits: sumExactCredits(lots.map((lot) => lot.expiredCredits)),
-      blocked: lots.some((lot) => lot.blocked === true),
+      blocked: lots.some((lot) => lot.blocked !== false),
     };
   }
 

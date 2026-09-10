@@ -566,7 +566,7 @@ export class MemoryCompetitionCreditRepository
         expiredCredits: sumExactCredits(
           lots.map((lot) => lot.expiredCredits),
         ),
-        blocked: lots.some((lot) => lot.blocked === true),
+        blocked: lots.some((lot) => lot.blocked !== false),
       };
       if (materialization.blocked) {
         throw new DomainConflictError(
@@ -630,7 +630,7 @@ export class MemoryCompetitionCreditRepository
         expiredCredits: sumExactCredits(
           lots.map((lot) => lot.expiredCredits),
         ),
-        blocked: lots.some((lot) => lot.blocked === true),
+        blocked: lots.some((lot) => lot.blocked !== false),
       };
       if (materialization.blocked) {
         throw new DomainConflictError(
