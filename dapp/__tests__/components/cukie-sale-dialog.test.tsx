@@ -7,6 +7,9 @@ const listingHash = `0x${'b'.repeat(64)}`;
 
 let approved = false;
 let listed = false;
+let accountAddress: string | undefined = wallet;
+let accountChainId: number | undefined = 56;
+let accountConnected = true;
 const readContract = jest.fn(async (input: { functionName: string }) => {
   switch (input.functionName) {
     case 'paused':
@@ -37,19 +40,24 @@ const writeContractAsync = jest.fn(async (input: { functionName: string }) => {
   }
   throw new Error(`Unexpected write ${input.functionName}`);
 });
-const requestWallet = jest.fn(async () => ({ kind: 'evm' as const, address: wallet, chainId: 56 }));
+const requestWallet = jest.fn(async () => {
+  accountAddress = wallet;
+  accountChainId = 56;
+  accountConnected = true;
+  return { kind: 'evm' as const, address: wallet, chainId: 56 };
+});
 const publicClient = { readContract, waitForTransactionReceipt };
 const wagmiConfig = { account: { address: wallet }, chainId: 56 };
 
 jest.mock('wagmi', () => ({
-  useAccount: () => ({ address: wallet, chainId: 56, isConnected: true }),
+  useAccount: () => ({ address: accountAddress, chainId: accountChainId, isConnected: accountConnected }),
   useConfig: () => wagmiConfig,
   usePublicClient: () => publicClient,
   useWriteContract: () => ({ writeContractAsync }),
 }));
 jest.mock('wagmi/actions', () => ({
-  getAccount: () => ({ address: wallet }),
-  getChainId: () => 56,
+  getAccount: () => ({ address: accountAddress }),
+  getChainId: () => accountChainId,
 }));
 jest.mock('@/providers/wallet-coordinator-context', () => ({
   useWalletCoordinator: () => ({ requestWallet }),
@@ -136,6 +144,9 @@ describe('CukieSaleDialog', () => {
   beforeEach(() => {
     approved = false;
     listed = false;
+    accountAddress = wallet;
+    accountChainId = 56;
+    accountConnected = true;
     jest.clearAllMocks();
   });
 
@@ -200,6 +211,21 @@ describe('CukieSaleDialog', () => {
     expect(screen.getByRole('button', { name: 'Aprobar Cukie' })).toBeEnabled();
   });
 
+  it('relee la cuenta después de que el coordinador conecta la wallet', async () => {
+    accountAddress = undefined;
+    accountChainId = undefined;
+    accountConnected = false;
+    renderDialog();
+    expect(screen.getByRole('status')).toHaveTextContent('Conecta o cambia la wallet');
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar Cukie' }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'approve',
+      args: [legacyMarketplaceContracts.bsc.contracts.marketplace, BigInt(4314)],
+    })));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+  });
+
   it('bloquea un Cukie depositado y no permite publicar', async () => {
     const lockedCuki: MyCukieCollectionItem = {
       ...cuki,
@@ -218,5 +244,21 @@ describe('CukieSaleDialog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('bloqueado');
     expect(screen.getByRole('button', { name: 'Aprobar Cukie' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Poner en la tienda' })).toBeDisabled();
+  });
+
+  it('mantiene bloqueada la publicación tras un timeout y permite reconsultarla', async () => {
+    approved = true;
+    publicClient.waitForTransactionReceipt.mockRejectedValueOnce(new Error('Timed out while waiting for receipt'));
+    renderDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    fireEvent.change(screen.getByLabelText('Precio de venta en BNB'), { target: { value: '0,195' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Poner en la tienda' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Publicación pendiente/ })).toBeDisabled());
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar publicación' }));
+
+    await waitFor(() => expect(screen.getByText(/Venta publicada en BNB Smart Chain/)).toBeInTheDocument());
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
   });
 });

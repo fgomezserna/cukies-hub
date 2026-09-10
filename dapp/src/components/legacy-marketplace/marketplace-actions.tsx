@@ -89,6 +89,7 @@ function getErrorMessage(error: unknown) {
   if (message.includes('already_approved')) return 'El contrato ya tiene permiso para operar con tus Cukies.';
   if (message.includes('listing_price_changed')) return 'El precio del anuncio cambió. Se ha actualizado la ficha; revísalo y confirma de nuevo.';
   if (message.includes('wallet_context_changed')) return 'La cuenta o la red cambió durante la validación. La operación no se ha enviado.';
+  if (message.includes('tron_signer_unavailable')) return 'Conecta TronLink para confirmar la operación y vuelve a intentarlo.';
   if (message.includes('tron_not_ready') || message.includes('tron_provider') || message.includes('missing signer') || message.includes('signer')) return 'TronLink no está listo para firmar en TRON Mainnet. Conéctalo y vuelve a intentarlo.';
   if (message.includes('energy') || message.includes('bandwidth') || message.includes('out_of_energy')) return 'TRON no tiene suficiente energía o ancho de banda para completar la operación.';
   if (message.includes('insufficient funds') || message.includes('insufficient balance')) return 'La wallet no tiene saldo suficiente para las comisiones de red.';
@@ -633,6 +634,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             callValue: Number(live.price),
             feeLimit: 800_000_000,
             shouldPollResponse: true,
+            rawResponse: true,
           },
           () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
         );
@@ -672,6 +674,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           callValue: Number(contractInteger(fee)),
           feeLimit: 800_000_000,
           shouldPollResponse: true,
+          rawResponse: true,
         },
         () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
       );
@@ -708,6 +711,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           callValue: Number(contractInteger(fee)),
           feeLimit: 800_000_000,
           shouldPollResponse: true,
+          rawResponse: true,
         },
         () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
       );
