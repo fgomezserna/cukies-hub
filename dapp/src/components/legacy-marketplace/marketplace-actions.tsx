@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { formatEther, parseEther } from 'viem';
+import { formatEther, parseEther, type Address } from 'viem';
 import {
   useAccount,
   useConnect,
@@ -93,8 +93,9 @@ function getErrorMessage(error: unknown) {
   if (message.includes('tron_not_ready') || message.includes('tron_provider') || message.includes('missing signer') || message.includes('signer')) return 'TronLink no está listo para firmar en TRON Mainnet. Conéctalo y vuelve a intentarlo.';
   if (message.includes('energy') || message.includes('bandwidth') || message.includes('out_of_energy')) return 'TRON no tiene suficiente energía o ancho de banda para completar la operación.';
   if (message.includes('insufficient funds') || message.includes('insufficient balance')) return 'La wallet no tiene saldo suficiente para las comisiones de red.';
-  if (message.includes('transaction_pending')) return 'La wallet recibió la operación, pero aún no se ha podido verificar su recibo. No la repitas; actualiza la ficha en unos instantes.';
-  if (message.includes('transaction_reverted') || message.includes('execution reverted') || message.includes('contractret') && message.includes('revert') || message.includes('failed')) return 'El contrato rechazó la operación. Actualiza la ficha y vuelve a intentarlo.';
+  if (message.includes('transaction_id_unavailable')) return 'La wallet no devolvió el identificador de la transacción. Actualiza la ficha antes de volver a intentarlo.';
+  if (message.includes('transaction_pending')) return 'La wallet recibió la operación, pero aún no se ha podido verificar la confirmación. No la repitas; actualiza la ficha en unos instantes.';
+  if (message.includes('transaction_reverted') || message.includes('execution reverted') || message.includes('contractret') && message.includes('revert')) return 'El contrato rechazó la operación. Actualiza la ficha y vuelve a intentarlo.';
   return 'La operación no se pudo completar. Vuelve a validar la red, el saldo y el estado del anuncio.';
 }
 
@@ -135,6 +136,26 @@ function tronTransactionId(value: unknown): string | null {
     return tronTransactionId(record.transaction);
   }
   return null;
+}
+
+function transactionMessage(error: unknown) {
+  const values: string[] = [];
+  const seen = new Set<object>();
+  const collect = (value: unknown, depth = 0) => {
+    if (depth > 4 || value === null || value === undefined || typeof value === 'function') return;
+    if (typeof value === 'string') {
+      if (value.trim()) values.push(value.trim());
+      return;
+    }
+    if (typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    const record = value as Record<string, unknown>;
+    for (const key of ['shortMessage', 'message', 'details', 'reason', 'error', 'data', 'cause', 'code', 'result', 'contractRet']) {
+      collect(record[key], depth + 1);
+    }
+  };
+  collect(error);
+  return values.join(' ').toLowerCase();
 }
 
 function assertTronSendResult(result: unknown) {
@@ -183,7 +204,26 @@ async function waitForTronReceipt(result: unknown) {
   throw new Error('TRANSACTION_PENDING');
 }
 
+function isTronPendingError(error: unknown) {
+  return transactionMessage(error).includes('transaction_pending');
+}
+
+function isTronRevertedError(error: unknown) {
+  const message = transactionMessage(error);
+  return message.includes('transaction_reverted')
+    || message.includes('execution reverted')
+    || message.includes('contractret') && message.includes('revert')
+    || message.includes('out_of_energy')
+    || message.includes('out_of_time');
+}
+
 type ActionLabel = 'Compra' | 'Operación';
+
+type PendingTronAction = {
+  hash: string;
+  context: LegacyTronActionContext;
+  actionLabel: ActionLabel;
+};
 
 export function MarketplaceActions({ cuki }: MarketplaceActionsProps) {
   if (!legacyMarketplaceRuntime.legacyMarketplaceActionsEnabled) {
@@ -222,6 +262,8 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   const [isPreparingBuy, setIsPreparingBuy] = useState(false);
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
   const actionLockRef = useRef(false);
+  const pendingTronActionRef = useRef<PendingTronAction | null>(null);
+  const [pendingTronAction, setPendingTronAction] = useState<PendingTronAction | null>(null);
   const hasMounted = useHasMounted();
 
   const tokenId = useMemo(() => BigInt(cuki.tokenId), [cuki.tokenId]);
@@ -312,38 +354,46 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         targetChainId: 56,
         reason: 'Conecta una wallet EVM en BNB Smart Chain para operar este anuncio.',
       });
+      const current = getAccount(wagmiConfig);
+      const currentChainId = getChainId(wagmiConfig);
+      if (!current.address || currentChainId !== 56) throw new Error('WALLET_CONTEXT_CHANGED');
       setStatus('Wallet lista. Ya puedes continuar.');
-      return true;
+      return current.address;
     } catch (error) {
       setStatus(`No se pudo conectar la wallet: ${getErrorMessage(error)}`);
-      return false;
+      return null;
     }
   }
 
-  function ensureBsc() {
-    if (!isBsc) return false;
-    if (!isConnected) {
-      setStatus('Conecta tu wallet antes de continuar.');
-      return false;
-    }
-    if (chainId !== 56 && getChainId(wagmiConfig) !== 56) {
-      setStatus('Cambia la wallet a BNB Smart Chain para continuar.');
-      void requestWallet({
+  async function ensureBsc() {
+    if (!isBsc) return null;
+    const current = getAccount(wagmiConfig);
+    const currentChainId = getChainId(wagmiConfig);
+    if (current.address && currentChainId === 56) return current.address;
+    setStatus(current.address ? 'Cambia la wallet a BNB Smart Chain para continuar.' : 'Conecta tu wallet para continuar.');
+    try {
+      await requestWallet({
         kind: 'evm',
         targetChainId: 56,
-        reason: 'Cambia la wallet a BNB Smart Chain para continuar esta acción.',
-      }).then(() => setStatus('Wallet lista. Revisa la acción y confirma de nuevo.'))
-        .catch((error) => setStatus(getErrorMessage(error)));
-      return false;
+        reason: current.address
+          ? 'Cambia la wallet a BNB Smart Chain para continuar esta acción.'
+          : 'Conecta una wallet EVM en BNB Smart Chain para continuar esta acción.',
+      });
+      const ready = getAccount(wagmiConfig);
+      const readyChainId = getChainId(wagmiConfig);
+      if (!ready.address || readyChainId !== 56) throw new Error('WALLET_CONTEXT_CHANGED');
+      setStatus('Wallet lista. Revisa la acción y confirma la transacción.');
+      return ready.address;
+    } catch (error) {
+      setStatus(getErrorMessage(error));
+      return null;
     }
-    return true;
   }
 
-  function assertCurrentBscContext() {
-    if (!address) throw new Error('WALLET_CONTEXT_CHANGED');
+  function assertCurrentBscContext(expectedAddress: string) {
     const current = getAccount(wagmiConfig);
     assertEvmActionContext({
-      expectedAddress: address,
+      expectedAddress,
       expectedChainId: 56,
       currentAddress: current.address,
       currentChainId: getChainId(wagmiConfig),
@@ -367,9 +417,10 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     if (!response.ok) throw new Error('LEGACY_RECONCILIATION_UNAVAILABLE');
   }
 
-  async function inspectBsc() {
-    if (!publicClient || !address) throw new Error('BSC_NOT_READY');
-    const [paused, owner, listing, approvedTokenLive, approvedForAll, liveFeeCancelPrice, liveFeeChangePrice] = await Promise.all([
+  async function inspectBsc(walletAddress: string) {
+    if (!publicClient) throw new Error('BSC_NOT_READY');
+    assertCurrentBscContext(walletAddress);
+    const [paused, owner, listing, liveFeeCancelPrice, liveFeeChangePrice] = await Promise.all([
       publicClient.readContract({
         address: bscMarketplaceAddress,
         abi: legacyMarketplaceBscAbis.marketplace,
@@ -388,18 +439,6 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         args: [tokenId],
       }),
       publicClient.readContract({
-        address: bscTokenAddress,
-        abi: legacyMarketplaceBscAbis.token,
-        functionName: 'getApproved',
-        args: [tokenId],
-      }),
-      publicClient.readContract({
-        address: bscTokenAddress,
-        abi: legacyMarketplaceBscAbis.token,
-        functionName: 'isApprovedForAll',
-        args: [address, bscMarketplaceAddress],
-      }),
-      publicClient.readContract({
         address: bscMarketplaceAddress,
         abi: legacyMarketplaceBscAbis.marketplace,
         functionName: 'feeCancelPrice',
@@ -414,9 +453,6 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     return {
       paused: paused as boolean,
       owner: String(owner),
-      approved: isSameEvmWallet(String(approvedTokenLive), bscMarketplaceAddress) || Boolean(approvedForAll),
-      approvedForAll: Boolean(approvedForAll),
-      approvedToken: String(approvedTokenLive),
       listingOwner: marketToken[0],
       price: marketToken[1],
       isOnSale: marketToken[3],
@@ -427,15 +463,17 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
 
   async function runBscAction(
     label: string,
-    request: () => Promise<`0x${string}`>,
+    request: (walletAddress: string) => Promise<`0x${string}`>,
     actionLabel: ActionLabel = 'Operación',
   ) {
-    if (actionLockRef.current || !ensureBsc() || !publicClient) return;
+    if (actionLockRef.current || !isBsc || !publicClient) return;
     actionLockRef.current = true;
     setIsBscPending(true);
     setStatus(label);
     try {
-      const hash = await request();
+      const walletAddress = await ensureBsc();
+      if (!walletAddress) return;
+      const hash = await request(walletAddress);
       setStatus('Transacción enviada. Esperando confirmación en BNB Smart Chain…');
       const confirmation = await reconcileConfirmedMarketplaceAction(
         async () => {
@@ -463,16 +501,16 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   async function buyBsc() {
-    await runBscAction('Comprobando el anuncio y el precio…', async () => {
-      const live = await inspectBsc();
+    await runBscAction('Comprobando el anuncio y el precio…', async (walletAddress) => {
+      const live = await inspectBsc(walletAddress);
       if (live.paused || !live.isOnSale || live.price <= BigInt(0)) {
         throw new Error('LISTING_NOT_ACTIVE');
       }
-      if (isSameEvmWallet(live.listingOwner, address)) throw new Error('OWNER_CANNOT_BUY');
+      if (isSameEvmWallet(live.listingOwner, walletAddress)) throw new Error('OWNER_CANNOT_BUY');
       assertDisplayedPriceUnchanged(cuki.priceOriginal, live.price);
-      assertCurrentBscContext();
+      assertCurrentBscContext(walletAddress);
       return writeContractAsync({
-        account: address,
+        account: walletAddress as Address,
         chainId: 56,
         address: bscMarketplaceAddress,
         abi: legacyMarketplaceBscAbis.marketplace,
@@ -484,14 +522,14 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   async function cancelBscSale() {
-    await runBscAction('Validando el anuncio antes de retirarlo…', async () => {
-      const live = await inspectBsc();
-      if (live.paused || !live.isOnSale || !isSameEvmWallet(live.listingOwner, address)) {
+    await runBscAction('Validando el anuncio antes de retirarlo…', async (walletAddress) => {
+      const live = await inspectBsc(walletAddress);
+      if (live.paused || !live.isOnSale || !isSameEvmWallet(live.listingOwner, walletAddress)) {
         throw new Error('LISTING_NOT_OWNED');
       }
-      assertCurrentBscContext();
+      assertCurrentBscContext(walletAddress);
       return writeContractAsync({
-        account: address,
+        account: walletAddress as Address,
         chainId: 56,
         address: bscMarketplaceAddress,
         abi: legacyMarketplaceBscAbis.marketplace,
@@ -503,14 +541,14 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
   }
 
   async function changeBscPrice() {
-    await runBscAction('Validando el anuncio antes de cambiar el precio…', async () => {
-      const live = await inspectBsc();
-      if (live.paused || !live.isOnSale || !isSameEvmWallet(live.listingOwner, address)) {
+    await runBscAction('Validando el anuncio antes de cambiar el precio…', async (walletAddress) => {
+      const live = await inspectBsc(walletAddress);
+      if (live.paused || !live.isOnSale || !isSameEvmWallet(live.listingOwner, walletAddress)) {
         throw new Error('LISTING_NOT_OWNED');
       }
-      assertCurrentBscContext();
+      assertCurrentBscContext(walletAddress);
       return writeContractAsync({
-        account: address,
+        account: walletAddress as Address,
         chainId: 56,
         address: bscMarketplaceAddress,
         abi: legacyMarketplaceBscAbis.marketplace,
@@ -572,12 +610,56 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     }
   }
 
+  async function recheckPendingTronAction() {
+    const pending = pendingTronActionRef.current;
+    if (!pending || actionLockRef.current) return;
+    actionLockRef.current = true;
+    setIsTronPending(true);
+    setStatus('Comprobando la transacción pendiente en TRON Mainnet…');
+    try {
+      const tronWeb = getLegacyTronWeb();
+      if (!tronWeb) throw new Error('TRON_NOT_READY');
+      assertTronActionContext(tronWeb, pending.context);
+      await waitForTronReceipt(pending.hash);
+      const currentTronWeb = getLegacyTronWeb();
+      if (!currentTronWeb) throw new Error('TRON_NOT_READY');
+      assertTronActionContext(currentTronWeb, pending.context);
+      let reconciled = false;
+      try {
+        await reconcileListing();
+        reconciled = true;
+      } catch {
+        // The receipt is already confirmed; indexer reconciliation may catch up later.
+      }
+      pendingTronActionRef.current = null;
+      setPendingTronAction(null);
+      setStatus(reconciled
+        ? `${pending.actionLabel} confirmada en TRON Mainnet. Tu colección ya está actualizada.`
+        : `${pending.actionLabel} confirmada en TRON Mainnet. Actualizando tu colección… No repitas la transacción.`);
+      router.refresh();
+    } catch (error) {
+      if (isTronRevertedError(error)) {
+        pendingTronActionRef.current = null;
+        setPendingTronAction(null);
+      }
+      setStatus(isTronPendingError(error)
+        ? 'La transacción sigue pendiente. Puedes comprobarla de nuevo sin firmar otra vez.'
+        : transactionMessage(error).includes('wallet_context_changed')
+          ? 'La transacción ya fue enviada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para comprobarla.'
+          : getErrorMessage(error));
+    } finally {
+      actionLockRef.current = false;
+      setIsTronPending(false);
+    }
+  }
+
   async function runTronAction(
     action: () => Promise<unknown>,
     label: string,
     actionLabel: ActionLabel = 'Operación',
+    actionContext: LegacyTronActionContext,
   ) {
-    if (actionLockRef.current) return;
+    if (actionLockRef.current || pendingTronActionRef.current) return;
     actionLockRef.current = true;
     setIsTronPending(true);
     setStatus(label);
@@ -586,11 +668,23 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         async () => {
           const result = await action();
           assertTronSendResult(result);
-          await waitForTronReceipt(result);
+          // `shouldPollResponse:false` returns the broadcast txid before any receipt polling.
+          const txId = tronTransactionId(result);
+          if (!txId) throw new Error('TRANSACTION_ID_UNAVAILABLE');
+          const pending = { hash: txId, context: actionContext, actionLabel };
+          pendingTronActionRef.current = pending;
+          setPendingTronAction(pending);
+          setStatus('Transacción enviada. Esperando confirmación en TRON Mainnet…');
+          await waitForTronReceipt(txId);
+          const currentTronWeb = getLegacyTronWeb();
+          if (!currentTronWeb) throw new Error('TRON_NOT_READY');
+          assertTronActionContext(currentTronWeb, actionContext);
           return result;
         },
         reconcileListing,
       );
+      pendingTronActionRef.current = null;
+      setPendingTronAction(null);
       if (confirmation.reconciled) {
         setStatus(`${actionLabel} confirmada en TRON Mainnet. Tu colección ya está actualizada.`);
       } else {
@@ -598,9 +692,22 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
       }
       router.refresh();
     } catch (error) {
-      setStatus(getErrorMessage(error));
-      if (error instanceof Error && error.message.includes('LISTING_PRICE_CHANGED')) {
-        router.refresh();
+      const pending = pendingTronActionRef.current;
+      if (pending) {
+        if (isTronRevertedError(error)) {
+          pendingTronActionRef.current = null;
+          setPendingTronAction(null);
+        }
+        setStatus(isTronPendingError(error)
+          ? 'La transacción sigue pendiente. Puedes comprobarla sin firmar otra vez.'
+          : transactionMessage(error).includes('wallet_context_changed')
+            ? 'La transacción ya fue enviada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para comprobarla.'
+            : getErrorMessage(error));
+      } else {
+        setStatus(getErrorMessage(error));
+        if (error instanceof Error && error.message.includes('LISTING_PRICE_CHANGED')) {
+          router.refresh();
+        }
       }
     } finally {
       actionLockRef.current = false;
@@ -633,14 +740,14 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           {
             callValue: Number(live.price),
             feeLimit: 800_000_000,
-            shouldPollResponse: true,
-            rawResponse: true,
+            shouldPollResponse: false,
           },
           () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
         );
       },
       'Comprobando el anuncio y el precio en TRON Mainnet…',
       'Compra',
+      actionContext,
     );
   }
 
@@ -673,12 +780,11 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         {
           callValue: Number(contractInteger(fee)),
           feeLimit: 800_000_000,
-          shouldPollResponse: true,
-          rawResponse: true,
+          shouldPollResponse: false,
         },
         () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
       );
-    }, 'Retirando el anuncio...');
+    }, 'Retirando el anuncio...', 'Operación', actionContext);
   }
 
   async function changeTronPrice() {
@@ -710,12 +816,11 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
         {
           callValue: Number(contractInteger(fee)),
           feeLimit: 800_000_000,
-          shouldPollResponse: true,
-          rawResponse: true,
+          shouldPollResponse: false,
         },
         () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
       );
-    }, 'Validando el anuncio antes de cambiar el precio…');
+    }, 'Validando el anuncio antes de cambiar el precio…', 'Operación', actionContext);
   }
 
   async function prepareBuy() {
@@ -743,7 +848,8 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
     }
   }
 
-  const disabled = isWriting || isBscPending || evmWallet.isConnecting || isTronPending || isConnectingWallet || isPreparingBuy;
+  const walletActionBusy = isWriting || isBscPending || evmWallet.isConnecting || isTronPending || isConnectingWallet || isPreparingBuy;
+  const disabled = walletActionBusy || Boolean(pendingTronAction);
 
   return (
     <div className="rounded-[12px] border border-[var(--uki-lilac)]/20 bg-[#080712]/92 p-5 shadow-[0_0_32px_rgba(228,92,255,0.08)]">
@@ -774,7 +880,7 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
           <Button
             onClick={() => {
               if (isConnected) {
-                ensureBsc();
+                void ensureBsc();
                 return;
               }
 
@@ -811,7 +917,6 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
               <p className="mt-1 text-xs text-lilac-100/80">
                 Comprador: {shortWallet(isBsc ? (address ?? '') : (tronAddress ?? ''))} · Red: {isBsc ? 'BNB Smart Chain' : 'TRON Mainnet'} · Precio: {formatLegacyPrice(cuki)}
               </p>
-              <p className="mt-1 text-xs text-lilac-100/70">Antes de firmar, se comprueban de nuevo el anuncio, el propietario, el precio y la red.</p>
             </div>
           ) : null}
           <Button
@@ -881,6 +986,17 @@ function LegacyMainnetMarketplaceActions({ cuki }: MarketplaceActionsProps) {
             {status}
           </div>
         )}
+        {pendingTronAction ? (
+          <Button
+            type="button"
+            onClick={() => void recheckPendingTronAction()}
+            disabled={walletActionBusy}
+            variant="outline"
+            className="border-amber-300/30 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"
+          >
+            Comprobar operación pendiente
+          </Button>
+        ) : null}
       </div>
 
       {saleDialogOpen ? (

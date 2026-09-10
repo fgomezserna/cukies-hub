@@ -117,7 +117,7 @@ describe('MarketplaceActions · compra TRON', () => {
     (globalThis.fetch as jest.Mock) = jest.fn(async () => ({ ok: true }));
   });
 
-  it('pasa rawResponse para conservar txid/receipt y no vuelve a firmar', async () => {
+  it('conserva el txid devuelto tras el broadcast y no vuelve a firmar', async () => {
     render(<MarketplaceActions cuki={cuki} />);
     fireEvent.click(screen.getByRole('button', { name: 'Conectar y revisar compra' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Confirmar compra' })).toBeInTheDocument());
@@ -128,7 +128,7 @@ describe('MarketplaceActions · compra TRON', () => {
       'marketplace',
       'buyToken',
       [cuki.tokenId],
-      expect.objectContaining({ shouldPollResponse: true, rawResponse: true, callValue: 3333000000 }),
+      expect.objectContaining({ shouldPollResponse: false, callValue: 3333000000 }),
       expect.any(Function),
     ));
     await waitFor(() => expect(screen.getByText(/Compra confirmada en TRON Mainnet/)).toBeInTheDocument());
@@ -146,4 +146,26 @@ describe('MarketplaceActions · compra TRON', () => {
     await waitFor(() => expect(screen.getByText('Conecta TronLink para confirmar la operación y vuelve a intentarlo.')).toBeInTheDocument());
     expect(routerRefresh).not.toHaveBeenCalled();
   });
+
+  it('mantiene bloqueada la compra tras timeout y permite reconsultar sin otro broadcast', async () => {
+    let reads = 0;
+    tronWeb.trx.getTransactionInfo.mockImplementation(async () => {
+      reads += 1;
+      return (reads < 7 ? {} : { receipt: { result: 'SUCCESS' } }) as unknown as {
+        receipt: { result: string };
+      };
+    });
+
+    render(<MarketplaceActions cuki={cuki} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Conectar y revisar compra' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Confirmar compra' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar compra' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar operación pendiente' })).toBeEnabled(), { timeout: 10_000 });
+    expect(sendLegacyTronContract).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar operación pendiente' }));
+
+    await waitFor(() => expect(screen.getByText(/Compra confirmada en TRON Mainnet/)).toBeInTheDocument());
+    expect(sendLegacyTronContract).toHaveBeenCalledTimes(1);
+  }, 12_000);
 });

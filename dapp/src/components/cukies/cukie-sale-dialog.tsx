@@ -61,9 +61,9 @@ import type { MyCukieCollectionItem } from '@/lib/cukies-data/my-collection-type
 import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 type SaleSurface = 'legacy-bsc' | 'legacy-tron' | 'uki';
-type ApprovalState = 'unknown' | 'checking' | 'required' | 'approved' | 'blocked' | 'error';
+type ApprovalState = 'unknown' | 'checking' | 'required' | 'approved' | 'pending' | 'blocked' | 'error';
 type TransactionPhase = 'idle' | 'checking' | 'approving' | 'listing' | 'syncing';
-type ListingState = 'idle' | 'pending' | 'published';
+type ListingState = 'idle' | 'pending' | 'confirmed' | 'published';
 
 type CukieSaleDialogProps = {
   cuki: MyCukieCollectionItem;
@@ -347,6 +347,9 @@ function userError(reason: unknown) {
   if (message.includes('wallet_coordinator_unavailable')) {
     return 'No se pudo preparar la wallet. Vuelve a conectar la red de firma.';
   }
+  if (message.includes('transaction_pending')) {
+    return 'La transacción sigue pendiente. Puedes comprobarla sin firmar otra vez.';
+  }
   if (message.includes('wallet_not_ready') || message.includes('bsc_not_ready')) {
     return 'Conecta la wallet en la red indicada para continuar.';
   }
@@ -372,14 +375,66 @@ function assertTronSendResult(result: unknown) {
   }
   if (!result || typeof result !== 'object') return;
   const record = result as Record<string, unknown>;
-  if (record.result === false || record.success === false) throw new Error('TRANSACTION_REVERTED');
+  const values = [record.result, record.code, record.contractRet, record.status]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.toLowerCase());
+  if (record.result === false || record.success === false || values.some((value) => (
+    value.includes('failed')
+    || value.includes('revert')
+    || value.includes('error')
+    || value.includes('out_of_energy')
+    || value.includes('out_of_time')
+  ))) throw new Error('TRANSACTION_REVERTED');
   const receipt = record.receipt;
   if (receipt && typeof receipt === 'object') {
     const receiptResult = (receipt as Record<string, unknown>).result;
-    if (receiptResult && receiptResult !== 'SUCCESS' && receiptResult !== 'success' && receiptResult !== true) {
+    if (typeof receiptResult === 'string' && /failed|revert|error|out_of_energy|out_of_time/i.test(receiptResult)) {
+      throw new Error('TRANSACTION_REVERTED');
+    }
+    if (receiptResult !== undefined && receiptResult !== 'SUCCESS' && receiptResult !== 'success' && receiptResult !== true) {
       throw new Error('TRANSACTION_REVERTED');
     }
   }
+}
+
+async function waitForTronReceipt(result: unknown) {
+  const txId = tronTransactionId(result);
+  if (!txId) throw new Error('TRANSACTION_PENDING');
+  const tronWeb = getLegacyTronWeb() as (ReturnType<typeof getLegacyTronWeb> & {
+    trx?: { getTransactionInfo?: (hash: string) => Promise<unknown> };
+  }) | null;
+  const trx = tronWeb?.trx;
+  const getInfo = trx?.getTransactionInfo;
+  if (!trx || typeof getInfo !== 'function') throw new Error('TRANSACTION_PENDING');
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      const info = await getInfo.call(trx, txId);
+      assertTronSendResult(info);
+      if (info && typeof info === 'object') {
+        const record = info as Record<string, unknown>;
+        const receipt = record.receipt && typeof record.receipt === 'object'
+          ? record.receipt as Record<string, unknown>
+          : null;
+        const resultValue = receipt?.result ?? record.contractRet ?? record.result;
+        if (typeof resultValue === 'string' && /success|confirmed/i.test(resultValue)) return;
+      }
+    } catch (reason) {
+      if (transactionMessage(reason).includes('transaction_reverted')) throw reason;
+    }
+    if (attempt < 5) await new Promise((resolve) => window.setTimeout(resolve, 700));
+  }
+  throw new Error('TRANSACTION_PENDING');
+}
+
+function isPendingReason(reason: unknown) {
+  return transactionMessage(reason).includes('transaction_pending');
+}
+
+function isRevertedReason(reason: unknown) {
+  const message = transactionMessage(reason);
+  return message.includes('transaction_reverted')
+    || message.includes('execution reverted')
+    || message.includes('reverted');
 }
 
 type SaleOperationContext = {
@@ -392,7 +447,13 @@ type SaleOperationContext = {
 
 type PendingListing = {
   context: SaleOperationContext;
-  hash: string;
+  hash: string | null;
+  wallet: string;
+};
+
+type PendingApproval = {
+  context: SaleOperationContext;
+  hash: string | null;
   wallet: string;
 };
 
@@ -441,6 +502,7 @@ export function CukieSaleDialog({
   const operationLockRef = useRef(false);
   const inspectionIdRef = useRef(0);
   const pendingListingRef = useRef<PendingListing | null>(null);
+  const pendingApprovalRef = useRef<PendingApproval | null>(null);
   const latestOperationContextRef = useRef<SaleOperationContext>({
     assetId: cuki.assetId,
     surface,
@@ -658,6 +720,7 @@ export function CukieSaleDialog({
     setLatestTxHash(null);
     setListingState('idle');
     pendingListingRef.current = null;
+    pendingApprovalRef.current = null;
   }, [cuki.assetId, openingSurface, open]);
 
   useEffect(() => {
@@ -715,7 +778,7 @@ export function CukieSaleDialog({
     input: Parameters<typeof writeContractAsync>[0],
     options: { preserveBroadcast?: boolean } = {},
   ) {
-    if (!publicClient) throw new Error('SALE_UI:No podemos comprobar el recibo de esta red.');
+      if (!publicClient) throw new Error('SALE_UI:No podemos comprobar la confirmación de esta red.');
     const hash = await writeContractAsync(input);
     setLatestTxHash(hash);
     let receipt;
@@ -747,6 +810,7 @@ export function CukieSaleDialog({
 
   async function reconcilePublishedListing(context: SaleOperationContext, wallet: string) {
     const delays = [0, 350, 750, 1_200];
+    let latest: Inspection | null = null;
     for (let index = 0; index < delays.length; index += 1) {
       if (delays[index] > 0) {
         await new Promise((resolve) => window.setTimeout(resolve, delays[index]));
@@ -755,18 +819,94 @@ export function CukieSaleDialog({
       try {
         const result = await inspectSurface(wallet);
         assertOperationContext(context);
+        latest = result;
         if (result.activeListing) return result;
       } catch (reason) {
         if (transactionMessage(reason).includes('wallet_context_changed')) throw reason;
       }
     }
-    return null;
+    return latest;
   }
 
-  function rememberPendingListing(context: SaleOperationContext, hash: string, wallet: string) {
+  function rememberPendingListing(context: SaleOperationContext, hash: string | null, wallet: string) {
     pendingListingRef.current = { context, hash, wallet };
-    setLatestTxHash(hash);
+    if (hash) setLatestTxHash(hash);
     setListingState('pending');
+  }
+
+  function rememberPendingApproval(context: SaleOperationContext, hash: string | null, wallet: string) {
+    pendingApprovalRef.current = { context, hash, wallet };
+    if (hash) setLatestTxHash(hash);
+    setApprovalState('pending');
+  }
+
+  async function recheckPendingApproval() {
+    const pending = pendingApprovalRef.current;
+    if (!pending || operationLockRef.current || busy) return;
+    if (!sameSaleOperationContext(pending.context, latestOperationContextRef.current)) {
+      setError('La wallet o el precio de la operación pendiente cambiaron. Vuelve a conectar la wallet original para comprobarla.');
+      return;
+    }
+    operationLockRef.current = true;
+    setPhase('syncing');
+    setError(null);
+    setNotice('Comprobando la aprobación…');
+    let receiptConfirmed = false;
+    try {
+      assertOperationContext(pending.context);
+      if (pending.context.surface === 'legacy-tron' && pending.hash) {
+        await waitForTronReceipt(pending.hash);
+        receiptConfirmed = true;
+        assertOperationContext(pending.context);
+      } else if (pending.context.surface !== 'legacy-tron' && pending.hash) {
+        if (!publicClient) throw new Error('SALE_UI:No podemos comprobar la confirmación de esta red.');
+        let receipt;
+        try {
+          receipt = await publicClient.waitForTransactionReceipt({ hash: pending.hash as `0x${string}` });
+        } catch {
+          throw new Error('TRANSACTION_PENDING');
+        }
+        assertOperationContext(pending.context);
+        if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+        receiptConfirmed = true;
+      }
+      const result = await inspectSurface(pending.wallet);
+      assertOperationContext(pending.context);
+      if (!pending.hash && !result.approved) throw new Error('TRANSACTION_PENDING');
+      pendingApprovalRef.current = null;
+      setInspection(result);
+      setApprovalState(result.approved ? 'approved' : 'required');
+      setNotice(result.approved
+        ? pending.hash
+          ? `Aprobación confirmada en ${signatureNetwork}. Ya puedes publicar el anuncio.`
+          : 'El contrato ya tiene permiso para este Cukie. Ya puedes publicar el anuncio.'
+        : `Aprobación confirmada en ${signatureNetwork}. El permiso actual ha cambiado; revísalo antes de publicar.`);
+    } catch (reason) {
+      if (isPendingReason(reason)) {
+        setApprovalState('pending');
+        setNotice('La aprobación sigue pendiente. Puedes volver a comprobarla sin firmar otra vez.');
+      } else if (isRevertedReason(reason)) {
+        pendingApprovalRef.current = null;
+        setApprovalState('required');
+        setLatestTxHash(null);
+        setError(userError(reason));
+      } else if (receiptConfirmed && !transactionMessage(reason).includes('wallet_context_changed')) {
+        pendingApprovalRef.current = null;
+        setApprovalState('approved');
+        setError(null);
+        setNotice(`Aprobación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
+      } else if (receiptConfirmed) {
+        setApprovalState('pending');
+        setError(null);
+        setNotice('La aprobación ya fue enviada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para comprobarla.');
+      } else {
+        setApprovalState('pending');
+        setError(userError(reason));
+      }
+    } finally {
+      operationLockRef.current = false;
+      setPhase('idle');
+    }
   }
 
   async function recheckPendingListing() {
@@ -780,10 +920,15 @@ export function CukieSaleDialog({
     setPhase('syncing');
     setError(null);
     setNotice('Comprobando la transacción y el anuncio…');
+    let receiptConfirmed = false;
     try {
       assertOperationContext(pending.context);
-      if (pending.context.surface !== 'legacy-tron') {
-        if (!publicClient) throw new Error('SALE_UI:No podemos comprobar el recibo de esta red.');
+      if (pending.context.surface === 'legacy-tron' && pending.hash) {
+        await waitForTronReceipt(pending.hash);
+        receiptConfirmed = true;
+        assertOperationContext(pending.context);
+      } else if (pending.context.surface !== 'legacy-tron') {
+        if (!publicClient) throw new Error('SALE_UI:No podemos comprobar la confirmación de esta red.');
         let receipt;
         try {
           receipt = await publicClient.waitForTransactionReceipt({ hash: pending.hash as `0x${string}` });
@@ -797,20 +942,39 @@ export function CukieSaleDialog({
           setLatestTxHash(null);
           throw new Error('TRANSACTION_REVERTED');
         }
+        receiptConfirmed = true;
       }
       const result = await inspectSurface(pending.wallet);
       assertOperationContext(pending.context);
-      if (!result.activeListing) throw new Error('TRANSACTION_PENDING');
+      if (!pending.hash && !result.activeListing) throw new Error('TRANSACTION_PENDING');
       pendingListingRef.current = null;
       setInspection(result);
-      setListingState('published');
-      setNotice(`Venta publicada en ${signatureNetwork}. Actualizando la ficha y el catálogo…`);
+      setListingState(result.activeListing ? 'published' : 'confirmed');
+      setNotice(result.activeListing
+        ? `Venta publicada en ${signatureNetwork}. Actualizando la ficha y el catálogo…`
+        : `Publicación confirmada en ${signatureNetwork}. El estado actual del anuncio ya está actualizado.`);
       window.dispatchEvent(new Event(pending.context.surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
       onCompleted?.();
     } catch (reason) {
       if (reason instanceof Error && reason.message === 'TRANSACTION_PENDING') {
         setListingState('pending');
         setNotice('La transacción sigue pendiente. Puedes volver a comprobarla sin firmar otra publicación.');
+      } else if (isRevertedReason(reason)) {
+        pendingListingRef.current = null;
+        setListingState('idle');
+        setLatestTxHash(null);
+        setError(userError(reason));
+      } else if (receiptConfirmed && !transactionMessage(reason).includes('wallet_context_changed')) {
+        pendingListingRef.current = null;
+        setListingState('confirmed');
+        setError(null);
+        setNotice(`Publicación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
+        window.dispatchEvent(new Event(pending.context.surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
+        onCompleted?.();
+      } else if (receiptConfirmed) {
+        setListingState('pending');
+        setError(null);
+        setNotice('La publicación ya fue enviada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para comprobarla.');
       } else {
         setError(userError(reason));
       }
@@ -823,10 +987,13 @@ export function CukieSaleDialog({
   async function approveCukie() {
     const context = latestOperationContextRef.current;
     if (!beginOperation('checking', context)) return;
+    let activeContext: SaleOperationContext | null = null;
+    let approvalHash: string | null = null;
+    let receiptConfirmed = false;
     try {
       assertOperationContext(context);
       const ready = await ensureWallet();
-      const activeContext = { ...context, wallet: ready.address };
+      activeContext = { ...context, wallet: ready.address };
       latestOperationContextRef.current = { ...latestOperationContextRef.current, wallet: ready.address };
       assertOperationContext(activeContext);
       const result = await inspectSurface(ready.address);
@@ -852,17 +1019,24 @@ export function CukieSaleDialog({
           'token',
           'approve',
           [marketplaceAddress, cuki.tokenId],
-          { feeLimit: 800_000_000, shouldPollResponse: true, rawResponse: true },
+          { feeLimit: 800_000_000, shouldPollResponse: false },
           () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
         );
         assertTronSendResult(tx);
+        approvalHash = tronTransactionId(tx);
+        rememberPendingApproval(activeContext, approvalHash, ready.address);
+        if (!approvalHash) throw new Error('TRANSACTION_PENDING');
+        await waitForTronReceipt(approvalHash);
+        receiptConfirmed = true;
         assertOperationContext(activeContext);
         const confirmed = await inspectSurface(actionContext.address);
         assertOperationContext(activeContext);
-        if (!confirmed.approved) throw new Error('SALE_UI:El recibo llegó, pero no hemos podido confirmar la aprobación.');
+        pendingApprovalRef.current = null;
         setInspection(confirmed);
-        setApprovalState('approved');
-        setNotice('Aprobación confirmada en TRON Mainnet. Ya puedes publicar el anuncio.');
+        setApprovalState(confirmed.approved ? 'approved' : 'required');
+        setNotice(confirmed.approved
+          ? 'Aprobación confirmada en TRON Mainnet. Ya puedes publicar el anuncio.'
+          : 'Aprobación confirmada en TRON Mainnet. El permiso actual ha cambiado; revísalo antes de publicar.');
         return;
       }
       if (!publicClient || !collectionAddress || !marketplaceAddress || !evmChain) throw new Error('WALLET_NOT_READY');
@@ -881,24 +1055,50 @@ export function CukieSaleDialog({
       }
       setPhase('approving');
       assertOperationContext(activeContext);
-      await writeEvm({
+      approvalHash = await writeEvm({
         account: ready.address as Address,
         chainId: evmChain,
         address: collectionAddress as Address,
         abi: surface === 'uki' ? ukiMarketplaceNftReadAbi : legacyMarketplaceBscAbis.token,
         functionName: 'approve',
         args: [marketplaceAddress as Address, BigInt(cuki.tokenId)],
-      });
+      }, { preserveBroadcast: true });
+      receiptConfirmed = true;
       assertOperationContext(activeContext);
       const confirmed = await inspectSurface(ready.address);
       assertOperationContext(activeContext);
-      if (!confirmed.approved) throw new Error('SALE_UI:El recibo llegó, pero no hemos podido confirmar la aprobación.');
+      pendingApprovalRef.current = null;
       setInspection(confirmed);
-      setApprovalState('approved');
-      setNotice(`Aprobación confirmada en ${signatureNetwork}. Ya puedes publicar el anuncio.`);
+      setApprovalState(confirmed.approved ? 'approved' : 'required');
+      setNotice(confirmed.approved
+        ? `Aprobación confirmada en ${signatureNetwork}. Ya puedes publicar el anuncio.`
+        : `Aprobación confirmada en ${signatureNetwork}. El permiso actual ha cambiado; revísalo antes de publicar.`);
     } catch (reason) {
-      setError(userError(reason));
-      setApprovalState('required');
+      const broadcastHash = reason instanceof BroadcastPendingError ? reason.hash : approvalHash;
+      const reverted = isRevertedReason(reason);
+      const contextChanged = transactionMessage(reason).includes('wallet_context_changed');
+      if (reverted) {
+        pendingApprovalRef.current = null;
+        setApprovalState('required');
+        setLatestTxHash(null);
+        setError(userError(reason));
+      } else if (receiptConfirmed && activeContext && !contextChanged) {
+        pendingApprovalRef.current = null;
+        setApprovalState('approved');
+        setError(null);
+        setNotice(`Aprobación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
+      } else if (broadcastHash && activeContext?.wallet) {
+        rememberPendingApproval(activeContext, broadcastHash, activeContext.wallet);
+        setError(null);
+        setNotice('Transacción enviada. Puedes comprobar la aprobación sin firmar otra vez.');
+      } else if (pendingApprovalRef.current && activeContext) {
+        setApprovalState('pending');
+        setError(null);
+        setNotice('Transacción enviada. Puedes comprobar la aprobación sin firmar otra vez.');
+      } else {
+        setError(userError(reason));
+        setApprovalState('required');
+      }
     } finally {
       operationLockRef.current = false;
       setPhase('idle');
@@ -910,6 +1110,7 @@ export function CukieSaleDialog({
     if (!beginOperation('checking', context)) return;
     let activeContext: SaleOperationContext | null = null;
     let listingHash: string | null = null;
+    let receiptConfirmed = false;
     try {
       assertOperationContext(context);
       if (identityError) throw new Error(`SALE_UI:${identityError}`);
@@ -941,30 +1142,27 @@ export function CukieSaleDialog({
           'marketplace',
           'putTokenOnSale',
           [cuki.tokenId, Number(priceRaw)],
-          { callValue: 0, feeLimit: 800_000_000, shouldPollResponse: true, rawResponse: true },
+          { callValue: 0, feeLimit: 800_000_000, shouldPollResponse: false },
           () => assertTronActionContext(getLegacyTronWeb()!, actionContext),
         );
         assertTronSendResult(tx);
         const txId = tronTransactionId(tx);
         listingHash = txId;
         if (txId) setLatestTxHash(txId);
+        rememberPendingListing(activeContext, txId, ready.address);
+        if (!txId) throw new Error('TRANSACTION_PENDING');
+        await waitForTronReceipt(txId);
+        receiptConfirmed = true;
         assertOperationContext(activeContext);
         setPhase('syncing');
         const reconciled = await reconcilePublishedListing(activeContext, ready.address);
         assertOperationContext(activeContext);
-        if (reconciled) {
-          pendingListingRef.current = null;
-          setListingState('published');
-        } else if (listingHash) {
-          rememberPendingListing(activeContext, listingHash, ready.address);
-        } else {
-          setListingState('pending');
-        }
-        setNotice(reconciled
+        pendingListingRef.current = null;
+        setInspection(reconciled);
+        setListingState(reconciled?.activeListing ? 'published' : 'confirmed');
+        setNotice(reconciled?.activeListing
           ? 'Venta publicada en TRON Mainnet. Actualizando la ficha y el catálogo…'
-          : txId
-            ? 'Transacción enviada en TRON Mainnet. Puedes comprobar la publicación sin firmar otra vez.'
-            : 'Transacción enviada en TRON Mainnet. La venta aparecerá cuando termine la indexación.');
+          : 'Publicación confirmada en TRON Mainnet. El estado actual del anuncio ya está actualizado.');
         window.dispatchEvent(new Event('cukies:legacy-marketplace:refresh'));
         onCompleted?.();
         return;
@@ -1003,28 +1201,47 @@ export function CukieSaleDialog({
         } as unknown as Parameters<typeof writeContractAsync>[0];
         listingHash = await writeEvm(request, { preserveBroadcast: true });
       }
+      receiptConfirmed = true;
       assertOperationContext(activeContext);
       setPhase('syncing');
       const reconciled = await reconcilePublishedListing(activeContext, ready.address);
       assertOperationContext(activeContext);
       if (reconciled) {
         pendingListingRef.current = null;
-        setListingState('published');
-      } else if (listingHash) {
-        rememberPendingListing(activeContext, listingHash, ready.address);
+        setInspection(reconciled);
+        setListingState(reconciled.activeListing ? 'published' : 'confirmed');
+        setNotice(reconciled.activeListing
+          ? `Venta publicada en ${signatureNetwork}. Actualizando la ficha y el catálogo…`
+          : `Publicación confirmada en ${signatureNetwork}. El estado actual del anuncio ya está actualizado.`);
       } else {
-        setListingState('pending');
+        // The receipt is decisive even when the indexer or a later read is unavailable.
+        // Keep the hash visible and let the normal refresh catch up without blocking close.
+        pendingListingRef.current = null;
+        setListingState('confirmed');
+        setNotice(`Publicación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
       }
-      setNotice(reconciled
-        ? `Venta publicada en ${signatureNetwork}. Actualizando la ficha y el catálogo…`
-        : `Transacción enviada en ${signatureNetwork}. Puedes comprobar la publicación sin firmar otra vez.`);
       window.dispatchEvent(new Event(surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
       onCompleted?.();
     } catch (reason) {
       const broadcastHash = reason instanceof BroadcastPendingError ? reason.hash : listingHash;
-      if (broadcastHash && activeContext?.wallet) {
-        rememberPendingListing(activeContext, broadcastHash, activeContext.wallet);
-        setError(reason instanceof BroadcastPendingError ? null : userError(reason));
+      const pending = pendingListingRef.current;
+      const reverted = isRevertedReason(reason);
+      const contextChanged = transactionMessage(reason).includes('wallet_context_changed');
+      if (reverted && (pending || broadcastHash)) {
+        pendingListingRef.current = null;
+        setListingState('idle');
+        setLatestTxHash(null);
+        setError(userError(reason));
+      } else if (receiptConfirmed && !contextChanged) {
+        pendingListingRef.current = null;
+        setListingState('confirmed');
+        setError(null);
+        setNotice(`Publicación confirmada en ${signatureNetwork}. La ficha se actualizará cuando el estado esté disponible.`);
+        window.dispatchEvent(new Event(surface === 'uki' ? 'cukies:uki-marketplace:refresh' : 'cukies:legacy-marketplace:refresh'));
+        onCompleted?.();
+      } else if (activeContext?.wallet && (broadcastHash || pending)) {
+        if (broadcastHash) rememberPendingListing(activeContext, broadcastHash, activeContext.wallet);
+        setError(null);
         setNotice('Transacción enviada. Puedes comprobar la publicación sin firmar otra vez.');
       } else {
         setError(userError(reason));
@@ -1065,7 +1282,7 @@ export function CukieSaleDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!busy && listingState !== 'pending') onOpenChange(next);
+        if (!busy && listingState !== 'pending' && approvalState !== 'pending') onOpenChange(next);
       }}
     >
       <DialogContent className="grid max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl border border-[var(--uki-lilac)]/30 bg-[#09060f] p-0 text-[var(--uki-cream)] shadow-[0_0_80px_rgba(228,92,255,0.18)] sm:max-h-[calc(100dvh-3rem)]">
@@ -1093,15 +1310,12 @@ export function CukieSaleDialog({
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 text-xs font-black text-[var(--uki-cream)]">
-                  {cuki.network ?? 'Red no identificada'}
-                </span>
                 <span className="rounded-full border border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 px-2.5 py-1 text-xs font-black text-[var(--uki-lilac)]">
                   {surfaceLabel(surface)}
                 </span>
               </div>
               <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-[5rem_minmax(0,1fr)]">
-                <dt className="font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Firma</dt>
+                <dt className="font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Tu wallet</dt>
                 <dd className="font-semibold text-[var(--uki-text)]">{signatureNetwork} · {shortIdentity(currentWallet)}</dd>
               </dl>
               <details className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs">
@@ -1130,7 +1344,7 @@ export function CukieSaleDialog({
                   setError(null);
                   setNotice(null);
                 }}
-                disabled={busy || listingState === 'pending'}
+                disabled={busy || listingState === 'pending' || approvalState === 'pending'}
                 className="min-h-11 rounded-xl border border-white/15 bg-black/30 px-3 text-sm font-bold text-[var(--uki-text)] outline-none transition focus:border-[var(--uki-lilac)]/60 disabled:opacity-60"
               >
                 {surfaces.map((option) => <option key={option} value={option}>{surfaceLabel(option)}</option>)}
@@ -1148,7 +1362,7 @@ export function CukieSaleDialog({
                 value={price}
                 onChange={(event) => setPrice(event.target.value)}
                 placeholder={surface === 'legacy-tron' ? '3333' : surface === 'legacy-bsc' ? '0,195' : '1250'}
-                disabled={busy || listingState === 'pending'}
+                disabled={busy || listingState === 'pending' || approvalState === 'pending'}
                 className="min-h-12 rounded-xl border border-white/15 bg-black/30 px-3 font-mono text-lg font-bold text-[var(--uki-cream)] outline-none transition placeholder:text-white/30 focus:border-[var(--uki-lilac)]/65 disabled:opacity-60"
               />
               {surface === 'uki' && !validation.valid && price ? <span className="text-xs font-semibold text-amber-200">{validation.priceError ?? validation.expiryError}</span> : null}
@@ -1194,29 +1408,40 @@ export function CukieSaleDialog({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-black text-[var(--uki-cream)]">Aprobar Cukie</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--uki-muted)]">Permiso limitado a este token y a este marketplace. La aprobación no publica el anuncio.</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--uki-muted)]">Permiso limitado a este Cukie y a este marketplace. La aprobación no publica el anuncio.</p>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => void approveCukie()}
-                    disabled={busy || approvalDone || Boolean(identityError)}
+                    disabled={busy || approvalDone || approvalState === 'pending' || Boolean(identityError)}
                     className="mt-3 min-h-10 border-[var(--uki-lilac)]/35 bg-[var(--uki-lilac)]/10 text-[var(--uki-cream)] hover:bg-[var(--uki-lilac)]/20"
                   >
                     <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                    {approvalDone ? 'Aprobar Cukie · ya aprobado' : phase === 'approving' ? 'Esperando recibo…' : phase === 'checking' ? 'Comprobando…' : 'Aprobar Cukie'}
+                    {approvalDone ? 'Aprobar Cukie · ya aprobado' : approvalState === 'pending' ? 'Aprobación pendiente…' : phase === 'approving' ? 'Esperando confirmación…' : phase === 'checking' ? 'Comprobando…' : 'Aprobar Cukie'}
                   </Button>
                   {approvalDone ? <p className="mt-2 text-xs font-bold text-emerald-200">Aprobación confirmada y revalidada.</p> : null}
+                  {approvalState === 'pending' ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void recheckPendingApproval()}
+                      disabled={busy}
+                      className="mt-2 min-h-10 border-amber-200/35 bg-amber-200/10 text-amber-100 hover:bg-amber-200/20"
+                    >
+                      Comprobar aprobación
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </li>
-            <li className={`rounded-xl border p-4 ${listingState === 'pending' || listingState === 'published' ? 'border-emerald-300/25 bg-emerald-300/[0.06]' : 'border-white/10 bg-black/20'}`}>
+            <li className={`rounded-xl border p-4 ${listingState === 'pending' || listingState === 'confirmed' || listingState === 'published' ? 'border-emerald-300/25 bg-emerald-300/[0.06]' : 'border-white/10 bg-black/20'}`}>
               <div className="flex items-start gap-3">
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-black ${listingState === 'pending' || listingState === 'published' ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100' : 'border-white/20 text-[var(--uki-muted)]'}`}>
-                  {listingState === 'pending' || listingState === 'published' ? <Check className="h-4 w-4" aria-hidden="true" /> : '2'}
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-black ${listingState === 'pending' || listingState === 'confirmed' || listingState === 'published' ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-100' : 'border-white/20 text-[var(--uki-muted)]'}`}>
+                  {listingState === 'pending' || listingState === 'confirmed' || listingState === 'published' ? <Check className="h-4 w-4" aria-hidden="true" /> : '2'}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-black text-[var(--uki-cream)]">Poner en la tienda</p>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--uki-muted)]">Después del recibo de aprobación, firma una segunda transacción para crear el anuncio.</p>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-[var(--uki-muted)]">Después de confirmar la aprobación, firma una segunda transacción para crear el anuncio.</p>
                   <Button
                     type="button"
                     onClick={() => void publishCukie()}
@@ -1224,7 +1449,7 @@ export function CukieSaleDialog({
                     className="mt-3 min-h-10 bg-[var(--uki-lilac)] text-[#09060f] hover:bg-[#f19bff]"
                   >
                     <Store className="h-4 w-4" aria-hidden="true" />
-                    {listingState === 'published' ? 'Anuncio publicado' : listingState === 'pending' ? 'Publicación pendiente…' : phase === 'listing' ? 'Esperando recibo…' : 'Poner en la tienda'}
+                    {listingState === 'published' ? 'Anuncio publicado' : listingState === 'confirmed' ? 'Publicación confirmada' : listingState === 'pending' ? 'Publicación pendiente…' : phase === 'listing' ? 'Esperando confirmación…' : 'Poner en la tienda'}
                   </Button>
                   {listingState === 'pending' ? (
                     <Button
@@ -1246,7 +1471,7 @@ export function CukieSaleDialog({
         </div>
 
         <DialogFooter className="border-t border-white/10 px-5 py-4 sm:px-7">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy || listingState === 'pending'} className="min-h-11 border-white/15 bg-white/[0.03] text-[var(--uki-cream)]">Cerrar</Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy || listingState === 'pending' || approvalState === 'pending'} className="min-h-11 border-white/15 bg-white/[0.03] text-[var(--uki-cream)]">Cerrar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
