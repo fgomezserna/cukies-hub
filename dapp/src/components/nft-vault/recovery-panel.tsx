@@ -39,6 +39,7 @@ type OnChainPosition = {
   beneficialOwner: Address;
   depositEpoch: bigint;
   depositedAt: bigint;
+  exitRequestedAt: bigint;
   withdrawableAt: bigint;
 };
 
@@ -91,6 +92,9 @@ function parsePosition(
   const ownerValue = tupleField(value, 'beneficialOwner', 0);
   const depositEpoch = uintField(value, 'depositEpoch', 1);
   const depositedAt = uintField(value, 'depositedAt', 2);
+  const exitRequestedAt = kind === 'cukie_pool'
+    ? uintField(value, 'exitRequestedAt', 4)
+    : BigInt(0);
   const withdrawableAt = kind === 'cukie_pool'
     ? uintField(value, 'withdrawableAt', 5)
     : BigInt(0);
@@ -100,6 +104,7 @@ function parsePosition(
     || !isAddress(ownerValue)
     || depositEpoch === null
     || depositedAt === null
+    || exitRequestedAt === null
     || withdrawableAt === null
   ) return null;
 
@@ -110,6 +115,7 @@ function parsePosition(
     beneficialOwner: ownerValue,
     depositEpoch,
     depositedAt,
+    exitRequestedAt,
     withdrawableAt,
   };
 }
@@ -878,11 +884,18 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 {phase === 'withdrawing' ? 'Retirando…' : 'Retirar Cukie'}
               </button>
             ) : (
-              <span className="max-w-xs text-right text-xs font-black uppercase text-amber-300">
-                {chainTimeVerified
-                  ? `Retirable desde ${utcTimestampLabel(result.position.withdrawableAt)} UTC`
-                  : 'No se pudo verificar la hora del último bloque; vuelve a comprobar la posición.'}
-              </span>
+              <div className="max-w-xs text-right text-xs text-amber-300">
+                <span className="font-black uppercase">
+                  {chainTimeVerified
+                    ? `Retirable desde ${utcTimestampLabel(result.position.withdrawableAt)} UTC`
+                    : 'No se pudo verificar la hora del último bloque; vuelve a comprobar la posición.'}
+                </span>
+                {chainTimeVerified && result.position.exitRequestedAt > BigInt(0) ? (
+                  <span className="mt-1 block font-semibold normal-case text-[var(--uki-muted)]">
+                    Solicitud registrada el {utcTimestampLabel(result.position.exitRequestedAt)} UTC. El contrato fija la retirada en el siguiente cierre de su periodo; no requiere esperar varios periodos ni al reparto.
+                  </span>
+                ) : null}
+              </div>
             )}
           </div>
         </div>
