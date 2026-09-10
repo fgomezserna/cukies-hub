@@ -1,0 +1,114 @@
+{
+  "recordedAt": "2026-09-10T12:17:00Z",
+  "scope": "Invalid, missing or revoked ambassador invitations fall back to Cukies World; unknown/503 preserves the invitation. Existing sponsor relationships, presale and cycle restrictions remain enforced.",
+  "authorization": "User explicitly requested a production hotfix and transfer to staging; no wallet signing or relationship changes performed during verification.",
+  "production": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/382",
+    "branch": "main",
+    "commit": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+    "candidate": "dcf5603ef6baeac491f8b2014b3a2d6673903b74",
+    "mergedAt": "2026-09-10T11:52:53Z",
+    "applicationId": 12,
+    "deploymentId": 1500,
+    "deploymentUuid": "t8g0ookg0wg8w0g8sssc8www",
+    "finishedAt": "2026-09-10T12:01:38Z",
+    "health": {
+      "httpStatus": 200,
+      "transport": "container localhost /api/health",
+      "environment": "production",
+      "gitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+      "gitRef": "main"
+    },
+    "containerVerification": {
+      "before": 92,
+      "after": 92,
+      "preservedIds": 90,
+      "replacedServices": [
+        "app12 dapp",
+        "app12 chain-indexer"
+      ],
+      "healthy": true
+    },
+    "indexer": {
+      "successfulLoops": 4,
+      "safeBlocks": [
+        121066539,
+        121066736,
+        121066939,
+        121067146
+      ],
+      "failedProjections": 0
+    },
+    "publicUi": {
+      "url": "https://cukies.world/embajadores/cw-000000000000",
+      "browser": "Edge",
+      "sponsor": "Cukies World",
+      "consentEnabledConfirm": true,
+      "consentRestoredUnchecked": true,
+      "signatureRequested": false,
+      "relationshipChanged": false
+    },
+    "validation": {
+      "lint": "pass",
+      "typecheck": "pass",
+      "buildChainId": 56,
+      "build": "pass",
+      "testSuites": 172,
+      "tests": 1488
+    },
+    "postflight": "https://github.com/fgomezserna/cukies-hub/pull/382#issuecomment-5618415102"
+  },
+  "staging": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/383",
+    "branch": "staging",
+    "commit": "bc03749ebf0ab9a1b1e4ac3b1b5e415adcf215ce",
+    "candidate": "b253cee253bc118119086436e198abf5c778e739",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34474927269",
+    "workflowConclusion": "success",
+    "applicationId": 32,
+    "deploymentUuid": "r0o0wc0ck04wsok80o8s0s4w",
+    "finishedAt": "2026-09-10T12:14:05.068Z",
+    "health": {
+      "httpStatus": 200,
+      "body": {
+        "status": "ok",
+        "app": "cukies-hub",
+        "environment": "staging",
+        "gitSha": "bc03749ebf0ab9a1b1e4ac3b1b5e415adcf215ce",
+        "gitRef": "staging",
+        "buildTime": null,
+        "coolify": {
+          "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+          "fqdn": null
+        }
+      }
+    },
+    "containerVerification": {
+      "before": 92,
+      "after": 92,
+      "preservedIds": 91,
+      "replacedServices": [
+        "app32 dapp"
+      ],
+      "healthy": true
+    },
+    "reusedImageCount": 7,
+    "validation": {
+      "lint": "pass",
+      "typecheck": "pass",
+      "buildChainId": 97,
+      "build": "pass",
+      "testSuites": 248,
+      "tests": 2016
+    },
+    "publicUi": {
+      "url": "https://cukieshub.eurekand.com/embajadores/cw-000000000000",
+      "result": "Page renders connection prompt; authenticated flow remains blocked by separately reviewed wallet restoration bug. No wallet signature requested."
+    }
+  },
+  "limits": [
+    "No sponsor confirmation transaction/signature executed.",
+    "No new commission, sponsor relationship or production feature activation.",
+    "Public HTTP health probe returned 403; health evidence uses authorized internal container reads. Production UI was verified in the public browser."
+  ]
+}
