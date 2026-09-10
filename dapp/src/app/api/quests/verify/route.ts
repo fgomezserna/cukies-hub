@@ -233,32 +233,19 @@ export async function POST(request: Request) {
         break;
 
       case 'telegram_join':
-        // Verify Telegram membership using verification code
-        if (!value || typeof value !== 'string' || value.trim().length === 0) {
+        // The webhook has already proven sender control and group membership.
+        // Client-provided values are intentionally ignored here.
+        const telegramLink = await prisma.telegramAccountLink.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        });
+        if (!telegramLink) {
           return NextResponse.json({
-            error: 'Verification code is required'
-          }, { status: 400 });
+            error: 'Complete Telegram verification before checking this task.'
+          }, { status: 403 });
         }
 
-        try {
-          // Use direct verification function instead of HTTP call
-          const { verifyTelegramByCode } = await import('@/lib/telegram-utils');
-          const telegramResult = await verifyTelegramByCode(user.walletAddress, value.trim());
-
-          if (!telegramResult.success) {
-            return NextResponse.json({
-              error: telegramResult.error || 'Failed to verify Telegram membership'
-            }, { status: telegramResult.status });
-          }
-
-          updateData.telegramUsername = telegramResult.user?.username || `user_${telegramResult.user?.id}`;
-          verificationResult = true;
-        } catch (error) {
-          console.error('Telegram verification error:', error);
-          return NextResponse.json({
-            error: 'Failed to verify Telegram membership. Please try again.'
-          }, { status: 500 });
-        }
+        verificationResult = true;
         break;
 
       case 'auto_verify':
