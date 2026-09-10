@@ -1,12 +1,14 @@
 {
-  "observedAt": "2026-09-10T03:56:50.109672+00:00",
+  "observedAt": "2026-09-10T04:30:27.147137+00:00",
   "scope": "World port preservation and common-CI integration; runtime and writes remain disabled",
   "source": {
     "pr": 346,
     "branch": "codex/world-stack-integration",
     "commit": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
     "deltaFiles": 205,
-    "inventory": "infrastructure/world/integration/inventory-20260910.json"
+    "inventory": "infrastructure/world/integration/inventory-20260910.json",
+    "prStatus": "CLOSED as superseded; original branch and worktree preserved",
+    "integrationComment": "https://github.com/fgomezserna/cukies-hub/pull/346#issuecomment-5613123346"
   },
   "integration": {
     "frozenCandidate": "09401296ae6732f6d80014c6619159662f6728bd",
@@ -43,7 +45,27 @@
     },
     "priorLockEntriesPreserved": 4224,
     "newLockEntries": 327,
-    "dappAndGameDiffFromReconciledStaging": []
+    "dappAndGameDiffFromReconciledStaging": [],
+    "finalVerification": {
+      "originalWorld": {
+        "head": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
+        "branch": "codex/world-stack-integration",
+        "trackedClean": true,
+        "untrackedFilesPreserved": true
+      },
+      "mainCheckout": {
+        "head": "6f13b055c124661b6108887973e0c6c4827d2fd4",
+        "branch": "codex/legacy-migration-inventory",
+        "trackedClean": true,
+        "untrackedFilesPreserved": true
+      },
+      "originalExactPaths": 199,
+      "originalDocOverlay": [
+        "infrastructure/world/README.md"
+      ],
+      "protectedHashes": "PASS"
+    },
+    "finalVerificationArtifactSha256": "afc26c3366b585bb2f8ccfa2122063893103243f626a8d67a6f244fb93a9c7bb"
   },
   "preReviewGates": {
     "candidateSha": "09401296ae6732f6d80014c6619159662f6728bd",
@@ -142,7 +164,7 @@
     }
   },
   "publication": {
-    "status": "plan classification corrected and reviewed; exact final-head plan and publication pending",
+    "status": "Registry publication and no-op release registration verified; new World runtime and writes remain disabled. Full migration remains open.",
     "registryImagesPublished": true,
     "worldActivated": false,
     "pr": 372,
@@ -156,7 +178,7 @@
     },
     "publishCiRunId": 34432744474,
     "squashTreeEqualsTestedCandidate": true,
-    "releaseRegistered": false,
+    "releaseRegistered": true,
     "firstAttempt": {
       "commit": "25284f97b91cea040cc2d2afa4838a2c87264d93",
       "ciRunId": 34432744474,
@@ -316,6 +338,127 @@
         "limit": "Worker local checkout lacked Nx; root will use observed full Nx input for exact final-head verification"
       },
       "rootDiffReview": "PASS"
+    },
+    "finalPr": 374,
+    "finalMergeCommit": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+    "finalMergedAt": "2026-09-10T04:02:21Z",
+    "finalPrCi": {
+      "runId": 34435382990,
+      "result": "SUCCESS",
+      "testedHead": "42e69a9dfa5e9ad9db03e31ff323c0d469897097",
+      "mergeTreeEqualsTestedTree": true
+    },
+    "finalPublishCi": {
+      "runId": 34435609267,
+      "result": "SUCCESS",
+      "build": [
+        "world-api",
+        "world-matchmaking"
+      ],
+      "reuse": [
+        "dapp",
+        "chain-indexer",
+        "cuki-card-worker",
+        "schedulers",
+        "cukies-bridge-relayer",
+        "treasure-hunt"
+      ],
+      "planReason": "world-integration-only",
+      "worldPullDigestsAndHarnessLogVerified": true,
+      "logSha256": "5514387840598357097ef0f16d68c82d066a60487508cde0fe02423cfc98a748"
+    },
+    "finalWorldImages": {
+      "world-api": {
+        "image": "192.168.1.207:5000/cukies-hub/world-api:26ae560eaf65e97f4e577a202c6e98baa4b39ea4-b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15@sha256:4190866ff3933b19b7c0284821ef904b6125417ef69ab212f7c7d7017f5b8518",
+        "digest": "sha256:4190866ff3933b19b7c0284821ef904b6125417ef69ab212f7c7d7017f5b8518",
+        "sourceSha": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+        "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-matchmaking": {
+        "image": "192.168.1.207:5000/cukies-hub/world-matchmaking:26ae560eaf65e97f4e577a202c6e98baa4b39ea4-b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15@sha256:dadc6fb06a5a6c0f58e29e559f7e41d6deecacbb7eb4bcca09781fdc260e62fa",
+        "digest": "sha256:dadc6fb06a5a6c0f58e29e559f7e41d6deecacbb7eb4bcca09781fdc260e62fa",
+        "sourceSha": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+        "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+        "environment": "staging",
+        "chainId": "97"
+      }
+    },
+    "deliveryResult": {
+      "status": "skipped",
+      "reason": "images-and-workers-compose-unchanged",
+      "servedSha": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+      "decision": {
+        "deliveryMode": "rolling",
+        "web": false,
+        "workers": false,
+        "game": false,
+        "skip": true,
+        "changed": [
+          "world-api",
+          "world-matchmaking"
+        ],
+        "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+      },
+      "stateCommit": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4"
+    },
+    "allSixActiveReferencesEqualPreflight": true,
+    "finalHeadPlanReview": {
+      "observedAt": "2026-09-10T03:58:11.392Z",
+      "head": "42e69a9dfa5e9ad9db03e31ff323c0d469897097",
+      "base": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+      "changedPathCount": 230,
+      "nxInput": {
+        "sourceRun": 34434107532,
+        "available": true,
+        "projects": [
+          "@cukies/world-api",
+          "@cukies/world-matchmaking",
+          "@cukies/world-shared",
+          "cukies-bridge-relayer",
+          "cuki-card-worker",
+          "chain-indexer",
+          "game-bridge",
+          "tower-builder",
+          "hyppie-road",
+          "contracts",
+          "sybil-slayer",
+          "schedulers",
+          "dapp"
+        ],
+        "graphInputsUnchangedSinceObservedHead": "556ee514b5a4484ef9af545a597f664453a98431"
+      },
+      "build": [
+        "world-api",
+        "world-matchmaking"
+      ],
+      "reuse": [
+        "dapp",
+        "chain-indexer",
+        "cuki-card-worker",
+        "schedulers",
+        "cukies-bridge-relayer",
+        "treasure-hunt"
+      ],
+      "reason": "world-integration-only",
+      "projections": {
+        "compose": "byte-identical without World",
+        "imagesCompose": "byte-identical without World",
+        "workersCompose": "byte-identical without World"
+      },
+      "deliverySimulation": {
+        "skip": true,
+        "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+        "entries": 8,
+        "webCommit": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+        "gameCommit": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+        "worldRefsFromPreviousPublishedCommit": "25284f97b91cea040cc2d2afa4838a2c87264d93",
+        "notProofOfFinalImagePublication": true,
+        "noLiveWrite": true
+      },
+      "unknownCiPathConservativeBuild": 8,
+      "result": "PASS"
     }
   },
   "remainingMigration": [
@@ -356,5 +499,277 @@
       "worldRuntimeInactive": true
     },
     "sourceArtifact": "/tmp/cukies-world-preflight-20260910.json"
+  },
+  "postflight": {
+    "observedAt": "2026-09-10T04:19:57.865132+00:00",
+    "result": "PASS_WITH_ATTENTION",
+    "scope": "Read-only postflight after PR374 World image publication on staging; no deploy, restart, pull, build, DB query or cleanup performed.",
+    "sourceArtifactSha256": "b6f0190e8ab4e9eed297f8d1ef78ea64a45cc7ee205add4921dc9a28a1d692dc",
+    "checks": {
+      "newWorldRuntimeDisabled": true,
+      "prValidation": true,
+      "protectedContainersUnchanged": true,
+      "publicHealthReady": true,
+      "publishPipeline": true,
+      "releaseJournalClean": true,
+      "releaseStateExists": true,
+      "stagingGuards": true,
+      "worldBuildAndSmoke": true,
+      "worldRefsPersisted": true
+    },
+    "containerComparison": {
+      "expectedProtectedAndFrontends": 15,
+      "protectedCount": 13,
+      "stageWorkerCount": 10,
+      "productionCount": 3,
+      "allIdsSame": true,
+      "allImageIdsSame": true,
+      "allPresent": true,
+      "allRestartsSame": true,
+      "allRunning": true
+    },
+    "release": {
+      "componentCount": 8,
+      "componentsAddedSinceBaseline": [
+        "world-api",
+        "world-matchmaking"
+      ],
+      "existingComponentsUnchangedSinceBaseline": [
+        "dapp",
+        "chain-indexer",
+        "cuki-card-worker",
+        "schedulers",
+        "cukies-bridge-relayer",
+        "treasure-hunt"
+      ],
+      "pendingJournal": false,
+      "summary": {
+        "chainId": "97",
+        "commit": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+        "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+        "deliveryMode": "rolling",
+        "deploymentUuid": "kcwcc8gcgk0o44wwwswos484",
+        "environment": "staging",
+        "gameCommit": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+        "gameDeploymentUuid": "x0oo80800o8wkw04osgs8c8g",
+        "gameResourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+        "previousCommit": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+        "schemaVersion": 1,
+        "updatedAt": "2026-09-10T04:03:48.020Z",
+        "webCommit": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+        "webResourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+        "workersResourceUuid": "u4s804o4wwcckowgk0woo4wg"
+      }
+    },
+    "guards": {
+      "game": {
+        "branch": "staging",
+        "resourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+        "stagingOnlyGuard": "true"
+      },
+      "production": {
+        "stagingOnlyGuardValues": [
+          "false"
+        ]
+      },
+      "stageWorkers": {
+        "composeProfiles": [
+          "staging-runtime,card-worker,legacy-card-worker"
+        ],
+        "stagingOnlyGuardValues": [
+          "true"
+        ],
+        "worldFlagsPresent": {
+          "WORLD_GAME_WRITES_ENABLED": [],
+          "WORLD_RUNTIME_ENABLED": []
+        }
+      },
+      "web": {
+        "branch": "staging",
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "stagingOnlyGuard": "true"
+      }
+    },
+    "publicChecks": {
+      "observedAt": "2026-09-10T04:12:16.909971+00:00",
+      "probes": [
+        {
+          "json": {
+            "app": "cukies-hub",
+            "environment": "staging",
+            "gitSha": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+            "status": "ok"
+          },
+          "status": 200,
+          "url": "https://cukieshub.eurekand.com/api/health"
+        },
+        {
+          "json": {
+            "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+            "gitSha": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+            "imageSha": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+            "status": "ready"
+          },
+          "status": 200,
+          "url": "https://cukieshub.eurekand.com/api/ready"
+        },
+        {
+          "json": {
+            "app": "treasure-hunt",
+            "environment": "staging",
+            "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+            "status": "ok"
+          },
+          "status": 200,
+          "url": "https://cukieshub.eurekand.com/treasurehunt-game/api/health"
+        },
+        {
+          "json": {
+            "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+            "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+            "imageSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+            "status": "ready"
+          },
+          "status": 200,
+          "url": "https://cukieshub.eurekand.com/treasurehunt-game/api/ready"
+        }
+      ]
+    },
+    "newWorldRuntime": {
+      "gate": "absence of new release26/app28 cukies-hub/world-api and cukies-hub/world-matchmaking containers; legacy World services are inventoried separately.",
+      "newPublishedImageContainers": [],
+      "newWorldRuntimeActive": false
+    },
+    "attention": [
+      {
+        "code": "LEGACY_WORLD_RUNTIME_OUT_OF_BAND",
+        "evidence": "CreatedAt/StartedAt de las instancias actuales son anteriores al postflight; el baseline no las capturó, por lo que no se afirma igualdad histórica de IDs.",
+        "nextStep": "Inventariar consumidores y ownership en una acción separada; no apagar ni retirar estos backends por esta integración.",
+        "severity": "medium",
+        "summary": "Legacy runtime preexistente y activo fuera de los UUID del release PR374; incluye game, marketplace y matchmaking en el compose legacy."
+      }
+    ]
+  },
+  "preexistingLegacyRuntime": {
+    "observedAt": "2026-09-10T04:19:57.865132+00:00",
+    "classification": "runtime Legacy preexistente y activo",
+    "coolifyResource": "service-vokgw84g4g4cs0woog0g8o0k",
+    "composeProjects": [
+      "cukies-api-staging",
+      "cukiesapistaging"
+    ],
+    "publicDomain": "staging-hub.cukies.world",
+    "containerCount": 8,
+    "runningCount": 8,
+    "baselineCoverage": "The baseline protected/frontends inventory did not include this compose; no historical ID comparison is asserted.",
+    "actionTaken": "none; preserved as inventory pending consumer/ownership review. No DB, credentials, stop, restart or removal action.",
+    "items": [
+      {
+        "name": "auth-api-cukiesapistaging",
+        "containerId": "00f92935dc50eae517ce78866147a94514e33fba1b3d381e0450d35e5db3a555",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_world-auth:latest",
+        "imageId": "sha256:7d198d322dedcf1ea4fe395ff47b941be2a82fc9da3133db2594e19ae3ba48c7",
+        "createdAt": "2026-06-30T17:39:59.041160546Z",
+        "startedAt": "2026-09-07T16:39:33.024557328Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukiesapistaging",
+        "service": "auth-api",
+        "publicPath": "/auth"
+      },
+      {
+        "name": "data-graphql-api-cukiesapistaging",
+        "containerId": "523744baa198de489176924cf0e4692875cc8f95058bb9fd2ea5134b4afa124a",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_world-data-graphql:security-20260820-54cbf484",
+        "imageId": "sha256:3ee6a484feacbf95d51ad9fdfda82f693f3d855e4fa9cc529f0019619dea6694",
+        "createdAt": "2026-08-20T11:22:23.874593558Z",
+        "startedAt": "2026-09-07T16:39:35.297611103Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukiesapistaging",
+        "service": "data-graphql-api",
+        "publicPath": "/data-graphql"
+      },
+      {
+        "name": "data-rest-api-cukiesapistaging",
+        "containerId": "f597e18591cb5360af61083d15fb0e3692b29814e031bb1b37447db429483846",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_world-data-rest:latest",
+        "imageId": "sha256:15f01b6ca5325e1f242906a39e0e695a24611ed47d8e6cb050102db82322256f",
+        "createdAt": "2026-06-29T18:08:37.980167902Z",
+        "startedAt": "2026-09-07T16:39:33.458889631Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukiesapistaging",
+        "service": "data-rest-api",
+        "publicPath": "/data-rest"
+      },
+      {
+        "name": "data-rest-learn-api-cukiesapistaging",
+        "containerId": "64bb0fb054bb7c7367eb62d5611db934101e49909d0bedf96144c97acde7ef4e",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_learn-data-rest:a7251b5",
+        "imageId": "sha256:07459732e6de43945895eaba813ecd987a78480d238262b79cac371faf0cfaaf",
+        "createdAt": "2026-08-21T11:40:39.569904427Z",
+        "startedAt": "2026-09-07T16:39:35.319947073Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukiesapistaging",
+        "service": "data-rest-learn-api",
+        "publicPath": "/learn"
+      },
+      {
+        "name": "data-rest-ludo-api-cukiesapistaging",
+        "containerId": "91250f838b2626a28c3f75c6425ffdd495944cf56686a092f0b0f3417de9ed75",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_ludo-data-rest:latest",
+        "imageId": "sha256:60fe5d42db9bd430df41f1baabbd4fafe2c4075ad37ba70d5dec2f742e9d8540",
+        "createdAt": "2026-06-29T18:08:37.979854224Z",
+        "startedAt": "2026-09-07T16:39:32.430880173Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukiesapistaging",
+        "service": "data-rest-ludo-api",
+        "publicPath": "/ludo"
+      },
+      {
+        "name": "game-api-cukiesapistaging",
+        "containerId": "0e16c93b3e22cff5e075c15a2c87f657b95c0ff71c29d520f278171ab76dd94c",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_world-game:latest",
+        "imageId": "sha256:94dc3230d23485f8569c2afbafa13c8e3d02dfac5e4c0c05c003592289ee933e",
+        "createdAt": "2026-07-02T14:57:44.874534997Z",
+        "startedAt": "2026-09-07T16:39:35.096195809Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukies-api-staging",
+        "service": "game-api",
+        "publicPath": "/game"
+      },
+      {
+        "name": "marketplace-cukiesapistaging",
+        "containerId": "52c91bb6a9150fd438485b99a1acdd2d77836f9d120e7fe7e04b14ebcc7a0e28",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_world-dapp:latest",
+        "imageId": "sha256:6f04194c31d85492b598bda060a418966cfa7fc8fdc27c481d53c23944fc20ac",
+        "createdAt": "2026-06-30T20:43:04.186421294Z",
+        "startedAt": "2026-09-07T16:39:35.069126935Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukies-api-staging",
+        "service": "marketplace",
+        "publicPath": null
+      },
+      {
+        "name": "matchmaking-api-cukiesapistaging",
+        "containerId": "8fda41b5c1def6987216f973905cbb0b83eceb7f3e5a4720c3f95ef9d52eec60",
+        "imageRef": "192.168.1.207:5000/cukies/cukies_world-matchmaking:codex-island-20260701T065752Z-1f4d04cc-join-token",
+        "imageId": "sha256:5b43ef59ee24cfb4a81a4b9ae434f2c6ae562b54823767347f53277907e86fa1",
+        "createdAt": "2026-07-01T08:02:41.960974684Z",
+        "startedAt": "2026-09-07T16:39:33.170367732Z",
+        "status": "running",
+        "health": null,
+        "composeProject": "cukies-api-staging",
+        "service": "matchmaking-api",
+        "publicPath": "/matchmaking"
+      }
+    ],
+    "nextStep": "Reconcile consumers, identity and data ownership in the remaining World migration before switching traffic or retiring services. Current observations do not establish obsolescence or historical ID equality."
   }
 }
