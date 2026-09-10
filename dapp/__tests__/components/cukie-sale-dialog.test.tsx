@@ -7,6 +7,9 @@ const listingHash = `0x${'b'.repeat(64)}`;
 
 let approved = false;
 let listed = false;
+let deactivateListingAfterBroadcast = false;
+let failListingRefreshReads = false;
+let listingReadActiveOverride: boolean | null = null;
 let accountAddress: string | undefined = wallet;
 let accountChainId: number | undefined = 56;
 let accountConnected = true;
@@ -17,7 +20,11 @@ const readContract = jest.fn(async (input: { functionName: string }) => {
     case 'ownerOf':
       return wallet;
     case 'marketTokens':
-      return [wallet, listed ? BigInt('195000000000000000') : BigInt(0), BigInt(0), listed, BigInt(0), BigInt(0)];
+      if (failListingRefreshReads && listed) throw new Error('RPC refresh failed');
+      {
+        const activeListing = listingReadActiveOverride ?? listed;
+        return [wallet, activeListing ? BigInt('195000000000000000') : BigInt(0), BigInt(0), activeListing, BigInt(0), BigInt(0)];
+      }
     case 'getApproved':
       return approved ? '0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91' : zeroAddress;
     case 'isApprovedForAll':
@@ -36,6 +43,7 @@ const writeContractAsync = jest.fn(async (input: { functionName: string }) => {
   }
   if (input.functionName === 'putTokenOnSale') {
     listed = true;
+    if (deactivateListingAfterBroadcast) listingReadActiveOverride = false;
     return listingHash;
   }
   throw new Error(`Unexpected write ${input.functionName}`);
@@ -130,12 +138,14 @@ const cuki: MyCukieCollectionItem = {
   availableActions: ['sell'],
 };
 
+const onOpenChange = jest.fn();
+
 function renderDialog() {
   return render(
     <CukieSaleDialog
       cuki={cuki}
       open
-      onOpenChange={jest.fn()}
+      onOpenChange={onOpenChange}
     />,
   );
 }
@@ -144,6 +154,9 @@ describe('CukieSaleDialog', () => {
   beforeEach(() => {
     approved = false;
     listed = false;
+    deactivateListingAfterBroadcast = false;
+    failListingRefreshReads = false;
+    listingReadActiveOverride = null;
     accountAddress = wallet;
     accountChainId = 56;
     accountConnected = true;
@@ -261,4 +274,34 @@ describe('CukieSaleDialog', () => {
     await waitFor(() => expect(screen.getByText(/Venta publicada en BNB Smart Chain/)).toBeInTheDocument());
     expect(writeContractAsync).toHaveBeenCalledTimes(1);
   });
+
+  it('libera el cierre tras un recibo exitoso aunque el anuncio ya no esté activo', async () => {
+    approved = true;
+    deactivateListingAfterBroadcast = true;
+    renderDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    fireEvent.change(screen.getByLabelText('Precio de venta en BNB'), { target: { value: '0,195' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Poner en la tienda' }));
+
+    await waitFor(() => expect(screen.getByText(/Publicación confirmada en BNB Smart Chain/)).toBeInTheDocument(), { timeout: 6_000 });
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeEnabled();
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  }, 8_000);
+
+  it('confirma el anuncio y permite cerrar si falla la relectura RPC tras el recibo', async () => {
+    approved = true;
+    failListingRefreshReads = true;
+    renderDialog();
+    await waitFor(() => expect(screen.getByRole('button', { name: /Aprobar Cukie · ya aprobado/ })).toBeDisabled());
+    fireEvent.change(screen.getByLabelText('Precio de venta en BNB'), { target: { value: '0,195' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Poner en la tienda' }));
+
+    await waitFor(() => expect(screen.getByText(/Publicación confirmada en BNB Smart Chain/)).toBeInTheDocument(), { timeout: 6_000 });
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeEnabled();
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  }, 8_000);
 });
