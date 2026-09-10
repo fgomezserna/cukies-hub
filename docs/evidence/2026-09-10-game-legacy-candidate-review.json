@@ -1,0 +1,355 @@
+{
+  "observedAt": "2026-09-10T06:57:06.050615+00:00",
+  "scope": "Pre-publication review of isolated game recovery and Legacy breeding identity candidates; no live state operations",
+  "stagingCodeObserved": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
+  "stagingChangedByTheseCandidates": false,
+  "gameRecovery": {
+    "candidate": "3903aa7cbc9dc11b7ccba787ace551df4fd1373f",
+    "base": "0cf0019742373364da5cb0811c3252d1a1cbd007",
+    "decision": "implementation_accepted_pending_combined_verification",
+    "reviewer": "root Astra Max",
+    "reviewed": "Complete nine-file diff, new recovery inspector, related engine compensation and Mongo resource ports, reported test coverage",
+    "productTestsRunByReviewer": false,
+    "reportedWorkerGates": {
+      "focalSuites": 5,
+      "focalTests": 59,
+      "fullSuites": 236,
+      "fullTests": 1929,
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "buildStaticPages": 92,
+      "scope": "Original candidate, not integrated staging"
+    },
+    "reportSha256": "4f515efa88180b48eb0ca38d01a8c3e0a2910f6671053d5e47bb84c08d8f1043",
+    "findings": [
+      {
+        "id": "GR1",
+        "priority": "P1",
+        "finding": "The original first-resource failure never created a Cukie binding; requiring both bindings permanently rejects its recovery.",
+        "evidence": [
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1091",
+          "dapp/src/lib/uki-economy/game-economy/resource-ports.ts:684"
+        ]
+      },
+      {
+        "id": "GR2",
+        "priority": "P1",
+        "finding": "A non-null Cukie reservation is checked as both own and pool; the empty alternative always rejects a valid compensated assignment.",
+        "evidence": [
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:841",
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:892"
+        ]
+      },
+      {
+        "id": "GR3",
+        "priority": "P1",
+        "finding": "The component forgets the old resume before persisting the replacement; a failed storage write can lose the stable recovery key and trigger random authority creation.",
+        "evidence": [
+          "dapp/src/components/games/treasure-hunt-game-view.tsx:227",
+          "dapp/src/lib/treasure-hunt-competition/client/game-session-resume.ts:305"
+        ]
+      },
+      {
+        "id": "GR4",
+        "priority": "P2",
+        "finding": "The snapshot includes other sessions using the same credit lots and then blocks recovery if any such reservation is active.",
+        "evidence": [
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:560",
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1209"
+        ]
+      },
+      {
+        "id": "GR5",
+        "priority": "P1",
+        "finding": "New tests exercise HTTP mapping and session starter, but mock the economic server entrypoint; they do not validate the recovery inspector that authorizes replacement.",
+        "evidence": [
+          "dapp/__tests__/api/treasure-hunt-economy-routes.test.ts:16",
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1419"
+        ]
+      }
+    ],
+    "nextStep": "Data task frozen. Root validates the combined candidate once, obtains exact-head release plan/preflight, then merges and verifies staging; no direct data repair.",
+    "taskId": "01a0814e-0ea0-7070-877c-701f264243e7",
+    "currentCandidate": "523187439e5ea9ab0f9749a17baef88062737fba",
+    "correctionReview": {
+      "candidate": "4fa4f37cc53936f0312c3525b385d18a37297544",
+      "decision": "changes_requested",
+      "reviewer": "root Astra Max",
+      "reviewed": "Complete six-file correction diff and focused test suite, related resource and session starter helpers",
+      "addressedInDiff": [
+        "GR1 sequential first-resource failure recognition",
+        "GR2 canonical own/pool selection",
+        "GR3 persist replacement before clearing old authority",
+        "GR4 scope active credit exclusion to the own attempt"
+      ],
+      "remainingFindings": [
+        {
+          "id": "GR1",
+          "priority": "P1",
+          "finding": "Multiple own epochs collapse to null while completeness remains true, so partial own effects are treated as proven absence and permit restart.",
+          "evidence": [
+            "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1583",
+            "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:810"
+          ]
+        },
+        {
+          "id": "GR5",
+          "priority": "P1",
+          "finding": "Recovery tests use a credit failure without durable reservation and manually reconstructed saga/Own/Pool receipts; durable credit compensation, another active player in a shared lot and lost-response effects remain untested.",
+          "evidence": [
+            "dapp/__tests__/lib/treasure-hunt-economy-recovery.test.ts:180",
+            "dapp/__tests__/lib/treasure-hunt-economy-recovery.test.ts:231"
+          ]
+        }
+      ],
+      "reproduction": {
+        "suites": 1,
+        "cases": 1,
+        "fixture": "Terminal first-credit failure with two own epochs referencing the same session and no complete binding/assignment",
+        "observed": "restart",
+        "result": "PASS reproduces residual defect, not acceptance",
+        "liveOperations": false
+      },
+      "reportedWorkerGates": {
+        "focalSuites": 5,
+        "focalTests": 61,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Correction candidate, not final combined staging candidate"
+      },
+      "reportSha256": "f8699c7b3f0b485beb4372ea1ac2574a8c013b92ff379180301160831c1f5880"
+    },
+    "finalCorrectionReview": {
+      "candidate": "523187439e5ea9ab0f9749a17baef88062737fba",
+      "reviewer": "root Astra Max",
+      "decision": "implementation_accepted_pending_combined_verification",
+      "reviewed": "Complete final production diff, canonical event producer extraction and focused canonical credit/Own/Pool and authority regression scenarios",
+      "outcome": [
+        "All observed own epochs retain cardinality; orphan/multiple effects fail closed",
+        "Durable credit compensation is validated through binding, reservations, ledger and lots before accepting absence of Cukie effects",
+        "Tests now use the repository event producer and real domain services for credit/Own/Pool, including lost reservation response and partial terminal evidence"
+      ],
+      "reportedWorkerGates": {
+        "focalSuites": 5,
+        "focalTests": 71,
+        "fullSuites": 237,
+        "fullTests": 1950,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "buildStaticPages": 92,
+        "scope": "Isolated Data source only; not attributed to integrated candidate"
+      },
+      "integratedHead": "61464a780f1f7cbec9718d915c0d709736892142",
+      "sourceToIntegrated": {
+        "3903aa7": "4fc085c",
+        "4fa4f37": "99c24ee",
+        "52318743": "61464a7"
+      },
+      "limit": "Legacy pool position already closed by withdrawal remains pending if compensation cannot be proven; no live state mutation during review."
+    }
+  },
+  "legacyBreeding": {
+    "candidate": "1178153140f0b63cb0378f2678096a85e454862c",
+    "base": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+    "decision": "implementation_accepted_pending_combined_verification",
+    "taskId": "01a08727-0cdb-7993-bbab-6829bcf3d333",
+    "reportedWorkerGates": {
+      "focalSuites": 3,
+      "focalTests": 13,
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "buildStaticPages": 92,
+      "scope": "Original candidate, not integrated staging"
+    },
+    "reviewer": "Independent Astra Max, findings reviewed by root",
+    "reviewReportSha256": "e45b0578fc41828b8797ff2e76a12e3d801f65930fe0d5cc7daecb6a47be4f3f",
+    "reproduction": {
+      "suites": 2,
+      "cases": 4,
+      "result": "Observed defective behavior reproduced; not acceptance tests",
+      "liveOperations": false,
+      "source": "Isolated Jest fixtures outside repository"
+    },
+    "findings": [
+      {
+        "id": "LB1",
+        "priority": "P1",
+        "finding": "Mongo ownerNormalized and counters are marked verified without evidence of current ownership/projection coverage.",
+        "evidence": [
+          "dapp/src/lib/cukies-data/data.ts:655",
+          "packages/chain-indexer/src/legacy/importer.ts:270"
+        ]
+      },
+      {
+        "id": "LB2",
+        "priority": "P2",
+        "finding": "Imported numChildren=0 overrides two materialized children and incorrectly grants known eligibility.",
+        "evidence": [
+          "dapp/src/lib/cukies-data/data.ts:380",
+          "packages/chain-indexer/src/projectors/index.ts:1137"
+        ]
+      },
+      {
+        "id": "LB3",
+        "priority": "P2",
+        "finding": "Selected parents remain in the preview after a wallet change or refreshed evidence revokes eligibility.",
+        "evidence": [
+          "dapp/src/components/legacy-marketplace/breeding-client.tsx:506",
+          "dapp/src/components/legacy-marketplace/breeding-client.tsx:798"
+        ]
+      },
+      {
+        "id": "LB4",
+        "priority": "P2",
+        "finding": "A lossy uppercase TRON lookup alias is accepted as verified owner even when the address itself is invalid.",
+        "evidence": [
+          "dapp/src/lib/legacy-marketplace/breeding-identity.ts:74",
+          "packages/chain-indexer/src/legacy/importer.ts:264"
+        ]
+      }
+    ],
+    "nextStep": "Legacy task frozen with sources intact. Root combines accepted Legacy commits with reviewed Data correction, runs final gates once, then publishes and verifies staging in one window.",
+    "currentCandidate": "5545860191cb7e34a98e4b8218025416229a52da",
+    "correctionReview": {
+      "candidate": "7101d637154d33b98535f6dc2ec2fa14cf561a1a",
+      "decision": "changes_requested",
+      "reviewer": "root Astra Max",
+      "addressedInDiff": [
+        "LB1 current canonical ownerOf and maxBreeds read",
+        "LB3 preview cleared on refresh and context change",
+        "LB4 exact TRON identity and validated observed address"
+      ],
+      "remainingFinding": {
+        "id": "LB2",
+        "priority": "P2",
+        "finding": "When numChildren is missing, normalizeCuki derives childrenCount from children.length and eligibility compares that derived value with the same array; partial relations still become verified eligibility without complete history or a current per-NFT counter.",
+        "evidence": [
+          "dapp/src/lib/cukies-data/data.ts:406",
+          "dapp/src/lib/legacy-marketplace/breeding-identity.ts:127"
+        ]
+      },
+      "reproduction": {
+        "suites": 1,
+        "cases": 1,
+        "fixture": "BSC56 canonical NFT29, current ownerOf correct, contractual max1, numChildren absent, children=[31]",
+        "observed": "verified eligible candidate with childrenCount1",
+        "result": "PASS reproduces residual defect, not acceptance",
+        "liveOperations": false
+      },
+      "reportedWorkerGates": {
+        "focalSuites": 3,
+        "focalTests": 18,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Correction candidate, not the final combined staging candidate"
+      },
+      "reportSha256": "b7f8dfd51ae7e9dfc87b0e543074cb8aadc0f878e17bbf0f543440d26d0621c5",
+      "preservedAlternateLocalCombination": "a78b139bc1a4a9e9b7d4118451e404ccfbd74d81",
+      "alternateCombinationPromoted": false
+    },
+    "latestCorrectionReview": {
+      "candidate": "6bf7b8bb3d7847858e39f5953223e05981e2ef80",
+      "decision": "changes_requested",
+      "reviewer": "Independent Astra Max, findings and report reviewed by root",
+      "reportedWorkerGates": {
+        "focalSuites": 4,
+        "focalTests": 22,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Correction candidate, not final combined staging candidate"
+      },
+      "resolvedInCorrection": [
+        "Current canonical ownerOf",
+        "Exact TRON identity",
+        "Wallet A to B preview reset",
+        "No children.length eligibility fallback; current contractual count"
+      ],
+      "findings": [
+        {
+          "id": "LB2-BOUNDARY",
+          "priority": "P1",
+          "finding": "The inherited BSC +1 was applied to an aggregate Mongo counter; available evidence does not establish that margin for the new per-contract getter. count=max is currently declared verified eligible.",
+          "evidence": [
+            "dapp/src/lib/legacy-marketplace/breeding-identity.ts:154",
+            "/Users/fgomezserna/Proyectos/cukies-world/apps/backend/sync/events/BreedFinish.js:176"
+          ],
+          "nextStep": "Preserve this unproven BSC boundary as unknown/partial and exclude selection until semantics are verified; no contract change or invented rule."
+        },
+        {
+          "id": "LB3-SIGNING-NETWORK",
+          "priority": "P2",
+          "finding": "Changing only the EVM signing chain clears candidate, completed and active lists without refetching the unchanged BSC56 read context.",
+          "evidence": [
+            "dapp/src/components/legacy-marketplace/breeding-client.tsx:800",
+            "dapp/src/components/legacy-marketplace/breeding-client.tsx:570"
+          ],
+          "nextStep": "Separate signing permission/parent invalidation from read inventory; preserve or explicitly reload BSC56 data for the same wallet."
+        }
+      ],
+      "reproduction": {
+        "cases": 5,
+        "result": "One UI regression reproduced, two counter/coverage cases, two RPC parser cases in Node",
+        "liveOperations": false,
+        "initialHarnessIssue": "TRON Buffer/Uint8Array fixture conversion under jsdom; only parser suite rerun in Node successfully, not a product failure"
+      },
+      "reportSha256": "7eae7b9527d80a3b70ae2005a51f897d0964ace9a0651bd3b85bee82230deabd"
+    },
+    "finalCorrectionReview": {
+      "candidate": "5545860191cb7e34a98e4b8218025416229a52da",
+      "reviewer": "root Astra Max",
+      "decision": "implementation_accepted_pending_combined_verification",
+      "reviewed": "Full final five-file diff, related read/reset effects, added API boundary and signing-network regressions",
+      "outcome": [
+        "Unproven BSC boundary excluded with partial status, without claiming new contract semantics",
+        "Signing-chain change clears parent previews while retaining fixed BSC56 inventory; owner/read-network changes still refresh and revoke selection"
+      ],
+      "reportedWorkerGates": {
+        "focalSuites": 4,
+        "focalTests": 24,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Final isolated Legacy candidate"
+      },
+      "integratedHead": "aad830ccb0cf50fcd251e3ed3840a02d7c1d1ba0",
+      "sourceToIntegrated": {
+        "1178153": "bd38e96",
+        "7101d637": "84cb5f9",
+        "6bf7b8bb": "2cea22f",
+        "55458601": "aad830c"
+      },
+      "sourceFilesMatched": 8,
+      "unexpectedIntegrationPaths": [],
+      "integrationEvidenceSha256": "ea3f0188a99b9dfa71ede5edfd3d3d256855a3aea2fae2b19af56f5bd65fb268",
+      "fullCombinedGatesRun": false,
+      "stagingPublication": false,
+      "writesEnabled": false,
+      "limit": "TRON retains existing threshold behavior; no independent proof of complete on-chain eligibility or Legacy parity is claimed."
+    }
+  },
+  "limits": [
+    "No production/main changes",
+    "No database, ledger, balance, incident, cursor or on-chain mutations",
+    "Previously verified NFT recovery and World publication remain closed; candidate review does not reopen them"
+  ],
+  "combinedIntegration": {
+    "head": "61464a780f1f7cbec9718d915c0d709736892142",
+    "compared": {
+      "data": {
+        "source": "523187439e5ea9ab0f9749a17baef88062737fba",
+        "files": 14,
+        "contentsMatch": true
+      },
+      "legacy": {
+        "source": "5545860191cb7e34a98e4b8218025416229a52da",
+        "files": 8,
+        "contentsMatch": true
+      }
+    },
+    "unexpectedPaths": [],
+    "stagingCode": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
+    "gatesRun": false,
+    "stagingPublication": false,
+    "reviewEvidenceSha256": "ce377927b336f0cdbcbbbc769e641bc6d0b7581672c6026199b712174ba5789a",
+    "decision": "ready_for_combined_verification"
+  }
+}

@@ -30,6 +30,10 @@ import {
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import {
+  isLegacyBreedingCandidate,
+  isLegacyCompletedBreed,
+} from '@/lib/legacy-marketplace/breeding-identity';
+import {
   LEGACY_TRON_MAINNET_RPC_URL,
   getLegacyTronWeb,
   getLegacyTronWalletRpcOrigin,
@@ -55,6 +59,7 @@ import {
 type BreedingNetwork = 'BSC' | 'TRON';
 export type BreedingTab = 'start' | 'active' | 'completed';
 type BscReadStatus = 'disabled' | 'loading' | 'verified' | 'unknown';
+type BreedingReadStatus = 'idle' | 'loading' | 'verified' | 'partial' | 'unknown';
 
 type OnChainBreed = {
   id: string;
@@ -313,6 +318,10 @@ export function BreedingClient({
   >([]);
   const [activeBreeds, setActiveBreeds] = useState<OnChainBreed[]>([]);
   const [candidatesReadError, setCandidatesReadError] = useState(false);
+  const [candidatesReadStatus, setCandidatesReadStatus] =
+    useState<BreedingReadStatus>('idle');
+  const [completedReadStatus, setCompletedReadStatus] =
+    useState<BreedingReadStatus>('idle');
   const [parent1, setParent1] = useState<LegacyMarketplaceCukiItem | null>(
     null,
   );
@@ -328,6 +337,8 @@ export function BreedingClient({
   const [status, setStatus] = useState<string | null>(null);
   const activeBreedsRequestRef = useRef(0);
   const tronSnapshotRequestRef = useRef(0);
+  const candidatesRequestRef = useRef(0);
+  const completedRequestRef = useRef(0);
 
   const owner = network === 'BSC' ? address : tronAddress;
   const tronWeb = getLegacyTronWeb();
@@ -430,7 +441,8 @@ export function BreedingClient({
   const bscReadVerified = bscReadAvailable && bscReadStatus === 'verified';
   const readReady = network === 'BSC' ? bscReadAvailable : tronReady;
   const candidateReadReady =
-    network === 'BSC' ? bscReadVerified : tronReady;
+    (network === 'BSC' ? bscReadVerified : tronReady)
+    && (candidatesReadStatus === 'verified' || candidatesReadStatus === 'partial');
   const ready = network === 'BSC' ? bscWriteReady : tronReady;
 
   const maxBreeds = useMemo(() => {
@@ -487,18 +499,29 @@ export function BreedingClient({
   }, [bscReadAvailable, refetchBscMaxBreeds, refetchBscPoints]);
 
   const refreshCandidates = useCallback(async () => {
+    const requestId = candidatesRequestRef.current + 1;
+    candidatesRequestRef.current = requestId;
+    const contextIsCurrent = () => requestId === candidatesRequestRef.current;
+
+    setParent1(null);
+    setParent2(null);
+    setCandidates([]);
+    setCandidatesReadStatus('loading');
+    setCandidatesReadError(false);
+
     if (!owner || (network === 'BSC' && !bscReadAvailable)) {
-      setCandidates([]);
-      setCandidatesReadError(false);
+      setCandidatesReadStatus('unknown');
+      setIsLoadingCandidates(false);
       return;
     }
 
     setIsLoadingCandidates(true);
-    setCandidatesReadError(false);
     try {
       if (maxBreeds === null) {
         if (network === 'BSC') await retryBscRead();
-        setCandidates([]);
+        if (!contextIsCurrent()) return;
+        setCandidatesReadStatus('unknown');
+        setCandidatesReadError(true);
         return;
       }
 
@@ -516,29 +539,55 @@ export function BreedingClient({
       }
       const payload =
         (await response.json()) as LegacyBreedingCandidatesResponse;
-      setCandidates(payload.items);
-    } catch (error) {
+      if (!contextIsCurrent()) return;
+      const payloadStatus = payload.status ?? 'unknown';
+      const rawItems = Array.isArray(payload.items) ? payload.items : [];
+      const verifiedItems = rawItems.filter((item) =>
+        isLegacyBreedingCandidate(item, network, owner, maxBreeds),
+      );
+      const hasRejectedItems = verifiedItems.length !== rawItems.length;
+      const resolvedStatus: BreedingReadStatus =
+        payloadStatus === 'verified' && hasRejectedItems
+          ? 'partial'
+          : payloadStatus;
+      setCandidates(verifiedItems);
+      setCandidatesReadStatus(resolvedStatus);
+      setCandidatesReadError(resolvedStatus === 'unknown');
+      if (resolvedStatus === 'unknown') {
+        setStatus('No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.');
+      } else if (resolvedStatus === 'partial') {
+        setStatus('Solo se muestran candidatos con identidad y elegibilidad Legacy verificables.');
+      }
+    } catch {
+      if (!contextIsCurrent()) return;
       setCandidatesReadError(true);
-      setStatus('No se han podido cargar candidatos. Pulsa Actualizar para reintentar.');
+      setCandidatesReadStatus('unknown');
+      setStatus('No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.');
       setCandidates([]);
     } finally {
-      setIsLoadingCandidates(false);
+      if (contextIsCurrent()) setIsLoadingCandidates(false);
     }
   }, [bscReadAvailable, maxBreeds, network, owner, retryBscRead]);
 
   const refreshCompleted = useCallback(async () => {
-    const wallets = [address, tronAddress].filter((wallet): wallet is string =>
-      Boolean(wallet),
-    );
+    const requestId = completedRequestRef.current + 1;
+    completedRequestRef.current = requestId;
+    const contextIsCurrent = () => requestId === completedRequestRef.current;
+    const requestOwner = network === 'BSC' ? address : tronAddress;
+    const wallets = requestOwner ? [requestOwner] : [];
+
+    setCompletedCukies([]);
+    setCompletedReadStatus('loading');
 
     if (wallets.length === 0) {
-      setCompletedCukies([]);
+      setCompletedReadStatus('unknown');
       return;
     }
 
     const query = new URLSearchParams({
       limit: '24',
       offset: '0',
+      network,
     });
     for (const wallet of wallets) query.append('wallet', wallet);
 
@@ -550,12 +599,31 @@ export function BreedingClient({
         throw new Error('No se han podido cargar los bred Cukies.');
       }
       const payload = (await response.json()) as LegacyCompletedBreedsResponse;
-      setCompletedCukies(payload.items);
-    } catch (error) {
-      setStatus(getErrorMessage(error));
+      if (!contextIsCurrent()) return;
+      const payloadStatus = payload.status ?? 'unknown';
+      const rawItems = Array.isArray(payload.items) ? payload.items : [];
+      const verifiedItems = rawItems.filter((item) =>
+        isLegacyCompletedBreed(item, requestOwner),
+      );
+      const hasRejectedItems = verifiedItems.length !== rawItems.length;
+      const resolvedStatus: BreedingReadStatus =
+        payloadStatus === 'verified' && hasRejectedItems
+          ? 'partial'
+          : payloadStatus;
+      setCompletedCukies(verifiedItems);
+      setCompletedReadStatus(resolvedStatus);
+      if (resolvedStatus === 'partial') {
+        setStatus('Solo se muestran crías completadas con identidad Legacy verificable.');
+      } else if (resolvedStatus === 'unknown') {
+        setStatus('No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.');
+      }
+    } catch {
+      if (!contextIsCurrent()) return;
+      setStatus('No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.');
+      setCompletedReadStatus('unknown');
       setCompletedCukies([]);
     }
-  }, [address, tronAddress]);
+  }, [address, network, tronAddress]);
 
   const fetchBscActiveBreeds = useCallback(async () => {
     if (!bscReadAvailable) return [];
@@ -732,11 +800,17 @@ export function BreedingClient({
   useEffect(() => {
     setParent1(null);
     setParent2(null);
+  }, [chainId]);
+
+  useEffect(() => {
     setCandidates([]);
     setCandidatesReadError(false);
+    setCandidatesReadStatus('idle');
+    setCompletedCukies([]);
+    setCompletedReadStatus('idle');
     setActiveBreeds([]);
     setStatus(null);
-  }, [network]);
+  }, [network, owner, tronWalletRpcOrigin]);
 
   useEffect(() => {
     setTab(initialTab);
@@ -1103,6 +1177,11 @@ export function BreedingClient({
                 <p className="mt-1 text-sm text-slate-400">
                   Elige dos Cukies disponibles de tu wallet.
                 </p>
+                {candidatesReadStatus === 'partial' && (
+                  <p role="status" className="mt-2 text-xs text-amber-200">
+                    Solo se muestran candidatos con identidad y elegibilidad Legacy verificables.
+                  </p>
+                )}
               </div>
               <Button
                 variant="outline"
@@ -1138,11 +1217,13 @@ export function BreedingClient({
                   {!owner
                     ? 'Conecta una wallet para cargar candidatos.'
                     : candidatesReadError
-                    ? 'No se han podido cargar candidatos. Pulsa Actualizar para reintentar.'
+                    ? 'No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.'
                     : network === 'BSC' && !bscReadVerified
                     ? 'No se ha podido verificar la lectura Legacy BSC. Pulsa Actualizar para reintentar.'
                     : network === 'TRON' && !candidateReadReady
                     ? 'La fuente de candidatos no está disponible hasta conectar la red seleccionada.'
+                    : candidatesReadStatus === 'partial'
+                    ? 'No hay candidatos con identidad y elegibilidad Legacy verificables en esta wallet.'
                     : 'No hay Cukies disponibles para cría en esta wallet.'}
                 </div>
               )}
@@ -1252,9 +1333,16 @@ export function BreedingClient({
       {tab === 'completed' && (
         <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-headline text-2xl font-bold text-white">
-              Crías completadas
-            </h2>
+            <div>
+              <h2 className="font-headline text-2xl font-bold text-white">
+                Crías completadas
+              </h2>
+              {completedReadStatus === 'partial' && (
+                <p role="status" className="mt-2 text-xs text-amber-200">
+                  Solo se muestran crías con identidad Legacy verificable.
+                </p>
+              )}
+            </div>
             <Button
               variant="outline"
               onClick={() => void refreshCompleted()}
@@ -1271,7 +1359,11 @@ export function BreedingClient({
               ))
             ) : (
               <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                No hay crías completadas para las wallets conectadas.
+                {completedReadStatus === 'unknown'
+                  ? 'No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.'
+                  : completedReadStatus === 'partial'
+                  ? 'No hay crías completadas con identidad Legacy verificable en esta wallet.'
+                  : 'No hay crías completadas para esta wallet.'}
               </div>
             )}
           </div>

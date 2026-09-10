@@ -806,6 +806,83 @@ describe('SybilSlayerPage game-session handshake', () => {
     ))).toBe(false);
   });
 
+  it('keeps the old authority when recovery cannot persist its replacement key', async () => {
+    const oldSessionId = 'game_' + '5'.repeat(64);
+    const replacementIdempotencyKey = 'treasure-recovery-' + '6'.repeat(64);
+    const sessionResponse = new Response(JSON.stringify({
+      success: true,
+      sessionId: oldSessionId,
+      sessionToken: 'old-parent-token',
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(sessionResponse)
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        success: true,
+        attempt: {
+          attemptId: 'attempt-recovery',
+          seed: 'server-seed',
+          alias: 'Hunter-RECOVERY',
+          status: 'active',
+          eligibilityKind: 'presale',
+          nextSequence: 0,
+          receipt: 'parent-only-receipt',
+        },
+      }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        status: 'error',
+        code: 'GAME_SESSION_RESTART_REQUIRED',
+        replacementIdempotencyKey,
+      }), { status: 409, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock as typeof fetch;
+    const nativeSetItem = Storage.prototype.setItem;
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItemWithRecoveryFailure(this: Storage, key, value) {
+      if (value.includes('"recovery":true')) {
+        throw new Error('storage unavailable');
+      }
+      return nativeSetItem.call(this, key, value);
+    });
+
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe(oldSessionId));
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: {
+          type: 'TREASURE_HUNT_COMPETITION_START_REQUEST',
+          requestId: 'recovery-storage-failure',
+          sessionId: oldSessionId,
+        },
+      }));
+    });
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      type: 'TREASURE_HUNT_COMPETITION_START_RESPONSE',
+      requestId: 'recovery-storage-failure',
+      sessionId: oldSessionId,
+      eligible: false,
+      practice: false,
+      reason: 'GAME_SESSION_RESTART_REQUIRED',
+    }, GAME_ORIGIN));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(postMessage.mock.calls.some(([message]) => (
+      (message as { type?: string }).type === 'GAME_SESSION_CLEAR'
+    ))).toBe(false);
+    expect(latestBridgeOptions().currentSessionId).toBe(oldSessionId);
+    const stored = sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    );
+    expect(stored).toContain(oldSessionId);
+    expect(stored).not.toContain(replacementIdempotencyKey);
+    setItem.mockRestore();
+  });
+
   it('fails an expired resumed session closed and rotates it before the next play', async () => {
     const staleSessionId = `game_${'3'.repeat(64)}`;
     const freshSessionId = `game_${'4'.repeat(64)}`;

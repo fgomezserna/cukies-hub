@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(() => ({
@@ -68,6 +68,7 @@ jest.mock('@/lib/legacy-marketplace/tron', () => ({
 
 import { BreedingClient } from '@/components/legacy-marketplace/breeding-client';
 import { legacyBscPublicClient, readLegacyBscContract } from '@/lib/legacy-marketplace/bsc';
+import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 import { useAccount, useReadContract, useSwitchChain, useWriteContract } from 'wagmi';
 
 const mockUseAccount = useAccount as jest.Mock;
@@ -124,9 +125,15 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
       id: '29',
       tokenId: '29',
       chainId: 56,
-      collectionAddress: null,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
       cukiNumber: 29,
       owner: '0x00000000000000000000000000000000000000aa',
+      ownerNormalized: '0x00000000000000000000000000000000000000aa',
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie',
       network: 'BSC',
       origin: 'original',
       birthNetwork: 'BSC',
@@ -146,7 +153,7 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     };
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ items: [candidate] }),
+      json: async () => ({ items: [candidate], status: 'verified' }),
     }) as never;
 
     render(<BreedingClient initialTab="start" />);
@@ -157,6 +164,270 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     expect(candidateButton).not.toBeDisabled();
     expect(screen.queryByText('La wallet está conectada a una red incorrecta.')).not.toBeInTheDocument();
     expect(mockSwitchChain).not.toHaveBeenCalled();
+    expect(mockWriteContract).not.toHaveBeenCalled();
+  });
+
+  it('conserva el inventario BSC56 al cambiar solo la red de firma', async () => {
+    const candidate = {
+      id: '29',
+      tokenId: '29',
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      cukiNumber: 29,
+      owner: '0x00000000000000000000000000000000000000aa',
+      ownerNormalized: '0x00000000000000000000000000000000000000aa',
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie',
+      network: 'BSC',
+      origin: 'original',
+      birthNetwork: 'BSC',
+      imageUrl: null,
+      type: 1,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      skills: {},
+      childrenCount: 0,
+      childrenCountTron: 0,
+      childrenCountBsc: 0,
+      parents: [],
+      children: [],
+      history: [],
+      timestamp: null,
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [candidate], status: 'verified' }),
+    }) as never;
+
+    mockUseAccount.mockReturnValue({
+      address: candidate.owner,
+      chainId: 97,
+      isConnected: true,
+    });
+    const view = render(<BreedingClient initialTab="start" />);
+    await screen.findByRole('button', { name: /Cukie #29/ });
+
+    mockUseAccount.mockReturnValue({
+      address: candidate.owner,
+      chainId: 1,
+      isConnected: true,
+    });
+    view.rerender(<BreedingClient initialTab="start" />);
+
+    expect(screen.getByRole('button', { name: /Cukie #29/ })).toBeInTheDocument();
+    expect(mockSwitchChain).not.toHaveBeenCalled();
+    expect(mockWriteContract).not.toHaveBeenCalled();
+  });
+
+  it('oculta candidatos con chain, colección o identidad de propietario no verificables', async () => {
+    const canonical = {
+      id: '29',
+      tokenId: '29',
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      cukiNumber: 29,
+      owner: '0x00000000000000000000000000000000000000aa',
+      ownerNormalized: '0x00000000000000000000000000000000000000aa',
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie',
+      network: 'BSC',
+      origin: 'original',
+      birthNetwork: 'BSC',
+      imageUrl: null,
+      type: 1,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      skills: {},
+      childrenCount: 0,
+      childrenCountTron: 0,
+      childrenCountBsc: 0,
+      parents: [],
+      children: [],
+      history: [],
+      timestamp: null,
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 'partial',
+        items: [
+          canonical,
+          { ...canonical, tokenId: '97', id: '97', chainId: 97 },
+          {
+            ...canonical,
+            tokenId: 'wrong-contract',
+            id: 'wrong-contract',
+            collectionAddress: '0x0000000000000000000000000000000000000001',
+          },
+          {
+            ...canonical,
+            tokenId: 'null-identity',
+            id: 'null-identity',
+            chainId: null,
+            collectionAddress: null,
+            identityVerified: undefined,
+          },
+        ],
+      }),
+    }) as never;
+
+    render(<BreedingClient initialTab="start" />);
+
+    const canonicalButton = await screen.findByRole('button', {
+      name: /Cukie #29/,
+    });
+    expect(canonicalButton).not.toBeDisabled();
+    expect(screen.queryByText('Cukie #97')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cukie #wrong-contract')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cukie #null-identity')).not.toBeInTheDocument();
+  });
+
+  it('descarta la respuesta de candidatos de una wallet anterior', async () => {
+    const walletA = '0x00000000000000000000000000000000000000aa';
+    const walletB = '0x00000000000000000000000000000000000000bb';
+    const pending = new Map<string, (value: unknown) => void>();
+    const candidate = (tokenId: string, owner: string) => ({
+      id: tokenId,
+      tokenId,
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      cukiNumber: Number(tokenId),
+      owner,
+      ownerNormalized: owner.toLowerCase(),
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie',
+      network: 'BSC',
+      origin: 'original',
+      birthNetwork: 'BSC',
+      imageUrl: null,
+      type: 1,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      skills: {},
+      childrenCount: 0,
+      childrenCountTron: 0,
+      childrenCountBsc: 0,
+      parents: [],
+      children: [],
+      history: [],
+      timestamp: null,
+    });
+    global.fetch = jest.fn((input) => {
+      const requestOwner = new URL(String(input), 'http://localhost').searchParams.get('owner');
+      return new Promise((resolve) => {
+        pending.set(requestOwner ?? '', resolve);
+      });
+    }) as never;
+
+    mockUseAccount.mockReturnValue({
+      address: walletA,
+      chainId: 97,
+      isConnected: true,
+    });
+    const view = render(<BreedingClient initialTab="start" />);
+    await waitFor(() => expect(pending.has(walletA)).toBe(true));
+
+    mockUseAccount.mockReturnValue({
+      address: walletB,
+      chainId: 97,
+      isConnected: true,
+    });
+    view.rerender(<BreedingClient initialTab="start" />);
+    await waitFor(() => expect(pending.has(walletB)).toBe(true));
+
+    await act(async () => {
+      pending.get(walletB)?.({
+        ok: true,
+        json: async () => ({
+          status: 'verified',
+          items: [candidate('32', walletB)],
+        }),
+      });
+      await Promise.resolve();
+    });
+    await screen.findByRole('button', { name: /Cukie #32/ });
+
+    await act(async () => {
+      pending.get(walletA)?.({
+        ok: true,
+        json: async () => ({
+          status: 'verified',
+          items: [candidate('31', walletA)],
+        }),
+      });
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: /Cukie #32/ })).toBeInTheDocument();
+    expect(screen.queryByText('Cukie #31')).not.toBeInTheDocument();
+  });
+
+  it('revoca el preview de A al cambiar a la wallet B', async () => {
+    const walletA = '0x00000000000000000000000000000000000000aa';
+    const walletB = '0x00000000000000000000000000000000000000bb';
+    const candidate = (tokenId: string, owner: string) => ({
+      id: tokenId,
+      tokenId,
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      cukiNumber: Number(tokenId),
+      owner,
+      ownerNormalized: owner.toLowerCase(),
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie',
+      network: 'BSC',
+      origin: 'original',
+      birthNetwork: 'BSC',
+      imageUrl: null,
+      type: 1,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      skills: {},
+      childrenCount: 0,
+      childrenCountTron: 0,
+      childrenCountBsc: 0,
+      parents: [],
+      children: [],
+      history: [],
+      timestamp: null,
+    });
+    const fetchForWallet = (input: unknown) => {
+      const requestOwner = new URL(String(input), 'http://localhost').searchParams.get('owner');
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          status: 'verified',
+          items: [candidate(requestOwner === walletA ? '31' : '32', requestOwner ?? walletA)],
+        }),
+      });
+    };
+    global.fetch = jest.fn(fetchForWallet) as never;
+    mockUseAccount.mockReturnValue({ address: walletA, chainId: 97, isConnected: true });
+    const view = render(<BreedingClient initialTab="start" />);
+    const parentA = await screen.findByRole('button', { name: /Cukie #31/ });
+    fireEvent.click(parentA);
+    expect(screen.getAllByText('Cukie #31')).toHaveLength(2);
+
+    mockUseAccount.mockReturnValue({ address: walletB, chainId: 97, isConnected: true });
+    view.rerender(<BreedingClient initialTab="start" />);
+    await screen.findByRole('button', { name: /Cukie #32/ });
+    expect(screen.queryByText('Cukie #31')).not.toBeInTheDocument();
+    expect(screen.getByText('Padre 1').parentElement).toHaveTextContent('Sin seleccionar');
     expect(mockWriteContract).not.toHaveBeenCalled();
   });
 

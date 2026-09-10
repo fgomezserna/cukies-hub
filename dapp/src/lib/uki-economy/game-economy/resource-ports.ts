@@ -32,6 +32,17 @@ import type {
   VerifyGameResultInput,
 } from "./ports";
 import { stableGameEconomyHash, validGameText } from "./rules";
+import {
+  buildGameCreditReservationEvidence,
+  buildGameCukieAssignmentEvidence,
+  buildGameOwnCukieAssignmentEvidence,
+} from "./resource-evidence";
+
+export {
+  buildGameCreditReservationEvidence,
+  buildGameCukieAssignmentEvidence,
+  buildGameOwnCukieAssignmentEvidence,
+} from "./resource-evidence";
 
 type ResourceBinding = {
   _id: string;
@@ -256,72 +267,6 @@ async function completeTerminalBinding(binding: ResourceBinding | null, now: Dat
     );
     if (result.matchedCount !== 1) throw new StaleFenceError("CAS terminal perdido.");
   });
-}
-
-export function buildGameCreditReservationEvidence(
-  reservation: CreditReservation,
-): GameResourceReservationResult {
-  return {
-    reservationId: reservation.reservationId,
-    evidenceHash: stableGameEconomyHash({
-      kind: "game-credit-reservation-evidence",
-      reservationId: reservation.reservationId,
-      sessionId: reservation.sessionId,
-      walletNormalized: reservation.walletNormalized,
-      costCode: reservation.costCode,
-      amountCredits: reservation.amountCredits,
-      bucket: reservation.bucket,
-      expiresAt: reservation.expiresAt,
-      payloadHash: reservation.payloadHash,
-    }),
-  };
-}
-
-export function buildGameCukieAssignmentEvidence(
-  assignment: CukiePoolAssignment,
-): GameResourceReservationResult {
-  return {
-    reservationId: assignment.assignmentId,
-    evidenceHash: stableGameEconomyHash({
-      kind: "game-cukie-pool-assignment-evidence",
-      assignmentId: assignment.assignmentId,
-      sessionId: assignment.sessionId,
-      assignmentKind: assignment.kind,
-      assetId: assignment.assetId,
-      tokenId: assignment.tokenId,
-      ownerNormalized: assignment.ownerNormalized,
-      generation: assignment.generation,
-      rarity: assignment.rarity,
-      ownerRewardEligible: assignment.ownerRewardEligible,
-      assignedAt: assignment.assignedAt,
-      expiresAt: assignment.expiresAt,
-      requestHash: assignment.requestHash,
-    }),
-  };
-}
-
-export function buildGameOwnCukieAssignmentEvidence(
-  assignment: OwnCukieAssignment,
-): GameResourceReservationResult {
-  assertOwnCukieAssignmentIntegrity(assignment);
-  return {
-    reservationId: assignment.assignmentId,
-    evidenceHash: stableGameEconomyHash({
-      kind: "game-cukie-own-assignment-evidence",
-      assignmentId: assignment.assignmentId,
-      sessionId: assignment.sessionId,
-      epochId: assignment.epochId,
-      assetId: assignment.assetId,
-      tokenId: assignment.tokenId,
-      ownerNormalized: assignment.ownerNormalized,
-      ownershipEventId: assignment.ownershipEventId,
-      generation: assignment.generation,
-      rarity: assignment.rarity,
-      assignedAt: assignment.assignedAt,
-      expiresAt: assignment.expiresAt,
-      requestHash: assignment.requestHash,
-    }),
-  };
 }
 
 export type ServerSelectedCukieReservation =

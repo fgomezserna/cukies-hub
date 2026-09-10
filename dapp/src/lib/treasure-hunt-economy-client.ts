@@ -3,8 +3,15 @@ import type {
   TreasureHuntEconomyStartResponse,
 } from "@/lib/uki-economy/game-economy/treasure-hunt-types";
 
+const RECOVERY_CODE = "GAME_SESSION_RESTART_REQUIRED";
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
 export class TreasureHuntEconomyClientError extends Error {
-  constructor(readonly code: string, message = code) {
+  constructor(
+    readonly code: string,
+    message = code,
+    readonly replacementIdempotencyKey?: string,
+  ) {
     super(message);
     this.name = "TreasureHuntEconomyClientError";
   }
@@ -22,15 +29,32 @@ async function economyRequest<T>(
     cache: "no-store",
     body: JSON.stringify(body),
   });
-  let payload: { status?: unknown; code?: unknown; result?: unknown };
+  let payload: {
+    status?: unknown;
+    code?: unknown;
+    result?: unknown;
+    replacementIdempotencyKey?: unknown;
+    recovery?: unknown;
+  };
   try {
     payload = (await response.json()) as typeof payload;
   } catch {
     throw new TreasureHuntEconomyClientError("TREASURE_ECONOMY_UNAVAILABLE");
   }
   if (!response.ok || payload.status !== "ok") {
+    const nestedRecovery = payload.recovery && typeof payload.recovery === "object"
+      && !Array.isArray(payload.recovery)
+      ? (payload.recovery as Record<string, unknown>).replacementIdempotencyKey
+      : undefined;
+    const replacementIdempotencyKey = payload.code === RECOVERY_CODE
+      && typeof (payload.replacementIdempotencyKey ?? nestedRecovery) === "string"
+      && IDEMPOTENCY_KEY_PATTERN.test(String(payload.replacementIdempotencyKey ?? nestedRecovery))
+      ? String(payload.replacementIdempotencyKey ?? nestedRecovery)
+      : undefined;
     throw new TreasureHuntEconomyClientError(
       typeof payload.code === "string" ? payload.code : "TREASURE_ECONOMY_UNAVAILABLE",
+      undefined,
+      replacementIdempotencyKey,
     );
   }
   return payload.result as T;

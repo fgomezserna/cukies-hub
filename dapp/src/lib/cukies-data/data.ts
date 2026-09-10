@@ -8,10 +8,18 @@ import {
   normalizeLegacyMarketplaceNftImageUrl,
 } from '@/lib/legacy-marketplace/config';
 import {
+  getLegacyBreedingIdentity,
+  isLegacyBreedingCandidate,
+  isLegacyBreedingEligibilityKnown,
+  isLegacyBreedingIdentity,
+  isLegacyBreedingOwner,
+} from '@/lib/legacy-marketplace/breeding-identity';
+import {
   legacyCukiNetworks,
   legacyCukiStates,
   type LegacyBreedingCandidatesParams,
   type LegacyBreedingCandidatesResponse,
+  type LegacyBreedingReadStatus,
   type LegacyCompletedBreedsParams,
   type LegacyCompletedBreedsResponse,
   type LegacyCukiePointsParams,
@@ -30,11 +38,17 @@ import {
   getLegacyPointExplorerUrl,
   legacyMarketplaceRuntime,
 } from '@/lib/legacy-marketplace/runtime';
+import {
+  readLegacyMarketplaceBreedingCount,
+  readLegacyMarketplaceMaxBreeds,
+  readLegacyMarketplaceOwner,
+} from '@/lib/legacy-marketplace/live-marketplace';
 
 type CukiDocument = {
   _id: string;
   tokenId?: unknown;
   chainId?: unknown;
+  collectionAddress?: unknown;
   collectionAddressNormalized?: unknown;
   user?: unknown;
   owner?: unknown;
@@ -109,6 +123,7 @@ type PointDocument = {
 
 const MAX_LIMIT = 60;
 const DEFAULT_LIMIT = 24;
+const MAX_CURRENT_OWNER_READS = 60;
 
 function toStringOrNull(value: unknown) {
   if (typeof value === 'string' && value.length > 0) return value;
@@ -204,6 +219,48 @@ async function getPointsCollection() {
   return db.collection<PointDocument>('point_transactions');
 }
 
+async function readCurrentLegacyOwners(items: LegacyMarketplaceCukiItem[]) {
+  const owners: Array<string | null> = Array.from({ length: items.length }, () => null);
+  const readableItems = items.slice(0, MAX_CURRENT_OWNER_READS);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < readableItems.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        owners[index] = await readLegacyMarketplaceOwner(readableItems[index]);
+      } catch {
+        owners[index] = null;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(8, readableItems.length) }, () => worker()),
+  );
+  return owners;
+}
+
+async function readCurrentLegacyBreedingCounts(items: LegacyMarketplaceCukiItem[]) {
+  const counts: Array<number | null> = Array.from({ length: items.length }, () => null);
+  const readableItems = items.slice(0, MAX_CURRENT_OWNER_READS);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < readableItems.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        counts[index] = await readLegacyMarketplaceBreedingCount(readableItems[index]);
+      } catch {
+        counts[index] = null;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(8, readableItems.length) }, () => worker()),
+  );
+  return counts;
+}
+
 function getRecordValue(value: unknown, key: string) {
   return value && typeof value === 'object'
     ? (value as Record<string, unknown>)[key]
@@ -275,7 +332,9 @@ function normalizeRelation(value: unknown): LegacyMarketplaceCukiReference | nul
     id,
     tokenId: id,
     chainId: toNumberOrNull(document.chainId),
-    collectionAddress: toStringOrNull(document.collectionAddressNormalized),
+    collectionAddress:
+      toStringOrNull(document.collectionAddressNormalized)
+      ?? toStringOrNull(document.collectionAddress),
     cukiNumber: toNumberOrNull(document.cukiNumber),
     network: toStringOrNull(document.network),
     birthNetwork: toStringOrNull(document.birthNetwork),
@@ -356,6 +415,7 @@ function normalizeCuki(document: CukiDocument): LegacyMarketplaceCukiItem {
     collectionAddress: toStringOrNull(document.collectionAddressNormalized),
     cukiNumber: toNumberOrNull(document.cukiNumber),
     owner,
+    ownerNormalized: toStringOrNull(document.ownerNormalized),
     network: toStringOrNull(document.network) ?? 'TRON',
     origin: toStringOrNull(document.origin),
     birthNetwork: toStringOrNull(document.birthNetwork),
@@ -365,9 +425,7 @@ function normalizeCuki(document: CukiDocument): LegacyMarketplaceCukiItem {
     price: toNumberOrNull(document.price),
     priceOriginal: toStringOrNull(document.priceOriginal) ?? toStringOrNull(document.priceRaw),
     skills,
-    childrenCount:
-      toNumberOrNull(document.numChildren) ??
-      (children.length > 0 ? children.length : null),
+    childrenCount: toNumberOrNull(document.numChildren),
     childrenCountTron: toNumberOrNull(document.numChildrenTron),
     childrenCountBsc: toNumberOrNull(document.numChildrenBsc),
     parents: normalizeRelations(document.parents),
@@ -605,21 +663,31 @@ export async function listBreedingCandidates(
     params.maxBreeds !== undefined && Number.isFinite(params.maxBreeds)
       ? Math.max(Math.trunc(params.maxBreeds), 0)
       : null;
+  const identity = getLegacyBreedingIdentity(params.network);
+  const owner = params.owner?.trim() ?? '';
+
+  if (!identity || !owner || maxBreeds === null) {
+    return {
+      source: 'empty',
+      items: [],
+      total: 0,
+      maxBreeds,
+      status: 'unknown',
+      error: 'No se pudo verificar la identidad Legacy de los candidatos.',
+    };
+  }
+
   const collection = await getCukiesCollection();
   const filter: Filter<CukiDocument> = {
     state: 'available',
+    network: identity.network,
   };
 
-  if (params.owner?.trim()) {
-    const owner = params.owner.trim();
-    filter.$or = [
-      { ownerNormalized: normalizeAddressForLookup(owner) },
-      { owner: new RegExp(`^${escapeRegex(owner)}$`, 'i') },
-      { user: new RegExp(`^${escapeRegex(owner)}$`, 'i') },
-    ];
-  }
-
-  if (isKnownNetwork(params.network)) filter.network = params.network;
+  filter.$or = [
+    { ownerNormalized: normalizeAddressForLookup(owner) },
+    { owner: new RegExp(`^${escapeRegex(owner)}$`, 'i') },
+    { user: new RegExp(`^${escapeRegex(owner)}$`, 'i') },
+  ];
 
   const documents = await collection
     .find(filter)
@@ -627,20 +695,108 @@ export async function listBreedingCandidates(
     .limit(Math.min(limit * 3, 180))
     .toArray();
 
-  const networkBump = params.network === 'BSC' ? 1 : 0;
-  const items = documents
-    .map(normalizeCuki)
-    .filter((item) => {
-      if (maxBreeds === null) return true;
-      return (item.childrenCount ?? 0) < maxBreeds + networkBump;
-    })
-    .slice(0, limit);
+  if (documents.length > 0) {
+    let currentMaxBreeds: number;
+    try {
+      currentMaxBreeds = await readLegacyMarketplaceMaxBreeds(identity.network);
+    } catch {
+      return {
+        source: 'mongo',
+        items: [],
+        total: 0,
+        maxBreeds,
+        status: 'unknown',
+        error: 'No se pudo verificar la elegibilidad Legacy ahora.',
+      };
+    }
+    if (currentMaxBreeds !== maxBreeds) {
+      return {
+        source: 'mongo',
+        items: [],
+        total: 0,
+        maxBreeds,
+        status: 'partial',
+        error: 'La elegibilidad Legacy ha cambiado. Actualiza para reintentar.',
+      };
+    }
+  }
+
+  let hasUnknownEvidence = false;
+  const pending = [] as LegacyMarketplaceCukiItem[];
+  for (const document of documents) {
+    const item = normalizeCuki(document);
+    const identityKnown = isLegacyBreedingIdentity(document, identity.network);
+    const ownerKnown = isLegacyBreedingOwner(document, identity.network, owner);
+
+    if (!identityKnown || !ownerKnown) {
+      hasUnknownEvidence = true;
+      continue;
+    }
+    pending.push(item);
+  }
+
+  const [currentOwners, currentBreedingCounts] = await Promise.all([
+    readCurrentLegacyOwners(pending),
+    readCurrentLegacyBreedingCounts(pending),
+  ]);
+  const items = [] as LegacyMarketplaceCukiItem[];
+  pending.forEach((item, index) => {
+    const currentOwner = currentOwners[index];
+    const currentBreedingCount = currentBreedingCounts[index];
+    if (!currentOwner || currentBreedingCount === null) {
+      hasUnknownEvidence = true;
+      return;
+    }
+
+    if (
+      item.childrenCount !== null
+      && item.childrenCount !== currentBreedingCount
+    ) {
+      hasUnknownEvidence = true;
+      return;
+    }
+
+    const verifiedItem = {
+      ...item,
+      childrenCount: currentBreedingCount,
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf' as const,
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie' as const,
+      owner: currentOwner,
+      ownerNormalized: currentOwner,
+    };
+    if (
+      isLegacyBreedingEligibilityKnown(verifiedItem, maxBreeds)
+      && isLegacyBreedingCandidate(verifiedItem, identity.network, owner, maxBreeds)
+    ) {
+      items.push(verifiedItem);
+    } else if (
+      identity.network === 'BSC'
+      && currentBreedingCount >= maxBreeds
+    ) {
+      // The old indexed BSC aggregate used a network offset, but the direct
+      // per-NFT contract read does not prove that the offset still applies.
+      hasUnknownEvidence = true;
+    }
+  });
+
+  const status: LegacyBreedingReadStatus =
+    documents.length === 0 ? 'unknown' : hasUnknownEvidence ? 'partial' : 'verified';
+  const visibleItems = items.slice(0, limit);
 
   return {
     source: 'mongo',
-    items,
-    total: items.length,
+    items: visibleItems,
+    total: visibleItems.length,
     maxBreeds,
+    status,
+    ...(status === 'unknown'
+      ? { error: 'No se pudo verificar la identidad Legacy de los candidatos.' }
+      : status === 'partial'
+        ? { error: 'Algunos candidatos no tienen una identidad o elegibilidad Legacy verificable.' }
+        : {}),
   };
 }
 
@@ -649,7 +805,7 @@ export async function listCompletedBreeds(
 ): Promise<LegacyCompletedBreedsResponse> {
   const limit = normalizeLimit(params.limit ?? 24);
   const offset = normalizeOffset(params.offset);
-  const collection = await getCukiesCollection();
+  const identity = getLegacyBreedingIdentity(params.network);
   const filter: Filter<CukiDocument> = {
     origin: 'breed',
   };
@@ -657,7 +813,21 @@ export async function listCompletedBreeds(
     ?.map((wallet) => wallet.trim())
     .filter((wallet) => wallet.length > 0);
 
-  if (wallets?.length) {
+  if (!identity || !wallets?.length) {
+    return {
+      source: 'empty',
+      items: [],
+      total: 0,
+      offset,
+      limit,
+      status: 'unknown',
+      error: 'No se pudo verificar la identidad Legacy de los resultados.',
+    };
+  }
+
+  const collection = await getCukiesCollection();
+  filter.network = identity.network;
+  if (wallets.length) {
     filter.$or = wallets.flatMap((wallet) => [
       { ownerNormalized: normalizeAddressForLookup(wallet) },
       { owner: new RegExp(`^${escapeRegex(wallet)}$`, 'i') },
@@ -665,27 +835,79 @@ export async function listCompletedBreeds(
     ]);
   }
 
-  if (isKnownNetwork(params.network)) filter.network = params.network;
+  const documents = await collection
+    .find(filter)
+    .sort({ timeStamp: -1, cukiNumber: -1, _id: -1 })
+    .skip(0)
+    .limit(Math.min((offset + limit) * 3, 180))
+    .toArray();
 
-  const [documents, total] = await Promise.all([
-    collection
-      .find(filter)
-      .sort({ timeStamp: -1, cukiNumber: -1, _id: -1 })
-      .skip(offset)
-      .limit(limit)
-      .toArray(),
-    collection.countDocuments(filter),
-  ]);
+  let hasUnknownEvidence = false;
+  const pending = documents.flatMap((document) => {
+    const identityKnown = isLegacyBreedingIdentity(document, identity.network);
+    const ownerKnown = wallets.some((wallet) =>
+      isLegacyBreedingOwner(document, identity.network, wallet),
+    );
+    if (!identityKnown || !ownerKnown) {
+      hasUnknownEvidence = true;
+      return [];
+    }
+    return [{ document, item: normalizeCuki(document) }];
+  });
+  const currentOwners = await readCurrentLegacyOwners(pending.map(({ item }) => item));
+  const verifiedDocuments = pending.flatMap(({ document, item }, index) => {
+    const currentOwner = currentOwners[index];
+    if (!currentOwner) {
+      hasUnknownEvidence = true;
+      return [];
+    }
+    const ownerMatches = wallets.some((wallet) =>
+      isLegacyBreedingOwner(
+        { ...item, owner: currentOwner, ownerNormalized: currentOwner },
+        identity.network,
+        wallet,
+      ),
+    );
+    if (!ownerMatches) return [];
+    return [{ document, item: {
+      ...item,
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf' as const,
+      owner: currentOwner,
+      ownerNormalized: currentOwner,
+    } }];
+  });
+  const pagedDocuments = verifiedDocuments.slice(offset, offset + limit);
   const hydrated = await Promise.all(
-    documents.map((document) => hydrateCukiRelations(document, collection)),
+    pagedDocuments.map(({ document }) => hydrateCukiRelations(document, collection)),
   );
+  const items = hydrated.map((document, index) => {
+    const verifiedItem = pagedDocuments[index].item;
+    return {
+      ...normalizeCuki(document),
+      owner: verifiedItem.owner,
+      ownerNormalized: verifiedItem.ownerNormalized,
+      identityVerified: verifiedItem.identityVerified,
+      ownershipVerified: verifiedItem.ownershipVerified,
+      ownershipSource: verifiedItem.ownershipSource,
+    };
+  });
+  const status: LegacyBreedingReadStatus =
+    documents.length === 0 ? 'unknown' : hasUnknownEvidence ? 'partial' : 'verified';
 
   return {
     source: 'mongo',
-    items: hydrated.map(normalizeCuki),
-    total,
+    items,
+    total: verifiedDocuments.length,
     offset,
     limit,
+    status,
+    ...(status === 'unknown'
+      ? { error: 'No se pudo verificar la identidad Legacy de los resultados.' }
+      : status === 'partial'
+        ? { error: 'Algunos resultados no tienen una identidad Legacy verificable.' }
+        : {}),
   };
 }
 

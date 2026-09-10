@@ -614,4 +614,121 @@ describe('reload-safe parent GameSession starter', () => {
     expect(sessionStorage.getItem('cukies:treasure-hunt:parent-session:v1:sybil-slayer'))
       .toContain(walletBSession);
   });
+
+  it('replaces a rejected authority with the exact server-authorized key', async () => {
+    const oldSessionId = `game_${'e'.repeat(64)}`;
+    const replacementSessionId = `game_${'f'.repeat(64)}`;
+    sessionStorage.setItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+      JSON.stringify({ ownerKey: 'wallet-user', sessionId: oldSessionId }),
+    );
+    const replacementKey = `treasure-recovery-${'1'.repeat(64)}`;
+    const fetchImpl = jest.fn().mockResolvedValue(jsonResponse({
+      success: true,
+      sessionId: replacementSessionId,
+      sessionToken: `session_${'2'.repeat(43)}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }));
+    const starter = createReloadSafeGameSessionStarter({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      fetchImpl,
+      storage: sessionStorage,
+    });
+
+    await expect(starter.replace('wallet-user', oldSessionId, replacementKey))
+      .resolves.toMatchObject({ sessionId: replacementSessionId });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1]?.body as string)).toEqual({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      idempotencyKey: replacementKey,
+    });
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    )).toContain(replacementSessionId);
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    )).not.toContain(oldSessionId);
+  });
+
+  it('single-flights duplicate recovery messages and preserves the pending key after a lost response', async () => {
+    const oldSessionId = `game_${'3'.repeat(64)}`;
+    const replacementKey = `treasure-recovery-${'4'.repeat(64)}`;
+    sessionStorage.setItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+      JSON.stringify({ ownerKey: 'wallet-user', sessionId: oldSessionId }),
+    );
+    let rejectRequest!: (error: unknown) => void;
+    const fetchImpl = jest.fn().mockImplementation(() => new Promise<Response>((_, reject) => {
+      rejectRequest = reject;
+    }));
+    const starter = createReloadSafeGameSessionStarter({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      fetchImpl,
+      storage: sessionStorage,
+      maxAttempts: 1,
+    });
+
+    const first = starter.replace('wallet-user', oldSessionId, replacementKey);
+    const duplicate = starter.replace('wallet-user', oldSessionId, replacementKey);
+    expect(duplicate).toBe(first);
+    await Promise.resolve();
+    rejectRequest(new TypeError('connection reset after write'));
+    await expect(first).rejects.toThrow('connection reset after write');
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    )).toContain(replacementKey);
+
+    const reloadedSessionId = `game_${'5'.repeat(64)}`;
+    const reloadFetch = jest.fn().mockResolvedValue(jsonResponse({
+      success: true,
+      sessionId: reloadedSessionId,
+      sessionToken: `session_${'6'.repeat(43)}`,
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }));
+    const reloaded = createReloadSafeGameSessionStarter({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      fetchImpl: reloadFetch,
+      storage: sessionStorage,
+      maxAttempts: 1,
+      idempotencyKeyFactory: () => 'must-not-rotate-recovery-key',
+    });
+    await expect(reloaded.start('wallet-user')).resolves.toMatchObject({
+      sessionId: reloadedSessionId,
+    });
+    expect(JSON.parse(reloadFetch.mock.calls[0][1]?.body as string)).toMatchObject({
+      idempotencyKey: replacementKey,
+    });
+  });
+
+  it('does not invalidate a newer authority that won before a late recovery message', async () => {
+    const oldSessionId = `game_${'7'.repeat(64)}`;
+    const newerSessionId = `game_${'8'.repeat(64)}`;
+    sessionStorage.setItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+      JSON.stringify({ ownerKey: 'wallet-user', sessionId: newerSessionId }),
+    );
+    const starter = createReloadSafeGameSessionStarter({
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+      fetchImpl: jest.fn(),
+      storage: sessionStorage,
+    });
+
+    await expect(starter.replace(
+      'wallet-user',
+      oldSessionId,
+      `treasure-recovery-${'9'.repeat(64)}`,
+    )).rejects.toMatchObject({
+      code: 'RECOVERY_SESSION_CHANGED',
+      status: 409,
+    });
+    expect(sessionStorage.getItem(
+      'cukies:treasure-hunt:parent-session:v1:sybil-slayer',
+    )).toContain(newerSessionId);
+  });
 });

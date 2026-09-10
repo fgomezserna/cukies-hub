@@ -44,6 +44,43 @@ export interface GameEconomyRepository {
   advanceRewardPeriodGuard(periodId: string, now: Date): Promise<void>;
 }
 
+/**
+ * Builds the immutable session event used by the Mongo repository.
+ * Keeping this producer public lets reconciliation and persistence adapters
+ * consume the same canonical receipt shape instead of rebuilding hashes in a
+ * second implementation.
+ */
+export function buildGameEconomySessionEvent(
+  previous: GameEconomySession | null,
+  next: GameEconomySession,
+): GameEconomyEvent {
+  const eventId = stableGameEconomyHash({
+    kind: "game-economy-session-event-id",
+    sessionId: next.sessionId,
+    toRevision: next.revision,
+  });
+  const immutable = {
+    eventId,
+    sessionId: next.sessionId,
+    fromRevision: previous?.revision ?? null,
+    toRevision: next.revision,
+    fromStatus: previous?.status ?? null,
+    toStatus: next.status,
+    creditState: next.credit.state,
+    cukieState: next.cukie.state,
+    fenceToken: next.fenceToken,
+    createdAt: next.updatedAt,
+  };
+  return {
+    _id: eventId,
+    ...immutable,
+    payloadHash: stableGameEconomyHash({
+      kind: "game-economy-session-event",
+      ...immutable,
+    }),
+  };
+}
+
 export type GameEconomyTransactionRunner = <T>(
   work: (repository: GameEconomyRepository) => Promise<T>
 ) => Promise<T>;
@@ -75,37 +112,6 @@ export function createMongoGameEconomyRepository(
     updatedAt: Date;
   }>("reward_period_states");
   const options = { session };
-
-  function sessionEvent(
-    previous: GameEconomySession | null,
-    next: GameEconomySession,
-  ): GameEconomyEvent {
-    const eventId = stableGameEconomyHash({
-      kind: "game-economy-session-event-id",
-      sessionId: next.sessionId,
-      toRevision: next.revision,
-    });
-    const immutable = {
-      eventId,
-      sessionId: next.sessionId,
-      fromRevision: previous?.revision ?? null,
-      toRevision: next.revision,
-      fromStatus: previous?.status ?? null,
-      toStatus: next.status,
-      creditState: next.credit.state,
-      cukieState: next.cukie.state,
-      fenceToken: next.fenceToken,
-      createdAt: next.updatedAt,
-    };
-    return {
-      _id: eventId,
-      ...immutable,
-      payloadHash: stableGameEconomyHash({
-        kind: "game-economy-session-event",
-        ...immutable,
-      }),
-    };
-  }
 
   return {
     async findActiveRule(gameId, at, expectedVersion) {
@@ -149,7 +155,7 @@ export function createMongoGameEconomyRepository(
       ),
     async insertSession(value) {
       await sessions.insertOne(value, options);
-      await events.insertOne(sessionEvent(null, value), options);
+      await events.insertOne(buildGameEconomySessionEvent(null, value), options);
     },
     async replaceSession(previous, next) {
       const { _id: _id, ...replacement } = next;
@@ -163,7 +169,7 @@ export function createMongoGameEconomyRepository(
         replacement as OptionalUnlessRequiredId<GameEconomySession>,
         { ...options, returnDocument: "after" }
       );
-      if (replaced) await events.insertOne(sessionEvent(previous, replaced), options);
+      if (replaced) await events.insertOne(buildGameEconomySessionEvent(previous, replaced), options);
       return replaced;
     },
     listExpiredSessions(now, limit) {
