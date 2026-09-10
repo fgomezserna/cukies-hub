@@ -1,6 +1,6 @@
 "use client";
 
-import Image from 'next/image';
+import { GameImage } from './game-image';
 import React from 'react';
 
 import { BASE_GAME_HEIGHT, BASE_GAME_WIDTH } from '../lib/constants';
@@ -190,7 +190,7 @@ export function HeartMeter({ value, max, compact = false }: HeartMeterProps) {
       aria-label={`${value} de ${max} vidas`}
     >
       {Array.from({ length: max }).map((_, index) => (
-        <Image
+        <GameImage
           key={index}
           src="/assets/collectibles/corazoncukies.png"
           alt=""
@@ -225,7 +225,7 @@ export function PlayerPortrait({
   return (
     <div className={joinClasses('th-player', `th-player--${tone}`, dimmed && 'th-player--dimmed')}>
       <div className="th-player__portrait">
-        <Image src={src} alt="" width={280} height={280} className="th-player__image" />
+        <GameImage src={src} alt="" width={280} height={280} className="th-player__image" />
       </div>
       <strong className="th-player__label">{label}</strong>
       {status ? <span className="th-player__status">{status}</span> : null}

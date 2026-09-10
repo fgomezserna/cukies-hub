@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import Image from 'next/image';
+import { GameImage } from './game-image';
 import {
   usePusherConnection,
   type TreasureHuntCompetitionAccess,
@@ -1661,7 +1661,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
   const opponentInfoBox = isMultiplayerMode ? (
     <div className="relative">
-      <Image
+      <GameImage
         src="/assets/ui/buttons/CartelMadera.png"
         alt="Opponent box"
         width={200}
@@ -3590,13 +3590,13 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 </header>
                 <div className="th-lobby__players">
                   <div className="th-lobby-player">
-                    <Image src="/assets/characters/1p.png" alt="Tu personaje" width={220} height={220} />
+                    <GameImage src="/assets/characters/1p.png" alt="Tu personaje" width={220} height={220} />
                     <strong>Tú</strong>
                     <span>Conectado</span>
                   </div>
                   <span className="th-lobby__vs" aria-hidden="true">VS</span>
                   <div className="th-lobby-player">
-                    <Image src="/assets/characters/2p.png" alt="Personaje rival" width={220} height={220} />
+                    <GameImage src="/assets/characters/2p.png" alt="Personaje rival" width={220} height={220} />
                     <strong>Rival</strong>
                     <span>{multiplayer.hasOpponent ? 'Listo' : 'Esperando'}</span>
                   </div>
@@ -3739,7 +3739,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </div>
                 </section>
                 <div className="th-result-art" aria-hidden="true">
-                  <Image src="/assets/characters/1p.png" alt="" width={430} height={500} />
+                  <GameImage src="/assets/characters/1p.png" alt="" width={430} height={500} />
                 </div>
               </TreasurePanel>
             </div>
@@ -3773,7 +3773,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </div>
                 </section>
                 <div className="th-result-art" aria-hidden="true">
-                  <Image src={localIsWinner === false ? '/assets/characters/2p.png' : '/assets/characters/1p.png'} alt="" width={430} height={500} />
+                  <GameImage src={localIsWinner === false ? '/assets/characters/2p.png' : '/assets/characters/1p.png'} alt="" width={430} height={500} />
                 </div>
               </TreasurePanel>
             </div>
@@ -3874,7 +3874,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="focus:outline-none game-button relative"
                   aria-label="Jugar"
                 >
-                  <Image 
+                  <GameImage
                     src="/assets/ui/buttons/caja-texto2.png"
                     alt="Jugar"
                     width={160}
@@ -3890,7 +3890,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   className="focus:outline-none game-button relative"
                   aria-label="Reglas"
                 >
-                  <Image 
+                  <GameImage
                     src="/assets/ui/buttons/caja-texto2.png"
                     alt="Reglas"
                     width={160}
@@ -3930,7 +3930,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               }}
             >
               <div className="relative">
-               <Image 
+               <GameImage
                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Score box"
                   width={150}
@@ -3945,7 +3945,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
 
               <div className="relative">
-               <Image 
+               <GameImage
                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Level box"
                   width={150}
@@ -3961,7 +3961,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
               {/* Caja de corazones centrada */}
               <div className="relative">
-               <Image 
+               <GameImage
                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Hearts box"
                   width={Math.max(120, 60 + gameState.maxHearts * 32)}
@@ -3971,7 +3971,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-primary text-shadow">
                   {Array.from({ length: gameState.maxHearts }).map((_, i) => (
-                    <Image
+                    <GameImage
                       key={i}
                       src="/assets/collectibles/corazoncukies.png"
                       alt={i < gameState.hearts ? "Full Heart" : "Empty Heart"}
@@ -3984,7 +3984,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
 
               <div className="relative">
-               <Image 
+               <GameImage
                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Time box"
                   width={150}
@@ -4040,7 +4040,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 className="focus:outline-none game-button relative"
                 aria-label="Start"
               >
-                <Image 
+                <GameImage
                   src="/assets/ui/buttons/caja-texto2.png"
                   alt="Play" 
                   width={120} 
@@ -4056,7 +4056,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 className="focus:outline-none game-button relative"
                 aria-label="Reset game"
               >
-                <Image 
+                <GameImage
                   src="/assets/ui/buttons/caja-texto2.png" 
                   alt="Reset" 
                   width={120} 
@@ -4072,7 +4072,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {hackerActive && (
                 <div className="flex items-center space-x-2 ml-4">
                                       <div className="relative" style={{ width: 60, height: 25 }}>
-                      <Image 
+                      <GameImage
                         src="/assets/collectibles/trump_imagen.png" 
                         alt="Trump" 
                         width={60} 
@@ -4091,7 +4091,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   <div className="flex items-center space-x-2">
                     <div className="relative w-[120px] h-[30px]">
                       {/* Imagen de fondo (barr.png) */}
-                      <Image 
+                      <GameImage
                         src="/assets/ui/game-container/barr.png" 
                         alt="Hacker Energy Bar Background" 
                         width={120} 
@@ -4102,7 +4102,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       />
                       
                       {/* Barra de progreso (barra_trump.png) con 5 saltos */}
-                      <Image 
+                      <GameImage
                         src="/assets/ui/game-container/barra_trump_hacker.png" 
                         alt="Hacker Energy Progress" 
                         width={120} 
@@ -4137,7 +4137,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       </span>
                       
                       {/* Imagen de energía (resource) */}
-                      <Image 
+                      <GameImage
                         src="/assets/collectibles/resource_rare_metals.png" 
                         alt="Resource" 
                         width={20} 
@@ -4221,7 +4221,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   </>
                 )}
                 
-               <Image 
+               <GameImage
                  src="/assets/ui/buttons/CartelMadera.png"
                   alt="Score box"
                   width={150}
@@ -4245,7 +4245,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
 
               <div className="relative">
-                <Image 
+                <GameImage
                   src="/assets/ui/buttons/CartelMadera.png"
                   alt="Level box"
                   width={150}
@@ -4261,7 +4261,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
 
               {/* Caja de corazones centrada */}
               <div className="relative">
-                <Image 
+                <GameImage
                   src="/assets/ui/buttons/CartelMadera.png"
                   alt="Hearts box"
                   width={Math.max(120, 60 + gameState.maxHearts * 32)}
@@ -4271,7 +4271,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-2xl font-pixellari text-primary text-shadow">
                   {Array.from({ length: gameState.maxHearts }).map((_, i) => (
-                    <Image
+                    <GameImage
                       key={i}
                       src="/assets/collectibles/corazoncukies.png"
                       alt={i < gameState.hearts ? "Full Heart" : "Empty Heart"}
@@ -4284,7 +4284,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               </div>
 
               <div className="relative">
-                <Image 
+                <GameImage
                   src="/assets/ui/buttons/CartelMadera.png"
                   alt="Time box"
                   width={150}
@@ -4595,7 +4595,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                           className="focus:outline-none game-button relative"
                           aria-label="Score Details"
                         >
-                          <Image 
+                          <GameImage
                             src="/assets/ui/buttons/caja-texto2.png"
                             alt="Score Details" 
                             width={180} 
@@ -4615,7 +4615,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                           className="focus:outline-none game-button relative"
                           aria-label="Volver al menú"
                         >
-                          <Image 
+                          <GameImage
                             src="/assets/ui/buttons/caja-texto2.png" 
                             alt="Volver al menú"
                             width={180} 
@@ -4663,7 +4663,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 className={`focus:outline-none game-button relative ${localControlsLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label={gameState.status === 'playing' ? 'Pause' : gameState.status === 'paused' ? 'Resume' : 'Start'}
               >
-                <Image 
+                <GameImage
                   src="/assets/ui/buttons/caja-texto2.png"
                   alt={gameState.status === 'playing' ? "Pause" : "Play"} 
                   width={120} 
@@ -4680,7 +4680,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                 className={`focus:outline-none game-button relative ${localControlsLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label="Reset game"
               >
-                <Image 
+                <GameImage
                   src="/assets/ui/buttons/caja-texto2.png" 
                   alt="Reset" 
                   width={120} 
@@ -4696,7 +4696,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
               {hackerActive && (
                 <div className="flex items-center space-x-2 ml-4">
                                       <div className="relative" style={{ width: 60, height: 25 }}>
-                      <Image 
+                      <GameImage
                         src="/assets/collectibles/trump_imagen.png" 
                         alt="Trump" 
                         width={60} 
@@ -4715,7 +4715,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                   <div className="flex items-center space-x-2">
                     <div className="relative w-[120px] h-[30px]">
                       {/* Imagen de fondo (barr.png) */}
-                      <Image 
+                      <GameImage
                         src="/assets/ui/game-container/barr.png" 
                         alt="Hacker Energy Bar Background" 
                         width={120} 
@@ -4726,7 +4726,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       />
                       
                       {/* Barra de progreso (barra_trump.png) con 5 saltos */}
-                      <Image 
+                      <GameImage
                         src="/assets/ui/game-container/barra_trump_hacker.png" 
                         alt="Hacker Energy Progress" 
                         width={120} 
@@ -4761,7 +4761,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
                       </span>
                       
                       {/* Imagen de energía (resource) */}
-                      <Image 
+                      <GameImage
                         src="/assets/collectibles/resource_rare_metals.png" 
                         alt="Resource" 
                         width={20} 
@@ -4804,7 +4804,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           className="focus:outline-none game-button"
           aria-label={musicEnabled ? 'Disable music' : 'Enable music'}
         >
-          <Image 
+          <GameImage
             src={musicEnabled 
               ? "/assets/ui/buttons/musicasi.png" 
               : "/assets/ui/buttons/musicano.png"}
@@ -4822,7 +4822,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           className="focus:outline-none game-button"
           aria-label={soundsEnabled ? 'Disable sounds' : 'Enable sounds'}
         >
-          <Image 
+          <GameImage
             src={soundsEnabled 
               ? "/assets/ui/buttons/efectossi.png" 
               : "/assets/ui/buttons/efectosno.png"}
@@ -4851,7 +4851,7 @@ const GameContainer: React.FC<GameContainerProps> = ({ width, height }) => {
           className="focus:outline-none game-button relative"
           aria-label="Información del juego"
         >
-          <Image 
+          <GameImage
             src="/assets/ui/buttons/botoninfo.png"
             alt="Información" 
             width={110} 

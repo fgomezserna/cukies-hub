@@ -1,6 +1,6 @@
 "use client";
 
-import Image from 'next/image';
+import { GameImage } from './game-image';
 import React from 'react';
 
 import type { TreasureHuntMultiplayerEntryState } from '../lib/multiplayer-feature';
@@ -367,7 +367,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   background: 'radial-gradient(circle, rgba(228, 92, 255, 0.18), transparent 68%)',
                 }}
               />
-              <Image
+              <GameImage
                 src="/assets/characters/1p.png"
                 alt="Personaje del modo para un jugador"
                 width={300}
@@ -503,7 +503,7 @@ const ModeSelectModal: React.FC<ModeSelectModalProps> = ({
                   background: 'radial-gradient(circle, rgba(215, 163, 67, 0.14), transparent 70%)',
                 }}
               />
-              <Image
+              <GameImage
                 src="/assets/characters/vs.png"
                 alt="Dos personajes preparados para un duelo"
                 width={600}
