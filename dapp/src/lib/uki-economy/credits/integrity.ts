@@ -7,6 +7,10 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 const RUN_ID_HEX = /^[0-9a-f]{64}$/;
 const PERIOD_CUTOFF = /^[A-Za-z0-9][A-Za-z0-9:._-]*:[0-9a-f]{64}:(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/;
 
+export function isKnownCreditRoute(value: unknown): value is CreditRoute {
+  return value === "uki" || value === "nft";
+}
+
 function incidentCutoff(periodId: unknown) {
   if (typeof periodId !== "string") return null;
   const match = PERIOD_CUTOFF.exec(periodId);
@@ -52,9 +56,27 @@ export function isBlockingCreditIncident(
   route: CreditRoute,
   cutoff: Date,
 ) {
+  if (incident.status !== "open") return false;
+  // A persisted document outside the two route values is a malformed/global
+  // incident. It must remain a block for every route rather than being
+  // discarded by a route-specific query.
+  if (!isKnownCreditRoute(incident.route)) return true;
   return (
-    incident.status === "open" &&
     incident.route === route &&
     !isContainedHistoricalCreditIncident(incident, route, cutoff)
   );
+}
+
+/**
+ * Reservation and public availability use the global integrity decision. A
+ * valid contained historical correction is exempt only for its own route and
+ * an older cutoff; every other open incident blocks the wallet.
+ */
+export function isBlockingCreditIncidentGlobally(
+  incident: CreditIntegrityIncident,
+  cutoff: Date,
+) {
+  return isKnownCreditRoute(incident.route)
+    ? isBlockingCreditIncident(incident, incident.route, cutoff)
+    : isBlockingCreditIncident(incident, "uki", cutoff);
 }

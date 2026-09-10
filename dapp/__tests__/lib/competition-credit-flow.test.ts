@@ -1786,6 +1786,97 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     ]);
   });
 
+  it("allows one reservation with two contained historical NFT incidents and keeps both open", async () => {
+    const { repository, service, first, nextCutoff } = await setupNftHistoricalIncident();
+    await openDailyRun({
+      repository,
+      service,
+      route: "nft",
+      cutoff: nextCutoff,
+      now: new Date(nextCutoff.getTime() + 60_000),
+    });
+    repository.state.incidents.push(
+      historicalSlotHistoryIncident(first, {
+        _id: "incident:nft-historical-second",
+        incidentId: "incident:nft-historical-second",
+      }),
+    );
+
+    const request = {
+      walletAddress: WALLET,
+      sessionId: "nft-historical-reservation",
+      costCode: "treasure-hunt:start",
+      idempotencyKey: "nft-historical-reservation-v1",
+      now: new Date(nextCutoff.getTime() + 5 * 60_000),
+    };
+    const reservation = await service.reserve(request);
+    const replay = await service.reserve({
+      ...request,
+      now: new Date(request.now.getTime() + 60_000),
+    });
+
+    expect(replay.reservationId).toBe(reservation.reservationId);
+    expect(repository.state.reservations).toHaveLength(1);
+    expect(repository.state.incidents).toHaveLength(2);
+    expect(repository.state.incidents.every((incident) => incident.status === "open")).toBe(true);
+  });
+
+  it.each([
+    ["same cutoff", {}],
+    ["future cutoff", { periodId: `${"credits-v1"}:${"a".repeat(64)}:2026-07-12T12:00:00.000Z` }],
+    ["malformed period", { periodId: "malformed-period" }],
+    ["extra reason", { reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED", "RUNTIME_RUN_INVALID"] }],
+    ["missing containment", { containment: undefined }],
+    ["invalid hash", { evidenceHash: "invalid" }],
+    ["unknown route", { route: "legacy" as never }],
+  ])("blocks reservation for a %s incident", async (_label, overrides) => {
+    const repository = nftRepositoryForFlow();
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    const run = await openDailyRun({ repository, service, route: "nft" });
+    repository.state.incidents.push(
+      historicalSlotHistoryIncident(run, overrides),
+    );
+
+    await expect(
+      service.reserve({
+        walletAddress: WALLET,
+        sessionId: `blocked-${_label.replace(/ /g, "-")}`,
+        costCode: "treasure-hunt:start",
+        idempotencyKey: `blocked-${_label.replace(/ /g, "-")}`,
+        now: new Date("2026-07-10T12:05:00.000Z"),
+      }),
+    ).rejects.toThrow(/wallet o el ledger de creditos estan bloqueados/);
+    expect(repository.state.reservations).toHaveLength(0);
+  });
+
+  it("blocks reservation when an account from another period is blocked", async () => {
+    const repository = new MemoryCompetitionCreditRepository({ slots: [slot()] });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    await openDailyRun({ repository, service });
+    const currentAccount = repository.state.accounts[0];
+    repository.state.accounts.push({
+      ...currentAccount,
+      _id: `${currentAccount._id}:historical`,
+      periodId: `${currentAccount.periodId}:historical`,
+      blocked: true,
+    });
+
+    await expect(
+      service.reserve({
+        walletAddress: WALLET,
+        sessionId: "blocked-account-other-period",
+        costCode: "treasure-hunt:start",
+        idempotencyKey: "blocked-account-other-period",
+        now: new Date("2026-07-10T12:05:00.000Z"),
+      }),
+    ).rejects.toThrow(/wallet o el ledger de creditos estan bloqueados/);
+    expect(repository.state.reservations).toHaveLength(0);
+  });
+
   it.each([
     ["normal reason", { reasonCodes: ["RUNTIME_RUN_INVALID"] }],
     ["mixed reasons", { reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED", "RUNTIME_RUN_INVALID"] }],

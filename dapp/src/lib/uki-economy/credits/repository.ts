@@ -28,7 +28,10 @@ import {
   type CreditVerifiedHistoryCoverage,
   type CreditVerifiedSlotVersion,
 } from "./history-coverage";
-import { isBlockingCreditIncident } from "./integrity";
+import {
+  isBlockingCreditIncident,
+  isBlockingCreditIncidentGlobally,
+} from "./integrity";
 import {
   CREDIT_RULE_SCOPE,
   CREDIT_SCHEMA_VERSION,
@@ -162,7 +165,7 @@ export interface CompetitionCreditRepository {
   findLedgerByIdempotencyKey(
     idempotencyKey: string
   ): Promise<CompetitionCreditLedgerEntry | null>;
-  hasOpenCreditBlock(walletNormalized: string): Promise<boolean>;
+  hasOpenCreditBlock(walletNormalized: string, cutoff: Date): Promise<boolean>;
   listAvailableOwnLots(
     walletNormalized: string,
     periodId: string,
@@ -512,7 +515,10 @@ export function createMongoCompetitionCreditRepository(
           options
         ),
         collections.incidents
-          .find({ status: "open", route }, {
+          .find({
+            status: "open",
+            $or: [{ route }, { route: { $nin: ["uki", "nft"] } }],
+          }, {
             ...options,
             projection: {
               _id: 1,
@@ -1637,21 +1643,26 @@ export function createMongoCompetitionCreditRepository(
         .findOne({ _id: sessionId }, { ...options, projection: { _id: 1, status: 1 } }),
     findLedgerByIdempotencyKey: (idempotencyKey) =>
       collections.ledger.findOne({ idempotencyKey }, options),
-    async hasOpenCreditBlock(walletNormalized) {
+    async hasOpenCreditBlock(walletNormalized, cutoff) {
       const [incidents, accountBlocks] = await Promise.all([
-        collections.incidents.countDocuments(
-          {
-            status: "open",
-            $or: [{ walletNormalized: null }, { walletNormalized }],
-          },
-          options
-        ),
+        collections.incidents
+          .find(
+            {
+              status: "open",
+              $or: [{ walletNormalized: null }, { walletNormalized }],
+            },
+            options,
+          )
+          .toArray()
+          .then((items) => items.some((incident) =>
+            isBlockingCreditIncidentGlobally(incident, cutoff)
+          )),
         collections.accounts.countDocuments(
           { walletNormalized, blocked: true },
           options
         ),
       ]);
-      return incidents + accountBlocks > 0;
+      return incidents || accountBlocks > 0;
     },
     async listAvailableOwnLots(walletNormalized, periodId, now, limit, after) {
       const runIds = await openRunIdsAt(periodId, now);

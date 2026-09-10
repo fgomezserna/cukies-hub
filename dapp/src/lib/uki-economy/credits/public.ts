@@ -73,7 +73,16 @@ export async function getCompetitionCreditWalletStatus(
   const rule = assertCompetitionCreditRule(rules[0]);
   const period = currentCompetitionCreditPeriod(now, rule);
   const routes: CreditRoute[] = ['uki', 'nft'];
-  const [accounts, pools, slots, watermarks, routeIncidentCounts, activeReservations] = await Promise.all([
+  const [
+    accounts,
+    pools,
+    slots,
+    watermarks,
+    routeIncidentCounts,
+    unknownRouteIncidentCount,
+    blockedAccountCount,
+    activeReservations,
+  ] = await Promise.all([
     db.collection<CreditAccountPeriod>('competition_credit_account_periods').find({
       walletNormalized,
       periodId: period.periodId,
@@ -118,6 +127,17 @@ export async function getCompetitionCreditWalletStatus(
           isBlockingCreditIncident(incident, route, period.cutoff)
         ).length),
     }))),
+    db.collection<CreditIntegrityIncident>('competition_credit_incidents').countDocuments({
+      status: 'open',
+      $and: [
+        { $or: [{ walletNormalized }, { walletNormalized: null }] },
+        { route: { $nin: routes } },
+      ],
+    }),
+    db.collection<CreditAccountPeriod>('competition_credit_account_periods').countDocuments({
+      walletNormalized,
+      blocked: true,
+    }),
     db.collection('competition_credit_reservations').countDocuments({
       walletNormalized,
       periodId: period.periodId,
@@ -198,7 +218,8 @@ export async function getCompetitionCreditWalletStatus(
       grants: {
         healthy: watermark?.status === 'healthy'
           && sourceWatermarkIsFresh(observedThrough ?? undefined, now, rule.sourceFreshnessMs)
-          && openIncidents === 0,
+          && openIncidents === 0
+          && unknownRouteIncidentCount === 0,
         sourceObservedThrough: observedThrough,
         openIncidents,
       },
@@ -208,6 +229,9 @@ export async function getCompetitionCreditWalletStatus(
     pool: { availableCredits: number; reservedCredits: number; blocked: boolean };
     grants: { healthy: boolean; sourceObservedThrough: Date | null; openIncidents: number };
   }>;
+  const knownOpenIncidents = routeIncidentCounts.reduce((total, item) => total + item.count, 0);
+  const openIncidents = knownOpenIncidents + unknownRouteIncidentCount;
+  const globallyBlocked = openIncidents > 0 || blockedAccountCount > 0;
   const balance = routes.reduce((total, route) => ({
     grantedCredits: total.grantedCredits + routeStatus[route].balance.grantedCredits,
     poolDepositedCredits: total.poolDepositedCredits + routeStatus[route].balance.poolDepositedCredits,
@@ -215,14 +239,13 @@ export async function getCompetitionCreditWalletStatus(
     reservedCredits: total.reservedCredits + routeStatus[route].balance.reservedCredits,
     spentCredits: total.spentCredits + routeStatus[route].balance.spentCredits,
     expiredCredits: total.expiredCredits + routeStatus[route].balance.expiredCredits,
-    blocked: total.blocked || routeStatus[route].balance.blocked,
+    blocked: total.blocked || routeStatus[route].balance.blocked || globallyBlocked,
   }), { ...emptyBalance });
   const poolBalance = routes.reduce((total, route) => ({
     availableCredits: total.availableCredits + routeStatus[route].pool.availableCredits,
     reservedCredits: total.reservedCredits + routeStatus[route].pool.reservedCredits,
     blocked: total.blocked || routeStatus[route].pool.blocked,
   }), { availableCredits: 0, reservedCredits: 0, blocked: false });
-  const openIncidents = routeIncidentCounts.reduce((total, item) => total + item.count, 0);
   const observed = routes
     .map((route) => routeStatus[route].grants.sourceObservedThrough)
     .filter((value): value is Date => value instanceof Date);

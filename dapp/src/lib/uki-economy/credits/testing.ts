@@ -13,7 +13,10 @@ import {
   safeCompetitionCreditSettlementPeriodScopeId,
   stableCreditHash,
 } from "./rules";
-import { isBlockingCreditIncident } from "./integrity";
+import {
+  isBlockingCreditIncident,
+  isBlockingCreditIncidentGlobally,
+} from "./integrity";
 import {
   CREDIT_RULE_SCOPE,
   CREDIT_SOURCE_WATERMARK_ID,
@@ -927,13 +930,14 @@ export class MemoryCompetitionCreditRepository
     );
   }
 
-  async hasOpenCreditBlock(walletNormalized: string) {
+  async hasOpenCreditBlock(walletNormalized: string, cutoff: Date) {
     return (
       this.state.incidents.some(
         (item) =>
-          item.status === "open" &&
           (item.walletNormalized === null ||
-            item.walletNormalized === walletNormalized)
+            typeof item.walletNormalized === "undefined" ||
+            item.walletNormalized === walletNormalized) &&
+          isBlockingCreditIncidentGlobally(item, cutoff)
       ) ||
       this.state.accounts.some(
         (item) => item.walletNormalized === walletNormalized && item.blocked

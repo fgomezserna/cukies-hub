@@ -1729,7 +1729,7 @@ export function createCompetitionCreditService(
             `La session ${sessionId} ya tiene una reserva.`
           );
         }
-        if (await repository.hasOpenCreditBlock(walletNormalized)) {
+        if (await repository.hasOpenCreditBlock(walletNormalized, period.cutoff)) {
           throw new DomainConflictError(
             "La wallet o el ledger de creditos estan bloqueados."
           );
