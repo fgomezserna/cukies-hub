@@ -79,6 +79,38 @@ export function pendingNftVaultOperationAssetKey(operation: Pick<NftVaultPending
   return canonicalNftVaultAssetId(operation) ?? operation.assetId;
 }
 
+/**
+ * Compares a persisted operation with the snapshot that produced a read.
+ * The asset key alone is insufficient because a later transaction may replace
+ * the pending operation for the same collection/token.
+ */
+export function pendingNftVaultOperationMatches(
+  operation: NftVaultPendingOperation | undefined,
+  expected: Pick<
+    NftVaultPendingOperation,
+    'chainId'
+    | 'walletAddress'
+    | 'vaultAddress'
+    | 'assetId'
+    | 'collectionAddress'
+    | 'tokenId'
+    | 'action'
+    | 'phase'
+    | 'txHash'
+    | 'depositEpoch'
+  >,
+) {
+  if (!operation) return false;
+  return operation.chainId === expected.chainId
+    && normalizeAddress(operation.walletAddress) === normalizeAddress(expected.walletAddress)
+    && normalizeAddress(operation.vaultAddress) === normalizeAddress(expected.vaultAddress)
+    && pendingNftVaultOperationAssetKey(operation) === pendingNftVaultOperationAssetKey(expected)
+    && operation.action === expected.action
+    && operation.phase === expected.phase
+    && operation.txHash.toLowerCase() === expected.txHash.toLowerCase()
+    && (expected.depositEpoch === undefined || operation.depositEpoch === expected.depositEpoch);
+}
+
 export function pendingNftVaultOperationMatchesAsset(
   operation: Pick<NftVaultPendingOperation, 'chainId' | 'collectionAddress' | 'tokenId' | 'assetId'>,
   asset: { chainId: number; collectionAddress: string; tokenId: string; assetId: string },
@@ -230,10 +262,26 @@ export function clearPendingNftVaultOperation(
   storage: StorageLike,
   context: NftVaultPendingContext,
   assetId: string,
+  expected?: Pick<
+    NftVaultPendingOperation,
+    'chainId'
+    | 'walletAddress'
+    | 'vaultAddress'
+    | 'assetId'
+    | 'collectionAddress'
+    | 'tokenId'
+    | 'action'
+    | 'phase'
+    | 'txHash'
+    | 'depositEpoch'
+  >,
 ) {
   try {
     const next = loadPendingNftVaultOperations(storage, context)
-      .filter((item) => item.assetId !== assetId && pendingNftVaultOperationAssetKey(item) !== assetId);
+      .filter((item) => {
+        const sameAsset = item.assetId === assetId || pendingNftVaultOperationAssetKey(item) === assetId;
+        return !(sameAsset && (!expected || pendingNftVaultOperationMatches(item, expected)));
+      });
     const key = pendingNftVaultStorageKey(context);
     if (next.length === 0) storage.removeItem(key);
     else storage.setItem(key, JSON.stringify(next));

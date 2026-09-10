@@ -5,6 +5,7 @@ import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'w
 import { CukiePoolStatusPanel } from '@/components/cukie-pool/status-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 import {
+  loadPendingNftVaultOperations,
   pendingNftVaultStorageKey,
   savePendingNftVaultOperation,
   type NftVaultPendingOperation,
@@ -217,6 +218,14 @@ function pendingDeposit(asset = availableAsset()): NftVaultPendingOperation {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
 describe('CukiePoolStatusPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -352,6 +361,136 @@ describe('CukiePoolStatusPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
     expect(await screen.findByRole('button', { name: /Actualizando depósito/i })).toBeDisabled();
     expect(screen.getByRole('img', { name: 'Cukie #7' })).toBeInTheDocument();
+  });
+
+  it('ignora un receipt retrasado después de cambiar la red de la wallet', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const receipt = deferred<{ status: string }>();
+    const getTransactionReceipt = jest.fn().mockReturnValue(receipt.promise);
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const pending = pendingDeposit(availableAsset());
+    const awaiting = { ...pending, phase: 'awaiting_receipt' as const };
+    savePendingNftVaultOperation(window.localStorage, awaiting);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    const view = render(<CukiePoolStatusPanel />);
+    await waitFor(() => expect(getTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash }));
+
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 56,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    view.rerender(<CukiePoolStatusPanel />);
+    await act(async () => {
+      receipt.resolve({ status: 'success' });
+      await Promise.resolve();
+    });
+
+    expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([awaiting]);
+  });
+
+  it('no persiste ni actualiza la UI si el componente se desmonta durante el receipt', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const receipt = deferred<{ status: string }>();
+    const getTransactionReceipt = jest.fn().mockReturnValue(receipt.promise);
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const awaiting = { ...pendingDeposit(availableAsset()), phase: 'awaiting_receipt' as const };
+    savePendingNftVaultOperation(window.localStorage, awaiting);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    const view = render(<CukiePoolStatusPanel />);
+    await waitFor(() => expect(getTransactionReceipt).toHaveBeenCalledWith({ hash: depositHash }));
+    view.unmount();
+    await act(async () => {
+      receipt.resolve({ status: 'success' });
+      await Promise.resolve();
+    });
+
+    expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([awaiting]);
+  });
+
+  it('no limpia la operación nueva del mismo asset si positionOf responde tarde', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const positionRead = deferred<unknown>();
+    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    const readContract = jest.fn().mockImplementation((request: { functionName?: string }) => (
+      request.functionName === 'positionOf' ? positionRead.promise : Promise.resolve(walletAddress)
+    ));
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract,
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const original = pendingDeposit(availableAsset());
+    const syncing = { ...original, depositEpoch: '2' };
+    savePendingNftVaultOperation(window.localStorage, syncing);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [availableAsset()] })));
+
+    render(<CukiePoolStatusPanel />);
+    await waitFor(() => expect(readContract).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'positionOf',
+      args: [collectionAddress, BigInt(7)],
+    })));
+
+    const replacement = {
+      ...syncing,
+      txHash: `0x${'c'.repeat(64)}` as const,
+      updatedAt: 2,
+    };
+    savePendingNftVaultOperation(window.localStorage, replacement);
+    await act(async () => {
+      positionRead.resolve({
+        beneficialOwner: walletAddress,
+        depositEpoch: BigInt(2),
+        depositedAt: BigInt(100),
+        activationAt: BigInt(200),
+      });
+      await Promise.resolve();
+    });
+
+    expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([replacement]);
   });
 
   it('does not retain another wallet list after the Pool identity changes', async () => {

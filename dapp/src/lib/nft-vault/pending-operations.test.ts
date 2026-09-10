@@ -67,6 +67,21 @@ describe('pending NFT vault operations', () => {
     ]);
   });
 
+  it('no limpia una operación sustitutiva con el mismo asset cuando el hash anterior termina tarde', () => {
+    const original = operation({ phase: 'syncing_projection' });
+    const replacement = operation({
+      phase: 'syncing_projection',
+      txHash: `0x${'b'.repeat(64)}`,
+      updatedAt: 2,
+    });
+    savePendingNftVaultOperation(localStorage, original);
+    savePendingNftVaultOperation(localStorage, replacement);
+
+    clearPendingNftVaultOperation(localStorage, context, original.assetId, original);
+
+    expect(loadPendingNftVaultOperations(localStorage, context)).toEqual([replacement]);
+  });
+
   it('conserva solicitudes de salida del vault de préstamos', () => {
     const requestExit = operation({ action: 'request_exit' });
     savePendingNftVaultOperation(localStorage, requestExit);
