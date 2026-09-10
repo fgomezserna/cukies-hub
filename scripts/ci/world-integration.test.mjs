@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { CI_COMPONENTS, WORLD_COMPONENTS } from './image-ref.mjs';
 import { chooseDelivery, assertWorldDisabled } from './release-delivery-plan.mjs';
@@ -17,6 +21,8 @@ import { withoutWorldRuntime } from './generate-images-compose.mjs';
 
 const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
+const SHA_WEB = 'c'.repeat(40);
+const SHA_GAME = 'd'.repeat(40);
 const HASH = 'c'.repeat(64);
 const DIGEST = `sha256:${'d'.repeat(64)}`;
 const LOCK_BASELINE = `lockfileVersion: '9.0'
@@ -251,11 +257,13 @@ test('World-only delivery changes catalogue images without starting active runti
   assert.throws(() => assertWorldDisabled('WORLD_RUNTIME_ENABLED=true'), /World sigue apagada/);
 });
 
-test('No-op registra World images y conserva identidades rolling del estado legacy', () => {
+test('No-op registra World images y conserva identidades rolling separadas', () => {
   const previous = {
     environment: 'staging',
     chainId: '97',
     commit: SHA_A,
+    webCommit: SHA_WEB,
+    gameCommit: SHA_GAME,
     configHash: HASH,
     deliveryMode: 'rolling',
     workersComposeHash: 'e'.repeat(64),
@@ -269,8 +277,9 @@ test('No-op registra World images y conserva identidades rolling del estado lega
   const candidate = worldManifest();
   const state = createNoopState({ previous, head: SHA_B, configHash: HASH, components: candidate.components, environment: 'staging', chainId: '97', workersComposeHash: previous.workersComposeHash });
   assert.equal(state.commit, SHA_B);
-  assert.equal(state.webCommit, SHA_A);
-  assert.equal(state.gameCommit, SHA_A);
+  assert.equal(state.webCommit, SHA_WEB);
+  assert.equal(state.gameCommit, SHA_GAME);
+  assert.notEqual(state.webCommit, state.gameCommit);
   assert.deepEqual(state.components['world-api'], candidate.components['world-api']);
   assert.equal(state.deploymentUuid, 'deploy-old');
   assert.deepEqual(state.rollback, previous.rollback);
@@ -278,6 +287,73 @@ test('No-op registra World images y conserva identidades rolling del estado lega
   assert.throws(() => createNoopState({ previous, head: SHA_B, configHash: HASH, components: { ...candidate.components, dapp: imageEntry('dapp', SHA_B) }, environment: 'staging', chainId: '97', workersComposeHash: previous.workersComposeHash }), /referencia activa de dapp/);
   assert.throws(() => createNoopState({ previous, head: SHA_B, configHash: HASH, components: candidate.components, environment: 'staging', chainId: '97', workersComposeHash: 'f'.repeat(64) }), /hash de Compose/);
   assert.throws(() => createNoopState({ previous, head: SHA_B, configHash: HASH, components: { ...candidate.components, 'chain-indexer': { ...candidate.components['chain-indexer'], environment: 'production', chainId: '56' } }, environment: 'staging', chainId: '97', workersComposeHash: previous.workersComposeHash }), /imagen activa previa|entorno/);
+});
+
+test('No-op bloquea la migración legacy ambigua antes de persistir', async () => {
+  const previous = {
+    environment: 'staging',
+    chainId: '97',
+    commit: SHA_WEB,
+    configHash: HASH,
+    deliveryMode: 'rolling',
+    workersComposeHash: chooseDelivery({ manifest: worldManifest(), previous: null, compose: COMPOSE_WITH_WORLD }).workersComposeHash,
+    components: activeComponents(),
+    deploymentUuid: 'deploy-old',
+    webResourceUuid: 'web-old',
+    workersResourceUuid: 'workers-old',
+    gameResourceUuid: 'game-old',
+  };
+  const candidate = worldManifest();
+  const directory = await mkdtemp(join(tmpdir(), 'cukies-world-noop-identity-'));
+  const statePath = join(directory, 'release.json');
+  const manifestPath = join(directory, 'manifest.json');
+  const composePath = join(directory, 'compose.yml');
+  const resultPath = join(directory, 'result.json');
+  const previousRaw = `${JSON.stringify(previous, null, 2)}\n`;
+  const manifestRaw = `${JSON.stringify(candidate, null, 2)}\n`;
+  try {
+    await writeFile(statePath, previousRaw);
+    await writeFile(manifestPath, manifestRaw);
+    await writeFile(composePath, COMPOSE_WITH_WORLD);
+    assert.throws(() => createNoopState({
+      previous,
+      head: candidate.commit,
+      configHash: candidate.configHash,
+      components: candidate.components,
+      environment: candidate.environment,
+      chainId: candidate.chainId,
+      workersComposeHash: previous.workersComposeHash,
+    }), /webCommit servido verificable/);
+
+    assert.throws(() => execFileSync(process.execPath, [
+      fileURLToPath(new URL('./deliver-release.mjs', import.meta.url)),
+      '--state', statePath,
+      '--manifest', manifestPath,
+      '--result', resultPath,
+      '--compose', composePath,
+    ], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+      env: { ...process.env, CUKIES_COOLIFY_URL: 'https://unused.invalid', CUKIES_COOLIFY_TOKEN: 'test-token' },
+    }), /webCommit servido verificable/);
+    assert.equal(await readFile(statePath, 'utf8'), previousRaw);
+    assert.equal(await readFile(manifestPath, 'utf8'), manifestRaw);
+    await assert.rejects(readFile(resultPath, 'utf8'), { code: 'ENOENT' });
+    await assert.rejects(readFile(`${statePath}.pending.json`, 'utf8'), { code: 'ENOENT' });
+
+    const webOnly = { ...previous, webCommit: SHA_WEB };
+    assert.throws(() => createNoopState({
+      previous: webOnly,
+      head: candidate.commit,
+      configHash: candidate.configHash,
+      components: candidate.components,
+      environment: candidate.environment,
+      chainId: candidate.chainId,
+      workersComposeHash: previous.workersComposeHash,
+    }), /gameCommit servido verificable/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('World integration refinement rejects global npmrc changes', async () => {

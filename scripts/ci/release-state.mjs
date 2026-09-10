@@ -6,6 +6,8 @@ import { requireValue } from './cli-args.mjs';
 import { assertEnvironmentMetadata, resolveDeploymentEnvironment } from './deployment-environment.mjs';
 import { assertImmutableImageEntry, CI_COMPONENTS, WORLD_COMPONENTS } from './image-ref.mjs';
 
+const SHA40 = /^[0-9a-f]{40}$/i;
+
 export async function readReleaseState(path) {
   return readFile(path, 'utf8').then(JSON.parse).catch((error) => {
     if (error.code === 'ENOENT' || error instanceof SyntaxError) return null;
@@ -89,6 +91,14 @@ export function createNoopState({ previous = null, head, configHash, components,
   if (!/^[0-9a-f]{64}$/i.test(workersComposeHash ?? '') || previous.workersComposeHash !== workersComposeHash) {
     throw new Error('el no-op requiere el mismo hash de Compose efectivo.');
   }
+  const servedWebCommit = previous.webCommit;
+  if (!SHA40.test(servedWebCommit ?? '')) {
+    throw new Error('el no-op requiere webCommit servido verificable en el estado previo; no puede inferirse de commit ni sourceSha.');
+  }
+  const servedGameCommit = previous.gameCommit;
+  if (!SHA40.test(servedGameCommit ?? '')) {
+    throw new Error('el no-op requiere gameCommit servido verificable en el estado previo; no puede inferirse de commit ni sourceSha.');
+  }
 
   const normalizedComponents = Object.fromEntries(CI_COMPONENTS.map((component) => {
     const entry = components?.[component];
@@ -128,12 +138,11 @@ export function createNoopState({ previous = null, head, configHash, components,
     configHash,
     workersComposeHash,
     components: normalizedComponents,
-    // Legacy rolling states (schema 6) did not persist lane commits.  Carry
-    // their served identities forward explicitly; otherwise a catalogue-only
-    // no-op would report the new CI head as the served web SHA.
-    webCommit: previous.webCommit ?? previous.commit ?? null,
-    gameCommit: previous.gameCommit
-      ?? (previous.components?.['treasure-hunt'] ? previous.commit : null),
+    // A catalogue-only no-op must carry identities that were already verified
+    // for each Coolify lane. The aggregate CI commit and image sourceSha are
+    // not evidence of what that lane was serving.
+    webCommit: servedWebCommit,
+    gameCommit: servedGameCommit,
     previousCommit: previous.commit ?? previous.deployedSha ?? null,
     updatedAt: new Date().toISOString(),
   };
