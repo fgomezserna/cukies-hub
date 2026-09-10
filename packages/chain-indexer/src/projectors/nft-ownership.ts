@@ -4,7 +4,9 @@ import type { ChainEvent, ChainName } from '../types.js';
 import { normalizeAddress } from '../utils/json.js';
 
 const ZERO_BSC_ADDRESS = '0x0000000000000000000000000000000000000000';
-const ZERO_TRON_ADDRESS = 'T9YD14NJ9J7XAB4DBGEIX9H8UNKKHXUWWB';
+// Base58 is case-sensitive. Keep the canonical Tron zero address rather than
+// the all-uppercase display form used by the legacy generic normalizer.
+const ZERO_TRON_ADDRESS = 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb';
 
 export type NftOwnershipEvidence = {
   eventId: string;
@@ -81,6 +83,17 @@ function normalizedTransferField(
   field: 'from' | 'to',
   raw: string,
 ) {
+  // TRON addresses are Base58 and case-sensitive. The generic normalizer
+  // uppercases TRON values for legacy wallet comparisons, so ownership keeps
+  // the raw canonical Base58 value here instead of changing its identity.
+  if (event.chain === 'TRON') {
+    // Older imported rows may contain the zero address in the generic
+    // upper-case form. Canonicalize only this well-known sentinel so mint
+    // detection remains correct while real owners retain their exact case.
+    return raw.toUpperCase() === ZERO_TRON_ADDRESS.toUpperCase()
+      ? ZERO_TRON_ADDRESS
+      : raw;
+  }
   return nonEmptyText(event.normalized[`${field}Normalized`])
     ?? nonEmptyText(normalizeAddress(event.chain, raw));
 }
@@ -130,13 +143,15 @@ export function buildNftOwnershipEvidence(event: ChainEvent): NftOwnershipEviden
     }
   }
 
-  const normalizedZero = normalizeAddress(event.chain, zeroAddress(event.chain));
+  const normalizedZero = zeroAddress(event.chain);
   return {
     ok: true,
     evidence: {
       eventId,
       chain: event.chain,
-      ...(event.chainId === undefined ? {} : { chainId: event.chainId }),
+      ...(event.chain === 'BSC' && event.chainId !== undefined
+        ? { chainId: event.chainId }
+        : {}),
       contractAlias: event.contractAlias,
       contractAddress: event.contractAddress,
       collectionAddressNormalized: event.chain === 'BSC'
@@ -147,7 +162,9 @@ export function buildNftOwnershipEvidence(event: ChainEvent): NftOwnershipEviden
       to,
       fromNormalized,
       toNormalized,
-      isMint: fromNormalized === normalizedZero,
+      isMint: event.chain === 'BSC'
+        ? fromNormalized.toLowerCase() === normalizedZero
+        : fromNormalized === normalizedZero,
       blockNumber,
       logIndex,
       ...(blockHash ? { blockHash: blockHash.toLowerCase() } : {}),
@@ -200,8 +217,11 @@ function stateIdentityConflict(
       && nonEmptyText(candidate)?.toUpperCase() !== evidence.chain
     ) return 'network distinta';
   }
-  if (state.chainId !== undefined && state.chainId !== null
-    && Number(state.chainId) !== evidence.chainId) return 'chainId distinta';
+  if (state.chainId !== undefined && state.chainId !== null) {
+    if (evidence.chain !== 'BSC' || Number(state.chainId) !== evidence.chainId) {
+      return 'chainId distinta';
+    }
+  }
   if (state.collectionAddressNormalized
     && (evidence.chain === 'BSC'
       ? String(state.collectionAddressNormalized).toLowerCase()
@@ -215,8 +235,21 @@ function stateIdentityConflict(
   return null;
 }
 
-function currentOwner(state: NftOwnershipProjectionState) {
-  return stateText(state.ownerNormalized)?.toLowerCase() ?? null;
+function comparableOwner(chain: ChainName, value: unknown) {
+  const owner = stateText(value);
+  return owner && chain === 'BSC' ? owner.toLowerCase() : owner;
+}
+
+function ownersEqual(chain: ChainName, left: unknown, right: unknown) {
+  const leftComparable = comparableOwner(chain, left);
+  const rightComparable = comparableOwner(chain, right);
+  return leftComparable !== null
+    && rightComparable !== null
+    && leftComparable === rightComparable;
+}
+
+function currentOwner(state: NftOwnershipProjectionState, chain: ChainName) {
+  return comparableOwner(chain, state.ownerNormalized);
 }
 
 /**
@@ -253,8 +286,8 @@ export function decideNftOwnershipProjection(
     ) {
       return { kind: 'conflict', reason: 'ownershipEventId reorg con blockHash distinto' };
     }
-    const owner = currentOwner(state);
-    if (owner && owner !== evidence.toNormalized.toLowerCase()) {
+    const owner = currentOwner(state, evidence.chain);
+    if (owner && !ownersEqual(evidence.chain, owner, evidence.toNormalized)) {
       return { kind: 'conflict', reason: 'ownershipEventId ya proyectado con owner distinto' };
     }
     return { kind: 'duplicate', nextOwnershipEventId: eventId, rotatesOwnership: false };
@@ -267,21 +300,22 @@ export function decideNftOwnershipProjection(
     return { kind: 'conflict', reason: 'dos Transfers distintos comparten la misma tuple' };
   }
 
-  const owner = currentOwner(state);
+  const owner = currentOwner(state, evidence.chain);
   if (owner) {
     if (evidence.isMint) {
-      if (owner !== evidence.toNormalized.toLowerCase()) {
+      if (!ownersEqual(evidence.chain, owner, evidence.toNormalized)) {
         return { kind: 'conflict', reason: 'mint contradice el owner proyectado' };
       }
       if (eventId) {
         return { kind: 'conflict', reason: 'mint distinto sobre un ownershipEventId existente' };
       }
-    } else if (owner !== evidence.fromNormalized.toLowerCase()) {
+    } else if (!ownersEqual(evidence.chain, owner, evidence.fromNormalized)) {
       return { kind: 'conflict', reason: 'Transfer no parte del owner proyectado' };
     }
   }
 
-  const rotatesOwnership = evidence.isMint || evidence.fromNormalized !== evidence.toNormalized;
+  const rotatesOwnership = evidence.isMint
+    || !ownersEqual(evidence.chain, evidence.fromNormalized, evidence.toNormalized);
   return {
     kind: 'apply',
     nextOwnershipEventId: rotatesOwnership || !eventId ? evidence.eventId : eventId,

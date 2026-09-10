@@ -19,6 +19,8 @@ import { DomainConflictError } from "../errors";
 import { OWN_CUKIE_MAX_WALLET_ASSETS } from "./rules";
 import {
   CANONICAL_OWNERSHIP_HISTORY_EVENT_LIMIT,
+  CANONICAL_OWNERSHIP_HISTORY_GLOBAL_LIMIT,
+  canonicalOwnershipHistoryQueryWindow,
   isCanonicalOwnershipHistoryWindowComplete,
   resolveCanonicalOwnershipHistory,
   type CanonicalOwnershipHistoryRow,
@@ -85,7 +87,7 @@ function ownershipEventId(document: CanonicalCukieDocument) {
 }
 
 const OWNERSHIP_HISTORY_EVENT_LIMIT = CANONICAL_OWNERSHIP_HISTORY_EVENT_LIMIT;
-const OWNERSHIP_HISTORY_GLOBAL_LIMIT = 50_000;
+const OWNERSHIP_HISTORY_GLOBAL_LIMIT = CANONICAL_OWNERSHIP_HISTORY_GLOBAL_LIMIT;
 
 function canonicalDocumentIdentity(document: CanonicalCukieDocument): CanonicalOwnershipIdentity | null {
   if (
@@ -170,17 +172,16 @@ async function resolveMissingOwnershipEventIds(
     status: "projected",
     "normalized.tokenId": identity.tokenId,
   }));
+  const queryWindow = canonicalOwnershipHistoryQueryWindow(unresolved.length);
   const rows = await chainEvents.find({ $or: filters }, { session })
     .sort({ blockNumber: 1, logIndex: 1 })
-    // Read one sentinel row per NFT and one sentinel row for the global cap.
-    // A full page must be distinguishable from an actually complete history;
-    // otherwise a late transfer can make an old owner appear current again.
-    .limit(Math.min(
-      unresolved.length * (OWNERSHIP_HISTORY_EVENT_LIMIT + 1),
-      OWNERSHIP_HISTORY_GLOBAL_LIMIT + 1,
-    ))
+    // Read one sentinel row per NFT and one extra row for the shared query
+    // boundary. A full page must be distinguishable from an actually complete
+    // history; otherwise a late transfer can make an old owner appear current.
+    .limit(queryWindow.queryLimit)
     .toArray() as CanonicalOwnershipHistoryRow[];
-  const globalTruncated = rows.length > OWNERSHIP_HISTORY_GLOBAL_LIMIT;
+  const globalTruncated = rows.length > queryWindow.sentinelBoundary
+    || rows.length > OWNERSHIP_HISTORY_GLOBAL_LIMIT;
   const byIdentity = new Map<string, CanonicalOwnershipHistoryRow[]>();
   for (const row of rows) {
     const chainId = Number(row.chainId);

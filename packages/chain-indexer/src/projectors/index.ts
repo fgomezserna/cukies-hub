@@ -319,16 +319,27 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
           { ownerNormalized: evidence.fromNormalized },
         ],
       };
-  const identityGuard = {
-    $and: [
-      ownerGuard,
-      {
+  const chainIdGuard = event.chain === 'BSC'
+    ? {
         $or: [
           { chainId: { $exists: false } },
           { chainId: evidence.chainId },
           { chainId: String(evidence.chainId) },
         ],
-      },
+      }
+    : {
+        // TRON legacy identities are mainnet-scoped and intentionally carry
+        // no numeric chainId. Accept only an absent/null field; never query
+        // with undefined or the string "undefined".
+        $or: [
+          { chainId: { $exists: false } },
+          { chainId: null },
+        ],
+      };
+  const identityGuard = {
+    $and: [
+      ownerGuard,
+      chainIdGuard,
       {
         $or: [
           { network: { $exists: false } },

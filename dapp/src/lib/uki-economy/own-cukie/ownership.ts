@@ -2,6 +2,27 @@ const ZERO_BSC_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 /** Maximum history that the compatibility reader can prove complete per NFT. */
 export const CANONICAL_OWNERSHIP_HISTORY_EVENT_LIMIT = 512;
+/** Global cap for one compatibility read before falling back closed. */
+export const CANONICAL_OWNERSHIP_HISTORY_GLOBAL_LIMIT = 50_000;
+
+/**
+ * Returns the boundary and one extra sentinel row used by the compatibility
+ * query. The extra row detects a hot NFT consuming the shared page before a
+ * second NFT gets its own per-identity sentinel.
+ */
+export function canonicalOwnershipHistoryQueryWindow(unresolvedCount: number) {
+  const count = Number.isSafeInteger(unresolvedCount) && unresolvedCount > 0
+    ? unresolvedCount
+    : 0;
+  const sentinelBoundary = Math.min(
+    count * (CANONICAL_OWNERSHIP_HISTORY_EVENT_LIMIT + 1),
+    CANONICAL_OWNERSHIP_HISTORY_GLOBAL_LIMIT + 1,
+  );
+  return {
+    sentinelBoundary,
+    queryLimit: sentinelBoundary + 1,
+  };
+}
 
 export type CanonicalOwnershipIdentity = {
   chainId: 56 | 97;

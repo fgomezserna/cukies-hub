@@ -2,6 +2,7 @@ jest.mock('server-only', () => ({}), { virtual: true });
 
 import {
   CANONICAL_OWNERSHIP_HISTORY_EVENT_LIMIT,
+  canonicalOwnershipHistoryQueryWindow,
   isCanonicalOwnershipHistoryWindowComplete,
   resolveCanonicalOwnershipHistory,
   type CanonicalOwnershipHistoryRow,
@@ -52,6 +53,23 @@ function transfer(
       toNormalized: to.toLowerCase(),
     },
     ...overrides,
+  };
+}
+
+function transferToken(
+  id: string,
+  blockNumber: number,
+  from: string,
+  to: string,
+  tokenId: string,
+): CanonicalOwnershipHistoryRow {
+  const row = transfer(id, blockNumber, from, to);
+  return {
+    ...row,
+    normalized: {
+      ...row.normalized,
+      tokenId,
+    },
   };
 }
 
@@ -362,6 +380,56 @@ describe('own Cukie canonical selection', () => {
     expect(isCanonicalOwnershipHistoryWindowComplete(fullHistory)).toBe(false);
     expect(isCanonicalOwnershipHistoryWindowComplete(prefix, { globalTruncated: true }))
       .toBe(false);
+  });
+
+  it('fails closed when a hot token consumes the shared history page before another token round trip', () => {
+    const hotToken = [
+      transfer('hot-mint', 1, '0x0000000000000000000000000000000000000000', OWNER),
+      transfer('hot-to-buyer', 2, OWNER, BUYER),
+      ...Array.from({ length: 698 }, (_, index) => (
+        transfer(`hot-self-${index}`, 3 + index, BUYER, BUYER)
+      )),
+    ];
+    const tokenBPrefix = [
+      transferToken('token-b-mint', 1001, '0x0000000000000000000000000000000000000000', OWNER, '8'),
+      transferToken('token-b-to-buyer-before-cut', 1002, OWNER, BUYER, '8'),
+      ...Array.from({ length: 325 }, (_, index) => (
+        transferToken(`token-b-self-${index}`, 1003 + index, BUYER, BUYER, '8')
+      )),
+    ];
+    const tokenBTail = [
+      transferToken('token-b-back-after-cut', 2000, BUYER, OWNER, '8'),
+      transferToken('token-b-to-buyer-after-cut', 2001, OWNER, BUYER, '8'),
+    ];
+    const allRows = [...hotToken, ...tokenBPrefix, ...tokenBTail];
+    const queryWindow = canonicalOwnershipHistoryQueryWindow(2);
+    const queriedRows = allRows.slice(0, queryWindow.queryLimit);
+    const tokenBRows = queriedRows.filter((row) => row.normalized?.tokenId === '8');
+    const tokenBInput = {
+      chainId: 97 as const,
+      collectionAddressNormalized: COLLECTION,
+      tokenId: '8',
+      expectedOwnerNormalized: BUYER,
+    };
+
+    expect(queryWindow).toEqual({ sentinelBoundary: 1026, queryLimit: 1027 });
+    expect(hotToken).toHaveLength(700);
+    expect(tokenBPrefix).toHaveLength(327);
+    expect(queriedRows).toHaveLength(queryWindow.queryLimit);
+    expect(queriedRows.length).toBeGreaterThan(queryWindow.sentinelBoundary);
+    expect(tokenBRows).toHaveLength(tokenBPrefix.length);
+    expect(resolveCanonicalOwnershipHistory(tokenBRows, tokenBInput)).toMatchObject({
+      status: 'resolved',
+      ownershipEventId: 'token-b-to-buyer-before-cut',
+    });
+    expect(resolveCanonicalOwnershipHistory([...tokenBPrefix, ...tokenBTail], tokenBInput))
+      .toMatchObject({
+        status: 'resolved',
+        ownershipEventId: 'token-b-to-buyer-after-cut',
+      });
+    expect(isCanonicalOwnershipHistoryWindowComplete(tokenBRows, {
+      globalTruncated: queriedRows.length > queryWindow.sentinelBoundary,
+    })).toBe(false);
   });
 
   it.each([
