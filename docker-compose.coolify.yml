@@ -890,9 +890,135 @@ services:
     networks:
       - coolify
 
+  world-redis:
+    image: redis:7-alpine
+    profiles:
+      - world-runtime
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --save
+      - ""
+      - --maxmemory-policy
+      - noeviction
+    expose:
+      - "6379"
+    tmpfs:
+      - /data:size=64m,mode=0700
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    networks:
+      - world-private
+
+  world-api:
+    profiles:
+      - world-runtime
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: world-api
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:-}
+      WORLD_RUNTIME_ENABLED: ${WORLD_RUNTIME_ENABLED:-false}
+      WORLD_SERVICE: api
+      WORLD_PORT: 3010
+      WORLD_NAMESPACE: ${WORLD_NAMESPACE:-}
+      WORLD_DATA_MONGO_URL: ${WORLD_DATA_MONGO_URL:-}
+      WORLD_GAME_MONGO_URL: ${WORLD_GAME_MONGO_URL:-}
+      WORLD_REDIS_URL: ${WORLD_REDIS_URL:-redis://world-redis:6379/0}
+      WORLD_SESSION_SECRET: ${WORLD_SESSION_SECRET:-}
+      WORLD_SESSION_ISSUER: ${WORLD_SESSION_ISSUER:-}
+      WORLD_SESSION_AUDIENCE: ${WORLD_SESSION_AUDIENCE:-}
+      WORLD_SESSION_EXPIRES_IN: ${WORLD_SESSION_EXPIRES_IN:-15m}
+      WORLD_SESSION_MAX_TTL_SECONDS: ${WORLD_SESSION_MAX_TTL_SECONDS:-3600}
+      WORLD_ISLAND_JOIN_SECRET: ${WORLD_ISLAND_JOIN_SECRET:-}
+      WORLD_CORS_ORIGINS: ${WORLD_CORS_ORIGINS:-}
+      WORLD_ISLAND_ECONOMY_TOKEN: ${WORLD_ISLAND_ECONOMY_TOKEN:-}
+      WORLD_REDIS_TLS: ${WORLD_REDIS_TLS:-false}
+      WORLD_GAME_WRITES_ENABLED: ${WORLD_GAME_WRITES_ENABLED:-false}
+    expose:
+      - "3010"
+    depends_on:
+      world-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/usr/local/lib/world/readiness.mjs"]
+      interval: 15s
+      timeout: 8s
+      retries: 6
+      start_period: 30s
+    networks:
+      world-private:
+        aliases:
+          - world-api-${COOLIFY_RESOURCE_UUID:-local}
+      coolify:
+        aliases:
+          - world-api-${COOLIFY_RESOURCE_UUID:-local}
+
+  world-matchmaking:
+    profiles:
+      - world-runtime
+    build:
+      context: .
+      dockerfile: Dockerfile.ci
+      target: world-matchmaking
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:-}
+      WORLD_RUNTIME_ENABLED: ${WORLD_RUNTIME_ENABLED:-false}
+      WORLD_SERVICE: matchmaking
+      WORLD_PORT: 3011
+      WORLD_NAMESPACE: ${WORLD_NAMESPACE:-}
+      WORLD_DATA_MONGO_URL: ${WORLD_DATA_MONGO_URL:-}
+      WORLD_GAME_MONGO_URL: ${WORLD_GAME_MONGO_URL:-}
+      WORLD_REDIS_URL: ${WORLD_REDIS_URL:-redis://world-redis:6379/0}
+      WORLD_SESSION_SECRET: ${WORLD_SESSION_SECRET:-}
+      WORLD_SESSION_ISSUER: ${WORLD_SESSION_ISSUER:-}
+      WORLD_SESSION_AUDIENCE: ${WORLD_SESSION_AUDIENCE:-}
+      WORLD_SESSION_EXPIRES_IN: ${WORLD_SESSION_EXPIRES_IN:-15m}
+      WORLD_SESSION_MAX_TTL_SECONDS: ${WORLD_SESSION_MAX_TTL_SECONDS:-3600}
+      WORLD_ISLAND_JOIN_SECRET: ${WORLD_ISLAND_JOIN_SECRET:-}
+      WORLD_ISLAND_PERMISSION_SECRET: ${WORLD_ISLAND_PERMISSION_SECRET:-}
+      WORLD_CORS_ORIGINS: ${WORLD_CORS_ORIGINS:-}
+      WORLD_MATCHMAKING_REGISTRATION_TOKEN: ${WORLD_MATCHMAKING_REGISTRATION_TOKEN:-}
+      WORLD_AGONES_API_SERVER: ${WORLD_AGONES_API_SERVER:-}
+      WORLD_REGISTERED_ISLAND_SERVER_TTL_SECONDS: ${WORLD_REGISTERED_ISLAND_SERVER_TTL_SECONDS:-}
+      WORLD_REDIS_TLS: ${WORLD_REDIS_TLS:-false}
+      WORLD_GAME_WRITES_ENABLED: ${WORLD_GAME_WRITES_ENABLED:-false}
+    expose:
+      - "3011"
+    depends_on:
+      world-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "/usr/local/lib/world/readiness.mjs"]
+      interval: 15s
+      timeout: 8s
+      retries: 6
+      start_period: 30s
+    networks:
+      world-private:
+        aliases:
+          - world-matchmaking-${COOLIFY_RESOURCE_UUID:-local}
+      coolify:
+        aliases:
+          - world-matchmaking-${COOLIFY_RESOURCE_UUID:-local}
+
 networks:
   coolify:
     external: true
+  world-private:
+    name: cukies-world-${COOLIFY_RESOURCE_UUID:-local}
+    internal: true
 
 volumes:
   staging-mongo-data:

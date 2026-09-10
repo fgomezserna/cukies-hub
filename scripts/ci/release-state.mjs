@@ -4,7 +4,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { requireValue } from './cli-args.mjs';
 import { assertEnvironmentMetadata, resolveDeploymentEnvironment } from './deployment-environment.mjs';
-import { assertImmutableImageEntry, CI_COMPONENTS } from './image-ref.mjs';
+import { assertImmutableImageEntry, CI_COMPONENTS, WORLD_COMPONENTS } from './image-ref.mjs';
 
 export async function readReleaseState(path) {
   return readFile(path, 'utf8').then(JSON.parse).catch((error) => {
@@ -62,6 +62,79 @@ export function createSuccessfulState({ previous = null, head, configHash, compo
     webCommit: resolvedWebCommit,
     gameCommit: resolvedGameCommit,
     previousCommit: previous?.commit ?? null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Persists a CI manifest when the effective rolling delivery is a no-op.
+ *
+ * World images are part of the registry/catalogue even while their runtime is
+ * disabled.  They therefore need to advance the durable base without claiming
+ * a new health SHA or changing any active Coolify identity.  Only the two
+ * World entries may differ from the previous state in this path.
+ */
+export function createNoopState({ previous = null, head, configHash, components, environment, chainId, workersComposeHash }) {
+  if (!previous || previous.deliveryMode !== 'rolling') {
+    throw new Error('un registro sin entrega rolling previa no puede marcar un no-op.');
+  }
+  const deployment = resolveDeploymentEnvironment(environment);
+  if (chainId !== undefined && String(chainId) !== deployment.chainId) {
+    throw new Error(`release state no corresponde al entorno ${deployment.environment}/${deployment.chainId}.`);
+  }
+  assertEnvironmentMetadata(previous, deployment, { allowLegacy: deployment.environment === 'staging', context: 'previous release state' });
+  if (!/^[0-9a-f]{40}$/i.test(head ?? '')) throw new Error('SHA procesado inválido.');
+  if (!/^[0-9a-f]{64}$/i.test(configHash ?? '')) throw new Error('config hash inválido.');
+  if (previous.configHash !== configHash) throw new Error('el no-op requiere el mismo config hash efectivo.');
+  if (!/^[0-9a-f]{64}$/i.test(workersComposeHash ?? '') || previous.workersComposeHash !== workersComposeHash) {
+    throw new Error('el no-op requiere el mismo hash de Compose efectivo.');
+  }
+
+  const normalizedComponents = Object.fromEntries(CI_COMPONENTS.map((component) => {
+    const entry = components?.[component];
+    if (!entry) throw new Error(`falta la imagen de ${component} para registrar el no-op.`);
+    assertEnvironmentMetadata(entry, deployment, { allowLegacy: deployment.environment === 'staging', context: `imagen de ${component}` });
+    const value = assertImmutableImageEntry(component, entry);
+    return [component, {
+      image: value.image,
+      digest: value.digest,
+      tag: value.tag,
+      configHash: value.configHash,
+      sourceSha: value.sourceSha,
+      environment: deployment.environment,
+      chainId: deployment.chainId,
+    }];
+  }));
+
+  for (const component of CI_COMPONENTS.filter((value) => !WORLD_COMPONENTS.includes(value))) {
+    const previousEntry = previous.components?.[component];
+    if (!previousEntry) throw new Error(`falta la imagen activa previa de ${component} para registrar el no-op.`);
+    assertEnvironmentMetadata(previousEntry, deployment, { allowLegacy: deployment.environment === 'staging', context: `imagen activa previa de ${component}` });
+    const previousValue = assertImmutableImageEntry(component, previousEntry);
+    const currentValue = normalizedComponents[component];
+    for (const key of ['image', 'digest', 'tag', 'configHash', 'sourceSha']) {
+      if (currentValue[key] !== previousValue[key]) {
+        throw new Error(`el no-op no puede cambiar la referencia activa de ${component}.`);
+      }
+    }
+  }
+
+  return {
+    ...previous,
+    schemaVersion: previous.schemaVersion ?? 1,
+    environment: deployment.environment,
+    chainId: deployment.chainId,
+    commit: head,
+    configHash,
+    workersComposeHash,
+    components: normalizedComponents,
+    // Legacy rolling states (schema 6) did not persist lane commits.  Carry
+    // their served identities forward explicitly; otherwise a catalogue-only
+    // no-op would report the new CI head as the served web SHA.
+    webCommit: previous.webCommit ?? previous.commit ?? null,
+    gameCommit: previous.gameCommit
+      ?? (previous.components?.['treasure-hunt'] ? previous.commit : null),
+    previousCommit: previous.commit ?? previous.deployedSha ?? null,
     updatedAt: new Date().toISOString(),
   };
 }

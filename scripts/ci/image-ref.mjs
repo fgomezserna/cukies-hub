@@ -7,7 +7,11 @@ export const KNOWN_CI_COMPONENTS = Object.freeze([
   'schedulers',
   'cukies-bridge-relayer',
   'treasure-hunt',
+  'world-api',
+  'world-matchmaking',
 ]);
+
+export const WORLD_COMPONENTS = Object.freeze(['world-api', 'world-matchmaking']);
 
 function loadCiComponents() {
   const declared = JSON.parse(readFileSync(new URL('../../infrastructure/ci/components.json', import.meta.url), 'utf8'));

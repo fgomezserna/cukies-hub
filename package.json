@@ -73,7 +73,10 @@
     "build:dapp": "pnpm --filter dapp build",
     "build:sybil-slayer": "pnpm --filter sybil-slayer build",
     "build:hyppie-road": "pnpm --filter hyppie-road build",
-    "build:tower-builder": "pnpm --filter tower-builder build"
+    "build:tower-builder": "pnpm --filter tower-builder build",
+    "build:world": "pnpm --filter @cukies/world-shared run build && pnpm --filter @cukies/world-api run build && pnpm --filter @cukies/world-matchmaking run build",
+    "typecheck:world": "pnpm --filter @cukies/world-shared run typecheck && pnpm --filter @cukies/world-api run typecheck && pnpm --filter @cukies/world-matchmaking run typecheck",
+    "test:world": "pnpm --filter @cukies/world-shared run test && pnpm --filter @cukies/world-api run test && pnpm --filter @cukies/world-matchmaking run test"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",

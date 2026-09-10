@@ -3,6 +3,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { requireValue } from './cli-args.mjs';
 import { assertImmutableImageEntry, CI_COMPONENTS } from './image-ref.mjs';
+import { withoutWorldRuntime } from './generate-images-compose.mjs';
+import { assertWorldDisabled } from './release-delivery-plan.mjs';
 
 export const COOLIFY_STAGING = Object.freeze({
   resourceUuid: 'u4s804o4wwcckowgk0woo4wg',
@@ -119,6 +121,8 @@ export function buildImageEnvironment(manifest) {
       schedulers: 'CUKIES_IMAGE_SCHEDULERS',
       'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
       'treasure-hunt': 'CUKIES_IMAGE_TREASURE_HUNT',
+      'world-api': 'CUKIES_IMAGE_WORLD_API',
+      'world-matchmaking': 'CUKIES_IMAGE_WORLD_MATCHMAKING',
     }[component];
     return [{ key: env, value: value.image, is_literal: true, is_runtime: true, is_buildtime: true }];
   });
@@ -128,6 +132,8 @@ export function buildImageEnvironment(manifest) {
 }
 
 export async function deployAndVerify({ client, compose, manifest, resourceUuid = COOLIFY_STAGING.resourceUuid, healthUrl = COOLIFY_STAGING.healthUrl, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), fetchImpl = globalThis.fetch, pollMs = 5000, timeoutMs = 30 * 60 * 1000, healthTimeoutMs = 15000 }) {
+  assertWorldDisabled(manifest, process.env);
+  compose = withoutWorldRuntime(compose);
   const imageEnvironment = buildImageEnvironment(manifest);
   assertStagingApplication(await client.getApplication(resourceUuid), { resourceUuid });
   await client.patchApplication(resourceUuid, {

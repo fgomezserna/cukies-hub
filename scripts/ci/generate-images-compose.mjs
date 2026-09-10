@@ -17,7 +17,16 @@ const SERVICE_IMAGES = Object.freeze({
   'weekly-ranking-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
   'reward-accounting-scheduler': 'CUKIES_IMAGE_SCHEDULERS',
   'reward-batch-publisher': 'CUKIES_IMAGE_SCHEDULERS',
+  'world-api': 'CUKIES_IMAGE_WORLD_API',
+  'world-matchmaking': 'CUKIES_IMAGE_WORLD_MATCHMAKING',
 });
+
+const INFRASTRUCTURE_IMAGES = Object.freeze({
+  'world-redis': 'redis:7-alpine',
+});
+
+export const WORLD_RUNTIME_SERVICES = Object.freeze(['world-api', 'world-matchmaking', 'world-redis']);
+const WORLD_RUNTIME_NETWORK = 'world-private';
 
 const GENERATED_HEADER = [
   '# GENERATED FILE. Do not edit directly.',
@@ -43,10 +52,14 @@ function removeBlock(lines, start, end) {
 }
 
 function transformService(lines, name, imageEnv) {
-  const result = [lines[0], `    image: "\${${imageEnv}:?Set ${imageEnv} to an immutable digest reference}"`];
+  const image = INFRASTRUCTURE_IMAGES[name];
+  const result = [lines[0], image
+    ? `    image: "${image}"`
+    : `    image: "\${${imageEnv}:?Set ${imageEnv} to an immutable digest reference}"`];
   let skipBuild = false;
   for (const line of lines.slice(1)) {
     if (line === '    <<: *dapp-runtime') continue;
+    if (image && line === `    image: ${image}`) continue;
     if (line === '    build:') {
       skipBuild = true;
       continue;
@@ -81,8 +94,14 @@ export function generateImagesCompose(source) {
   const transformed = [];
   const serviceDocument = ['services:', ...serviceLines];
   for (const block of serviceBlocks(serviceDocument).slice(0)) {
-    if (!SERVICE_IMAGES[block.name]) {
+    if (!SERVICE_IMAGES[block.name] && !INFRASTRUCTURE_IMAGES[block.name]) {
       throw new Error(`service ${block.name} no tiene una imagen CI definida.`);
+    }
+    if (block.name === 'world-redis') {
+      const body = serviceDocument.slice(block.index, block.end);
+      if (!body.includes('    image: redis:7-alpine') || body.some((line) => line === '    build:')) {
+        throw new Error('world-redis debe usar exclusivamente la imagen de infraestructura redis:7-alpine.');
+      }
     }
     const body = serviceDocument.slice(block.index, block.end);
     transformed.push(...transformService(body, block.name, SERVICE_IMAGES[block.name]));
@@ -112,6 +131,57 @@ export function generateImagesCompose(source) {
     throw new Error('el compose de imágenes conserva build o recursos staging-mongo.');
   }
   return output;
+}
+
+/**
+ * Returns the delivery projection with World disabled. The full generated
+ * Compose keeps the opt-in profile for future activation, but the current
+ * delivery path must never let an external COMPOSE_PROFILES value start it.
+ */
+export function withoutWorldRuntime(source) {
+  const normalized = String(source).replace(/\r\n/g, '\n');
+  // Synthetic callers in the release tests use an inline empty services map.
+  // It already contains no World service/network, so the projection is the
+  // source itself and must remain byte-for-byte identical.
+  if (/^services:\s*\{\}\s*$/m.test(normalized)) return normalized;
+  let lines = normalized.split('\n');
+  const servicesMarker = lines.findIndex((line) => line === 'services:');
+  if (servicesMarker === -1) throw new Error('Compose sin sección services.');
+  const servicesEndOffset = lines.slice(servicesMarker + 1)
+    .findIndex((line) => /^(networks|volumes):$/.test(line));
+  const servicesEnd = servicesEndOffset === -1 ? lines.length : servicesMarker + 1 + servicesEndOffset;
+  const serviceLines = lines.slice(servicesMarker, servicesEnd);
+  for (const block of serviceBlocks(serviceLines).reverse()) {
+    if (WORLD_RUNTIME_SERVICES.includes(block.name)) {
+      let start = servicesMarker + block.index;
+      let end = servicesMarker + block.end;
+      if (start > servicesMarker + 1 && lines[start - 1] === '') start -= 1;
+      if (end > start && lines[end - 1] === '') end -= 1;
+      lines = [...lines.slice(0, start), ...lines.slice(end)];
+    }
+  }
+
+  const networksIndex = lines.findIndex((line) => line === 'networks:');
+  if (networksIndex !== -1) {
+    const networkEndOffset = lines.slice(networksIndex + 1)
+      .findIndex((line) => /^(volumes|secrets|configs):$/.test(line));
+    const networkEnd = networkEndOffset === -1 ? lines.length : networksIndex + 1 + networkEndOffset;
+    const networkLines = lines.slice(networksIndex, networkEnd);
+    const blocks = [];
+    for (let index = 1; index < networkLines.length; index += 1) {
+      const match = networkLines[index].match(/^  ([a-z0-9-]+):$/);
+      if (match) blocks.push({ index, name: match[1] });
+    }
+    const worldNetwork = blocks.find((block) => block.name === WORLD_RUNTIME_NETWORK);
+    if (worldNetwork) {
+      let start = networksIndex + worldNetwork.index;
+      let end = networksIndex + (blocks.find((block) => block.index > worldNetwork.index)?.index ?? networkLines.length);
+      if (end > start && lines[end - 1] === '') end -= 1;
+      lines = [...lines.slice(0, start), ...lines.slice(end)];
+    }
+  }
+
+  return lines.join('\n');
 }
 
 const DAPP_INTERNAL_URL = 'http://dapp-${COOLIFY_RESOURCE_UUID}:3000';
@@ -227,10 +297,7 @@ async function main() {
     return;
   }
   if (!process.argv.includes('--write')) throw new Error('usa --write o --check.');
-  const currentImages = await readFile(imagesPath, 'utf8').catch(() => null);
-  if (currentImages !== generatedImages) {
-    throw new Error('docker-compose.images.yml no coincide con generateImagesCompose; no se sobrescribe.');
-  }
+  await writeFile(imagesPath, generatedImages);
   await writeFile(workersPath, generatedWorkers);
 }
 
