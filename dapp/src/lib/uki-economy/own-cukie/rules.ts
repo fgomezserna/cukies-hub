@@ -82,16 +82,10 @@ export function assertOwnCukieAssetEligible(
   asset: OwnCukieAssetSnapshot,
   walletNormalized: string,
 ) {
-  const softStake = asset.activeLocks.filter((lock) => (
-    lock.reason === "soft_stake"
-    && lock.state === "soft_staked"
-    && lock.ownerNormalized === walletNormalized
-    && Boolean(lock.lockId)
-  ));
+  // A game reservation may only use a Cukie that is currently in the wallet.
+  // Master staking, Pool custody/loan, Marketplace (legacy/V2), bridge and any
+  // unknown lock remain unavailable until their lock is fully terminal.
   const available = asset.canonicalState === "available" && asset.activeLocks.length === 0;
-  const softStaked = asset.canonicalState === "soft_staked"
-    && asset.activeLocks.length === 1
-    && softStake.length === 1;
   if (
     asset.network !== "bsc"
     || asset.ownerNormalized !== walletNormalized
@@ -99,7 +93,7 @@ export function assertOwnCukieAssetEligible(
     || !asset.ownershipEventId
     || asset.generation === "unknown"
     || asset.rarity === "unknown"
-    || (!available && !softStaked)
+    || !available
     || asset.blockers.some((blocker) => [
       "asset_not_found",
       "owner_mismatch",
@@ -123,7 +117,7 @@ export function assertOwnCukieAssetEligible(
     asset,
     generation: asset.generation as OwnCukieGeneration,
     rarity: asset.rarity as OwnCukieRarity,
-    softStakeLockId: softStaked ? softStake[0].lockId! : null,
+    softStakeLockId: null,
   };
 }
 

@@ -620,7 +620,8 @@ Uso de creditos:
 
 Uso de Cukies:
 
-- Si el jugador tiene Cukies propios con partidas disponibles, la politica actual los selecciona automaticamente.
+- Si el jugador tiene Cukies propios con partidas disponibles, la politica actual los selecciona automaticamente solo cuando el NFT sigue disponible en la wallet y no tiene ningun lock activo.
+- Un Cukie en staking de Cukie Master, en Pool o prestado, listado en Marketplace legacy/V2, en bridge, asignado a otra partida o marcado como unknown no es elegible para una partida nueva. La seleccion vuelve al Pool si no queda otro Cukie propio elegible.
 - Si no tiene Cukies propios disponibles, se asigna un Cukie del pool siguiendo prioridad Original, Segunda Generacion y Seiku.
 - El game server no puede elegir libremente `assetIds`; recibe una reserva autorizada por el motor economico.
 - Una futura seleccion manual del Cukie propio requerira otra politica versionada.

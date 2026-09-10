@@ -26,6 +26,20 @@ function monotonicTupleFilter(id: string, tuple: MonotonicTuple) {
   };
 }
 
+function withGuard(
+  filter: Record<string, unknown>,
+  guard?: Record<string, unknown>,
+) {
+  if (!guard) return filter;
+  return {
+    _id: filter._id,
+    $and: [
+      { $or: filter.$or },
+      guard,
+    ],
+  };
+}
+
 /**
  * Applies a block/log cursor atomically. A stale writer cannot match the
  * update filter; a concurrent first writer is handled by the duplicate-key
@@ -38,6 +52,8 @@ export async function monotonicAbsoluteUpdate(
   values: Record<string, unknown>,
   createdAt: Date,
   session?: ClientSession,
+  guard?: Record<string, unknown>,
+  insertValues?: Record<string, unknown>,
 ) {
   const set = {
     ...values,
@@ -45,7 +61,7 @@ export async function monotonicAbsoluteUpdate(
     lastLogIndex: tuple.logIndex,
   };
   const updateExisting = () => target.updateOne(
-    monotonicTupleFilter(id, tuple),
+    withGuard(monotonicTupleFilter(id, tuple), guard),
     { $set: set },
     { upsert: false, session },
   );
@@ -53,7 +69,7 @@ export async function monotonicAbsoluteUpdate(
   if (updated.matchedCount > 0) return true;
 
   try {
-    await target.insertOne({ _id: id, ...set, createdAt }, { session });
+    await target.insertOne({ _id: id, ...set, ...insertValues, createdAt }, { session });
     return true;
   } catch (error) {
     if (!isMongoDuplicateKey(error)) throw error;

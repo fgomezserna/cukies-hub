@@ -17,6 +17,13 @@ import { createNftAssetLockService } from "@/lib/nft-inventory/locks";
 
 import { DomainConflictError } from "../errors";
 import { OWN_CUKIE_MAX_WALLET_ASSETS } from "./rules";
+import {
+  CANONICAL_OWNERSHIP_HISTORY_EVENT_LIMIT,
+  isCanonicalOwnershipHistoryWindowComplete,
+  resolveCanonicalOwnershipHistory,
+  type CanonicalOwnershipHistoryRow,
+  type CanonicalOwnershipIdentity,
+} from "./ownership";
 import type {
   OwnCukieAssignment,
   OwnCukieAssetSnapshot,
@@ -77,9 +84,145 @@ function ownershipEventId(document: CanonicalCukieDocument) {
     : null;
 }
 
+const OWNERSHIP_HISTORY_EVENT_LIMIT = CANONICAL_OWNERSHIP_HISTORY_EVENT_LIMIT;
+const OWNERSHIP_HISTORY_GLOBAL_LIMIT = 50_000;
+
+function canonicalDocumentIdentity(document: CanonicalCukieDocument): CanonicalOwnershipIdentity | null {
+  if (
+    document.network !== undefined
+    && document.network !== null
+    && String(document.network).toLowerCase() !== "bsc"
+  ) return null;
+  const chainId = Number(document.chainId);
+  const collectionAddressNormalized = typeof document.collectionAddressNormalized === "string"
+    ? document.collectionAddressNormalized.trim().toLowerCase()
+    : "";
+  const tokenId = typeof document.tokenId === "string"
+    ? document.tokenId.trim()
+    : typeof document.tokenId === "number" && Number.isSafeInteger(document.tokenId)
+      ? String(document.tokenId)
+      : "";
+  if (
+    (chainId !== 56 && chainId !== 97)
+    || !/^0x[0-9a-f]{40}$/.test(collectionAddressNormalized)
+    || !tokenId
+  ) return null;
+  return {
+    chainId,
+    collectionAddressNormalized,
+    tokenId,
+  };
+}
+
+function canonicalDocumentOwner(document: CanonicalCukieDocument) {
+  const candidate = typeof document.ownerNormalized === "string"
+    ? document.ownerNormalized.trim().toLowerCase()
+    : typeof document.owner === "string"
+      ? document.owner.trim().toLowerCase()
+      : typeof document.user === "string"
+        ? document.user.trim().toLowerCase()
+        : "";
+  return /^0x[0-9a-f]{40}$/.test(candidate) && !/^0x0{40}$/.test(candidate)
+    ? candidate
+    : null;
+}
+
+function ownershipKey(identity: CanonicalOwnershipIdentity) {
+  return `${identity.chainId}:${identity.collectionAddressNormalized}:${identity.tokenId}`;
+}
+
+function escapedRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function resolveMissingOwnershipEventIds(
+  documents: CanonicalCukieDocument[],
+  chainEvents: ReturnType<Db["collection"]>,
+  session: ClientSession,
+) {
+  const unresolved = documents
+    .filter((document) => !ownershipEventId(document))
+    .map((document) => {
+      const identity = canonicalDocumentIdentity(document);
+      const ownerNormalized = canonicalDocumentOwner(document);
+      return identity && ownerNormalized
+        ? { document, identity, ownerNormalized, assetId: buildCukiesAssetId(document) }
+        : null;
+    })
+    .filter((item): item is {
+      document: CanonicalCukieDocument;
+      identity: CanonicalOwnershipIdentity;
+      ownerNormalized: string;
+      assetId: string;
+    } => item !== null);
+  const resolved = new Map<string, string>();
+  if (unresolved.length === 0) return resolved;
+
+  const filters = unresolved.map(({ identity }) => ({
+    chain: "BSC",
+    chainId: { $in: [identity.chainId, String(identity.chainId)] },
+    contractAlias: { $in: ["TOKEN", "TOKEN_V2"] },
+    contractAddress: {
+      $regex: `^${escapedRegex(identity.collectionAddressNormalized)}$`,
+      $options: "i",
+    },
+    eventName: "Transfer",
+    status: "projected",
+    "normalized.tokenId": identity.tokenId,
+  }));
+  const rows = await chainEvents.find({ $or: filters }, { session })
+    .sort({ blockNumber: 1, logIndex: 1 })
+    // Read one sentinel row per NFT and one sentinel row for the global cap.
+    // A full page must be distinguishable from an actually complete history;
+    // otherwise a late transfer can make an old owner appear current again.
+    .limit(Math.min(
+      unresolved.length * (OWNERSHIP_HISTORY_EVENT_LIMIT + 1),
+      OWNERSHIP_HISTORY_GLOBAL_LIMIT + 1,
+    ))
+    .toArray() as CanonicalOwnershipHistoryRow[];
+  const globalTruncated = rows.length > OWNERSHIP_HISTORY_GLOBAL_LIMIT;
+  const byIdentity = new Map<string, CanonicalOwnershipHistoryRow[]>();
+  for (const row of rows) {
+    const chainId = Number(row.chainId);
+    const collectionAddressNormalized = typeof row.contractAddress === "string"
+      ? row.contractAddress.toLowerCase()
+      : "";
+    const tokenId = typeof row.normalized?.tokenId === "string"
+      ? row.normalized.tokenId
+      : "";
+    if ((chainId !== 56 && chainId !== 97) || !collectionAddressNormalized || !tokenId) continue;
+    const key = `${chainId}:${collectionAddressNormalized}:${tokenId}`;
+    const list = byIdentity.get(key) ?? [];
+    // Keep the per-identity sentinel so this NFT is blocked closed when the
+    // query returned more history than the resolver can prove complete.
+    if (list.length <= OWNERSHIP_HISTORY_EVENT_LIMIT) list.push(row);
+    byIdentity.set(key, list);
+  }
+  const truncatedIdentities = new Set<string>();
+  for (const [key, list] of byIdentity) {
+    if (list.length > OWNERSHIP_HISTORY_EVENT_LIMIT) truncatedIdentities.add(key);
+  }
+  for (const item of unresolved) {
+    const key = ownershipKey(item.identity);
+    const history = byIdentity.get(key) ?? [];
+    if (
+      globalTruncated
+      || truncatedIdentities.has(key)
+      || !isCanonicalOwnershipHistoryWindowComplete(history)
+    ) continue;
+    const result = resolveCanonicalOwnershipHistory(
+      history,
+      { ...item.identity, expectedOwnerNormalized: item.ownerNormalized },
+    );
+    if (result.status === "resolved") resolved.set(item.assetId, result.ownershipEventId);
+  }
+  return resolved;
+}
+
 async function hydrateAssets(
   documents: CanonicalCukieDocument[],
   locks: ReturnType<Db["collection"]>,
+  chainEvents: ReturnType<Db["collection"]>,
   now: Date,
   session: ClientSession,
 ) {
@@ -94,10 +237,15 @@ async function hydrateAssets(
     list.push(lock);
     byAsset.set(lock.assetId, list);
   }
+  const compatibleOwnershipIds = await resolveMissingOwnershipEventIds(
+    documents,
+    chainEvents,
+    session,
+  );
   return documents.flatMap((document) => {
-    const eventId = ownershipEventId(document);
-    if (!eventId) return [];
     const assetId = buildCukiesAssetId(document);
+    const eventId = ownershipEventId(document) ?? compatibleOwnershipIds.get(assetId) ?? null;
+    if (!eventId) return [];
     return [{
       ...normalizeCukiesInventoryDocument(document, byAsset.get(assetId) ?? [], now),
       ownershipEventId: eventId,
@@ -119,6 +267,7 @@ export function createMongoOwnCukieRepository(
 ): OwnCukieRepository {
   const cukies = db.collection<CanonicalCukieDocument>("cukies");
   const locks = db.collection<InventoryLockDocument>("nft_asset_locks");
+  const chainEvents = db.collection("chain_events");
   const epochs = db.collection<OwnCukieEpoch>("game_owned_cukie_epochs");
   const assignments = db.collection<OwnCukieAssignment>("game_owned_cukie_assignments");
   const events = db.collection<OwnCukieEvent>("game_owned_cukie_events");
@@ -136,7 +285,7 @@ export function createMongoOwnCukieRepository(
           `La wallet supera ${OWN_CUKIE_MAX_WALLET_ASSETS} Cukies; seleccion automatica bloqueada.`,
         );
       }
-      return (await hydrateAssets(documents, locks, now, session))
+      return (await hydrateAssets(documents, locks, chainEvents, now, session))
         .sort((left, right) => left.assetId.localeCompare(right.assetId));
     },
     async findAsset(assetId, now) {
@@ -147,7 +296,7 @@ export function createMongoOwnCukieRepository(
         options,
       );
       if (!document || buildCukiesAssetId(document) !== assetId) return null;
-      return (await hydrateAssets([document], locks, now, session))[0] ?? null;
+      return (await hydrateAssets([document], locks, chainEvents, now, session))[0] ?? null;
     },
     findEpoch: (epochId) => epochs.findOne({ _id: epochId }, options),
     insertEpoch: async (epoch) => { await epochs.insertOne(epoch, options); },
