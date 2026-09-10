@@ -151,10 +151,12 @@ export function isLegacyBreedingEligible(
   if (!isLegacyBreedingEligibilityKnown(record, maxBreeds)) return false;
   const identity = getLegacyBreedingIdentity(network);
   if (!identity) return false;
-  const networkBump = identity.network === 'BSC' ? 1 : 0;
   const childrenCount = record.childrenCount;
   return typeof childrenCount === 'number'
-    && childrenCount < maxBreeds! + networkBump;
+    // The current getNumBreedsByCukie value is authoritative, but the
+    // historical BSC +1 offset was only proven for the indexed aggregate.
+    // Keep the boundary conservative until the contract semantics are proven.
+    && childrenCount < maxBreeds!;
 }
 
 export function isLegacyBreedingCandidate(

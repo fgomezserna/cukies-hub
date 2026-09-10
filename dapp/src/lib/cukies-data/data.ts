@@ -772,6 +772,13 @@ export async function listBreedingCandidates(
       && isLegacyBreedingCandidate(verifiedItem, identity.network, owner, maxBreeds)
     ) {
       items.push(verifiedItem);
+    } else if (
+      identity.network === 'BSC'
+      && currentBreedingCount >= maxBreeds
+    ) {
+      // The old indexed BSC aggregate used a network offset, but the direct
+      // per-NFT contract read does not prove that the offset still applies.
+      hasUnknownEvidence = true;
     }
   });
 

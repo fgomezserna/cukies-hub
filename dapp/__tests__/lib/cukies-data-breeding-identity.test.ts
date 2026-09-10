@@ -195,6 +195,35 @@ describe('identidad Legacy en lecturas de breeding', () => {
     );
   });
 
+  it('mantiene el borde BSC conservador y aplica el umbral TRON probado', async () => {
+    documents = [makeDocument({ numChildren: 1 })];
+    mockReadLegacyMarketplaceBreedingCount.mockResolvedValue(1);
+
+    const bsc = await listBreedingCandidates({
+      owner: wallet,
+      network: 'BSC',
+      maxBreeds: 1,
+    });
+    expect(bsc).toMatchObject({ status: 'partial', items: [] });
+
+    const tronOwner = legacyMarketplaceContracts.tron.contracts.token;
+    documents = [makeDocument({
+      network: 'TRON',
+      chainId: null,
+      collectionAddressNormalized: tronOwner,
+      owner: tronOwner,
+      ownerNormalized: tronOwner,
+      user: tronOwner,
+      numChildren: 1,
+    })];
+    const tron = await listBreedingCandidates({
+      owner: tronOwner,
+      network: 'TRON',
+      maxBreeds: 1,
+    });
+    expect(tron).toMatchObject({ status: 'verified', items: [] });
+  });
+
   it('exige la dirección TRON Base58 exacta y no verifica un alias en mayúsculas', async () => {
     const tronOwner = legacyMarketplaceContracts.tron.contracts.token;
     documents = [makeDocument({

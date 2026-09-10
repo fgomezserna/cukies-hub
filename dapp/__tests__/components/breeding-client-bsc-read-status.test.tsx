@@ -167,6 +167,62 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     expect(mockWriteContract).not.toHaveBeenCalled();
   });
 
+  it('conserva el inventario BSC56 al cambiar solo la red de firma', async () => {
+    const candidate = {
+      id: '29',
+      tokenId: '29',
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      cukiNumber: 29,
+      owner: '0x00000000000000000000000000000000000000aa',
+      ownerNormalized: '0x00000000000000000000000000000000000000aa',
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
+      eligibilityVerified: true,
+      eligibilitySource: 'legacy-getNumBreedsByCukie',
+      network: 'BSC',
+      origin: 'original',
+      birthNetwork: 'BSC',
+      imageUrl: null,
+      type: 1,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      skills: {},
+      childrenCount: 0,
+      childrenCountTron: 0,
+      childrenCountBsc: 0,
+      parents: [],
+      children: [],
+      history: [],
+      timestamp: null,
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [candidate], status: 'verified' }),
+    }) as never;
+
+    mockUseAccount.mockReturnValue({
+      address: candidate.owner,
+      chainId: 97,
+      isConnected: true,
+    });
+    const view = render(<BreedingClient initialTab="start" />);
+    await screen.findByRole('button', { name: /Cukie #29/ });
+
+    mockUseAccount.mockReturnValue({
+      address: candidate.owner,
+      chainId: 1,
+      isConnected: true,
+    });
+    view.rerender(<BreedingClient initialTab="start" />);
+
+    expect(screen.getByRole('button', { name: /Cukie #29/ })).toBeInTheDocument();
+    expect(mockSwitchChain).not.toHaveBeenCalled();
+    expect(mockWriteContract).not.toHaveBeenCalled();
+  });
+
   it('oculta candidatos con chain, colección o identidad de propietario no verificables', async () => {
     const canonical = {
       id: '29',

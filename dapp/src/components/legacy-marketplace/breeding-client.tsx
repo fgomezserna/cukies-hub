@@ -800,6 +800,9 @@ export function BreedingClient({
   useEffect(() => {
     setParent1(null);
     setParent2(null);
+  }, [chainId]);
+
+  useEffect(() => {
     setCandidates([]);
     setCandidatesReadError(false);
     setCandidatesReadStatus('idle');
@@ -807,7 +810,7 @@ export function BreedingClient({
     setCompletedReadStatus('idle');
     setActiveBreeds([]);
     setStatus(null);
-  }, [chainId, network, owner, tronWalletRpcOrigin]);
+  }, [network, owner, tronWalletRpcOrigin]);
 
   useEffect(() => {
     setTab(initialTab);
