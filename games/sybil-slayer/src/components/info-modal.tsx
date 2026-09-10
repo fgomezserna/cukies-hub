@@ -1,6 +1,6 @@
 "use client";
 
-import Image from 'next/image';
+import { GameImage } from './game-image';
 import React, { useEffect, useMemo, useState } from 'react';
 import { SoundType } from '../hooks/useAudio';
 import { TreasureButton, TreasurePanel } from './treasure-hunt-ui';
@@ -366,7 +366,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlaySound }) =
               return (
                 <article className="th-rule-card" key={item.name}>
                   <div className="th-rule-card__media">
-                    <Image
+                    <GameImage
                       src={media.src}
                       alt={media.alt}
                       width={172}
