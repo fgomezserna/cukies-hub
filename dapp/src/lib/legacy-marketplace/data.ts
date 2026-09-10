@@ -373,7 +373,7 @@ function buildOwnerRegex(owner: string) {
 }
 
 function buildPointWalletClauses(wallets: string[], network?: string) {
-  return wallets.flatMap((wallet) => {
+  return wallets.flatMap<Filter<LegacyPointDocument>>((wallet) => {
     const isBscWallet = /^0x/i.test(wallet);
     const walletNetwork = isBscWallet ? 'BSC' : 'TRON';
     if (isLegacyNetwork(network) && network !== walletNetwork) return [];
