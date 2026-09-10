@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { useAccount, useDisconnect, useSignMessage } from 'wagmi';
 import { useTronLink } from '@/hooks/use-tronlink';
 import { AuthProvider, useAuth } from '@/providers/auth-provider';
@@ -118,5 +118,137 @@ describe('AuthProvider wallet slots', () => {
       return typeof body === 'string' ? JSON.parse(body).walletAddress : null;
     });
     expect(addresses).not.toContain(tronAddress);
+  });
+
+  it('invalida la primaria EVM al desconectarla sin promocionar la secundaria TRON', async () => {
+    mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
+    mockUseTronLink.mockReturnValue({
+      address: null,
+      isConnected: false,
+      disconnect: jest.fn(),
+    } as never);
+
+    const { rerender } = renderAuth();
+    await waitFor(() => expect(screen.getByTestId('wallet-type')).toHaveTextContent('evm'));
+
+    mockFetch.mockClear();
+    mockUseTronLink.mockReturnValue({
+      address: tronAddress,
+      isConnected: true,
+      disconnect: jest.fn(),
+    } as never);
+    rerender(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('wallet-type')).toHaveTextContent('evm'));
+
+    mockUseAccount.mockReturnValue({ address: undefined, isConnected: false } as never);
+    rerender(<AuthProvider><Probe /></AuthProvider>);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-type')).toHaveTextContent('evm');
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent('none');
+    });
+    const addresses = mockFetch.mock.calls.map(([, init]) => {
+      const body = init?.body;
+      return typeof body === 'string' ? JSON.parse(body).walletAddress : null;
+    });
+    expect(addresses).not.toContain(tronAddress);
+  });
+
+  it('invalida el cambio de cuenta primaria EVM y exige login explícito para la nueva cuenta', async () => {
+    const nextEvmAddress = '0x2222222222222222222222222222222222222222';
+    mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
+    mockUseTronLink.mockReturnValue({
+      address: tronAddress,
+      isConnected: true,
+      disconnect: jest.fn(),
+    } as never);
+
+    const { rerender } = renderAuth();
+    await waitFor(() => expect(screen.getByTestId('wallet-type')).toHaveTextContent('evm'));
+    mockFetch.mockClear();
+
+    mockUseAccount.mockReturnValue({ address: nextEvmAddress, isConnected: true } as never);
+    rerender(<AuthProvider><Probe /></AuthProvider>);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-type')).toHaveTextContent('evm');
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent('none');
+    });
+    const addresses = mockFetch.mock.calls.map(([, init]) => {
+      const body = init?.body;
+      return typeof body === 'string' ? JSON.parse(body).walletAddress : null;
+    });
+    expect(addresses).not.toContain(nextEvmAddress);
+  });
+
+  it('invalida la primaria TRON al desconectarla sin promocionar la secundaria EVM', async () => {
+    mockUseAccount.mockReturnValue({ address: undefined, isConnected: false } as never);
+    mockUseTronLink.mockReturnValue({
+      address: tronAddress,
+      isConnected: true,
+      disconnect: jest.fn(),
+    } as never);
+
+    const { rerender } = renderAuth();
+    await waitFor(() => expect(screen.getByTestId('wallet-type')).toHaveTextContent('tron'));
+
+    mockFetch.mockClear();
+    mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
+    rerender(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('wallet-type')).toHaveTextContent('tron'));
+
+    mockUseTronLink.mockReturnValue({
+      address: null,
+      isConnected: false,
+      disconnect: jest.fn(),
+    } as never);
+    rerender(<AuthProvider><Probe /></AuthProvider>);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-type')).toHaveTextContent('tron');
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent('none');
+    });
+    const addresses = mockFetch.mock.calls.map(([, init]) => {
+      const body = init?.body;
+      return typeof body === 'string' ? JSON.parse(body).walletAddress : null;
+    });
+    expect(addresses).not.toContain(evmAddress);
+  });
+
+  it('descarta una respuesta de login tardía de la primaria después de desconectar y conectar otra wallet', async () => {
+    let resolveLogin: (response: Response) => void = () => undefined;
+    mockFetch.mockImplementation(() => new Promise<Response>((resolve) => {
+      resolveLogin = resolve;
+    }));
+    mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
+    mockUseTronLink.mockReturnValue({
+      address: null,
+      isConnected: false,
+      disconnect: jest.fn(),
+    } as never);
+
+    const { rerender } = renderAuth();
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    mockUseAccount.mockReturnValue({ address: undefined, isConnected: false } as never);
+    mockUseTronLink.mockReturnValue({
+      address: tronAddress,
+      isConnected: true,
+      disconnect: jest.fn(),
+    } as never);
+    rerender(<AuthProvider><Probe /></AuthProvider>);
+
+    await act(async () => {
+      resolveLogin({
+        ok: true,
+        json: async () => ({ ...user, walletAddress: evmAddress }),
+      } as Response);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-type')).toHaveTextContent('none');
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent('none');
+    });
+    expect(screen.getByTestId('wallet-address')).not.toHaveTextContent(evmAddress);
   });
 });

@@ -19,8 +19,17 @@ export type TronLinkProviderLike = {
   removeListener?: (event: string, listener: (...args: unknown[]) => void) => unknown;
   chainId?: string;
   tronWeb?: TronWebLike;
+  isTronLink?: boolean;
+  isTronlink?: boolean;
   selectedAddress?: string | null;
   defaultAddress?: { base58?: string; hex?: string };
+};
+
+export type TronProviderAnnouncementInfo = {
+  name?: string;
+  rdns?: string;
+  uuid?: string;
+  icon?: string;
 };
 
 declare global {
@@ -37,12 +46,36 @@ function browserWindow() {
 
 let announcedTronProvider: TronLinkProviderLike | null = null;
 
-export function registerTronProvider(candidate: unknown) {
+function isTronLinkAnnouncement(info: unknown) {
+  if (!info || typeof info !== 'object') return false;
+  const announcement = info as TronProviderAnnouncementInfo;
+  const name = announcement.name?.trim().toLowerCase();
+  const rdns = announcement.rdns?.trim().toLowerCase();
+  return name === 'tronlink' && (!rdns || rdns === 'org.tronlink.www');
+}
+
+function hasExplicitTronCapability(provider: TronLinkProviderLike) {
+  // The announced TIP/EIP provider must expose the native TRON surface. A
+  // generic EVM provider (including TronLink's EVM surface) can also expose
+  // request/on and an isTronLink marker, but it has no nested tronWeb.
+  return Boolean(provider.tronWeb);
+}
+
+export function registerTronProvider(
+  candidate: unknown,
+  info?: unknown,
+) {
   if (!candidate || typeof candidate !== 'object') return null;
   const provider = candidate as TronLinkProviderLike;
+  if (!isTronLinkAnnouncement(info) || !hasExplicitTronCapability(provider)) return null;
   if (!provider.request && !provider.on && !provider.selectedAddress && !provider.defaultAddress) return null;
   announcedTronProvider = provider;
   return provider;
+}
+
+/** Clears the event-discovered provider between isolated browser/test sessions. */
+export function clearRegisteredTronProvider() {
+  announcedTronProvider = null;
 }
 
 export function resolveTronProvider(): TronLinkProviderLike | null {

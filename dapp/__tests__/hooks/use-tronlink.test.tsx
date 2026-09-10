@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 
 import { useTronLink } from '@/hooks/use-tronlink';
+import { clearRegisteredTronProvider } from '@/lib/tronlink-provider';
 
 const tronAddress = 'TJEAyJ111111111111111111111111111VjhM';
 
@@ -28,6 +29,7 @@ describe('useTronLink', () => {
   });
 
   afterEach(() => {
+    clearRegisteredTronProvider();
     window.localStorage.clear();
     delete window.tron;
     delete window.tronWeb;
@@ -61,5 +63,62 @@ describe('useTronLink', () => {
 
     second.unmount();
     remounted.unmount();
+  });
+
+  it('ignora un anuncio EIP-6963 exclusivamente EVM y no expone TRON como instalado', () => {
+    delete window.tron;
+    delete window.tronWeb;
+    const evmProvider = {
+      request: jest.fn(),
+      on: jest.fn(),
+      isTronLink: true,
+    };
+    const { result, unmount } = renderHook(() => useTronLink());
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('eip6963:announceProvider', {
+        detail: {
+          info: { name: 'MetaMask', rdns: 'io.metamask' },
+          provider: evmProvider,
+        },
+      }));
+    });
+
+    expect(result.current.isInstalled).toBe(false);
+    expect(result.current.isConnected).toBe(false);
+    expect(result.current.address).toBeNull();
+    expect(evmProvider.request).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('registra un anuncio TIP-6963 TronLink válido con tronWeb anidado', () => {
+    delete window.tron;
+    delete window.tronWeb;
+    const address = 'TAnnounced1111111111111111111111111111111';
+    const provider = {
+      selectedAddress: address,
+      request: jest.fn(),
+      on: jest.fn(),
+      tronWeb: {
+        defaultAddress: { base58: address },
+        fullNode: { host: 'https://api.trongrid.io' },
+      },
+    };
+    const { result, unmount } = renderHook(() => useTronLink());
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('TIP6963:announceProvider', {
+        detail: {
+          info: { name: 'TronLink', rdns: 'org.tronlink.www' },
+          provider,
+        },
+      }));
+    });
+
+    expect(result.current.isInstalled).toBe(true);
+    expect(result.current.isConnected).toBe(true);
+    expect(result.current.address).toBe(address);
+    expect(result.current.network).toBe('mainnet');
+    unmount();
   });
 });

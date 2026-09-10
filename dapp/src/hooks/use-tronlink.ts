@@ -131,8 +131,8 @@ function installListeners() {
   const handleChainChanged = () => syncConnection();
   const handleConnected = () => syncConnection();
   const handleAnnouncedProvider = (event: Event) => {
-    const detail = (event as CustomEvent<{ provider?: unknown }>).detail;
-    registerTronProvider(detail?.provider);
+    const detail = (event as CustomEvent<{ info?: unknown; provider?: unknown }>).detail;
+    registerTronProvider(detail?.provider, detail?.info);
     syncConnection();
   };
 

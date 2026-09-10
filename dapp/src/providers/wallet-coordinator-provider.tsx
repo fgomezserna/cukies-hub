@@ -37,7 +37,9 @@ import {
 } from '@/providers/wallet-coordinator-context';
 
 type PendingRequest = {
+  id: number;
   request: WalletRequest;
+  startedAddress: string | null;
   resolve: (value: WalletReady) => void;
   reject: (reason?: unknown) => void;
 };
@@ -95,6 +97,7 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
   const [walletDialogReason, setWalletDialogReason] = useState<string | null>(null);
   const [walletDialogError, setWalletDialogError] = useState<string | null>(null);
   const pendingRequestRef = useRef<PendingRequest | null>(null);
+  const requestIdRef = useRef(0);
 
   const evmConnectors = useMemo(() => getVisibleWalletConnectors(connectors), [connectors]);
   const evm = useMemo<EvmWalletSlot>(() => ({
@@ -133,19 +136,37 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
     };
   }, [address, chainId, isConnected, tronAddress, tronChainId, tronIsConnected]);
 
-  const settlePending = useCallback((ready: WalletReady) => {
-    pendingRequestRef.current?.resolve(ready);
+  const isCurrentPending = useCallback((pending: PendingRequest | null) => (
+    Boolean(pending && pendingRequestRef.current?.id === pending.id)
+  ), []);
+
+  const pendingAddress = useCallback((request: WalletRequest) => (
+    request.kind === 'evm' ? address ?? null : tronAddress ?? null
+  ), [address, tronAddress]);
+
+  const addressesMatch = useCallback((kind: WalletKind, left: string, right: string) => (
+    kind === 'evm'
+      ? left.toLowerCase() === right.toLowerCase()
+      : left === right
+  ), []);
+
+  const settlePending = useCallback((pending: PendingRequest, ready: WalletReady) => {
+    if (!isCurrentPending(pending)) return;
+    pending.resolve(ready);
     pendingRequestRef.current = null;
     setWalletDialogOpen(false);
     setWalletDialogError(null);
-  }, []);
+  }, [isCurrentPending]);
 
-  const rejectPending = useCallback((error: unknown) => {
-    pendingRequestRef.current?.reject(error);
-    pendingRequestRef.current = null;
+  const rejectPending = useCallback((pending: PendingRequest | null, error: unknown) => {
+    if (pending && !isCurrentPending(pending)) return;
+    if (pending) {
+      pending.reject(error);
+      pendingRequestRef.current = null;
+    }
     setWalletDialogOpen(false);
     setWalletDialogError(errorMessage(error));
-  }, []);
+  }, [isCurrentPending]);
 
   const switchTronToMainnet = useCallback(async () => {
     const provider = resolveTronProvider();
@@ -156,20 +177,52 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
     });
   }, []);
 
-  const finishPendingIfReady = useCallback(() => {
-    const pending = pendingRequestRef.current;
-    if (!pending) return;
+  const finishPendingIfReady = useCallback((pending = pendingRequestRef.current) => {
+    if (!pending || !isCurrentPending(pending)) return;
+    const currentAddress = pendingAddress(pending.request);
+    if (currentAddress && !pending.startedAddress) {
+      pending.startedAddress = currentAddress;
+    } else if (
+      pending.startedAddress
+      && (!currentAddress || !addressesMatch(pending.request.kind, pending.startedAddress, currentAddress))
+    ) {
+      rejectPending(pending, new Error('WALLET_ACCOUNT_CHANGED'));
+      return;
+    }
     const ready = buildReady(pending.request);
-    if (ready) settlePending(ready);
-  }, [buildReady, settlePending]);
+    if (ready) settlePending(pending, ready);
+  }, [addressesMatch, buildReady, isCurrentPending, pendingAddress, rejectPending, settlePending]);
 
   useEffect(() => {
     finishPendingIfReady();
   }, [finishPendingIfReady, address, chainId, isConnected, tronAddress, tronChainId, tronIsConnected]);
 
-  const requestWallet = useCallback(async (request: WalletRequest) => {
+  useEffect(() => () => {
+    const pending = pendingRequestRef.current;
+    if (!pending) return;
+    pendingRequestRef.current = null;
+    pending.reject(new Error('WALLET_REQUEST_CANCELLED'));
+  }, []);
+
+  useEffect(() => {
+    const pending = pendingRequestRef.current;
+    if (!pending || !pending.startedAddress) return;
+    const currentAddress = pendingAddress(pending.request);
+    if (!currentAddress || !addressesMatch(pending.request.kind, pending.startedAddress, currentAddress)) {
+      rejectPending(pending, new Error('WALLET_ACCOUNT_CHANGED'));
+    }
+  }, [addressesMatch, pendingAddress, rejectPending, address, tronAddress]);
+
+  const requestWallet = useCallback((request: WalletRequest) => {
     const ready = buildReady(request);
-    if (ready) return ready;
+    if (ready) {
+      const pending = pendingRequestRef.current;
+      if (pending) {
+        if (sameRequest(pending.request, request)) settlePending(pending, ready);
+        else rejectPending(pending, new Error('WALLET_REQUEST_REPLACED'));
+      }
+      return Promise.resolve(ready);
+    }
     if (pendingRequestRef.current) {
       if (sameRequest(pendingRequestRef.current.request, request)) {
         return new Promise<WalletReady>((resolve, reject) => {
@@ -187,45 +240,57 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
           };
         });
       }
-      rejectPending(new Error('WALLET_REQUEST_REPLACED'));
+      rejectPending(pendingRequestRef.current, new Error('WALLET_REQUEST_REPLACED'));
     }
 
     const promise = new Promise<WalletReady>((resolve, reject) => {
-      pendingRequestRef.current = { request, resolve, reject };
+      pendingRequestRef.current = {
+        id: ++requestIdRef.current,
+        request,
+        startedAddress: pendingAddress(request),
+        resolve,
+        reject,
+      };
     });
+    const pending = pendingRequestRef.current;
+    if (!pending) return promise;
     setWalletDialogKind(request.kind);
     setWalletDialogReason(request.reason);
     setWalletDialogError(null);
 
     if (request.kind === 'evm' && isConnected && request.targetChainId !== undefined && chainId !== request.targetChainId) {
-      try {
-        await switchChainAsync({ chainId: request.targetChainId });
-        const currentAddress = address;
-        if (!currentAddress) throw new Error('EVM_WALLET_DISCONNECTED');
-        settlePending({ kind: 'evm', address: currentAddress, chainId: request.targetChainId });
-      } catch (error) {
-        rejectPending(new Error(isRejected(error) ? 'Cambio de red cancelado en la wallet.' : errorMessage(error)));
-      }
+      const targetChainId = request.targetChainId;
+      void (async () => {
+        try {
+          await switchChainAsync({ chainId: targetChainId });
+          if (isCurrentPending(pending)) finishPendingIfReady(pending);
+        } catch (error) {
+          rejectPending(pending, new Error(isRejected(error) ? 'Cambio de red cancelado en la wallet.' : errorMessage(error)));
+        }
+      })();
       return promise;
     }
 
     if (request.kind === 'tron' && tronIsConnected && request.targetTronNetwork === 'mainnet' && tronChainId !== TRON_MAINNET_CHAIN_ID) {
-      try {
-        await switchTronToMainnet();
-        finishPendingIfReady();
-      } catch (error) {
-        rejectPending(new Error(isRejected(error) ? 'Cambio a TRON Mainnet cancelado en TronLink.' : errorMessage(error)));
-      }
+      void (async () => {
+        try {
+          await switchTronToMainnet();
+          if (isCurrentPending(pending)) finishPendingIfReady(pending);
+        } catch (error) {
+          rejectPending(pending, new Error(isRejected(error) ? 'Cambio a TRON Mainnet cancelado en TronLink.' : errorMessage(error)));
+        }
+      })();
       return promise;
     }
 
     setWalletDialogOpen(true);
     return promise;
-  }, [address, buildReady, chainId, finishPendingIfReady, isConnected, rejectPending, settlePending, switchChainAsync, switchTronToMainnet, tronChainId, tronIsConnected]);
+  }, [buildReady, chainId, finishPendingIfReady, isConnected, isCurrentPending, pendingAddress, rejectPending, settlePending, switchChainAsync, switchTronToMainnet, tronChainId, tronIsConnected]);
 
   const selectEvmConnector = useCallback(async (selectedConnector: Connector) => {
+    const pending = pendingRequestRef.current;
     try {
-      const request = pendingRequestRef.current?.request;
+      const request = pending?.request;
       const result = await connectAsync({
         connector: selectedConnector,
         ...(request?.targetChainId ? { chainId: request.targetChainId } : {}),
@@ -233,21 +298,20 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
       if (request?.targetChainId !== undefined && result.chainId !== request.targetChainId) {
         await switchChainAsync({ chainId: request.targetChainId });
       }
-      const currentAddress = result.accounts?.[0] ?? address;
-      if (!currentAddress) throw new Error('EVM_WALLET_DISCONNECTED');
-      if (request) {
-        settlePending({ kind: 'evm', address: currentAddress, chainId: request.targetChainId ?? result.chainId });
+      if (pending) {
+        if (isCurrentPending(pending)) finishPendingIfReady(pending);
       } else {
         setWalletDialogOpen(false);
       }
     } catch (error) {
-      rejectPending(new Error(isRejected(error) ? 'Conexión o cambio de red cancelado en la wallet.' : errorMessage(error)));
+      rejectPending(pending, new Error(isRejected(error) ? 'Conexión o cambio de red cancelado en la wallet.' : errorMessage(error)));
     }
-  }, [address, connectAsync, rejectPending, settlePending, switchChainAsync]);
+  }, [connectAsync, finishPendingIfReady, isCurrentPending, rejectPending, switchChainAsync]);
 
   const selectTronLink = useCallback(async () => {
+    const pending = pendingRequestRef.current;
     try {
-      const request = pendingRequestRef.current?.request;
+      const request = pending?.request;
       const connectedAddress = tronIsConnected && tronAddress
         ? tronAddress
         : await connectTronLink();
@@ -259,20 +323,14 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
         }
       }
       if (request) {
-        const chainId = resolveTronChainId();
-        settlePending({
-          kind: 'tron',
-          address: connectedAddress,
-          tronChainId: chainId,
-          network: tronNetworkFromChainId(chainId),
-        });
+        if (isCurrentPending(pending)) finishPendingIfReady(pending);
       } else {
         setWalletDialogOpen(false);
       }
     } catch (error) {
-      rejectPending(new Error(isRejected(error) ? 'Conexión o cambio a TRON Mainnet cancelado en TronLink.' : errorMessage(error)));
+      rejectPending(pending, new Error(isRejected(error) ? 'Conexión o cambio a TRON Mainnet cancelado en TronLink.' : errorMessage(error)));
     }
-  }, [connectTronLink, rejectPending, settlePending, switchTronToMainnet, tronAddress, tronChainId, tronError, tronIsConnected]);
+  }, [connectTronLink, finishPendingIfReady, isCurrentPending, rejectPending, switchTronToMainnet, tronAddress, tronChainId, tronError, tronIsConnected]);
 
   const openWalletSelector = useCallback((kind: WalletDialogKind = 'any', reason?: string) => {
     setWalletDialogKind(kind);
@@ -282,7 +340,7 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
   }, []);
 
   const closeWalletSelector = useCallback(() => {
-    if (pendingRequestRef.current) rejectPending(new Error('WALLET_REQUEST_CANCELLED'));
+    if (pendingRequestRef.current) rejectPending(pendingRequestRef.current, new Error('WALLET_REQUEST_CANCELLED'));
     else setWalletDialogOpen(false);
   }, [rejectPending]);
 
