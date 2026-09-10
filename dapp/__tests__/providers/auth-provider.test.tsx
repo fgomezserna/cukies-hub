@@ -119,7 +119,12 @@ describe('providers/AuthProvider', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress }),
+      body: JSON.stringify({
+        walletAddress,
+        walletType: 'evm',
+        restoreSession: true,
+        requireSignedWallet: true,
+      }),
     })
   })
 
@@ -139,7 +144,7 @@ describe('providers/AuthProvider', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('no-user')
   })
 
-  it('should handle fetch errors and disconnect wallet', async () => {
+  it('should handle initial restore errors without disconnecting the wallet', async () => {
     const walletAddress = '0x123456789'
     mockUseAccount.mockReturnValue({
       address: walletAddress,
@@ -158,13 +163,14 @@ describe('providers/AuthProvider', () => {
     )
 
     await waitFor(() => {
-      expect(mockDisconnect).toHaveBeenCalled()
+      expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
     })
 
     expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    expect(mockDisconnect).not.toHaveBeenCalled()
   })
 
-  it('should handle network errors and disconnect wallet', async () => {
+  it('should handle initial restore network errors without disconnecting the wallet', async () => {
     const walletAddress = '0x123456789'
     mockUseAccount.mockReturnValue({
       address: walletAddress,
@@ -180,10 +186,11 @@ describe('providers/AuthProvider', () => {
     )
 
     await waitFor(() => {
-      expect(mockDisconnect).toHaveBeenCalled()
+      expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
     })
 
     expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    expect(mockDisconnect).not.toHaveBeenCalled()
   })
 
   it('should set loading state correctly during fetch', async () => {
@@ -400,7 +407,12 @@ describe('providers/AuthProvider', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress }),
+      body: JSON.stringify({
+        walletAddress,
+        walletType: 'evm',
+        restoreSession: true,
+        requireSignedWallet: true,
+      }),
     })
     expect(mockFetch).not.toHaveBeenCalledWith(
       '/api/auth/challenge',

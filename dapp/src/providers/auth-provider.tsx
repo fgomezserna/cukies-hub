@@ -23,6 +23,8 @@ type FetchUserOptions = {
   walletType?: LoginWalletType;
   evmConnector?: Connector;
   requireSignedWallet?: boolean;
+  restoreSession?: boolean;
+  onRestoreResult?: (result: 'matched' | 'missing' | 'retry' | 'stale') => void;
 };
 
 function isUserRejectedRequest(error: unknown) {
@@ -82,6 +84,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const previousAddressRef = useRef<string | undefined>(undefined);
   const authGenerationRef = useRef(0);
   const explicitSelectionRef = useRef<{ address: string; walletType: LoginWalletType } | null>(null);
+  const initialRestoreAttemptsRef = useRef(new Map<string, number>());
+  const initialRestoreInFlightRef = useRef(false);
   const walletSlotsRef = useRef({
     evmAddress,
     isEvmConnected,
@@ -121,6 +125,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const loginWalletType: LoginWalletType = options.walletType || walletType || (isEvmConnected ? 'evm' : 'tron');
     const shouldPromptForSignature = Boolean(options.promptForSignature);
     const requireSignedWallet = options.requireSignedWallet === true;
+    const restoreSession = options.restoreSession === true;
+    const reportRestoreResult = (result: 'matched' | 'missing' | 'retry' | 'stale') => {
+      if (restoreSession) options.onRestoreResult?.(result);
+    };
     const generation = ++authGenerationRef.current;
     const startedSlotAddress = loginWalletType === 'evm'
       ? walletSlotsRef.current.evmAddress
@@ -142,7 +150,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return true;
     };
 
-    if (walletAddress || shouldPromptForSignature) {
+    if ((walletAddress || shouldPromptForSignature) && !restoreSession) {
       initialRestorePendingRef.current = false;
       if (walletAddress && options.walletType) {
         explicitSelectionRef.current = {
@@ -167,6 +175,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null);
         setIsLoading(false);
         setIsWaitingForApproval(false);
+        reportRestoreResult('missing');
       }
       return;
     }
@@ -180,16 +189,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: addressToUse,
-          ...(requireSignedWallet
-            ? { walletType: loginWalletType, requireSignedWallet: true }
+          ...((requireSignedWallet || restoreSession)
+            ? {
+                walletType: loginWalletType,
+                ...(restoreSession ? { restoreSession: true } : {}),
+                ...(requireSignedWallet ? { requireSignedWallet: true } : {}),
+              }
             : {}),
         }),
       });
 
       if (response.status === 401) {
-        if (!isCurrentRequest()) return;
+        if (!isCurrentRequest()) {
+          reportRestoreResult('stale');
+          return;
+        }
         if (!shouldPromptForSignature) {
           setUser(null);
+          if (restoreSession) {
+            reportRestoreResult('missing');
+            return;
+          }
           setPrimaryWalletInvalidated(true);
           return;
         }
@@ -208,7 +228,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         const challenge = await challengeResponse.json();
-        if (!isCurrentRequest()) return;
+        if (!isCurrentRequest()) {
+          reportRestoreResult('stale');
+          return;
+        }
         setIsWaitingForApproval(true);
         didRequestSignature = true;
         const signature =
@@ -220,7 +243,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               })
             : await signTronLoginMessage(challenge.message);
 
-        if (!isCurrentRequest()) return;
+        if (!isCurrentRequest()) {
+          reportRestoreResult('stale');
+          return;
+        }
         response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -237,10 +263,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!response.ok) throw new Error('Login failed');
 
       const userData = await response.json();
-      if (!isCurrentRequest()) return;
+      if (!isCurrentRequest()) {
+        reportRestoreResult('stale');
+        return;
+      }
       setUser(userData);
       setWalletType(loginWalletType);
       setPrimaryWalletInvalidated(false);
+      if (restoreSession) {
+        initialRestorePendingRef.current = false;
+        previousAddressRef.current = addressToUse;
+      }
       if (
         explicitSelectionRef.current
         && walletAddressesEqual(loginWalletType, explicitSelectionRef.current.address, addressToUse)
@@ -257,8 +290,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           description: `Successfully connected to ${addressToUse?.slice(0, 6)}...${addressToUse?.slice(-4)}`,
         });
       }
+      reportRestoreResult('matched');
     } catch (error) {
-      if (!isCurrentRequest()) return;
+      if (!isCurrentRequest()) {
+        reportRestoreResult('stale');
+        return;
+      }
+      if (restoreSession) {
+        console.error(error);
+        setUser(null);
+        reportRestoreResult('retry');
+        return;
+      }
       console.error(error);
       setUser(null);
       setPrimaryWalletInvalidated(true);
@@ -295,6 +338,73 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [activeEvmConnector, currentAddress, disconnectEvm, disconnectTron, evmAddress, isConnected, isEvmConnected, isTronConnected, primaryWalletInvalidated, signMessageAsync, toast, tronAddress, walletType]);
 
+  const restoreInitialSession = useCallback(async () => {
+    if (
+      !initialRestorePendingRef.current
+      || primaryWalletInvalidated
+      || walletType
+      || initialRestoreInFlightRef.current
+    ) {
+      return;
+    }
+
+    initialRestoreInFlightRef.current = true;
+    try {
+      while (initialRestorePendingRef.current && !primaryWalletInvalidated && !walletType) {
+        const slots = walletSlotsRef.current;
+        const candidates = [
+          slots.evmAddress && slots.isEvmConnected
+            ? {
+                address: slots.evmAddress,
+                revision: slots.evmRevision,
+                walletType: 'evm' as const,
+              }
+            : null,
+          slots.tronAddress && slots.isTronConnected
+            ? {
+                address: slots.tronAddress,
+                revision: slots.tronRevision,
+                walletType: 'tron' as const,
+              }
+            : null,
+        ].filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate));
+        const candidate = candidates.find((entry) => {
+          const addressKey = entry.walletType === 'evm' ? entry.address.toLowerCase() : entry.address;
+          const key = `${entry.walletType}:${entry.revision}:${addressKey}`;
+          return (initialRestoreAttemptsRef.current.get(key) ?? 0) < 2;
+        });
+
+        if (!candidate) {
+          setIsLoading(false);
+          return;
+        }
+
+        const addressKey = candidate.walletType === 'evm' ? candidate.address.toLowerCase() : candidate.address;
+        const key = `${candidate.walletType}:${candidate.revision}:${addressKey}`;
+        const attempt = (initialRestoreAttemptsRef.current.get(key) ?? 0) + 1;
+        initialRestoreAttemptsRef.current.set(key, attempt);
+        const restoreResult = { value: 'stale' as 'matched' | 'missing' | 'retry' | 'stale' };
+
+        await fetchUser(candidate.address, {
+          promptForSignature: false,
+          walletType: candidate.walletType,
+          requireSignedWallet: candidate.walletType === 'evm',
+          restoreSession: true,
+          onRestoreResult: (nextResult) => {
+            restoreResult.value = nextResult;
+          },
+        });
+
+        if (restoreResult.value === 'matched') return;
+        if (restoreResult.value !== 'retry' || attempt >= 2) {
+          initialRestoreAttemptsRef.current.set(key, 2);
+        }
+      }
+    } finally {
+      initialRestoreInFlightRef.current = false;
+    }
+  }, [fetchUser, primaryWalletInvalidated, walletType]);
+
   // Enhanced wallet change detection effect
   useEffect(() => {
     console.log('Wallet hook update:', {
@@ -311,15 +421,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!hasObservedWalletStateRef.current) {
       hasObservedWalletStateRef.current = true;
       previousAddressRef.current = currentAddress || undefined;
-      if (currentAddress && !primaryWalletInvalidated) {
-        initialRestorePendingRef.current = false;
-      }
-      void fetchUser(undefined, { promptForSignature: false });
+      void restoreInitialSession();
       return;
     }
 
     // Detect wallet change
     const hasWalletChanged = previousAddressRef.current !== currentAddress;
+
+    if (initialRestorePendingRef.current && !primaryWalletInvalidated && !walletType) {
+      if (hasWalletChanged) previousAddressRef.current = currentAddress || undefined;
+      void restoreInitialSession();
+      return;
+    }
 
     if (!hasWalletChanged) return;
 
@@ -335,18 +448,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    if (
-      initialRestorePendingRef.current
-      && !previousAddressRef.current
-      && currentAddress
-      && !primaryWalletInvalidated
-    ) {
-      initialRestorePendingRef.current = false;
-      previousAddressRef.current = currentAddress;
-      void fetchUser(undefined, { promptForSignature: false });
-      return;
-    }
-
     {
       console.log('🔄 Wallet change detected:', {
         previous: previousAddressRef.current,
@@ -355,6 +456,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       // Clear current user state (logout)
+      initialRestorePendingRef.current = false;
       authGenerationRef.current += 1;
       setUser(null);
       setIsLoading(false);
@@ -364,7 +466,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Update reference for next comparison
       previousAddressRef.current = currentAddress || undefined;
     }
-  }, [evmAddress, tronAddress, currentAddress, isConnected, fetchUser, primaryWalletInvalidated, walletType]);
+  }, [evmAddress, tronAddress, currentAddress, isConnected, primaryWalletInvalidated, restoreInitialSession, walletType]);
 
   // Direct wallet event listener as backup (EVM wallets)
   useEffect(() => {

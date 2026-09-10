@@ -2,6 +2,7 @@ const mockPrismaFindUnique = jest.fn();
 const mockReadWalletSession = jest.fn();
 const mockWalletSessionMatchesAddress = jest.fn();
 const mockEvmWalletSessionMatchesSignedAddress = jest.fn();
+const mockWalletSessionMatchesSignedAddress = jest.fn();
 const mockReadWalletChallenge = jest.fn();
 const mockVerifyWalletSignature = jest.fn();
 const mockSetWalletSessionCookie = jest.fn();
@@ -33,6 +34,9 @@ jest.mock('@/lib/wallet-auth', () => ({
   ),
   setWalletSessionCookie: (...args: unknown[]) => mockSetWalletSessionCookie(...args),
   verifyWalletSignature: (...args: unknown[]) => mockVerifyWalletSignature(...args),
+  walletSessionMatchesSignedAddress: (...args: unknown[]) => (
+    mockWalletSessionMatchesSignedAddress(...args)
+  ),
   walletSessionMatchesAddress: (...args: unknown[]) => mockWalletSessionMatchesAddress(...args),
 }));
 
@@ -55,6 +59,7 @@ import { POST } from '@/app/api/auth/login/route';
 
 const buyerAddress = '0x1111111111111111111111111111111111111111';
 const otherAddress = '0x2222222222222222222222222222222222222222';
+const profileTronAddress = 'TQmPrimary11111111111111111111111111111';
 const sessionUser = {
   id: 'buyer-user',
   walletAddress: buyerAddress,
@@ -81,6 +86,7 @@ describe('/api/auth/login requireSignedWallet', () => {
     });
     mockWalletSessionMatchesAddress.mockReturnValue(true);
     mockEvmWalletSessionMatchesSignedAddress.mockReturnValue(false);
+    mockWalletSessionMatchesSignedAddress.mockReturnValue(false);
     mockPrismaFindUnique.mockResolvedValue(sessionUser);
     mockVerifyWalletSignature.mockResolvedValue(true);
     mockSetWalletSessionCookie.mockResolvedValue(undefined);
@@ -131,6 +137,59 @@ describe('/api/auth/login requireSignedWallet', () => {
     }));
 
     expect(response.status).toBe(200);
+    expect(mockPrismaFindUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: sessionUser.id },
+    }));
+  });
+
+  it('no reutiliza un alias de perfil durante la restauración estricta TRON', async () => {
+    mockReadWalletSession.mockResolvedValue({
+      userId: sessionUser.id,
+      walletAddress: profileTronAddress,
+      signedWalletAddress: buyerAddress,
+      walletType: 'evm',
+    });
+
+    const response = await POST(loginRequest({
+      walletAddress: profileTronAddress,
+      walletType: 'tron',
+      restoreSession: true,
+    }));
+
+    expect(response.status).toBe(401);
+    expect(mockWalletSessionMatchesSignedAddress).toHaveBeenCalledWith(
+      expect.objectContaining({ signedWalletAddress: buyerAddress, walletType: 'evm' }),
+      profileTronAddress,
+      'tron',
+    );
+    expect(mockWalletSessionMatchesAddress).not.toHaveBeenCalled();
+    expect(mockPrismaFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('reutiliza una sesión TRON solo cuando coincide la wallet firmada', async () => {
+    const tronAddress = 'TJRabPrwbZy45sbavfcjinPJC18kjpRTv8';
+    const tronSession = {
+      userId: sessionUser.id,
+      walletAddress: profileTronAddress,
+      signedWalletAddress: tronAddress,
+      walletType: 'tron',
+    };
+    mockReadWalletSession.mockResolvedValue(tronSession);
+    mockWalletSessionMatchesSignedAddress.mockReturnValue(true);
+
+    const response = await POST(loginRequest({
+      walletAddress: tronAddress,
+      walletType: 'tron',
+      restoreSession: true,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mockWalletSessionMatchesSignedAddress).toHaveBeenCalledWith(
+      tronSession,
+      tronAddress,
+      'tron',
+    );
+    expect(mockWalletSessionMatchesAddress).not.toHaveBeenCalled();
     expect(mockPrismaFindUnique).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: sessionUser.id },
     }));
