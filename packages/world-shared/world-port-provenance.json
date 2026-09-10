@@ -1,0 +1,2772 @@
+{
+  "generatedAt": "2026-09-09T11:47:49.304Z",
+  "sourceRepository": "/Users/fgomezserna/Proyectos/cukies-world",
+  "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+  "sourceWorkingTree": "M .env\n M .gitlab-ci.yml\n M apps/backend/auth/Dockerfile\n M apps/backend/auth/project.json\n M apps/backend/auth/src/app/modules/login/login.service.ts\n M apps/backend/auth/src/app/modules/login/schemas/wallet.schema.ts\n M apps/backend/auth/src/main.ts\n M apps/backend/cards/Dockerfile\n M apps/backend/cards/project.json\n M apps/backend/commander/src/app/app.module.ts\n M apps/backend/consumer/Dockerfile\n M apps/backend/consumer/project.json\n M apps/backend/data-graphql/Dockerfile\n M apps/backend/data-graphql/project.json\n M apps/backend/data-graphql/src/app/app.module.ts\n M apps/backend/data-rest/Dockerfile\n M apps/backend/data-rest/project.json\n M apps/backend/game/Dockerfile\n M apps/backend/game/project.json\n M apps/backend/game/src/app/app.module.ts\n M apps/backend/game/src/app/modules/crafting/crafting.service.ts\n M apps/backend/game/src/app/modules/cuki-mission/cuki-mission.controller.ts\n M apps/backend/game/src/app/modules/cuki-mission/cuki-mission.module.ts\n M apps/backend/game/src/app/modules/cuki-mission/cuki-mission.service.ts\n M apps/backend/game/src/app/modules/cuki/cuki.module.ts\n M apps/backend/game/src/app/modules/cuki/cuki.service.ts\n M apps/backend/game/src/app/modules/inventory/inventory.service.ts\n M apps/backend/game/src/app/modules/item/item.service.ts\n D apps/backend/game/src/app/modules/item/test/item.\n M apps/backend/game/src/app/modules/item/test/item.e2e.spec.ts\n D apps/backend/game/src/app/modules/saakuru/saakuru.module.ts\n D apps/backend/game/src/app/modules/saakuru/saakuru.service.ts\n M apps/backend/game/src/app/modules/user/user.service.ts\n M apps/backend/game/src/app/modules/userMap/dto/buildingTile.dto.ts\n M apps/backend/game/src/app/modules/userMap/dto/create-userMap.dto.ts\n M apps/backend/game/src/app/modules/userMap/dto/mapTileRange.dto.ts\n M apps/backend/game/src/app/modules/userMap/userMap.controller.ts\n M apps/backend/game/src/app/modules/userMap/userMap.service.ts\n M apps/backend/game/src/app/test.spec.ts\n M apps/backend/game/src/main.ts\n M apps/backend/matchmaking/Dockerfile\n M apps/backend/matchmaking/project.json\n M apps/backend/matchmaking/src/app/app.controller.spec.ts\n M apps/backend/matchmaking/src/app/app.controller.ts\n M apps/backend/matchmaking/src/app/app.module.ts\n M apps/backend/matchmaking/src/app/app.service.spec.ts\n M apps/backend/matchmaking/src/app/app.service.ts\n M apps/backend/matchmaking/src/main.ts\n M apps/backend/producer/bsc/Dockerfile\n M apps/backend/producer/bsc/project.json\n M apps/backend/producer/tron/Dockerfile\n M apps/backend/producer/tron/project.json\n M apps/backend/sync/Dockerfile/generateMissingImages\n M apps/backend/sync/Dockerfile/getterBSC\n M apps/backend/sync/Dockerfile/getterTron\n M apps/backend/sync/Dockerfile/setter\n M apps/backend/sync/project.json\n M apps/frontend/dapp/project.json\n M apps/frontend/dbform/project.json\n D digitalocean/frontend.yaml\n D digitalocean/workers.yaml\n M libs/shared/backend/schemas/src/index.ts\n M libs/shared/backend/schemas/src/lib/common/cuki.schema.ts\n M libs/shared/backend/schemas/src/lib/common/wallet.schema.ts\n M libs/shared/backend/schemas/src/lib/game/inventory.schema.ts\n M libs/shared/backend/schemas/src/lib/game/item.schema.ts\n D libs/shared/backend/schemas/src/lib/game/saakuru_tx.schema.ts\n M libs/shared/backend/schemas/src/lib/game/userMap.schema.ts\n M libs/shared/common/environment/src/lib/environment.prod.ts\n M libs/shared/common/environment/src/lib/environment.staging.ts\n M libs/shared/common/environment/src/lib/environment.ts\n M package.json\n?? AGENTS.md\n?? apps/backend/game/src/app/interceptors/redacting-logging.interceptor.ts\n?? apps/backend/game/src/app/modules/cuki/cuki.service.spec.ts\n?? apps/backend/game/src/app/modules/inventory/inventory.service.spec.ts\n?? apps/backend/game/src/app/modules/islandEconomy/dto/islandEconomyMutation.dto.ts\n?? apps/backend/game/src/app/modules/islandEconomy/islandEconomy.controller.spec.ts\n?? apps/backend/game/src/app/modules/islandEconomy/islandEconomy.controller.ts\n?? apps/backend/game/src/app/modules/islandEconomy/islandEconomy.module.ts\n?? apps/backend/game/src/app/modules/islandEconomy/islandEconomy.service.spec.ts\n?? apps/backend/game/src/app/modules/islandEconomy/islandEconomy.service.ts\n?? apps/backend/game/src/app/modules/userMap/dto/islandActionEvent.dto.ts\n?? apps/backend/game/src/app/modules/userMap/dto/islandChatBlock.dto.ts\n?? apps/backend/game/src/app/modules/userMap/dto/islandChatMessage.dto.ts\n?? apps/backend/game/src/app/modules/userMap/dto/islandChatReport.dto.ts\n?? apps/backend/game/src/app/modules/userMap/dto/shareIslandMap.dto.ts\n?? apps/backend/game/src/app/modules/userMap/userMap.controller.spec.ts\n?? apps/backend/game/src/app/modules/userMap/userMap.service.spec.ts\n?? apps/backend/matchmaking/src/app/dto/island-server-connection.dto.ts\n?? apps/backend/matchmaking/src/app/dto/registered-island-server.dto.ts\n?? apps/backend/matchmaking/src/app/interceptors/redacting-logging.interceptor.ts\n?? scripts/backfill-usermap-island-ids.js\n?? scripts/generate-map-pool.js\n?? scripts/lib/seeded-map-generator.js\n?? scripts/rebuild-staging-maps.js",
+  "destinationBranch": "codex/world-stack-integration",
+  "exclusions": [
+    ".env",
+    ".env.*",
+    "nx.json",
+    "project.json",
+    "*.nx.*",
+    "*credential*",
+    "*secret*",
+    "*.e2e.spec.ts",
+    "apps/backend/auth/**",
+    "apps/backend/data-graphql/**",
+    "*saakuru*"
+  ],
+  "hashSemantics": "sourceObservedHash and destinationHash are final observed hashes; they do not prove an atomic copy or historical equality",
+  "files": [
+    {
+      "destination": "packages/world-api/src/app/app.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "e606106e6bac0c6fae253356ee94f9d7cb68e6c09eb9e3c789ac7a01d8b5cc90",
+      "source": "apps/backend/game/src/app/app.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "0a34439308040555e924f9dbf92b973a48c85febe77819ce120375d328ab0b90",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/auth/admin.authentication.guard.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "092b90c1b058fc6caf1fd4d8bbb86a1e17a1e34696ac0bd93f001f1ab102f2bb",
+      "source": "apps/backend/game/src/app/auth/admin.authentication.guard.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "aa2b22b6d297aa5f4eae4f45d93d0f5a2a1e9c9fc3d5ce6b94364ff1d798f313",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/auth/authentication.guard.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "441fa28642c53ec2ea7a2cd76332cc1998ad63f40ab5451e9141870a95f51810",
+      "source": "apps/backend/game/src/app/auth/authentication.guard.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ae3057cb48894b8c6209c63ebb941e19f0e1718b224dbdb307e37d655de873df",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/decorators/swagger.decorator.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "167feac5f7937bfd09bb8f6422abf7a840faff30f2b6d4d1ee9d15600d811759",
+      "source": "apps/backend/game/src/app/decorators/swagger.decorator.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "167feac5f7937bfd09bb8f6422abf7a840faff30f2b6d4d1ee9d15600d811759",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/interceptors/redacting-logging.interceptor.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "fb439db4e56f65300d5e78465abfff6e9e183811864b96386982a7fb9d03b06b",
+      "source": "apps/backend/game/src/app/interceptors/redacting-logging.interceptor.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "fb439db4e56f65300d5e78465abfff6e9e183811864b96386982a7fb9d03b06b",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/building/building.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "deb4dd78798a46a5e1b2e9968e23ab1df0bca89b152b0b2c9554e27e8a84c5a3",
+      "source": "apps/backend/game/src/app/modules/building/building.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "416a146efbd37c86f2f9331807c9c7f0524f4a0ff1d305645de2ca2ca0820db9",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/building/building.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "372fa342a4ba670a30e7476fffe68f8509f7d0f84408ba8c717cb757ba509d99",
+      "source": "apps/backend/game/src/app/modules/building/building.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "3dac6ad260a3b1e7e63dc13e52f548869d3e7f581c1adcf3a4173d7be0927e6c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/building/building.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "4bd0ada87a41505a005424de09e2a2be4e6706a295ae574725dec4491cd1b930",
+      "source": "apps/backend/game/src/app/modules/building/building.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "9698b25e0a0142e03e4821510e90921951d16c968c38e36bbd9477bb7922d716",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/building/dto/create-building.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "effa7048b31556a0d06e5412821ca826a99e645530559b082dcad0b35a77fbaf",
+      "source": "apps/backend/game/src/app/modules/building/dto/create-building.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "effa7048b31556a0d06e5412821ca826a99e645530559b082dcad0b35a77fbaf",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/building/dto/itemContent.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "ab30c4dd1d88360ca14d7b29d40eff7150927cdb8eb656aa6d54f528159b7bf3",
+      "source": "apps/backend/game/src/app/modules/building/dto/itemContent.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ab30c4dd1d88360ca14d7b29d40eff7150927cdb8eb656aa6d54f528159b7bf3",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/building/dto/update-building.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "4a6866c3b9e4af14020c9d14088618b32ba8e7ef01dce5fcb814997729156a0f",
+      "source": "apps/backend/game/src/app/modules/building/dto/update-building.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "4a6866c3b9e4af14020c9d14088618b32ba8e7ef01dce5fcb814997729156a0f",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/crafting/crafting.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "aed164122adb5d33c0f9e763ad27a29cb0ebb0d6aea4736bbe773d10eb31b779",
+      "source": "apps/backend/game/src/app/modules/crafting/crafting.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "97093c62e5dddae50fd6d159bb2202b5b07e06e645d121c852aedcaff7f62667",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/crafting/crafting.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "9d2f0b0357ada385f13ebca0b0a2823e7a5d1fd368ae980f29c21fe340f1f994",
+      "source": "apps/backend/game/src/app/modules/crafting/crafting.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "7de0abf229f6d5215e7c8cf8e1c575f6743630109979c6047fc8ada4b61aa0d5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/crafting/crafting.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "5a8098fa932ebb725ab1415ec976b6c573c7496caffe5bb9ffe252c1c40c7643",
+      "source": "apps/backend/game/src/app/modules/crafting/crafting.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "696f2f650f22e3cc7867553f220786d3adf5a02d42f0bf831d49e6834dfd94e4",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/crafting/dto/create-crafting.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c61883439888bffdcd5386b26926ac7394272de300107c523078df44542d9398",
+      "source": "apps/backend/game/src/app/modules/crafting/dto/create-crafting.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "c61883439888bffdcd5386b26926ac7394272de300107c523078df44542d9398",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/crafting/dto/update-crafting.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "694f5083a99e7bb957fa63a21ef9e82829fc436be1b800f854391ff78b757bce",
+      "source": "apps/backend/game/src/app/modules/crafting/dto/update-crafting.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "694f5083a99e7bb957fa63a21ef9e82829fc436be1b800f854391ff78b757bce",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/cuki.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "6c95a4e195d1c2b27e598c47f9414da79048fce7fafddbc4ebabc345fbb7557e",
+      "source": "apps/backend/game/src/app/modules/cuki/cuki.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "3d9af4e701f7196717fbb780fac15f79d81b059f8cc636dc09cf552d84eb44c5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/cuki.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "bb899c5f90bcae790d4f11ad951d54f4d2cbd141d74d4527bfe99c68b7a1edd6",
+      "source": "apps/backend/game/src/app/modules/cuki/cuki.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "816b4396b56c5a6a0d494471aca688110716f2c1badf7036954e8bff9fea1965",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/cuki.service.spec.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "d7bae03dd1a423c08cb8c30999c633fc4a9401e4a2b792e3305153e24cec7259",
+      "source": "apps/backend/game/src/app/modules/cuki/cuki.service.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "d7bae03dd1a423c08cb8c30999c633fc4a9401e4a2b792e3305153e24cec7259",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/cuki.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b63f0c792bfee308e1856b604fe2fe95f98fad53f7e8a803ecc8735630a43f1f",
+      "source": "apps/backend/game/src/app/modules/cuki/cuki.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "2ace27da168809e40823d076f1fae005a0407673afbd6bd56361f208ecb459ea",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/dto/add-exp.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "2d498616492dbe337c35e5aaf32a7a6a231e0e5ea3c70cc498ee3f76ad5d6444",
+      "source": "apps/backend/game/src/app/modules/cuki/dto/add-exp.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "2d498616492dbe337c35e5aaf32a7a6a231e0e5ea3c70cc498ee3f76ad5d6444",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/dto/create-cuki.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "a05d429c8cac27688f8c72114010bee24831b0d64637d6aaab6931f20e5687cb",
+      "source": "apps/backend/game/src/app/modules/cuki/dto/create-cuki.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "2335a7673379be3d24c1d5cf889c5843516102462cad038886ec59716116a265",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/dto/in-game-stats.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "ea457e610a04c7074b7b958c1c1f8431d0e4a935489e3aec588a96bc4587a6ea",
+      "source": "apps/backend/game/src/app/modules/cuki/dto/in-game-stats.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ea457e610a04c7074b7b958c1c1f8431d0e4a935489e3aec588a96bc4587a6ea",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/dto/level-up.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "683242866841d885f6da24ca3c9c5a1e019c6ea596df24630516bf8d38815f7f",
+      "source": "apps/backend/game/src/app/modules/cuki/dto/level-up.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "683242866841d885f6da24ca3c9c5a1e019c6ea596df24630516bf8d38815f7f",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki/dto/update-cuki.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "6665ca8c727625aed72ab3b4a9c1900124baf43dcbf7b24a81d60915f3507fbb",
+      "source": "apps/backend/game/src/app/modules/cuki/dto/update-cuki.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "6665ca8c727625aed72ab3b4a9c1900124baf43dcbf7b24a81d60915f3507fbb",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki-mission/cuki-mission.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "5a14181bf7903bc22f07f9a6e56c8674f44b088b8cd386fed9e7a0496233d1f5",
+      "source": "apps/backend/game/src/app/modules/cuki-mission/cuki-mission.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "5a14181bf7903bc22f07f9a6e56c8674f44b088b8cd386fed9e7a0496233d1f5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki-mission/cuki-mission.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c4b8f2d395a8e8c318d8ef04882149c7202921f99eaa7bc67f551028b2b61e08",
+      "source": "apps/backend/game/src/app/modules/cuki-mission/cuki-mission.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "3f982ce0b64458c00d7c1de255a98d4ab4bbe120908e74e5f346d4d2a57e9617",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki-mission/cuki-mission.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "20dec376d629672e5163a12e9d929bd814d075752287c1a579ee34938196e3de",
+      "source": "apps/backend/game/src/app/modules/cuki-mission/cuki-mission.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "0588c783442d7090a0dcddb7fece5920b981975cde97b926c595a59f92525778",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki-mission/dto/UpdateCukiMissionProgressDto.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "538c37da3d5a309bdf24df64c22d60ba65584ee61179415f82b38f92a3097f3a",
+      "source": "apps/backend/game/src/app/modules/cuki-mission/dto/UpdateCukiMissionProgressDto.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "538c37da3d5a309bdf24df64c22d60ba65584ee61179415f82b38f92a3097f3a",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki-mission/dto/completeCheckmarkDto.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "3db34cec43a974703104692188c239b920f89a7ea47c3cae1e23e8384da34ed0",
+      "source": "apps/backend/game/src/app/modules/cuki-mission/dto/completeCheckmarkDto.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "3db34cec43a974703104692188c239b920f89a7ea47c3cae1e23e8384da34ed0",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki-mission/dto/completeMissionDto.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "318a843d4b31f748a29ed51e3f1ddd0c8445721db4ca20f7f96fec21636ccc12",
+      "source": "apps/backend/game/src/app/modules/cuki-mission/dto/completeMissionDto.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "318a843d4b31f748a29ed51e3f1ddd0c8445721db4ca20f7f96fec21636ccc12",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/cuki-mission/dto/create-cuki-missions.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "14903d1c06beb3186c7ee6cce67e5225d69af87ec4b5e10030fd29e72ff504d5",
+      "source": "apps/backend/game/src/app/modules/cuki-mission/dto/create-cuki-missions.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "14903d1c06beb3186c7ee6cce67e5225d69af87ec4b5e10030fd29e72ff504d5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/dto/change-equipItem.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "8e24c2d1fe12d2aaa302d70d954891b9b087447a71d374ba9d1bbf1d518d5338",
+      "source": "apps/backend/game/src/app/modules/inventory/dto/change-equipItem.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "8e24c2d1fe12d2aaa302d70d954891b9b087447a71d374ba9d1bbf1d518d5338",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/dto/create-inventory.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "271301487d6f3abb17ea1c9a2c2a67cec9c7ae5e2f2ed997cd003adf671f70c7",
+      "source": "apps/backend/game/src/app/modules/inventory/dto/create-inventory.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "271301487d6f3abb17ea1c9a2c2a67cec9c7ae5e2f2ed997cd003adf671f70c7",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/dto/equipItem.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "04a932dc2b16318e1e62a9f356d2bfba0894d9fc664b2038f12fcef9ffae971c",
+      "source": "apps/backend/game/src/app/modules/inventory/dto/equipItem.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "04a932dc2b16318e1e62a9f356d2bfba0894d9fc664b2038f12fcef9ffae971c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/dto/itemContent.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "2a3306fe4a4e48698cc3c70d3a4c1f4c8119e668d6ea24ab77da402637c6588e",
+      "source": "apps/backend/game/src/app/modules/inventory/dto/itemContent.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "2a3306fe4a4e48698cc3c70d3a4c1f4c8119e668d6ea24ab77da402637c6588e",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/dto/swapSlotsDto.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "ef5725c7ef33ad2eb890db8af05e8bc604cd4fd18e6751fa56c74bfe55c48211",
+      "source": "apps/backend/game/src/app/modules/inventory/dto/swapSlotsDto.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ef5725c7ef33ad2eb890db8af05e8bc604cd4fd18e6751fa56c74bfe55c48211",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/dto/unequipEquipItem.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "7f47465e21233651016944f67e3cd5b2682874db6e84d5cfa9f765430fc5e5b3",
+      "source": "apps/backend/game/src/app/modules/inventory/dto/unequipEquipItem.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "7f47465e21233651016944f67e3cd5b2682874db6e84d5cfa9f765430fc5e5b3",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/dto/update-inventory.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "1a7af0cbee4b289973ffe3a44b07d8440772fe9db45ea23f7141d274b2b12944",
+      "source": "apps/backend/game/src/app/modules/inventory/dto/update-inventory.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "1a7af0cbee4b289973ffe3a44b07d8440772fe9db45ea23f7141d274b2b12944",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/inventory.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c245046507c669b96259fdfe5130ea03858a09f8579e11d3e0e36ad3e9caa060",
+      "source": "apps/backend/game/src/app/modules/inventory/inventory.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "9b29542b4fdccf92d5f8b2a20c63b0e050bdd3bf5d3e3fca13a334c59718a1fe",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/inventory.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "1058442bef6aa31b464cc2ea41192c0cd1178593722d26ef2e60d5dcf23894a1",
+      "source": "apps/backend/game/src/app/modules/inventory/inventory.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "cf58323034278ca53c766b27ddba4c40820d9d10e05eaaf66ced2ebc58708795",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/inventory.service.spec.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "632266b9d4c20a070e3ef79129cd1ec20477c05a22820344b36730029d9f9c3a",
+      "source": "apps/backend/game/src/app/modules/inventory/inventory.service.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "632266b9d4c20a070e3ef79129cd1ec20477c05a22820344b36730029d9f9c3a",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/inventory.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "ce56053ad8f77e8504744afe5c14c4251d0ee181cbe45a491f68ccbb373fee06",
+      "source": "apps/backend/game/src/app/modules/inventory/inventory.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "35957f2aaeeabca80900bdc36ef554b3a7c229757643acfd0ebfc4b17d2a778e",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/inventory/test/stubs/inventory.stub.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "e1af786c76bd98ede516ac6a094a31439bd1d116bc2421bacefac866d4caff27",
+      "source": "apps/backend/game/src/app/modules/inventory/test/stubs/inventory.stub.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "e1af786c76bd98ede516ac6a094a31439bd1d116bc2421bacefac866d4caff27",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/islandEconomy/dto/islandEconomyMutation.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "583705fd8f953fb116d6ac5ee80eaa53eb2429de39b81b53f7b0c3bb54cf62f5",
+      "source": "apps/backend/game/src/app/modules/islandEconomy/dto/islandEconomyMutation.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "583705fd8f953fb116d6ac5ee80eaa53eb2429de39b81b53f7b0c3bb54cf62f5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/islandEconomy/islandEconomy.controller.spec.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "cd4d76dd4ce59323e70e35ed10d2084ea3b5b946f4cd93cc82e46edc6165c1d2",
+      "source": "apps/backend/game/src/app/modules/islandEconomy/islandEconomy.controller.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "cd4d76dd4ce59323e70e35ed10d2084ea3b5b946f4cd93cc82e46edc6165c1d2",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/islandEconomy/islandEconomy.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "2fd734467e5b4490cfd5f33cf23e63d208f3f81dc39d49f10a8918ab3e6163d5",
+      "source": "apps/backend/game/src/app/modules/islandEconomy/islandEconomy.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "5eaf9f36fad6f1f2f52a81e6dd24e6b6b7d6a23c3cf44589aa26409aa016daf2",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/islandEconomy/islandEconomy.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "7aef20a04da0c022d77ecdf769f857f94a45ace2f679e5c626e9fbe935d53204",
+      "source": "apps/backend/game/src/app/modules/islandEconomy/islandEconomy.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "a3505a35e8f91afdad506272b827f8ea1783b0b6b7a1f8f8e49881d0da5d1757",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/islandEconomy/islandEconomy.service.spec.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "a451ca0800cd55f3b59ecdd63d1dc330b23a27c7aec7a9cb652dc250c01646b4",
+      "source": "apps/backend/game/src/app/modules/islandEconomy/islandEconomy.service.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "b0378abe0a3a0f37520261acb895e79f79f357f514abc16f5c08bdedf81ca4f6",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/islandEconomy/islandEconomy.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "ac65ffb1810a81bc339070b4e2b3088e4bc7c9f5b7133fadaede8dc089643803",
+      "source": "apps/backend/game/src/app/modules/islandEconomy/islandEconomy.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "8659539c187726fb0f627f3b047fcbbe4f9f369b83ef5fda9761bef7c7279009",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/item/dto/create-item.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "a2375b9b6857f0fa90345214766e5f852001b3f696a32f62eec06431e34ca80f",
+      "source": "apps/backend/game/src/app/modules/item/dto/create-item.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "a2375b9b6857f0fa90345214766e5f852001b3f696a32f62eec06431e34ca80f",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/item/dto/tradeable-item.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "ae66704bd31fd0789334924106ff87f494f7f0b3e004a18608884b4441fb6375",
+      "source": "apps/backend/game/src/app/modules/item/dto/tradeable-item.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ae66704bd31fd0789334924106ff87f494f7f0b3e004a18608884b4441fb6375",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/item/dto/update-item.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "e72cd515d0775e94430212cfd5c6d3b9df87e2680950b6405901d2258cbe7427",
+      "source": "apps/backend/game/src/app/modules/item/dto/update-item.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "e72cd515d0775e94430212cfd5c6d3b9df87e2680950b6405901d2258cbe7427",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/item/item.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "fa1e65fc35cac16a4a131085106b8909dcebaa477b81508fb670b984e211f1e2",
+      "source": "apps/backend/game/src/app/modules/item/item.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ce7f727af79d8c5529540b898a259cb89b71670790877a9a84847ac4d7d125e9",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/item/item.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "8fde8a3fcbbc5d91cd00e7da94aa0655134aed718cb6ba8ecf864922ba4e00a1",
+      "source": "apps/backend/game/src/app/modules/item/item.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "83e4e46a0a223220c3f820039be2922cda3d2ce0d7083c8b54b25380055871f7",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/item/item.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "944a368fc6a9536a9f7c10539acedce497b38b2067a00e2f38007748d769358a",
+      "source": "apps/backend/game/src/app/modules/item/item.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "7fe23b4acf35cb245798c8ed9b653de4d48cc75df24bfcb4a7ba2dd98d36b2f7",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/item/test/stubs/item.stub.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "647ac9382feeb2c01f10f925d2b5374857aad211469cc6dec3d03821b9557173",
+      "source": "apps/backend/game/src/app/modules/item/test/stubs/item.stub.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "647ac9382feeb2c01f10f925d2b5374857aad211469cc6dec3d03821b9557173",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/map/dto/create-map.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "d9f66201b38592e69f0cdefb3662c17e3334c7e212ee53198502ed69a3ac7b00",
+      "source": "apps/backend/game/src/app/modules/map/dto/create-map.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "d9f66201b38592e69f0cdefb3662c17e3334c7e212ee53198502ed69a3ac7b00",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/map/dto/update-map.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "052cdce73577dfe1cb6f4bf8d71c2a3c80e3891c9b7c2bf5b267dbdddc194ff8",
+      "source": "apps/backend/game/src/app/modules/map/dto/update-map.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "052cdce73577dfe1cb6f4bf8d71c2a3c80e3891c9b7c2bf5b267dbdddc194ff8",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/map/map.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "d39a07a803871d96105e11225d3c0d1ee7ef4a8200123f717110722cf899e5fa",
+      "source": "apps/backend/game/src/app/modules/map/map.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "3ff19b7dbb76b2dbfabf99c2f799e21585691fd142bd775d6a22593d2ec0215c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/map/map.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c36d07c29fb78263c513c66e194c90c8200aa95c22f55dfd221cb84dde956e1e",
+      "source": "apps/backend/game/src/app/modules/map/map.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "8fa7ab0aaceef5af220e3283cc80feb6fdcde4491fd8701c3bd9beec9f7af834",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/map/map.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c80412870e6c2d11a1dadcd774c5ceeb331e8fa3faff6c288b1b0776b6116ffa",
+      "source": "apps/backend/game/src/app/modules/map/map.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "02fa33ea846833fa3be14d13037e9301b542286faf51d88ec95966857625e2b0",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/mission/dto/create-mission.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "1220a00b6e77f58c182c6f94bacdb5621f1d34bfd6323d5785e6418641de0205",
+      "source": "apps/backend/game/src/app/modules/mission/dto/create-mission.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ff91e2bc8ae9f92b1206958a50b66e1556ae578433735da493f10befd25f814d",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/mission/dto/update-mission.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c8f5683ca42e4ac82e1e18f8290e8fd931fef1d4b4626a8896c32b87a182107f",
+      "source": "apps/backend/game/src/app/modules/mission/dto/update-mission.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "c8f5683ca42e4ac82e1e18f8290e8fd931fef1d4b4626a8896c32b87a182107f",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/mission/mission.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "af089830a8e8831da47b3f5bec3745192d3ee4b7bfa7467fd65616dcbd77bc50",
+      "source": "apps/backend/game/src/app/modules/mission/mission.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "761a3dc19e1567987dcc77a547cd4ad1772f6bbdaf5e8a522d64b82aefe1bc5e",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/mission/mission.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "7a97d6653159d8ea7efe0337efc98abc94dae7b8dc9992a6aa2b1d4e5664978a",
+      "source": "apps/backend/game/src/app/modules/mission/mission.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "978c97e5732a1b7e6537c2d42978e2b28fd71ad425506375842fd4de34dd919a",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/mission/mission.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "8630ec1488db1a3693d534b08aa44d61c13e084cb154df539df0180cd72135c1",
+      "source": "apps/backend/game/src/app/modules/mission/mission.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "01ac6ec9fd0acfe31c4780af256274f9800ff9d727aa7430cd9bc54224660435",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionGroup/dto/create-missionGroup.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "964b3f04a0f482866850905a79e9b64795acecd79ad6fdcf29eaec3de33a2df8",
+      "source": "apps/backend/game/src/app/modules/missionGroup/dto/create-missionGroup.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "964b3f04a0f482866850905a79e9b64795acecd79ad6fdcf29eaec3de33a2df8",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionGroup/dto/update-missionGroup.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b1c0f5b36031ead01c69d05df0b4249009448a15cfb57141e7d4be04634daddd",
+      "source": "apps/backend/game/src/app/modules/missionGroup/dto/update-missionGroup.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "b1c0f5b36031ead01c69d05df0b4249009448a15cfb57141e7d4be04634daddd",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionGroup/entities/missionGroup.entity.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "94fd5284a32e346f38a85fec6afc2dd20a3042e6f6ce29d1967618d5c1105b6c",
+      "source": "apps/backend/game/src/app/modules/missionGroup/entities/missionGroup.entity.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "94fd5284a32e346f38a85fec6afc2dd20a3042e6f6ce29d1967618d5c1105b6c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionGroup/missionGroup.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "cbf0696e50aca3b40fb7090b1d34a2f19cb01d68ab1ec13e4b5924a8f6b00213",
+      "source": "apps/backend/game/src/app/modules/missionGroup/missionGroup.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "f553b06616f9522b3aac629009c3410ee7897d29671fbe61b8cdc0fffef19462",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionGroup/missionGroup.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "9e2cb1e08273b86d9b912645d9aa4841287c29f816a1b5cc57275a501fddff15",
+      "source": "apps/backend/game/src/app/modules/missionGroup/missionGroup.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "cdf8350f8db01be192e706767489c6f273a42a86052a0da817c798b2ccd1f807",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionGroup/missionGroup.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "43ec1619a117002206779198583eb0ef722415b284a7827fe650c2474bfe8966",
+      "source": "apps/backend/game/src/app/modules/missionGroup/missionGroup.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "8db6e6fb9ac862612a08c8e4fdeac4ff49d3b535f18764497da57f74ca873be7",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionStep/dto/create-missionStep.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "6102258e68ce3d6e9067d192844350862a864f0bded8f7a169094b251a4519ba",
+      "source": "apps/backend/game/src/app/modules/missionStep/dto/create-missionStep.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "e418339d717b53e0d377d54fa8b982940beccd331155dcee5377eb74c53a6451",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionStep/dto/update-missionStep.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "a011ebbd34e081c44a034e7bde7db61025b408db6e1aa86a714675660a88c573",
+      "source": "apps/backend/game/src/app/modules/missionStep/dto/update-missionStep.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "a011ebbd34e081c44a034e7bde7db61025b408db6e1aa86a714675660a88c573",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionStep/missionStep.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c686a05b53883fed9ff5dd8df11aacfba56b4667688d90c8a02ab02f40763909",
+      "source": "apps/backend/game/src/app/modules/missionStep/missionStep.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "ac5be0bce048dab0068c5ff4a7b9630d98878adbb2934f639cba021df0c64003",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionStep/missionStep.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "7c6f62679ba80436ef1fcc5424060bf31880dc8ca8228dc4471e4e2123991226",
+      "source": "apps/backend/game/src/app/modules/missionStep/missionStep.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "392d8de3417fbd9c4b0d36e32feaf8a2e91e32bc94a091a20e1497ad35e171f2",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/missionStep/missionStep.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "cf1b344fae0f10304ca59d092e8204a961cce6bb40152d580343c0cdbd0f23c2",
+      "source": "apps/backend/game/src/app/modules/missionStep/missionStep.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "d838d67af9c5261901889fe2bbb1f481ee3b30c3574f089a17aa6ad5c4928031",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/movements/movement.controler.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "bec5c48068b84b5662bb9a2383795787b4e1f1d6d138732edbf0e8bf46e3a465",
+      "source": "apps/backend/game/src/app/modules/movements/movement.controler.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "7d8576978ed9ebc4c52280de1fb2f92a1794f8f9f01f1eab728234eb7dad15a9",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/movements/movement.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b50b12e0b15f7dda4165c90b5770f156e1dec339e8e1b8c900aa0ef77a347b9a",
+      "source": "apps/backend/game/src/app/modules/movements/movement.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "79b101426e92903e37fd2a52d7173c2a6fd46f24a0e41b7194527184d10ec573",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/movements/movement.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "e4482c3b2d465639814d85cbd18510dca3068096c48751d674672e055c04c613",
+      "source": "apps/backend/game/src/app/modules/movements/movement.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "baaa77515aff36338f71b1e6fdf123a49d78bc280dbf0506a37bb23e3adf5171",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/resourceMap/dto/create-resourceMap.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b75e818ad2291a866c7451c4a5e42e0cf95f93cb1c79c728b97dfe723bc38999",
+      "source": "apps/backend/game/src/app/modules/resourceMap/dto/create-resourceMap.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "b75e818ad2291a866c7451c4a5e42e0cf95f93cb1c79c728b97dfe723bc38999",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/resourceMap/dto/update-resourceMap.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "16df4446626c1e32da5cfb3a2235dac60813753c1226c3d7b73afdf3c234c2f3",
+      "source": "apps/backend/game/src/app/modules/resourceMap/dto/update-resourceMap.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "16df4446626c1e32da5cfb3a2235dac60813753c1226c3d7b73afdf3c234c2f3",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/resourceMap/resourceMap.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "4b4ebf81bbd829b10287cba6b5032fc7441d80c60d08f4524093a26a1fa863f6",
+      "source": "apps/backend/game/src/app/modules/resourceMap/resourceMap.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "617989c888a5c82ba0eaf560bb0213b28af0e6e195fe7f024628492c2fa7fe8c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/resourceMap/resourceMap.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "d6d487d3c165b3e3c21c9a896464063a26dcbdad6f81da2e5686b0cd26fa8156",
+      "source": "apps/backend/game/src/app/modules/resourceMap/resourceMap.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "841cb3bdfa7ff72825dd13eaccbeeb92f443c63c06ec1ad171d615ba24ae3e65",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/resourceMap/resourceMap.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "0e54d0b5381e6790cf1c5fa68db34c242933125500a020ede4a85a1450aaab27",
+      "source": "apps/backend/game/src/app/modules/resourceMap/resourceMap.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "5eb4182b8a116c4edef1cab91417b40eb20268cd471061ac00a0767af2e92f6c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/stats/dto/create-stats.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "332a153acf920062158248a68940516dee5798a79f9c7863fe2273bbb4636fab",
+      "source": "apps/backend/game/src/app/modules/stats/dto/create-stats.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "332a153acf920062158248a68940516dee5798a79f9c7863fe2273bbb4636fab",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/stats/dto/item-history.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b5d29cdef2a23d058f5ffe2db9e0bc3a9f32577ca286fd3ddb97fef3ca9dea3b",
+      "source": "apps/backend/game/src/app/modules/stats/dto/item-history.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "b5d29cdef2a23d058f5ffe2db9e0bc3a9f32577ca286fd3ddb97fef3ca9dea3b",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/stats/dto/update-stats.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "6203766540188f60e00717f452a1d4e993dbd22d160df4c47fa7e8f75bebf70e",
+      "source": "apps/backend/game/src/app/modules/stats/dto/update-stats.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "6203766540188f60e00717f452a1d4e993dbd22d160df4c47fa7e8f75bebf70e",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/stats/stats.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "cd69889c888075e006d577bf42031fd44faa45cfd9eeabdc51147261514066aa",
+      "source": "apps/backend/game/src/app/modules/stats/stats.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "1756bdea8dc9d74a8120bd9124a5a4347153fedfbbf96a1f7453d26af22f98d4",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/stats/stats.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "55bcb6d824ee4631b44c0df6c86b666cd2b5201b3ef5079fca700470cfb35d83",
+      "source": "apps/backend/game/src/app/modules/stats/stats.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "bf6df74bec2d435478a2c54fdcc09970a9772b34b3058474cc78d1faeddc4220",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/stats/stats.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "4cf0ffbd2dcbfbd594e6590fa7ae14ab00f3f2755989053896e9412c8e56c140",
+      "source": "apps/backend/game/src/app/modules/stats/stats.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "3a55762adc14912ac9288a67d306a093d8987784035cc783d3762a3be259812b",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/user/dto/create-user.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "58ae7ebe1c1af3283b4b5f8d7fb4dc420a826d5a55af263dd36cff9d565ffccf",
+      "source": "apps/backend/game/src/app/modules/user/dto/create-user.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "8aa93ceaa8e19626951ab38a5651aaef636905cffb165835ea97915a30fb8a1d",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/user/dto/update-user.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "8787c1734242d00832f675522fcc93b79f77242633739f6f3766a67392ccbf88",
+      "source": "apps/backend/game/src/app/modules/user/dto/update-user.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "8787c1734242d00832f675522fcc93b79f77242633739f6f3766a67392ccbf88",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/user/user.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "d9c391ca9be37bebf6977c8150c1ffbecf731dc758ddd59bdb352cf58976de57",
+      "source": "apps/backend/game/src/app/modules/user/user.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "d18e2cc9baeedc57562ad057b9dcd1d54c0ac2a77080198941c2c4bf675cca61",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/user/user.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "dc964c6cfd99088b83be74e21618d1874255ff2fc4f33a6e99a60e6fcd14d67a",
+      "source": "apps/backend/game/src/app/modules/user/user.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "c4371f21c2bbbc63b6f2e1fee6afdc17c2f003236458ab5bede7cc2fb7b399c5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/user/user.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "44595eb40946a2ee4ac872a2090948c87518411ac9729eb2296717454a6b8549",
+      "source": "apps/backend/game/src/app/modules/user/user.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "f9ddb4b39ea51ba6cde24bcd4eab700bf04ece7f90f402685865da98b65c0e39",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/building.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "3d11aaedd5438b0300525a16e6e455cbf8c1e2dad5387279aa90b8d89c3376f5",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/building.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "3d11aaedd5438b0300525a16e6e455cbf8c1e2dad5387279aa90b8d89c3376f5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/buildingTile.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "5080eb236c254c1a21b59456573201502ce8b017ad8c4e7e136058e5f4ba3ee1",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/buildingTile.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "5080eb236c254c1a21b59456573201502ce8b017ad8c4e7e136058e5f4ba3ee1",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/create-userMap.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "3a879aa33a79768a8c05aa2ee73464873d222984e72b6d0288c9a02a4abfb5b0",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/create-userMap.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "3a879aa33a79768a8c05aa2ee73464873d222984e72b6d0288c9a02a4abfb5b0",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/houseAppliances.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b0b261ffed629651f6314f060593b7ae91262aa600e6e7eb17242a0877ed2f26",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/houseAppliances.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "b0b261ffed629651f6314f060593b7ae91262aa600e6e7eb17242a0877ed2f26",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/islandActionEvent.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b4dc2ad633babd6cd7aa4873c642cb61b1902ad4ba530f715a361d47f2a19543",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/islandActionEvent.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "b4dc2ad633babd6cd7aa4873c642cb61b1902ad4ba530f715a361d47f2a19543",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/islandChatBlock.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b9e4912503124b2bcc2f6cf229afe6418789a53888baacdd7b80432f942d08db",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/islandChatBlock.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "b9e4912503124b2bcc2f6cf229afe6418789a53888baacdd7b80432f942d08db",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/islandChatMessage.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "e72ccc57b95287a1f98f69d50df5c6827c86db1535e6ad08dfe2347198c17f92",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/islandChatMessage.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "e72ccc57b95287a1f98f69d50df5c6827c86db1535e6ad08dfe2347198c17f92",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/islandChatReport.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c1ab746c23c3b82fdf5fa77f347ed5a01bcabc068cc30a740110fd7fcee15b7e",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/islandChatReport.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "c1ab746c23c3b82fdf5fa77f347ed5a01bcabc068cc30a740110fd7fcee15b7e",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/mapTile.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "1ca8d71f091f3e00d7eeeaf70349e86fa6a60599925e09fdcaa179e84a8a027e",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/mapTile.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "1ca8d71f091f3e00d7eeeaf70349e86fa6a60599925e09fdcaa179e84a8a027e",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/mapTileCoordinates.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b127cbb6d70eea4ab16bd41f8467623d00671a4cd674222595217c6e12ca9744",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/mapTileCoordinates.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "b127cbb6d70eea4ab16bd41f8467623d00671a4cd674222595217c6e12ca9744",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/mapTileRange.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "1a01bfd8d80d6fb0510257c419755d620763d1f71a014bcf4fbb6fe7906fac03",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/mapTileRange.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "1a01bfd8d80d6fb0510257c419755d620763d1f71a014bcf4fbb6fe7906fac03",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/shareIslandMap.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "86f2819bdb9eb58a3c8e7b365c78f1af07e22861548c98525b9ef70d2ab5e468",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/shareIslandMap.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "86f2819bdb9eb58a3c8e7b365c78f1af07e22861548c98525b9ef70d2ab5e468",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/dto/update-userMap.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "aa7dc5157ce1fb9eeddb70a69d94040b9a1b06dde8615c25393d3752eb8caec4",
+      "source": "apps/backend/game/src/app/modules/userMap/dto/update-userMap.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "aa7dc5157ce1fb9eeddb70a69d94040b9a1b06dde8615c25393d3752eb8caec4",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/userMap.controller.spec.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "5832c9126d432b084e9f0adbdb574cd0cb96394ef2eb45f0d0ff331179ea80c4",
+      "source": "apps/backend/game/src/app/modules/userMap/userMap.controller.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "5832c9126d432b084e9f0adbdb574cd0cb96394ef2eb45f0d0ff331179ea80c4",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/userMap.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "488dc6dd5209ed51e1bb113dd2b56d3dba3f7b361f5f5743b0394cf396880820",
+      "source": "apps/backend/game/src/app/modules/userMap/userMap.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "82ee603dbb5b1e6e0548a829b585b01f954fc3f2a99fd1639ab3efcaf142a00c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/userMap.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "7f1061c4bb47312523a771d51296a9810fefbebd2c31bf14470623a33115af44",
+      "source": "apps/backend/game/src/app/modules/userMap/userMap.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "dee3b58e3c18f182250d25e0c06de1b6818ee04b07eee340a3b97b3238664b86",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/userMap.service.spec.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "c1e4e18b3e140275680754a824206fbb578dafcc44db4b369866d02212f69d06",
+      "source": "apps/backend/game/src/app/modules/userMap/userMap.service.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "9d0c5584aaf3d3d4e659dbfd37e6475907a08ef98263254d71e79ac0aac0e8fc",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/userMap/userMap.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "6ccc984572b72b34f1722bb059050af517f7e45d7c5dd273584943275f31bec7",
+      "source": "apps/backend/game/src/app/modules/userMap/userMap.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "81795d51c0ed38f89be7b27fbe06a98300297923ccc1c12b91ffe18083149da3",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/utils/dto/create-util.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "bf35a52da4bbeeba3842bd4975daee5201972d1729fbe49b820392f20c7d9a0b",
+      "source": "apps/backend/game/src/app/modules/utils/dto/create-util.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "bf35a52da4bbeeba3842bd4975daee5201972d1729fbe49b820392f20c7d9a0b",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/utils/dto/update-util.dto.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "317d9923b566118db1b92031255826fe1464605614b781677d811fae52aea6b4",
+      "source": "apps/backend/game/src/app/modules/utils/dto/update-util.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "317d9923b566118db1b92031255826fe1464605614b781677d811fae52aea6b4",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/utils/entities/util.entity.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "0259ea773655606d5c2601bf4fa19689004de4bafd507ff16be1ca94c0276a42",
+      "source": "apps/backend/game/src/app/modules/utils/entities/util.entity.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "0259ea773655606d5c2601bf4fa19689004de4bafd507ff16be1ca94c0276a42",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/utils/utils.controller.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "07138596a298e98066378327eb9a90e1aaeb0b51504738a7c7e445c33600e888",
+      "source": "apps/backend/game/src/app/modules/utils/utils.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "07138596a298e98066378327eb9a90e1aaeb0b51504738a7c7e445c33600e888",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/utils/utils.module.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "1bd41c4d6b151bf45584ce91ed43ea3404aba9402a9f30b5627d274abd5ed979",
+      "source": "apps/backend/game/src/app/modules/utils/utils.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "1bd41c4d6b151bf45584ce91ed43ea3404aba9402a9f30b5627d274abd5ed979",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/app/modules/utils/utils.service.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "b79d0a3a91b07bd0198be896cb60ca80e7e2d13a3613bf6000f9a063035e12d9",
+      "source": "apps/backend/game/src/app/modules/utils/utils.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "b79d0a3a91b07bd0198be896cb60ca80e7e2d13a3613bf6000f9a063035e12d9",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-api/src/main.ts",
+      "adaptationFamily": "world-api",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types and DTO boundaries adapted to standalone Nest package",
+        "access control scoped to new World credentials",
+        "runtime/readiness/write-gate integration applied locally"
+      ],
+      "destinationHash": "54732bd4240c82d6bf86b87817861ce14c659c3df12d76bfd5ec495fcfe61d7b",
+      "source": "apps/backend/game/src/main.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "d9f5bc7ca9137a83bb8b593f5e1530ef0841ac66ee1b56a9197d27a5bb93212f",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/app.controller.spec.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "e0e6d318d2acbe5e6b995730514ea9d1e3ece866f0e483611666bc8a1cd1c37d",
+      "source": "apps/backend/matchmaking/src/app/app.controller.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "e0e6d318d2acbe5e6b995730514ea9d1e3ece866f0e483611666bc8a1cd1c37d",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/app.controller.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "c9fac71b85d8d6eae0042b2b81702746a247563da54f2986559591f517a65588",
+      "source": "apps/backend/matchmaking/src/app/app.controller.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "c9fac71b85d8d6eae0042b2b81702746a247563da54f2986559591f517a65588",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/app.module.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "ad48cd55c1115b3247dc8a774a4ac43b3c61063ae2faaad1d1bd83dcc1ccdcfe",
+      "source": "apps/backend/matchmaking/src/app/app.module.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "e5f114cefbea543e402fcedaba25433757136f5abd4aa224a38583f30ccff394",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/app.service.spec.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "28fb4dd942b3e1164efa17c9c04766c115e7e4139e02127ca2cff64f60dcaa97",
+      "source": "apps/backend/matchmaking/src/app/app.service.spec.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "f9c0730c95612638b99e0198e52db39c3f88efc761e662c1ea75335ff7a5f1da",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/app.service.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "01acb0dc0cce80603cbaf5f5172c8e47824fee2cfc197c9d744b5aa19feccc7e",
+      "source": "apps/backend/matchmaking/src/app/app.service.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "bd53da47229e59949de3e6f46403bddfb51dfc8f0ec2d3cca188560f8690810b",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/auth/admin.authentication.guard.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "092b90c1b058fc6caf1fd4d8bbb86a1e17a1e34696ac0bd93f001f1ab102f2bb",
+      "source": "apps/backend/matchmaking/src/app/auth/admin.authentication.guard.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "665faeb5f957e619dcce8eab68818ef5ec78e94d06169a1ff48554e45c8afea6",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/auth/authentication.guard.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "9e941390375e74540fc20cbe83f6b0f04cf1c1c3bfba7cb74a515ba2d7d4951b",
+      "source": "apps/backend/matchmaking/src/app/auth/authentication.guard.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "dde3d962c6d9dd66f4692eaf1bf3fd01a6761b8db3d7f8206cd59012a382fbe9",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/dto/create-multiplayerGame.dto.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "6c14b1981ff729146654e141e4b5b59ea4ac29db366e2b76031e35b4132e3a20",
+      "source": "apps/backend/matchmaking/src/app/dto/create-multiplayerGame.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "6c14b1981ff729146654e141e4b5b59ea4ac29db366e2b76031e35b4132e3a20",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/dto/gameserver.dto.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "db2e442c57c72bbe326eb1793ca53625e079b0a04f642162cc26a8444460e1f3",
+      "source": "apps/backend/matchmaking/src/app/dto/gameserver.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "db2e442c57c72bbe326eb1793ca53625e079b0a04f642162cc26a8444460e1f3",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/dto/island-server-connection.dto.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "7c674c7811d4c08c88f9267ad32b879fac007c0e1483a27ceda29df2321a66a7",
+      "source": "apps/backend/matchmaking/src/app/dto/island-server-connection.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "7c674c7811d4c08c88f9267ad32b879fac007c0e1483a27ceda29df2321a66a7",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/dto/registered-island-server.dto.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "e95abf42083acc3506cd46acc08b0584c1c0e406fbd06eefec249aaf7b4b8de5",
+      "source": "apps/backend/matchmaking/src/app/dto/registered-island-server.dto.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "e95abf42083acc3506cd46acc08b0584c1c0e406fbd06eefec249aaf7b4b8de5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/app/interceptors/redacting-logging.interceptor.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "53699184bc111c8b8ffe91d1da1ef74c73792b0f5c1cbdb055c8a269700ce7a1",
+      "source": "apps/backend/matchmaking/src/app/interceptors/redacting-logging.interceptor.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "untracked",
+      "sourceObservedHash": "53699184bc111c8b8ffe91d1da1ef74c73792b0f5c1cbdb055c8a269700ce7a1",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-matchmaking/src/main.ts",
+      "adaptationFamily": "world-matchmaking",
+      "adaptations": [
+        "imports aliased to @cukies/world-shared",
+        "types adapted to standalone Nest/CommonJS package",
+        "admission and island access use new credential boundaries",
+        "Redis/runtime lifecycle integration applied locally"
+      ],
+      "destinationHash": "2897affb84a969dac72c2bb72c9fac583232fa250ba9481a1cc1bd0129bc36a8",
+      "source": "apps/backend/matchmaking/src/main.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "e4efb35b915e02df69dbcd1431a2dfacce52263d4f084369d0ab304f4dcd1920",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/auth.spec.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "0d1964c89ba30693daeb672098e2cbb1699b6cee57e4deb8f2affa7f1231772d",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/auth.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "85c8eb7b9f95a17d965e6519a1a2f24c449e911ca372de2a2a5968373e510219",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/config.spec.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "2e274b87be0dafecf7823b85804ea0fc9829d552a3f019994b636b44c4c6f2af",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/config.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "be666c8eb39888c3ffe3f09db7a7baa58cdd6ce5d10dafe35539ec250647cf8e",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/crud/index.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "a6957c67c8b19af0d02fb1c8669b48ad5bcd01af13a8dbde7be78c6444c93193",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/crud/shared-backend-crud.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "0f98c90af57141d75c50d4eb6beaadbaf58968ada32622bc4e68a0520b317c18",
+      "source": "libs/shared/backend/crud/src/lib/shared-backend-crud.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "d8247b43e5547c70a78d1f0d89adea6ea0d2e8eb040fca717a26d49c55ce9683",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/filters.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "6e5d60dff8d796a20ebd4013362cb99ce84c0509b40fd6e9caa79001e98608b0",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/health/index.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "2c2dccb1e591c44964e043291c69368e46339294f79565e6aaddeafb81c87069",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/health.spec.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "9a5a5c6223c41ca264f418dd303514b1c37b346b5be09104fc908f61ce4da828",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/index.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "03f99ad1ec237009d87718f0956c55009dd0444982fcc07a82cee9020daaa8ac",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/interfaces/crud.interfaces.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "78d2c10a14a4589497f44d319a777158288ef53bf4ccafcf3438b3b5d217bd14",
+      "source": "libs/shared/backend/interfaces-lib/src/lib/crud.interfaces.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "226996d1719503796fe0552ea2d0a792e7092e659eb19e7a939b3deb03d7f862",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/interfaces/general.interfaces.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "82c32e22bc127bc7c481ce62ef7b0e6fd70bc7910951bc8c31bbc8e45963e93f",
+      "source": "libs/shared/backend/interfaces-lib/src/lib/general.interfaces.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "82c32e22bc127bc7c481ce62ef7b0e6fd70bc7910951bc8c31bbc8e45963e93f",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/interfaces/index.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "b8d7a4b2ed1b2256c2ec648b9f10cc07b258a1c868fe1cd07b1917b31ad73ab4",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/interfaces/logger.intefaces.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "771481b9e499dd4fc96bef0a65e60a99a852ca7da2e9338c1329a81ce3256f94",
+      "source": "libs/shared/backend/interfaces-lib/src/lib/logger.intefaces.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "e67a9295499d1a316648555a5e56e5052669a2bddc09c7f046aed46deb1c025b",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/index.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "4ac4bd461bf5ae8ef1dcc81a72f4e82fd3e35db2445c99a0979922ad515d332f",
+      "source": "libs/shared/backend/schemas/src/index.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "ca278f13b4a975dfbe571939a553d76cca018c3a9b03330bf0fc1f6f8465008a",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/common/cuki.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "468e3bea706f81aa21636d72f0e1e29e68c95a338d5b011b532166a03c3e93bf",
+      "source": "libs/shared/backend/schemas/src/lib/common/cuki.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "468e3bea706f81aa21636d72f0e1e29e68c95a338d5b011b532166a03c3e93bf",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/common/movement.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "c29abbd9af03c584b33a02b70c71df0e83ae0897cd5d4342a5e0626d8a4f2832",
+      "source": "libs/shared/backend/schemas/src/lib/common/movement.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "c29abbd9af03c584b33a02b70c71df0e83ae0897cd5d4342a5e0626d8a4f2832",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/common/stats.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "4a0fde44d8a250d4ab5e1275df792a8ed6f90e26c7a5cc1ec152e385c8fd8ec0",
+      "source": "libs/shared/backend/schemas/src/lib/common/stats.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "4a0fde44d8a250d4ab5e1275df792a8ed6f90e26c7a5cc1ec152e385c8fd8ec0",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/common/user.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "2fd41aecc6b8f86dba3e3019bf1a768305bef04463f1be5a1180484a19abae06",
+      "source": "libs/shared/backend/schemas/src/lib/common/user.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "2fd41aecc6b8f86dba3e3019bf1a768305bef04463f1be5a1180484a19abae06",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/common/wallet.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "943a99820d0a31c23c75a1c71445f449abe19cd4185cb846da01cd8e220b9a45",
+      "source": "libs/shared/backend/schemas/src/lib/common/wallet.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "943a99820d0a31c23c75a1c71445f449abe19cd4185cb846da01cd8e220b9a45",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/building.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "baba5b94d6f34cd219b166f2bff12494a13574fd61d17f145c4019a4de0a72c7",
+      "source": "libs/shared/backend/schemas/src/lib/game/building.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "baba5b94d6f34cd219b166f2bff12494a13574fd61d17f145c4019a4de0a72c7",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/crafting.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "fde38830ef5ee530feba79584ebffa5ee3fa13e007db9690a1d1559a6420ebad",
+      "source": "libs/shared/backend/schemas/src/lib/game/crafting.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "fde38830ef5ee530feba79584ebffa5ee3fa13e007db9690a1d1559a6420ebad",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/cuki-mission.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "517a72234361d53c347887a26da6a18ab3a8ae5ca537ee66771cca97c57ccfc7",
+      "source": "libs/shared/backend/schemas/src/lib/game/cuki-mission.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "517a72234361d53c347887a26da6a18ab3a8ae5ca537ee66771cca97c57ccfc7",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/inventory.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "a264f1a5736e4753b8adea8465967d00bb380ffce29d8968ab56177515032d6d",
+      "source": "libs/shared/backend/schemas/src/lib/game/inventory.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "18113c4da629b1a24ebdbfae19b86e45f2ceb3c99b65e9b2e6a6ec714b940d2e",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/item.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "97cc9fa81c481cf1318360e6a0e022d434d412bf882c4dd2cd5945c3311d1d5a",
+      "source": "libs/shared/backend/schemas/src/lib/game/item.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "97cc9fa81c481cf1318360e6a0e022d434d412bf882c4dd2cd5945c3311d1d5a",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/map.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "269e18ec06c71046cf2c36f1ab20b77ed18ec13e31e63e9b75b7b07e6636e44b",
+      "source": "libs/shared/backend/schemas/src/lib/game/map.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "269e18ec06c71046cf2c36f1ab20b77ed18ec13e31e63e9b75b7b07e6636e44b",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/mission.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "e6ff0d4bf3f6153c7eb52e6f65c79d5b5c173c1a4b51b780533315fb504bd606",
+      "source": "libs/shared/backend/schemas/src/lib/game/mission.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "e6ff0d4bf3f6153c7eb52e6f65c79d5b5c173c1a4b51b780533315fb504bd606",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/missionGroup.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "f2c40bc869105427f50957c6fe43a857b6bdd0b30d6ba871d1d9049dcc4eb6a3",
+      "source": "libs/shared/backend/schemas/src/lib/game/missionGroup.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "f2c40bc869105427f50957c6fe43a857b6bdd0b30d6ba871d1d9049dcc4eb6a3",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/missionStep.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "5c43e108c557bfb56260aef0da88abc79116b748f761fe14e5e39f00814acef8",
+      "source": "libs/shared/backend/schemas/src/lib/game/missionStep.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "5c43e108c557bfb56260aef0da88abc79116b748f761fe14e5e39f00814acef8",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/resource.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "49a95dbae88111c156349050e0e55d34e4f8a132ed8f4730d229cc08045198b4",
+      "source": "libs/shared/backend/schemas/src/lib/game/resource.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "49a95dbae88111c156349050e0e55d34e4f8a132ed8f4730d229cc08045198b4",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/resourceMap.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "06ebb22002a2af65c666fd1ad8f49dce00720f10c56fcf150075d03de03393c5",
+      "source": "libs/shared/backend/schemas/src/lib/game/resourceMap.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "06ebb22002a2af65c666fd1ad8f49dce00720f10c56fcf150075d03de03393c5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/tile.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "06bc22fa5de6fabd81fc45852de638312193172e38e5c2f062207db77c4b8dfa",
+      "source": "libs/shared/backend/schemas/src/lib/game/tile.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "06bc22fa5de6fabd81fc45852de638312193172e38e5c2f062207db77c4b8dfa",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/game/userMap.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "744fdb3e14da297a3743b4c68113c96e9d3be9cb8340b552f846355d6cbf1cea",
+      "source": "libs/shared/backend/schemas/src/lib/game/userMap.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-dirty: M",
+      "sourceObservedHash": "744fdb3e14da297a3743b4c68113c96e9d3be9cb8340b552f846355d6cbf1cea",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/bscEvent.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "7ebb599cc076fd5ef27762de61e286651927e3213659ca4466025d23392e27cc",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/bscEvent.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "7ebb599cc076fd5ef27762de61e286651927e3213659ca4466025d23392e27cc",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/completedEvent.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "36364053dae43adb31e0f2f16f5b96ddd5620418a2fa8f0c47d2adaa61cae20c",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/completedEvent.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "36364053dae43adb31e0f2f16f5b96ddd5620418a2fa8f0c47d2adaa61cae20c",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/dashboard_cache.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "2adcc8535be4113773d0028826131ea0fe3444b20c8d1b88d5f7c20b170852c4",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/dashboard_cache.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "2adcc8535be4113773d0028826131ea0fe3444b20c8d1b88d5f7c20b170852c4",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/processedEvent.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "52b12562fbc9760c8bdc216291342b7e46e29eab6b259d5fdf61529f89ce39b5",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/processedEvent.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "52b12562fbc9760c8bdc216291342b7e46e29eab6b259d5fdf61529f89ce39b5",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/referral.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "5865c6cddb0263979989639ef635e7781d5036aa404c6edf95fca6da4205bf94",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/referral.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "5865c6cddb0263979989639ef635e7781d5036aa404c6edf95fca6da4205bf94",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/tronEvent.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "1f43596c6237aa669cd7c45c53cc059d167dfee8f86c2636a84cdfdb7bdc7c08",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/tronEvent.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "1f43596c6237aa669cd7c45c53cc059d167dfee8f86c2636a84cdfdb7bdc7c08",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/tx_nft.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "2b6a913bfcdfd17db9bdcb6ce51bc753dbc74023f955c5d2ade43ae16844e22a",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/tx_nft.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "2b6a913bfcdfd17db9bdcb6ce51bc753dbc74023f955c5d2ade43ae16844e22a",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/schemas/lib/marketplace/tx_point.schema.ts",
+      "adaptationFamily": "world-shared",
+      "adaptations": [
+        "shared schemas/interfaces/CRUD imported from local package",
+        "types preserved or narrowed for standalone compilation",
+        "runtime package boundary retained without legacy private registry"
+      ],
+      "destinationHash": "55cf4ce6e9804a36414ac0cb9e41f5cfeab0a808cb898aed9f71823a91ff99b9",
+      "source": "libs/shared/backend/schemas/src/lib/marketplace/tx_point.schema.ts",
+      "sourceHead": "f6ed108682260c8e62844b686a60299843bbd619",
+      "sourceState": "tracked-clean",
+      "sourceObservedHash": "55cf4ce6e9804a36414ac0cb9e41f5cfeab0a808cb898aed9f71823a91ff99b9",
+      "hashObservation": "final source and destination bytes observed during registration; not an atomic copy proof"
+    },
+    {
+      "destination": "packages/world-shared/src/write-gate.spec.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "ea550ea09e8e2b5407b0bf27ad7cf04a9dee4a546b4dd453a964165fed473016",
+      "source": null,
+      "sourceState": "new"
+    },
+    {
+      "destination": "packages/world-shared/src/write-gate.ts",
+      "adaptationFamily": "hub-adapter",
+      "adaptations": [
+        "runtime package entrypoint and local service wiring"
+      ],
+      "destinationHash": "f71dea1bee7eab4551ec8d1819f173b8825044fbdba417653b2ac6ae97bcccc2",
+      "source": null,
+      "sourceState": "new"
+    }
+  ]
+}
