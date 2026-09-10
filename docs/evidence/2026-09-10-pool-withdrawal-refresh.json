@@ -1,0 +1,431 @@
+{
+  "schema": "cukies.pool-withdrawal-refresh.v1",
+  "status": "validated_ready_for_staging_delivery",
+  "environment": "staging",
+  "baselineBranchSha": "261829f3bdd7e952c1e8af6a25bb09e9af3e459a",
+  "baselineServedSha": "4de6cf1679a7319a0fea9af078380e1479d1b5dd",
+  "chainId": 97,
+  "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+  "reportedTokens": [
+    "98000006",
+    "98000009",
+    "98000010",
+    "98000011"
+  ],
+  "reportedSymptom": "After signing a withdrawal, the pending label eventually disappears and the stale card offers withdrawal again. Screenshot also shows degraded service data.",
+  "browserObservation": {
+    "route": "/cukie-hodler#mi-cukie-pool",
+    "observedAt": "2026-09-10T18:04:20Z",
+    "availableAfterNavigation": [
+      "98000002",
+      "98000005",
+      "98000006",
+      "98000007",
+      "98000008",
+      "98000009",
+      "98000012"
+    ],
+    "remainingCurrentPool": [
+      "98000010",
+      "98000011"
+    ],
+    "transactionsSignedByAgent": false
+  },
+  "codeCause": {
+    "path": "dapp/src/components/cukie-pool/status-panel.tsx",
+    "function": "projectionMatchesPoolOperation",
+    "detail": "withdraw reconciliation accepted absent position even for sourceHealthy=false. The UI separately retained the prior healthy positions, so clearing pending re-enabled withdrawal for the retained stale card."
+  },
+  "regression": {
+    "path": "dapp/__tests__/components/cukie-pool-status-panel.test.tsx",
+    "scenario": "Successful withdrawal receipt followed by degraded empty positions must keep the transaction hash and prevent another withdrawal signature.",
+    "baseline": "New regression fails because pending operations become empty; 24 existing component cases pass."
+  },
+  "chainVerification": {
+    "observedAt": "2026-09-10T18:19:40.355Z",
+    "scope": {
+      "chainId": 97,
+      "network": "BSC Testnet",
+      "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+      "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+      "tokenIds": [
+        "98000006",
+        "98000009",
+        "98000010",
+        "98000011"
+      ],
+      "mode": "read-only; no signer, writes, backfill, or service changes"
+    },
+    "withdrawals": [
+      {
+        "tokenId": "98000006",
+        "depositEpoch": "2",
+        "requestedAt": "1789058913",
+        "requestedAtIso": "2026-09-10T16:48:33.000Z",
+        "withdrawableAt": "1789059600",
+        "withdrawableAtIso": "2026-09-10T17:00:00.000Z",
+        "withdrawnAt": "1789063207",
+        "withdrawnAtIso": "2026-09-10T18:00:07.000Z",
+        "exitTxHash": "0xa79707f27aa389f73ccba672cb3af06c7e54beebcc2e52bea3e6dfd7bb31ced9",
+        "withdrawTxHash": "0x3d7d9418a1350a10b986c58de0ac3ed85bccb0a9b6fabb8e90db43cd3d7ff319",
+        "withdrawBlock": 130259290,
+        "withdrawLogIndex": 11
+      },
+      {
+        "tokenId": "98000009",
+        "depositEpoch": "1",
+        "requestedAt": "1789058925",
+        "requestedAtIso": "2026-09-10T16:48:45.000Z",
+        "withdrawableAt": "1789059600",
+        "withdrawableAtIso": "2026-09-10T17:00:00.000Z",
+        "withdrawnAt": "1789063220",
+        "withdrawnAtIso": "2026-09-10T18:00:20.000Z",
+        "exitTxHash": "0xe92d2a1fce6438cdc59076c961082286c0f2f7430f0d4508cf84454d2684817c",
+        "withdrawTxHash": "0x58e75acc40fd1501a616d2ccca8702f3b7abf097a7aceb6b3bb87828797fda1f",
+        "withdrawBlock": 130259319,
+        "withdrawLogIndex": 1
+      }
+    ],
+    "receipts": {
+      "0xa79707f27aa389f73ccba672cb3af06c7e54beebcc2e52bea3e6dfd7bb31ced9": {
+        "status": "success",
+        "blockNumber": "130249749",
+        "from": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "to": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "gasUsed": "47442",
+        "logsCount": 1
+      },
+      "0xe92d2a1fce6438cdc59076c961082286c0f2f7430f0d4508cf84454d2684817c": {
+        "status": "success",
+        "blockNumber": "130249775",
+        "from": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "to": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "gasUsed": "47442",
+        "logsCount": 1
+      },
+      "0x3d7d9418a1350a10b986c58de0ac3ed85bccb0a9b6fabb8e90db43cd3d7ff319": {
+        "status": "success",
+        "blockNumber": "130259290",
+        "transactionIndex": 1,
+        "from": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "to": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "gasUsed": "56703",
+        "logsCount": 2
+      },
+      "0x58e75acc40fd1501a616d2ccca8702f3b7abf097a7aceb6b3bb87828797fda1f": {
+        "status": "success",
+        "blockNumber": "130259319",
+        "transactionIndex": 0,
+        "from": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "to": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "gasUsed": "56703",
+        "logsCount": 2
+      }
+    },
+    "chainState": {
+      "98000006": {
+        "ownerOf": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "pool": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "2",
+          "lifecycleCode": 0,
+          "lifecycle": "NONE",
+          "position": {
+            "depositedAt": "0",
+            "activationAt": "0",
+            "exitRequestedAt": "0",
+            "withdrawableAt": "0",
+            "exitPeriodId": "0",
+            "depositCalendarVersion": 0,
+            "exitCalendarVersion": 0
+          }
+        },
+        "master": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "3"
+        },
+        "recovery": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "0"
+        }
+      },
+      "98000009": {
+        "ownerOf": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "pool": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "1",
+          "lifecycleCode": 0,
+          "lifecycle": "NONE",
+          "position": {
+            "depositedAt": "0",
+            "activationAt": "0",
+            "exitRequestedAt": "0",
+            "withdrawableAt": "0",
+            "exitPeriodId": "0",
+            "depositCalendarVersion": 0,
+            "exitCalendarVersion": 0
+          }
+        },
+        "master": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "0"
+        },
+        "recovery": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "0"
+        }
+      },
+      "98000010": {
+        "ownerOf": "0x359b8FC829eB6D320DF6301C8F323AF9AE773B41",
+        "pool": {
+          "beneficialOwner": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+          "depositEpoch": "1",
+          "totalDepositEpochs": "1",
+          "lifecycleCode": 4,
+          "lifecycle": "WITHDRAWABLE",
+          "position": {
+            "depositedAt": "1788955818",
+            "activationAt": "1788957000",
+            "exitRequestedAt": "1789058951",
+            "withdrawableAt": "1789059600",
+            "exitPeriodId": "993893",
+            "depositCalendarVersion": 1,
+            "exitCalendarVersion": 1
+          }
+        },
+        "master": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "0"
+        },
+        "recovery": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "0"
+        }
+      },
+      "98000011": {
+        "ownerOf": "0x359b8FC829eB6D320DF6301C8F323AF9AE773B41",
+        "pool": {
+          "beneficialOwner": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+          "depositEpoch": "1",
+          "totalDepositEpochs": "1",
+          "lifecycleCode": 4,
+          "lifecycle": "WITHDRAWABLE",
+          "position": {
+            "depositedAt": "1788971788",
+            "activationAt": "1788973200",
+            "exitRequestedAt": "1789058964",
+            "withdrawableAt": "1789059600",
+            "exitPeriodId": "993893",
+            "depositCalendarVersion": 1,
+            "exitCalendarVersion": 1
+          }
+        },
+        "master": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "0"
+        },
+        "recovery": {
+          "beneficialOwner": "0x0000000000000000000000000000000000000000",
+          "depositEpoch": "0",
+          "totalDepositEpochs": "0"
+        }
+      }
+    },
+    "indexer": {
+      "cursors": [
+        {
+          "eventName": "CukiePoolDeposited",
+          "nextBlock": 130261799,
+          "processedThroughBlock": 130261798,
+          "safeBlock": 130261798,
+          "updatedAt": "2026-09-10T18:19:21.618Z",
+          "verifiedChainId": 97
+        },
+        {
+          "eventName": "CukiePoolExitRequested",
+          "nextBlock": 130261799,
+          "processedThroughBlock": 130261798,
+          "safeBlock": 130261798,
+          "updatedAt": "2026-09-10T18:19:21.814Z",
+          "verifiedChainId": 97
+        },
+        {
+          "eventName": "CukiePoolWithdrawableAtAdvanced",
+          "nextBlock": 130261799,
+          "processedThroughBlock": 130261798,
+          "safeBlock": 130261798,
+          "updatedAt": "2026-09-10T18:19:22.010Z",
+          "verifiedChainId": 97
+        },
+        {
+          "eventName": "CukiePoolWithdrawn",
+          "nextBlock": 130261799,
+          "processedThroughBlock": 130261798,
+          "safeBlock": 130261798,
+          "updatedAt": "2026-09-10T18:19:22.205Z",
+          "verifiedChainId": 97
+        }
+      ],
+      "recentRuns": [
+        {
+          "startedAt": "2026-09-10T18:19:01.714Z",
+          "endedAt": "2026-09-10T18:19:23.226Z",
+          "outcome": "complete",
+          "inserted": 0,
+          "safeBlock": 130261798,
+          "errors": [],
+          "failedContractAliases": [],
+          "projected": 0,
+          "ignored": 0,
+          "failed": 0
+        },
+        {
+          "startedAt": "2026-09-10T18:18:30.470Z",
+          "endedAt": "2026-09-10T18:18:51.710Z",
+          "outcome": "complete",
+          "inserted": 0,
+          "safeBlock": 130261728,
+          "errors": [],
+          "failedContractAliases": [],
+          "projected": 0,
+          "ignored": 0,
+          "failed": 0
+        },
+        {
+          "startedAt": "2026-09-10T18:17:58.907Z",
+          "endedAt": "2026-09-10T18:18:20.464Z",
+          "outcome": "complete",
+          "inserted": 0,
+          "safeBlock": 130261658,
+          "errors": [],
+          "failedContractAliases": [],
+          "projected": 0,
+          "ignored": 0,
+          "failed": 0
+        }
+      ],
+      "deadLetters": 0,
+      "integrityIncidents": 0
+    },
+    "projectionPositions": [
+      {
+        "tokenId": "98000006",
+        "depositEpoch": "1",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "exitRequestedAt": "1788953381",
+        "withdrawableAt": "1788953400",
+        "withdrawnAt": "1788953835",
+        "vaultAddressNormalized": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "withdrawalEvidence": {
+          "blockNumber": 130016249,
+          "logIndex": 1,
+          "txHash": "0xd684a712a8d7653ed7347f68b704fa1b09121c6fb2bbfc4fbbb65a93260b4fa0"
+        }
+      },
+      {
+        "tokenId": "98000006",
+        "depositEpoch": "2",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "exitRequestedAt": "1789058913",
+        "withdrawableAt": "1789059600",
+        "withdrawnAt": "1789063207",
+        "vaultAddressNormalized": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "withdrawalEvidence": {
+          "blockNumber": 130259290,
+          "logIndex": 11,
+          "txHash": "0x3d7d9418a1350a10b986c58de0ac3ed85bccb0a9b6fabb8e90db43cd3d7ff319"
+        }
+      },
+      {
+        "tokenId": "98000009",
+        "depositEpoch": "1",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "exitRequestedAt": "1789058925",
+        "withdrawableAt": "1789059600",
+        "withdrawnAt": "1789063220",
+        "vaultAddressNormalized": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "withdrawalEvidence": {
+          "blockNumber": 130259319,
+          "logIndex": 1,
+          "txHash": "0x58e75acc40fd1501a616d2ccca8702f3b7abf097a7aceb6b3bb87828797fda1f"
+        }
+      },
+      {
+        "tokenId": "98000010",
+        "depositEpoch": "1",
+        "lifecycle": "exit_requested",
+        "lifecycleOpen": true,
+        "custody": "cukie_pool_nft_vault",
+        "exitRequestedAt": "1789058951",
+        "withdrawableAt": "1789059600",
+        "withdrawnAt": null,
+        "vaultAddressNormalized": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "withdrawalEvidence": null
+      },
+      {
+        "tokenId": "98000011",
+        "depositEpoch": "1",
+        "lifecycle": "exit_requested",
+        "lifecycleOpen": true,
+        "custody": "cukie_pool_nft_vault",
+        "exitRequestedAt": "1789058964",
+        "withdrawableAt": "1789059600",
+        "withdrawnAt": null,
+        "vaultAddressNormalized": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "withdrawalEvidence": null
+      }
+    ],
+    "latency": {
+      "98000006": {
+        "chainConfirmedAt": "2026-09-10T18:00:07Z",
+        "eventIngestedAt": "2026-09-10T18:00:51.042Z",
+        "projectedAt": "2026-09-10T18:00:52.082Z",
+        "chainToProjectionSeconds": 45.082,
+        "ingestionToProjectionSeconds": 1.04
+      },
+      "98000009": {
+        "chainConfirmedAt": "2026-09-10T18:00:20Z",
+        "eventIngestedAt": "2026-09-10T18:01:22.541Z",
+        "projectedAt": "2026-09-10T18:01:23.590Z",
+        "chainToProjectionSeconds": 63.59,
+        "ingestionToProjectionSeconds": 1.049
+      },
+      "interpretation": "The projection processing took about one second after event ingestion. Total chain-to-projection latency was about 45 and 64 seconds; these are different intervals. This patch prevents the UI from undoing a receipt confirmation during incomplete reads, and does not change indexer cadence."
+    }
+  },
+  "validation": {
+    "focal": "3 suites, 38 tests PASS",
+    "jest": "261 suites, 2131 tests PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "build": "PASS with staging chain 97 public config; hash af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+    "regressions": [
+      "receipt success then degraded empty response retains hash and lock",
+      "healthy terminal projection completes refresh",
+      "reverted receipt exposes failure and allows retry",
+      "wallet/network context change preserves correct operation",
+      "confirmed withdrawal no longer offers ready-to-withdraw copy or next action"
+    ]
+  },
+  "delivery": "pending staging pipeline",
+  "fixCommits": [
+    "d304d0d",
+    "780962d"
+  ],
+  "fix": "Require a healthy projection for the same wallet, chain and vault before reconciling a pending operation. Keep confirmed withdrawal hash and lock across degraded reads; card, schedule, counts and next actions reflect the confirmation while inventory updates."
+}
