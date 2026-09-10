@@ -1,6 +1,6 @@
 {
   "schema": "cukies.pool-withdrawal-refresh.v1",
-  "status": "validated_ready_for_staging_delivery",
+  "status": "delivered_verified_in_staging",
   "environment": "staging",
   "baselineBranchSha": "261829f3bdd7e952c1e8af6a25bb09e9af3e459a",
   "baselineServedSha": "4de6cf1679a7319a0fea9af078380e1479d1b5dd",
@@ -422,10 +422,61 @@
       "confirmed withdrawal no longer offers ready-to-withdraw copy or next action"
     ]
   },
-  "delivery": "pending staging pipeline",
+  "delivery": {
+    "observedAt": "2026-09-10T18:40:33.537114+00:00",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/396",
+    "mergedSha": "1e480a778394183795b04814a04af7fc0b5a0312",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34514771577",
+    "workflowConclusion": "success",
+    "publicUrl": "https://cukieshub.eurekand.com",
+    "publicGitSha": "1e480a778394183795b04814a04af7fc0b5a0312",
+    "readyHttpStatus": 200,
+    "webCommit": "1e480a778394183795b04814a04af7fc0b5a0312",
+    "webHealthy": true,
+    "journal": "clean",
+    "changedComponents": [
+      "dapp"
+    ],
+    "configHashUnchanged": true,
+    "workersComposeHashUnchanged": true,
+    "protectedContainers": {
+      "total": 25,
+      "preserved": 25,
+      "changed": []
+    },
+    "signedTransactionsByAgent": false,
+    "scope": "Staging web only; no production, contract, database or economy-cycle mutation.",
+    "workerCount": 10,
+    "workersRunningNoRestarts": true,
+    "productionPublicGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+    "productionPublicShaUnchanged": true
+  },
   "fixCommits": [
     "d304d0d",
     "780962d"
   ],
-  "fix": "Require a healthy projection for the same wallet, chain and vault before reconciling a pending operation. Keep confirmed withdrawal hash and lock across degraded reads; card, schedule, counts and next actions reflect the confirmation while inventory updates."
+  "fix": "Require a healthy projection for the same wallet, chain and vault before reconciling a pending operation. Keep confirmed withdrawal hash and lock across degraded reads; card, schedule, counts and next actions reflect the confirmation while inventory updates.",
+  "postDeploymentBrowserObservation": {
+    "recordedAt": "2026-09-10T18:43:01.692007+00:00",
+    "route": "/cukie-hodler#mi-cukie-pool",
+    "availableInWallet": [
+      "98000005",
+      "98000006",
+      "98000007",
+      "98000008",
+      "98000009",
+      "98000012"
+    ],
+    "remainingCurrentPool": [
+      "98000010",
+      "98000011"
+    ],
+    "withdrawalControlsEnabledFor": [
+      "98000010",
+      "98000011"
+    ],
+    "degradedServiceNotice": false,
+    "transactionsSignedByAgent": false,
+    "method": "Reloaded authenticated Edge QA tab and read the rendered accessibility tree and DOM. Confirmed-receipt/degraded-refresh behavior is covered by the regression tests; no additional withdrawal was signed."
+  }
 }
