@@ -1,0 +1,121 @@
+{
+  "base": "19df664b351f8888b3f23637be10fdffbdabdf1c",
+  "fullDappTests": {
+    "suites": 261,
+    "tests": 2149,
+    "status": "PASS"
+  },
+  "fullGates": [
+    {
+      "check": "tests",
+      "command": [
+        "pnpm",
+        "dapp",
+        "test",
+        "--runInBand"
+      ],
+      "exitCode": 0,
+      "seconds": 61.93
+    },
+    {
+      "check": "lint",
+      "command": [
+        "pnpm",
+        "dapp",
+        "lint"
+      ],
+      "exitCode": 0,
+      "seconds": 6.65
+    },
+    {
+      "check": "typecheck",
+      "command": [
+        "pnpm",
+        "dapp",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 23.44
+    },
+    {
+      "check": "build",
+      "command": [
+        "pnpm",
+        "dapp",
+        "build"
+      ],
+      "exitCode": 0,
+      "seconds": 53.44
+    }
+  ],
+  "finalAmbassadorDisclosureAdjustment": {
+    "tests": 33,
+    "checks": [
+      {
+        "check": "tests",
+        "command": [
+          "pnpm",
+          "dapp",
+          "test",
+          "--runInBand",
+          "__tests__/components/ambassador-program.test.tsx"
+        ],
+        "exitCode": 0,
+        "seconds": 3.27
+      },
+      {
+        "check": "lint",
+        "command": [
+          "pnpm",
+          "dapp",
+          "lint"
+        ],
+        "exitCode": 0,
+        "seconds": 2.28
+      },
+      {
+        "check": "typecheck",
+        "command": [
+          "pnpm",
+          "dapp",
+          "typecheck"
+        ],
+        "exitCode": 0,
+        "seconds": 9.29
+      },
+      {
+        "check": "build",
+        "command": [
+          "pnpm",
+          "dapp",
+          "build"
+        ],
+        "exitCode": 0,
+        "seconds": 33.41
+      }
+    ]
+  },
+  "sourceFiles": {
+    "dapp/__tests__/app/marketplace-sections.test.tsx": "e14208fde0b1ad7517dee209ab3cb58a22ac24ea708808651111eca701a455c4",
+    "dapp/__tests__/components/ambassador-program.test.tsx": "6ff495c6000536a5235b31342e8301659287863c562b32fd24d74309d5b2461f",
+    "dapp/__tests__/components/competition-credit-panel.test.tsx": "74999159f72da5177c76d1aba5b738ac8a3f3a2945966e60075b89c09e6cf1a2",
+    "dapp/__tests__/components/cukie-master-workspace.test.tsx": "a03acf24309e524419af4724fecf6881a45e9356ce8209b387c179873f7a0fb3",
+    "dapp/__tests__/components/cukie-pool-status-panel.test.tsx": "6cecdfc6b1808e7000c74f6c25d0d85df415f72e1c70a205e7550e4fb36697ff",
+    "dapp/__tests__/components/cukiepoints-client-tron-read.test.tsx": "608bf1d318ba96acee83f0aadc22f2c0de93dd966b9d4a4ee4511f26afe1e734",
+    "dapp/__tests__/components/cukiepoints-client.test.tsx": "c32173665c30fbe916e6bc8abd1d71234ea7450846d878a4f0ded11b44387cf4",
+    "dapp/__tests__/components/cukies-bridge-client-read-context.test.tsx": "30e12a1b3f8c5d86fade6a6e34e98f74bcff7a92e48c1fd936f09a96c0a9b684",
+    "dapp/__tests__/components/premios-content.test.tsx": "c62469dadcd3ddac628fb505c6f6d0ce46b3a1bcd36452aacf390978272ecc88",
+    "dapp/src/app/(app)/credits/page.tsx": "f31d091af7607770ee3fcce2351fc93e87bb1c9adb7667fecc1ece51f79cf639",
+    "dapp/src/app/(app)/marketplace/page.tsx": "ba577f103ed317e018b3312b5480458d4ad74d2cfbafc66f33a2442eca97ad70",
+    "dapp/src/app/vesting/page.tsx": "53b415f5b47347ba6d5ad1441397c6a2b73a07f478c5eb92a24d7fdec4056a83",
+    "dapp/src/components/ambassadors/ambassador-program.tsx": "5048197e99f1003481398cff141506d9793a3de3ede2d88273bce6880c8c92eb",
+    "dapp/src/components/cukie-master/credit-panel.tsx": "172fb3e0422b82d3c870645c42f93e877130debe3cd8148c94cc48763c24a805",
+    "dapp/src/components/cukie-master/workspace.tsx": "25af8ca4b1ee69aee5737e66fa81e0f2a91b722b7b517de3ab1e13d430e0affd",
+    "dapp/src/components/cukie-pool/status-panel.tsx": "572e9e54da81c000fa6358b2e25b12eeb508e3fbba1352d6b8cdc67cd4d1dd4b",
+    "dapp/src/components/legacy-marketplace/bridge-client.tsx": "4f38ac5e2edb4ef1617ca278cf5d6dbbf3ca1af1eee42efd62a11bedbabacc54",
+    "dapp/src/components/legacy-marketplace/cukiepoints-client.tsx": "50759944b90723b5b9dcf9df68bb005e2fc30fac791cb378a49a1f332d95b739",
+    "dapp/src/components/legacy-marketplace/marketplace-sections.tsx": "6916cc2a1821a5dfa9d0ee10130fa7cabc3b70cab13bf73087fd1da76e86bc49",
+    "dapp/src/components/premios/premios-content.tsx": "c30cdf4176195b1fc2048b5d125f900c8f225efae2633db3f933d0b339747246"
+  },
+  "signedTransactions": false
+}

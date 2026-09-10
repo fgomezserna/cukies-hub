@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
+  ChevronDown,
   Coins,
   Database,
   Flame,
@@ -571,44 +572,53 @@ export function CukiePointsClient() {
         </div>
       </section>
 
-      <section className="grid gap-3 rounded-[8px] border border-white/10 bg-black/25 p-4 md:grid-cols-4">
-        <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-          <Sparkles className="mb-3 h-4 w-4 text-lilac-200" />
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            Emitidos BSC
-          </p>
-          <p className="mt-1 font-mono font-semibold text-white">
-            {formatPointValue(bscEmitted as bigint)}
-          </p>
-        </div>
-        <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-          <Flame className="mb-3 h-4 w-4 text-amber-200" />
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            Quemados BSC
-          </p>
-          <p className="mt-1 font-mono font-semibold text-white">
-            {formatPointValue(bscBurned as bigint)}
-          </p>
-        </div>
-        <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-          <Sparkles className="mb-3 h-4 w-4 text-emerald-200" />
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            Emitidos TRON
-          </p>
-          <p className="mt-1 font-mono font-semibold text-white">
-            {tronSnapshot.emitted ?? '-'}
-          </p>
-        </div>
-        <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-          <Flame className="mb-3 h-4 w-4 text-rose-200" />
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            Quemados TRON
-          </p>
-          <p className="mt-1 font-mono font-semibold text-white">
-            {tronSnapshot.burned ?? '-'}
-          </p>
-        </div>
-      </section>
+      <details className="group rounded-[8px] border border-white/10 bg-black/25">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-black text-white marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lilac-300">
+          <span>Datos globales</span>
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400">
+            Emitidos y quemados por red
+            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </span>
+        </summary>
+        <section className="grid gap-3 border-t border-white/10 p-4 md:grid-cols-4">
+          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
+            <Sparkles className="mb-3 h-4 w-4 text-lilac-200" />
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Emitidos BSC
+            </p>
+            <p className="mt-1 font-mono font-semibold text-white">
+              {formatPointValue(bscEmitted as bigint)}
+            </p>
+          </div>
+          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
+            <Flame className="mb-3 h-4 w-4 text-amber-200" />
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Quemados BSC
+            </p>
+            <p className="mt-1 font-mono font-semibold text-white">
+              {formatPointValue(bscBurned as bigint)}
+            </p>
+          </div>
+          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
+            <Sparkles className="mb-3 h-4 w-4 text-emerald-200" />
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Emitidos TRON
+            </p>
+            <p className="mt-1 font-mono font-semibold text-white">
+              {tronSnapshot.emitted ?? '-'}
+            </p>
+          </div>
+          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
+            <Flame className="mb-3 h-4 w-4 text-rose-200" />
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Quemados TRON
+            </p>
+            <p className="mt-1 font-mono font-semibold text-white">
+              {tronSnapshot.burned ?? '-'}
+            </p>
+          </div>
+        </section>
+      </details>
 
       <section className="rounded-[8px] border border-white/10 bg-black/30">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-4">

@@ -1,0 +1,351 @@
+{
+  "rows": [
+    {
+      "surface": "marketplace",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "tabs": [
+        {
+          "label": "Comprar",
+          "height": 44,
+          "clientWidth": 566,
+          "scrollWidth": 566,
+          "controls": true
+        },
+        {
+          "label": "Mis anuncios",
+          "height": 44,
+          "clientWidth": 566,
+          "scrollWidth": 566,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [],
+      "interaction": true
+    },
+    {
+      "surface": "marketplace",
+      "width": 390,
+      "scrollWidth": 390,
+      "tabs": [
+        {
+          "label": "Comprar",
+          "height": 44,
+          "clientWidth": 172,
+          "scrollWidth": 172,
+          "controls": true
+        },
+        {
+          "label": "Mis anuncios",
+          "height": 44,
+          "clientWidth": 172,
+          "scrollWidth": 172,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [],
+      "interaction": true
+    },
+    {
+      "surface": "marketplace",
+      "width": 320,
+      "scrollWidth": 320,
+      "tabs": [
+        {
+          "label": "Comprar",
+          "height": 44,
+          "clientWidth": 137,
+          "scrollWidth": 137,
+          "controls": true
+        },
+        {
+          "label": "Mis anuncios",
+          "height": 44,
+          "clientWidth": 137,
+          "scrollWidth": 137,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [],
+      "interaction": true
+    },
+    {
+      "surface": "bridge",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "tabs": [
+        {
+          "label": "Preparar",
+          "height": 44,
+          "clientWidth": 566,
+          "scrollWidth": 566,
+          "controls": true
+        },
+        {
+          "label": "Seguimiento",
+          "height": 44,
+          "clientWidth": 566,
+          "scrollWidth": 566,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [],
+      "interaction": true
+    },
+    {
+      "surface": "bridge",
+      "width": 390,
+      "scrollWidth": 390,
+      "tabs": [
+        {
+          "label": "Preparar",
+          "height": 44,
+          "clientWidth": 172,
+          "scrollWidth": 172,
+          "controls": true
+        },
+        {
+          "label": "Seguimiento",
+          "height": 44,
+          "clientWidth": 172,
+          "scrollWidth": 172,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [],
+      "interaction": true
+    },
+    {
+      "surface": "bridge",
+      "width": 320,
+      "scrollWidth": 320,
+      "tabs": [
+        {
+          "label": "Preparar",
+          "height": 44,
+          "clientWidth": 137,
+          "scrollWidth": 137,
+          "controls": true
+        },
+        {
+          "label": "Seguimiento",
+          "height": 44,
+          "clientWidth": 137,
+          "scrollWidth": 137,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [],
+      "interaction": true
+    },
+    {
+      "surface": "points",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "tabs": [],
+      "visiblePanels": 0,
+      "summaries": [
+        {
+          "label": "Datos globalesEmitidos y quemados por red",
+          "height": 44,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "points",
+      "width": 390,
+      "scrollWidth": 390,
+      "tabs": [],
+      "visiblePanels": 0,
+      "summaries": [
+        {
+          "label": "Datos globalesEmitidos y quemados por red",
+          "height": 44,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "points",
+      "width": 320,
+      "scrollWidth": 320,
+      "tabs": [],
+      "visiblePanels": 0,
+      "summaries": [
+        {
+          "label": "Datos globalesEmitidos y quemados por red",
+          "height": 64,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "vesting",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "tabs": [],
+      "visiblePanels": 0,
+      "summaries": [
+        {
+          "label": "C\u00f3mo funciona tu vesting3 pasos",
+          "height": 44,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "vesting",
+      "width": 390,
+      "scrollWidth": 390,
+      "tabs": [],
+      "visiblePanels": 0,
+      "summaries": [
+        {
+          "label": "C\u00f3mo funciona tu vesting3 pasos",
+          "height": 56,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "vesting",
+      "width": 320,
+      "scrollWidth": 320,
+      "tabs": [],
+      "visiblePanels": 0,
+      "summaries": [
+        {
+          "label": "C\u00f3mo funciona tu vesting3 pasos",
+          "height": 56,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "ambassadors",
+      "width": 1440,
+      "scrollWidth": 1440,
+      "tabs": [
+        {
+          "label": "Mi programa",
+          "height": 44,
+          "clientWidth": 376,
+          "scrollWidth": 376,
+          "controls": true
+        },
+        {
+          "label": "Invitados",
+          "height": 44,
+          "clientWidth": 376,
+          "scrollWidth": 376,
+          "controls": true
+        },
+        {
+          "label": "Comisiones",
+          "height": 44,
+          "clientWidth": 376,
+          "scrollWidth": 376,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [
+        {
+          "label": "C\u00f3mo funciona",
+          "height": 52,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "ambassadors",
+      "width": 390,
+      "scrollWidth": 390,
+      "tabs": [
+        {
+          "label": "Mi programa",
+          "height": 44,
+          "clientWidth": 113,
+          "scrollWidth": 113,
+          "controls": true
+        },
+        {
+          "label": "Invitados",
+          "height": 44,
+          "clientWidth": 113,
+          "scrollWidth": 113,
+          "controls": true
+        },
+        {
+          "label": "Comisiones",
+          "height": 44,
+          "clientWidth": 113,
+          "scrollWidth": 113,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [
+        {
+          "label": "C\u00f3mo funciona",
+          "height": 52,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "surface": "ambassadors",
+      "width": 320,
+      "scrollWidth": 320,
+      "tabs": [
+        {
+          "label": "Mi programa",
+          "height": 44,
+          "clientWidth": 90,
+          "scrollWidth": 90,
+          "controls": true
+        },
+        {
+          "label": "Invitados",
+          "height": 44,
+          "clientWidth": 90,
+          "scrollWidth": 90,
+          "controls": true
+        },
+        {
+          "label": "Comisiones",
+          "height": 44,
+          "clientWidth": 90,
+          "scrollWidth": 90,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "summaries": [
+        {
+          "label": "C\u00f3mo funciona",
+          "height": 52,
+          "indicator": true
+        }
+      ],
+      "interaction": true
+    }
+  ],
+  "signedTransactions": false,
+  "scope": "Actual components; MarketplaceSections with synthetic children; wallet/RPC/API adapters use fixtures. No live balances or signatures."
+}

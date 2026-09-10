@@ -20,6 +20,7 @@ import {
 } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTronLink } from '@/hooks/use-tronlink';
 import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import {
@@ -52,6 +53,16 @@ import {
 } from './format';
 
 type BridgeNetwork = 'BSC' | 'TRON';
+type BridgeTab = 'prepare' | 'tracking';
+
+const BRIDGE_TAB_HASH: Record<BridgeTab, string> = {
+  prepare: '#bridge-preparar',
+  tracking: '#seguimiento',
+};
+
+function bridgeTabForHash(hash: string): BridgeTab {
+  return hash === '#seguimiento' ? 'tracking' : 'prepare';
+}
 
 type TronBridgeSnapshot = {
   price: string | null;
@@ -302,6 +313,7 @@ function BridgeOperationsClient({
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isLoadingBridging, setIsLoadingBridging] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<BridgeTab>('prepare');
   const [tronSnapshot, setTronSnapshot] = useState<TronBridgeSnapshot>({
     price: null,
     rawPrice: null,
@@ -309,6 +321,37 @@ function BridgeOperationsClient({
     approved: null,
   });
   const tronSnapshotRequestRef = useRef(0);
+
+  const syncTabFromLocation = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    setActiveTab(bridgeTabForHash(window.location.hash));
+  }, []);
+
+  useEffect(() => {
+    syncTabFromLocation();
+    window.addEventListener('hashchange', syncTabFromLocation);
+    window.addEventListener('popstate', syncTabFromLocation);
+    return () => {
+      window.removeEventListener('hashchange', syncTabFromLocation);
+      window.removeEventListener('popstate', syncTabFromLocation);
+    };
+  }, [syncTabFromLocation]);
+
+  function selectTab(value: string) {
+    const tab = value as BridgeTab;
+    if (tab !== 'prepare' && tab !== 'tracking') return;
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const nextHash = BRIDGE_TAB_HASH[tab];
+      if (window.location.hash !== nextHash) {
+        window.history.pushState(
+          window.history.state,
+          '',
+          `${window.location.pathname}${window.location.search}${nextHash}`,
+        );
+      }
+    }
+  }
 
   const destinationNetwork = getDestinationNetwork(sourceNetwork);
   const sourceOwner = sourceNetwork === 'BSC' ? address : tronAddress;
@@ -712,274 +755,310 @@ function BridgeOperationsClient({
   }
 
   return (
-    <div className="grid gap-6">
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="rounded-[8px] border border-white/10 bg-black/30 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-headline text-2xl font-bold text-white">
-                Migracion TRON a BSC
-              </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Transfiere tus Cukies entre las redes disponibles.
-              </p>
-            </div>
-            <div className="rounded-[8px] border border-lilac-300/30 bg-lilac-300/10 px-4 py-2 text-sm font-semibold text-lilac-100">
-              TRON → BNB Smart Chain
-            </div>
-          </div>
+    <div className="grid min-w-0 gap-6">
+      <Tabs value={activeTab} onValueChange={selectTab} className="min-w-0">
+        <TabsList
+          aria-label="Secciones del bridge"
+          className="grid h-auto w-full min-w-0 grid-cols-2 gap-1 rounded-[10px] border border-white/10 bg-black/25 p-1"
+        >
+          <TabsTrigger
+            value="prepare"
+            className="min-h-11 min-w-0 rounded-[8px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-slate-400 focus-visible:ring-lilac-300 data-[state=active]:bg-lilac-300/15 data-[state=active]:text-white sm:text-sm"
+          >
+            Preparar
+          </TabsTrigger>
+          <TabsTrigger
+            value="tracking"
+            className="min-h-11 min-w-0 rounded-[8px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-slate-400 focus-visible:ring-lilac-300 data-[state=active]:bg-lilac-300/15 data-[state=active]:text-white sm:text-sm"
+          >
+            Seguimiento
+          </TabsTrigger>
+        </TabsList>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            {[
-              ['Origen', sourceNetwork, Network],
-              ['Destino', destinationNetwork, Route],
-              ['Coste del bridge', bridgePrice, ArrowRightLeft],
-              ['Estado', bridgeStatusLabel, ShieldAlert],
-            ].map(([label, value, Icon]) => (
+        <TabsContent
+          value="prepare"
+          forceMount
+          hidden={activeTab !== 'prepare'}
+          className="mt-6 min-w-0 data-[state=inactive]:hidden"
+        >
+          <div id="bridge-preparar" className="grid min-w-0 gap-6 scroll-mt-24">
+            <section className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="min-w-0 rounded-[8px] border border-white/10 bg-black/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-headline text-2xl font-bold text-white">
+                      Migracion TRON a BSC
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Transfiere tus Cukies entre las redes disponibles.
+                    </p>
+                  </div>
+                  <div className="rounded-[8px] border border-lilac-300/30 bg-lilac-300/10 px-4 py-2 text-sm font-semibold text-lilac-100">
+                    TRON → BNB Smart Chain
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  {[
+                    ['Origen', sourceNetwork, Network],
+                    ['Destino', destinationNetwork, Route],
+                    ['Coste del bridge', bridgePrice, ArrowRightLeft],
+                    ['Estado', bridgeStatusLabel, ShieldAlert],
+                  ].map(([label, value, Icon]) => (
+                    <div
+                      key={String(label)}
+                      className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3"
+                    >
+                      <Icon className="mb-3 h-4 w-4 text-lilac-200" />
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        {label as string}
+                      </p>
+                      <p className="mt-1 truncate font-semibold text-white">
+                        {String(value)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <aside className="grid min-w-0 gap-3 rounded-[8px] border border-white/10 bg-black/30 p-4">
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-lilac-200" />
+                  <div>
+                    <h2 className="font-headline text-xl font-bold text-white">
+                      Wallet destino
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      {sourceNetwork} a {destinationNetwork}
+                    </p>
+                  </div>
+                </div>
+                <label className="grid min-w-0 gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Destination owner
+                  </span>
+                  <input
+                    value={destinationOwner}
+                    onChange={(event) => setDestinationOwner(event.target.value)}
+                    placeholder={
+                      destinationNetwork === 'BSC'
+                        ? '0x... destination'
+                        : 'T... destination'
+                    }
+                    className="h-11 min-w-0 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-lilac-300/50"
+                  />
+                </label>
+                <Button
+                  variant="outline"
+                  onClick={() => setDestinationOwner(suggestedDestination)}
+                  disabled={!suggestedDestination}
+                  className="min-w-0 whitespace-normal border-lilac-300/25 bg-lilac-300/10 text-center text-lilac-100 hover:bg-lilac-300/20"
+                >
+                  Usar wallet conectada como destino
+                </Button>
+              </aside>
+            </section>
+
+            {readOnly && (
               <div
-                key={String(label)}
-                className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3"
+                role="status"
+                className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
               >
-                <Icon className="mb-3 h-4 w-4 text-lilac-200" />
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  {label as string}
-                </p>
-                <p className="mt-1 truncate font-semibold text-white">
-                  {String(value)}
+                Contratos Legacy identificados en sus redes existentes. Esta vista
+                permite consultar wallet, estado y movimientos. Las transferencias
+                estarán disponibles cuando finalice la revisión.
+              </div>
+            )}
+
+            {!ready && (
+              <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
+                {sourceNetwork === 'BSC' ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>Conecta una wallet EVM y usa {bscNetworkLabel}.</span>
+                    {isConnected && chainId !== bscChainId && (
+                      <Button onClick={() => void ensureBsc()}>
+                        Cambiar a {bscNetworkLabel}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>
+                      Conecta TronLink en {tronNetworkLabel} para iniciar el bridge.
+                    </span>
+                    <Button onClick={() => void ensureTron()}>
+                      Conectar TronLink
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <section className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="min-w-0 rounded-[8px] border border-white/10 bg-black/30 p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-headline text-2xl font-bold text-white">
+                      Selecciona un Cukie
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Cukies disponibles en la wallet seleccionada.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={isLoadingCandidates}
+                    onClick={() => void refreshCandidates()}
+                    className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
+                  >
+                    {isLoadingCandidates ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCcw className="mr-2 h-4 w-4" />
+                    )}
+                    Actualizar
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {candidates.length > 0 ? (
+                    candidates.map((cuki) => (
+                      <BridgeCukiCard
+                        key={cuki.tokenId}
+                        cuki={cuki}
+                        selected={selectedCuki?.tokenId === cuki.tokenId}
+                        disabled={!ready || !operationsEnabled}
+                        onSelect={() => setSelectedCuki(cuki)}
+                      />
+                    ))
+                  ) : (
+                    <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
+                      {sourceOwner
+                        ? 'No hay Cukies disponibles para bridge en esta wallet/red.'
+                        : 'Conecta la wallet origen para cargar candidatos.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <aside className="grid min-w-0 content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
+                <div>
+                  <h2 className="font-headline text-2xl font-bold text-white">
+                    Resumen del bridge
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-400">
+                    Revisa destino, coste y confirma el bridge.
+                  </p>
+                </div>
+
+                <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    Cukie seleccionado
+                  </p>
+                  <p className="mt-1 font-semibold text-white">
+                    {selectedCuki
+                      ? getCukiDisplayName(selectedCuki)
+                      : 'Sin seleccionar'}
+                  </p>
+                </div>
+                <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    Destino
+                  </p>
+                  <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
+                    {destinationOwner || '-'}
+                  </p>
+                </div>
+                <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    Coste requerido
+                  </p>
+                  <p className="mt-1 font-mono text-lg font-semibold text-white">
+                    {bridgePrice}
+                  </p>
+                </div>
+
+                {!approved && (
+                  <Button
+                    onClick={() => void approveBridge()}
+                    disabled={disabled || !ready || !operationsEnabled}
+                    variant="outline"
+                    className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
+                  >
+                    <Check className="mr-2 h-4 w-4" />
+                    Aprobar bridge
+                  </Button>
+                )}
+
+                <Button
+                  onClick={() => void startBridge()}
+                  disabled={
+                    disabled ||
+                    !ready ||
+                    !operationsEnabled ||
+                    !selectedCuki ||
+                    !approved ||
+                    !destinationOwner ||
+                    bridgePaused !== false
+                  }
+                  className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+                >
+                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                  Iniciar bridge
+                </Button>
+              </aside>
+            </section>
+          </div>
+        </TabsContent>
+
+        <TabsContent
+          value="tracking"
+          forceMount
+          hidden={activeTab !== 'tracking'}
+          className="mt-6 min-w-0 data-[state=inactive]:hidden"
+        >
+          <section
+            id="seguimiento"
+            className="min-w-0 rounded-[8px] border border-white/10 bg-black/30 p-5"
+          >
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-headline text-2xl font-bold text-white">
+                  Bridge en curso
+                </h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Cukies que ya estan en proceso de bridge.
                 </p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <aside className="grid gap-3 rounded-[8px] border border-white/10 bg-black/30 p-4">
-          <div className="flex items-center gap-3">
-            <Wallet className="h-5 w-5 text-lilac-200" />
-            <div>
-              <h2 className="font-headline text-xl font-bold text-white">
-                Wallet destino
-              </h2>
-              <p className="text-xs text-slate-400">
-                {sourceNetwork} a {destinationNetwork}
-              </p>
-            </div>
-          </div>
-          <label className="grid gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Destination owner
-            </span>
-            <input
-              value={destinationOwner}
-              onChange={(event) => setDestinationOwner(event.target.value)}
-              placeholder={
-                destinationNetwork === 'BSC'
-                  ? '0x... destination'
-                  : 'T... destination'
-              }
-              className="h-11 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-lilac-300/50"
-            />
-          </label>
-          <Button
-            variant="outline"
-            onClick={() => setDestinationOwner(suggestedDestination)}
-            disabled={!suggestedDestination}
-            className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
-          >
-            Usar wallet conectada como destino
-          </Button>
-        </aside>
-      </section>
-
-      {readOnly && (
-        <div
-          role="status"
-          className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
-        >
-          Contratos Legacy identificados en sus redes existentes. Esta vista
-          permite consultar wallet, estado y movimientos. Las transferencias
-          estarán disponibles cuando finalice la revisión.
-        </div>
-      )}
-
-      {!ready && (
-        <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
-          {sourceNetwork === 'BSC' ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>Conecta una wallet EVM y usa {bscNetworkLabel}.</span>
-              {isConnected && chainId !== bscChainId && (
-                <Button onClick={() => void ensureBsc()}>
-                  Cambiar a {bscNetworkLabel}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>
-                Conecta TronLink en {tronNetworkLabel} para iniciar el bridge.
-              </span>
-              <Button onClick={() => void ensureTron()}>
-                Conectar TronLink
+              <Button
+                variant="outline"
+                disabled={isLoadingBridging}
+                onClick={() => void refreshBridgingCukies()}
+                className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
+              >
+                {isLoadingBridging ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                )}
+                Actualizar
               </Button>
             </div>
-          )}
-        </div>
-      )}
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="rounded-[8px] border border-white/10 bg-black/30 p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-headline text-2xl font-bold text-white">
-                Selecciona un Cukie
-              </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Cukies disponibles en la wallet seleccionada.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              disabled={isLoadingCandidates}
-              onClick={() => void refreshCandidates()}
-              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
-            >
-              {isLoadingCandidates ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <div className="grid gap-3 lg:grid-cols-2">
+              {bridgingCukies.length > 0 ? (
+                bridgingCukies.map((cuki) => (
+                  <BridgeCukiCard key={cuki.tokenId} cuki={cuki} />
+                ))
               ) : (
-                <RefreshCcw className="mr-2 h-4 w-4" />
+                <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
+                  No hay movimientos de bridge para las wallets conectadas.
+                </div>
               )}
-              Actualizar
-            </Button>
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-2">
-            {candidates.length > 0 ? (
-              candidates.map((cuki) => (
-                <BridgeCukiCard
-                  key={cuki.tokenId}
-                  cuki={cuki}
-                  selected={selectedCuki?.tokenId === cuki.tokenId}
-                  disabled={!ready || !operationsEnabled}
-                  onSelect={() => setSelectedCuki(cuki)}
-                />
-              ))
-            ) : (
-              <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                {sourceOwner
-                  ? 'No hay Cukies disponibles para bridge en esta wallet/red.'
-                  : 'Conecta la wallet origen para cargar candidatos.'}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <aside className="grid content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
-          <div>
-            <h2 className="font-headline text-2xl font-bold text-white">
-              Resumen del bridge
-            </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Revisa destino, coste y confirma el bridge.
-            </p>
-          </div>
-
-          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Cukie seleccionado
-            </p>
-            <p className="mt-1 font-semibold text-white">
-              {selectedCuki
-                ? getCukiDisplayName(selectedCuki)
-                : 'Sin seleccionar'}
-            </p>
-          </div>
-          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Destino
-            </p>
-            <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
-              {destinationOwner || '-'}
-            </p>
-          </div>
-          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Coste requerido
-            </p>
-            <p className="mt-1 font-mono text-lg font-semibold text-white">
-              {bridgePrice}
-            </p>
-          </div>
-
-          {!approved && (
-            <Button
-              onClick={() => void approveBridge()}
-              disabled={disabled || !ready || !operationsEnabled}
-              variant="outline"
-              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
-            >
-              <Check className="mr-2 h-4 w-4" />
-              Aprobar bridge
-            </Button>
-          )}
-
-          <Button
-            onClick={() => void startBridge()}
-            disabled={
-              disabled ||
-              !ready ||
-              !operationsEnabled ||
-              !selectedCuki ||
-              !approved ||
-              !destinationOwner ||
-              bridgePaused !== false
-            }
-            className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
-          >
-            <ArrowRightLeft className="mr-2 h-4 w-4" />
-            Iniciar bridge
-          </Button>
-        </aside>
-      </section>
-
-      <section
-        id="seguimiento"
-        className="rounded-[8px] border border-white/10 bg-black/30 p-5"
-      >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-headline text-2xl font-bold text-white">
-              Bridge en curso
-            </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Cukies que ya estan en proceso de bridge.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            disabled={isLoadingBridging}
-            onClick={() => void refreshBridgingCukies()}
-            className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
-          >
-            {isLoadingBridging ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCcw className="mr-2 h-4 w-4" />
-            )}
-            Actualizar
-          </Button>
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          {bridgingCukies.length > 0 ? (
-            bridgingCukies.map((cuki) => (
-              <BridgeCukiCard key={cuki.tokenId} cuki={cuki} />
-            ))
-          ) : (
-            <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-              No hay movimientos de bridge para las wallets conectadas.
             </div>
-          )}
-        </div>
-      </section>
+          </section>
+        </TabsContent>
+      </Tabs>
 
       {status && (
         <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-3 text-sm text-lilac-100">

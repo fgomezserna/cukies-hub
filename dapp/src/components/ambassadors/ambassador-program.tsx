@@ -7,6 +7,7 @@ import { useSignMessage } from 'wagmi';
 import {
   ArrowClockwise,
   ArrowRight,
+  CaretDown,
   Check,
   ClockCountdown,
   Copy,
@@ -25,6 +26,7 @@ import {
 
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Panel } from '@/components/landing/primitives';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/providers/auth-provider';
 
 type AttributionSource = 'presale_locked' | 'presale_default' | 'signed_wallet_session' | 'admin_override';
@@ -158,9 +160,9 @@ function sourceCopy(source: AttributionSource) {
 
 function Metric({ label, value, helper }: { label: string; value: string; helper: string }) {
   return (
-    <div className="min-w-0 px-5 py-5 sm:px-6">
+    <div className="min-w-0 px-3 py-4 sm:px-6 sm:py-5">
       <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[var(--uki-muted)]">{label}</p>
-      <p className="mt-2 font-headline text-3xl font-black tracking-[-0.03em] text-[var(--uki-cream)]">{value}</p>
+      <p className="mt-2 break-words font-headline text-2xl font-black tracking-[-0.03em] text-[var(--uki-cream)] sm:text-3xl">{value}</p>
       <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{helper}</p>
     </div>
   );
@@ -179,6 +181,20 @@ function LoadingProgram() {
 }
 
 const PENDING_INVITATION_KEY = 'cukies:ambassador:pending-invitation';
+
+type AmbassadorTab = 'program' | 'referrals' | 'commissions';
+
+const AMBASSADOR_TAB_HASH: Record<AmbassadorTab, string> = {
+  program: '#summary-title',
+  referrals: '#referrals-title',
+  commissions: '#comisiones',
+};
+
+function ambassadorTabForHash(hash: string): AmbassadorTab {
+  if (hash === '#comisiones' || hash === '#commissions-title') return 'commissions';
+  if (hash === '#referrals-title' || hash === '#referidos') return 'referrals';
+  return 'program';
+}
 
 function storedInvitation() {
   try {
@@ -223,6 +239,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const [consent, setConsent] = useState(false);
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; error?: boolean } | null>(null);
+  const [activeTab, setActiveTab] = useState<AmbassadorTab>('program');
   const mounted = useRef(false);
   const currentWallet = useRef(walletKey);
   currentWallet.current = walletKey;
@@ -236,6 +253,45 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const pendingInvitationRef = useRef(pendingInvitationCode);
   pendingInvitationRef.current = pendingInvitationCode;
   const currentDashboard = dashboard?.walletNormalized.toLowerCase() === walletKey ? dashboard : null;
+
+  const syncTabFromLocation = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    setActiveTab(ambassadorTabForHash(window.location.hash));
+  }, []);
+
+  useEffect(() => {
+    syncTabFromLocation();
+    window.addEventListener('hashchange', syncTabFromLocation);
+    window.addEventListener('popstate', syncTabFromLocation);
+    return () => {
+      window.removeEventListener('hashchange', syncTabFromLocation);
+      window.removeEventListener('popstate', syncTabFromLocation);
+    };
+  }, [syncTabFromLocation]);
+
+  useEffect(() => {
+    // Re-read the hash after auth/dashboard state settles so deep links stay
+    // deterministic across the client transition from the SSR shell.
+    if (!authLoading && (walletKey || pendingInvitationCode || currentDashboard)) {
+      syncTabFromLocation();
+    }
+  }, [authLoading, currentDashboard, pendingInvitationCode, syncTabFromLocation, walletKey]);
+
+  function selectTab(value: string) {
+    const tab = value as AmbassadorTab;
+    if (tab !== 'program' && tab !== 'referrals' && tab !== 'commissions') return;
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const nextHash = AMBASSADOR_TAB_HASH[tab];
+      if (window.location.hash !== nextHash) {
+        window.history.pushState(
+          window.history.state,
+          '',
+          `${window.location.pathname}${window.location.search}${nextHash}`,
+        );
+      }
+    }
+  }
 
   useEffect(() => {
     mounted.current = true;
@@ -653,7 +709,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                 <ArrowClockwise className="h-4 w-4" weight="bold" /> Actualizar
               </button>
             </div>
-            <div className="grid overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.055] sm:grid-cols-2 xl:grid-cols-4 sm:[&>*+*]:border-l sm:[&>*+*]:border-white/10">
+            <div className="grid grid-cols-2 overflow-hidden rounded-[16px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] xl:grid-cols-4">
               <Metric label="Invitados confirmados" value={currentDashboard.referrals.length.toLocaleString('es-ES')} helper="Relaciones directas y permanentes" />
               <Metric label="En preparación" value={`${formatUki(currentDashboard.commissions.totals.pendingRaw)} UKI`} helper="Registrado antes de su publicación" />
               <Metric label="Disponible" value={`${formatUki(currentDashboard.commissions.totals.claimableRaw)} UKI`} helper="Ya puede cobrarse en Premios" />
@@ -661,180 +717,231 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
             </div>
           </section>
 
-          <section className="grid gap-5 pt-7 lg:grid-cols-[1.08fr_0.92fr]">
-            <Panel innerClassName="p-5 sm:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="uki-label">Comparte tu invitación</p>
-                  <h2 className="mt-2 font-headline text-2xl font-black">Tu enlace de embajador</h2>
-                </div>
-                <LinkSimple className="h-7 w-7 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
-              </div>
-              <div className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                {invitationUrl ? (
-                  'La persona invitada verá tu wallet abreviada y decidirá si confirma la relación. Tu dirección completa no aparece en el enlace.'
-                ) : currentDashboard.enrollment.isCukieMaster === false ? (
-                  <>
-                    <p>Tus referidos, tu código y el historial de comisiones se conservan. Activa Cukie Master para volver a usar el mismo enlace y generar nuevas comisiones.</p>
-                    <Link href="/cukie-master" className="mt-4 inline-flex items-center gap-2 font-black text-[var(--uki-lilac)]">
-                      Activar Cukie Master <ArrowRight className="h-4 w-4" weight="bold" />
-                    </Link>
-                  </>
-                ) : isEligibilityUnknown ? (
-                  <>
-                    <p>No se puede comprobar ahora si cumples el requisito Cukie Master. Tus datos se conservan; reintenta para volver a comprobarlo.</p>
-                    <button type="button" onClick={loadDashboard} className="mt-4 inline-flex items-center gap-2 font-black text-[var(--uki-lilac)]">
-                      Reintentar <ArrowClockwise className="h-4 w-4" weight="bold" />
-                    </button>
-                  </>
-                ) : (
-                  'Tu enlace todavía no está disponible. Actualiza para volver a comprobar el estado de tu programa.'
-                )}
-              </div>
-              {invitationUrl ? <div className="mt-5 overflow-hidden rounded-[10px] border border-white/10 bg-black/25">
-                <p className="break-all px-4 py-3 font-mono text-xs text-[var(--uki-text)]">{invitationUrl}</p>
-                <div className="grid border-t border-white/10 sm:grid-cols-2">
-                  <button type="button" onClick={copyInvitationLink} className="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-black text-[var(--uki-lilac)] transition active:scale-[0.98]">
-                    {copied ? <Check className="h-4 w-4" weight="bold" /> : <Copy className="h-4 w-4" weight="bold" />}
-                    {copied ? 'Copiado' : 'Copiar enlace'}
-                  </button>
-                  <button type="button" onClick={shareInvitationLink} className="inline-flex min-h-11 items-center justify-center gap-2 border-t border-white/10 px-4 text-sm font-black text-[var(--uki-cream)] transition active:scale-[0.98] sm:border-l sm:border-t-0">
-                    <ShareNetwork className="h-4 w-4" weight="bold" /> Compartir
-                  </button>
-                </div>
-              </div> : !hasConfirmedSponsor ? <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[var(--uki-lilac)]"><LockKey className="h-5 w-5 shrink-0" weight="fill" /> Confirmación de embajador pendiente</p> : null}
-            </Panel>
+          <Tabs value={activeTab} onValueChange={selectTab} className="mt-7 min-w-0">
+            <TabsList
+              aria-label="Secciones del programa de embajadores"
+              className="grid h-auto w-full min-w-0 grid-cols-3 gap-1 rounded-[12px] border border-white/10 bg-black/25 p-1"
+            >
+              <TabsTrigger
+                value="program"
+                className="min-h-11 min-w-0 rounded-[9px] px-2 py-2 text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:px-3 sm:text-sm"
+              >
+                Mi programa
+              </TabsTrigger>
+              <TabsTrigger
+                value="referrals"
+                className="min-h-11 min-w-0 rounded-[9px] px-2 py-2 text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:px-3 sm:text-sm"
+              >
+                Invitados
+              </TabsTrigger>
+              <TabsTrigger
+                value="commissions"
+                className="min-h-11 min-w-0 rounded-[9px] px-2 py-2 text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:px-3 sm:text-sm"
+              >
+                Comisiones
+              </TabsTrigger>
+            </TabsList>
 
-            <Panel innerClassName="p-5 sm:p-7">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="uki-label">Tu relación</p>
-                  <h2 className="mt-2 font-headline text-2xl font-black">Mi embajador</h2>
-                </div>
-                <ShieldCheck className="h-7 w-7 shrink-0 text-[var(--uki-lilac)]" weight="fill" />
-              </div>
-              {currentDashboard.ownAttribution ? (
-                <div className="mt-5 rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.055] p-5">
-                  {currentDashboard.ownAttribution.isCukiesWorld ? <p className="mb-1 font-black">Cukies World</p> : null}
-                  <p className="font-mono text-lg font-black">{currentDashboard.ownAttribution.ambassadorWalletMasked}</p>
-                  <p className="mt-2 text-sm font-semibold text-[var(--uki-lilac)]">{sourceCopy(currentDashboard.ownAttribution.source)}</p>
-                  <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Desde el {formatDate(currentDashboard.ownAttribution.acceptedAt)}. No puedes sustituirla desde tu cuenta; administración o soporte puede corregirla con autorización y trazabilidad.</p>
-                </div>
-              ) : (
-                <div className="mt-5 flex items-start gap-3 rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
-                  <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
-                  <div>
-                    <p className="font-black">{currentDashboard.enrollment.isPresaleParticipant ? 'Sin embajador en la preventa' : 'Embajador pendiente de confirmar'}</p>
-                    <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{currentDashboard.enrollment.isPresaleParticipant
-                      ? 'Tu participación en la preventa ya no permite asignarte un patrocinador desde aquí.'
-                      : proposedAmbassador
-                        ? 'Conectar tu wallet y navegar no confirma la relación. Solo se guardará cuando la confirmes con una firma específica, sin gas.'
-                        : pendingInvitationCode
-                          ? 'Conservamos tu invitación pendiente. Debe estar disponible antes de que puedas confirmarla.'
-                          : 'Ahora no podemos ofrecerte un embajador. Puedes seguir navegando y volver a intentarlo más adelante.'}</p>
+            <TabsContent
+              value="program"
+              forceMount
+              hidden={activeTab !== 'program'}
+              className="mt-6 min-w-0 data-[state=inactive]:hidden"
+            >
+              <section id="programa" className="scroll-mt-24 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
+                <Panel innerClassName="p-5 sm:p-7">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="uki-label">Comparte tu invitación</p>
+                      <h2 className="mt-2 font-headline text-2xl font-black">Tu enlace de embajador</h2>
+                    </div>
+                    <LinkSimple className="h-7 w-7 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
                   </div>
-                </div>
-              )}
-            </Panel>
-          </section>
+                  <div className="mt-3 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    {invitationUrl ? (
+                      'La persona invitada verá tu wallet abreviada y decidirá si confirma la relación. Tu dirección completa no aparece en el enlace.'
+                    ) : currentDashboard.enrollment.isCukieMaster === false ? (
+                      <>
+                        <p>Tus referidos, tu código y el historial de comisiones se conservan. Activa Cukie Master para volver a usar el mismo enlace y generar nuevas comisiones.</p>
+                        <Link href="/cukie-master" className="mt-4 inline-flex items-center gap-2 font-black text-[var(--uki-lilac)]">
+                          Activar Cukie Master <ArrowRight className="h-4 w-4" weight="bold" />
+                        </Link>
+                      </>
+                    ) : isEligibilityUnknown ? (
+                      <>
+                        <p>No se puede comprobar ahora si cumples el requisito Cukie Master. Tus datos se conservan; reintenta para volver a comprobarlo.</p>
+                        <button type="button" onClick={loadDashboard} className="mt-4 inline-flex items-center gap-2 font-black text-[var(--uki-lilac)]">
+                          Reintentar <ArrowClockwise className="h-4 w-4" weight="bold" />
+                        </button>
+                      </>
+                    ) : (
+                      'Tu enlace todavía no está disponible. Actualiza para volver a comprobar el estado de tu programa.'
+                    )}
+                  </div>
+                  {invitationUrl ? <div className="mt-5 overflow-hidden rounded-[10px] border border-white/10 bg-black/25">
+                    <p className="break-all px-4 py-3 font-mono text-xs text-[var(--uki-text)]">{invitationUrl}</p>
+                    <div className="grid border-t border-white/10 sm:grid-cols-2">
+                      <button type="button" onClick={copyInvitationLink} className="inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-black text-[var(--uki-lilac)] transition active:scale-[0.98]">
+                        {copied ? <Check className="h-4 w-4" weight="bold" /> : <Copy className="h-4 w-4" weight="bold" />}
+                        {copied ? 'Copiado' : 'Copiar enlace'}
+                      </button>
+                      <button type="button" onClick={shareInvitationLink} className="inline-flex min-h-11 items-center justify-center gap-2 border-t border-white/10 px-4 text-sm font-black text-[var(--uki-cream)] transition active:scale-[0.98] sm:border-l sm:border-t-0">
+                        <ShareNetwork className="h-4 w-4" weight="bold" /> Compartir
+                      </button>
+                    </div>
+                  </div> : !hasConfirmedSponsor ? <p className="mt-5 flex items-center gap-2 text-sm font-semibold text-[var(--uki-lilac)]"><LockKey className="h-5 w-5 shrink-0" weight="fill" /> Confirmación de embajador pendiente</p> : null}
+                </Panel>
 
-          <section aria-labelledby="referrals-title" className="pt-10">
-            <div className="flex items-end justify-between gap-4 border-b border-white/10 pb-5">
-              <div>
-                <p className="uki-label">Relaciones confirmadas</p>
-                <h2 id="referrals-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">Tus invitados</h2>
-                <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Aquí aparecen tanto las nuevas invitaciones como los referidos confirmados durante la preventa.</p>
-              </div>
-              <span className="font-headline text-3xl font-black text-[var(--uki-lilac)]">{currentDashboard.referrals.length}</span>
-            </div>
-            {currentDashboard.referrals.length === 0 ? (
-              <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
-                <UsersThree className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
-                <p className="mt-4 font-headline text-xl font-black">Todavía no tienes invitados confirmados</p>
-                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{invitationUrl
-                  ? 'Comparte tu enlace. La relación aparecerá aquí en cuanto la otra wallet la confirme.'
-                  : currentDashboard.enrollment.isCukieMaster === false
-                    ? 'Tus referidos se conservan. Activa Cukie Master para volver a invitar.'
-                    : isEligibilityUnknown
-                      ? 'No se puede comprobar ahora si puedes invitar. Reintenta para actualizar el estado.'
-                      : 'Tu enlace todavía no está disponible. Actualiza para volver a comprobar el estado.'}</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-white/10 border-b border-white/10">
-                {currentDashboard.referrals.map((referral) => (
-                  <article key={referral.attributionId} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.07]">
-                        <Check className="h-4 w-4 text-[var(--uki-lilac)]" weight="bold" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-mono text-sm font-black">{referral.referredWalletMasked}</p>
-                        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{sourceCopy(referral.source)}</p>
+                <Panel innerClassName="p-5 sm:p-7">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="uki-label">Tu relación</p>
+                      <h2 className="mt-2 font-headline text-2xl font-black">Mi embajador</h2>
+                    </div>
+                    <ShieldCheck className="h-7 w-7 shrink-0 text-[var(--uki-lilac)]" weight="fill" />
+                  </div>
+                  {currentDashboard.ownAttribution ? (
+                    <div className="mt-5 rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.055] p-5">
+                      {currentDashboard.ownAttribution.isCukiesWorld ? <p className="mb-1 font-black">Cukies World</p> : null}
+                      <p className="font-mono text-lg font-black">{currentDashboard.ownAttribution.ambassadorWalletMasked}</p>
+                      <p className="mt-2 text-sm font-semibold text-[var(--uki-lilac)]">{sourceCopy(currentDashboard.ownAttribution.source)}</p>
+                      <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Desde el {formatDate(currentDashboard.ownAttribution.acceptedAt)}. No puedes sustituirla desde tu cuenta; administración o soporte puede corregirla con autorización y trazabilidad.</p>
+                    </div>
+                  ) : (
+                    <div className="mt-5 flex items-start gap-3 rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
+                      <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
+                      <div>
+                        <p className="font-black">{currentDashboard.enrollment.isPresaleParticipant ? 'Sin embajador en la preventa' : 'Embajador pendiente de confirmar'}</p>
+                        <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{currentDashboard.enrollment.isPresaleParticipant
+                          ? 'Tu participación en la preventa ya no permite asignarte un patrocinador desde aquí.'
+                          : proposedAmbassador
+                            ? 'Conectar tu wallet y navegar no confirma la relación. Solo se guardará cuando la confirmes con una firma específica, sin gas.'
+                            : pendingInvitationCode
+                              ? 'Conservamos tu invitación pendiente. Debe estar disponible antes de que puedas confirmarla.'
+                              : 'Ahora no podemos ofrecerte un embajador. Puedes seguir navegando y volver a intentarlo más adelante.'}</p>
                       </div>
                     </div>
-                    <p className="pl-[3.25rem] text-xs font-semibold text-[var(--uki-muted)] sm:pl-0">Confirmado el {formatDate(referral.acceptedAt)}</p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+                  )}
+                </Panel>
+              </section>
+            </TabsContent>
 
-          <section id="comisiones" aria-labelledby="commissions-title" className="scroll-mt-24 pt-10">
-            <div className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="uki-label">Movimientos de embajador</p>
-                <h2 id="commissions-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">Tus comisiones</h2>
-                <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Cada fila explica cuándo se registró y en qué estado se encuentra. El historial se conserva aunque ahora no puedas generar nuevas comisiones.</p>
-              </div>
-              <Link href="/premios?category=ambassador" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-[var(--uki-lilac)]/35 px-4 text-sm font-black text-[var(--uki-lilac)]">
-                Ver en Premios <ArrowRight className="h-4 w-4" weight="bold" />
-              </Link>
-            </div>
-            {currentDashboard.commissions.history.length === 0 ? (
-              <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
-                <Gift className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
-                <p className="mt-4 font-headline text-xl font-black">Aún no se han generado comisiones</p>
-                <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{currentDashboard.enrollment.isCukieMaster === false
-                  ? 'No se generan nuevas comisiones mientras no cumplas el requisito Cukie Master.'
-                  : isEligibilityUnknown
-                    ? 'No podemos comprobar ahora si puedes generar nuevas comisiones. Reintenta para actualizar el estado.'
-                    : 'Aparecerán cuando un invitado confirmado reciba un premio elegible.'}</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-white/10 border-b border-white/10">
-                {currentDashboard.commissions.history.map((entry) => {
-                  const status = STATUS_COPY[entry.status];
-                  return (
-                    <article key={entry.allocationId} className="grid gap-4 py-5 md:grid-cols-[minmax(0,1.2fr)_minmax(180px,0.7fr)_auto] md:items-center">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.07]">
-                          {entry.status === 'claimable' || entry.status === 'claimed'
-                            ? <Check className="h-4 w-4 text-[var(--uki-lilac)]" weight="bold" />
-                            : <ClockCountdown className="h-4 w-4 text-[var(--uki-lilac)]" weight="bold" />}
-                        </span>
-                        <div>
-                          <p className="font-black">{entry.kind === 'weekly' ? 'Comisión semanal' : 'Comisión por premios'}</p>
-                          <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{periodLabel(entry.periodId)} · {entry.sourceCount} {entry.sourceCount === 1 ? 'origen' : 'orígenes'}</p>
+            <TabsContent
+              value="referrals"
+              forceMount
+              hidden={activeTab !== 'referrals'}
+              className="mt-6 min-w-0 data-[state=inactive]:hidden"
+            >
+              <section id="referidos" aria-labelledby="referrals-title" className="scroll-mt-24 pt-4">
+                <div className="flex items-end justify-between gap-4 border-b border-white/10 pb-5">
+                  <div>
+                    <p className="uki-label">Relaciones confirmadas</p>
+                    <h2 id="referrals-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">Tus invitados</h2>
+                    <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Aquí aparecen tanto las nuevas invitaciones como los referidos confirmados durante la preventa.</p>
+                  </div>
+                  <span className="font-headline text-3xl font-black text-[var(--uki-lilac)]">{currentDashboard.referrals.length}</span>
+                </div>
+                {currentDashboard.referrals.length === 0 ? (
+                  <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
+                    <UsersThree className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
+                    <p className="mt-4 font-headline text-xl font-black">Todavía no tienes invitados confirmados</p>
+                    <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{invitationUrl
+                      ? 'Comparte tu enlace. La relación aparecerá aquí en cuanto la otra wallet la confirme.'
+                      : currentDashboard.enrollment.isCukieMaster === false
+                        ? 'Tus referidos se conservan. Activa Cukie Master para volver a invitar.'
+                        : isEligibilityUnknown
+                          ? 'No se puede comprobar ahora si puedes invitar. Reintenta para actualizar el estado.'
+                          : 'Tu enlace todavía no está disponible. Actualiza para volver a comprobar el estado.'}</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/10 border-b border-white/10">
+                    {currentDashboard.referrals.map((referral) => (
+                      <article key={referral.attributionId} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.07]">
+                            <Check className="h-4 w-4 text-[var(--uki-lilac)]" weight="bold" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-mono text-sm font-black">{referral.referredWalletMasked}</p>
+                            <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{sourceCopy(referral.source)}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-lilac)]">{status.label}</p>
-                        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{status.helper}</p>
-                      </div>
-                      <p className="font-headline text-2xl font-black text-[var(--uki-cream)]">{formatUki(entry.amountRaw)} UKI</p>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+                        <p className="pl-[3.25rem] text-xs font-semibold text-[var(--uki-muted)] sm:pl-0">Confirmado el {formatDate(referral.acceptedAt)}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+
+            <TabsContent
+              value="commissions"
+              forceMount
+              hidden={activeTab !== 'commissions'}
+              className="mt-6 min-w-0 data-[state=inactive]:hidden"
+            >
+              <section id="comisiones" aria-labelledby="commissions-title" className="scroll-mt-24 pt-4">
+                <div className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="uki-label">Movimientos de embajador</p>
+                    <h2 id="commissions-title" className="mt-2 font-headline text-2xl font-black sm:text-3xl">Tus comisiones</h2>
+                    <p className="mt-2 text-sm font-semibold text-[var(--uki-muted)]">Cada fila explica cuándo se registró y en qué estado se encuentra. El historial se conserva aunque ahora no puedas generar nuevas comisiones.</p>
+                  </div>
+                  <Link href="/premios?category=ambassador" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-[var(--uki-lilac)]/35 px-4 text-sm font-black text-[var(--uki-lilac)]">
+                    Ver en Premios <ArrowRight className="h-4 w-4" weight="bold" />
+                  </Link>
+                </div>
+                {currentDashboard.commissions.history.length === 0 ? (
+                  <div className="flex min-h-44 flex-col items-center justify-center border-b border-white/10 px-5 py-8 text-center">
+                    <Gift className="h-9 w-9 text-[var(--uki-lilac)]" weight="duotone" />
+                    <p className="mt-4 font-headline text-xl font-black">Aún no se han generado comisiones</p>
+                    <p className="mt-2 max-w-lg text-sm font-semibold text-[var(--uki-muted)]">{currentDashboard.enrollment.isCukieMaster === false
+                      ? 'No se generan nuevas comisiones mientras no cumplas el requisito Cukie Master.'
+                      : isEligibilityUnknown
+                        ? 'No podemos comprobar ahora si puedes generar nuevas comisiones. Reintenta para actualizar el estado.'
+                        : 'Aparecerán cuando un invitado confirmado reciba un premio elegible.'}</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/10 border-b border-white/10">
+                    {currentDashboard.commissions.history.map((entry) => {
+                      const status = STATUS_COPY[entry.status];
+                      return (
+                        <article key={entry.allocationId} className="grid gap-4 py-5 md:grid-cols-[minmax(0,1.2fr)_minmax(180px,0.7fr)_auto] md:items-center">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.07]">
+                              {entry.status === 'claimable' || entry.status === 'claimed'
+                                ? <Check className="h-4 w-4 text-[var(--uki-lilac)]" weight="bold" />
+                                : <ClockCountdown className="h-4 w-4 text-[var(--uki-lilac)]" weight="bold" />}
+                            </span>
+                            <div>
+                              <p className="font-black">{entry.kind === 'weekly' ? 'Comisión semanal' : 'Comisión por premios'}</p>
+                              <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{periodLabel(entry.periodId)} · {entry.sourceCount} {entry.sourceCount === 1 ? 'origen' : 'orígenes'}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-lilac)]">{status.label}</p>
+                            <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">{status.helper}</p>
+                          </div>
+                          <p className="font-headline text-2xl font-black text-[var(--uki-cream)]">{formatUki(entry.amountRaw)} UKI</p>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+          </Tabs>
 
           <section className="pt-10">
             <Panel innerClassName="overflow-hidden">
+              <details className="group">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)] sm:px-7 [&::-webkit-details-marker]:hidden">
+                  <h2>Cómo funciona</h2>
+                  <CaretDown aria-hidden="true" className="h-5 w-5 shrink-0 text-[var(--uki-lilac)] group-open:rotate-180" weight="bold" />
+                </summary>
               <div className="grid gap-px bg-white/10 lg:grid-cols-[0.8fr_1.2fr]">
                 <div className="bg-[#0d0914] p-5 sm:p-7">
                   <p className="uki-label">Reglas claras</p>
-                  <h2 className="mt-2 font-headline text-2xl font-black">Cómo funciona</h2>
                   <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">El sistema conserva la relación y calcula la comisión usando la atribución vigente cuando se crea la partida o se cierra el periodo.</p>
                 </div>
                 <ol className="divide-y divide-white/10 bg-[#0d0914]">
@@ -856,6 +963,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                   ))}
                 </ol>
               </div>
+              </details>
             </Panel>
           </section>
         </>

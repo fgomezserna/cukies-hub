@@ -1,0 +1,146 @@
+{
+  "checks": [
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "tabs": [
+        {
+          "label": "Reparto",
+          "height": 44,
+          "top": 428.1875,
+          "controls": true
+        },
+        {
+          "label": "Historial",
+          "height": 44,
+          "top": 428.1875,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "surface": "credits",
+      "draftOrSelection": true,
+      "keyboard": true
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "tabs": [
+        {
+          "label": "Reparto",
+          "height": 44,
+          "top": 707.9375,
+          "controls": true
+        },
+        {
+          "label": "Historial",
+          "height": 44,
+          "top": 707.9375,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "surface": "credits",
+      "draftOrSelection": true,
+      "keyboard": true
+    },
+    {
+      "width": 320,
+      "scrollWidth": 320,
+      "tabs": [
+        {
+          "label": "Reparto",
+          "height": 44,
+          "top": 758.6875,
+          "controls": true
+        },
+        {
+          "label": "Historial",
+          "height": 44,
+          "top": 758.6875,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "surface": "credits",
+      "draftOrSelection": true,
+      "keyboard": true
+    },
+    {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "tabs": [
+        {
+          "label": "En el pool",
+          "height": 44,
+          "top": 429.59375,
+          "controls": true
+        },
+        {
+          "label": "Aportar Cukies",
+          "height": 44,
+          "top": 429.59375,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "surface": "pool",
+      "draftOrSelection": true,
+      "keyboard": true
+    },
+    {
+      "width": 390,
+      "scrollWidth": 390,
+      "tabs": [
+        {
+          "label": "En el pool",
+          "height": 44,
+          "top": 640.34375,
+          "controls": true
+        },
+        {
+          "label": "Aportar Cukies",
+          "height": 44,
+          "top": 640.34375,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "surface": "pool",
+      "draftOrSelection": true,
+      "keyboard": true
+    },
+    {
+      "width": 320,
+      "scrollWidth": 320,
+      "tabs": [
+        {
+          "label": "En el pool",
+          "height": 44,
+          "top": 721.09375,
+          "controls": true
+        },
+        {
+          "label": "Aportar Cukies",
+          "height": 44,
+          "top": 721.09375,
+          "controls": true
+        }
+      ],
+      "visiblePanels": 1,
+      "background": "none",
+      "surface": "pool",
+      "draftOrSelection": true,
+      "keyboard": true
+    }
+  ],
+  "deepLinks": true,
+  "browserHistory": true,
+  "signedTransactions": false,
+  "source": "Actual credit/pool components with synthetic resources, signatures disabled"
+}

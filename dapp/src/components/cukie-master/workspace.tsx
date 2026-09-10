@@ -1,9 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ArrowRight,
   Coins,
   Crown,
   Gem,
@@ -16,9 +15,26 @@ import { CukieMasterStatusPanel } from '@/components/cukie-master/status-panel';
 import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { UkiStakingPanel } from '@/components/cukie-master/uki-staking-panel';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/providers/auth-provider';
 
 type MasterRoute = 'uki' | 'nft';
+
+function routeFromLocation() {
+  if (typeof window === 'undefined') return null;
+  const tokenId = new URLSearchParams(window.location.search).get('tokenId');
+  const hashTarget = window.location.hash.slice(1);
+  if (hashTarget === 'uki-staking') return { route: 'uki' as const, target: hashTarget };
+  if (hashTarget === 'cukie-master-nft-staking' || hashTarget.startsWith('cukie-master-cukie-')) {
+    return { route: 'nft' as const, target: hashTarget };
+  }
+  if (tokenId) return { route: 'nft' as const, target: `cukie-master-cukie-${tokenId}` };
+  return null;
+}
+
+function routeHash(route: MasterRoute) {
+  return route === 'nft' ? 'cukie-master-nft-staking' : 'uki-staking';
+}
 
 const ROUTES = {
   uki: {
@@ -40,6 +56,11 @@ const ROUTES = {
 export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: boolean }) {
   const { user, isLoading: authLoading } = useAuth();
   const [activeRoute, setActiveRoute] = useState<MasterRoute>('uki');
+  const [visitedRoutes, setVisitedRoutes] = useState<Set<MasterRoute>>(() => new Set());
+  const [navigationReady, setNavigationReady] = useState(false);
+  const routeInteractionRef = useRef(false);
+  const [hashTarget, setHashTarget] = useState<string | null>(null);
+  const hashScrollHandledRef = useRef<string | null>(null);
   const [routePreview, setRoutePreview] = useState<UkiRoutePreview | null>(null);
   const handleRoutePreview = useCallback((preview: UkiRoutePreview | null) => {
     setRoutePreview(preview);
@@ -47,36 +68,73 @@ export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: bo
 
   useEffect(() => {
     const selectRouteFromHash = () => {
-      const tokenId = new URLSearchParams(window.location.search).get('tokenId');
-      const hashTarget = window.location.hash.slice(1);
-      const route = window.location.hash === '#cukie-master-nft-staking'
-        ? 'nft'
-        : hashTarget.startsWith('cukie-master-cukie-') || tokenId
-          ? 'nft'
-        : window.location.hash === '#uki-staking'
-          ? 'uki'
-          : null;
-
-      if (!route) return;
-      setActiveRoute(route);
-      window.setTimeout(() => {
-        const targetId = hashTarget || (tokenId ? `cukie-master-cukie-${tokenId}` : '');
-        document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
-      }, 0);
+      const selection = routeFromLocation() ?? { route: 'uki' as const, target: '' };
+      hashScrollHandledRef.current = null;
+      setHashTarget(selection.target || null);
+      setActiveRoute(selection.route);
+      setVisitedRoutes((current) => current.has(selection.route)
+        ? current
+        : new Set([...current, selection.route]));
     };
 
-    selectRouteFromHash();
+    const initialSelection = routeFromLocation();
+    if (!routeInteractionRef.current) {
+      if (initialSelection) {
+        setActiveRoute(initialSelection.route);
+        setVisitedRoutes(new Set([initialSelection.route]));
+        setHashTarget(initialSelection.target || null);
+      } else {
+        setActiveRoute('uki');
+        setVisitedRoutes(new Set(['uki']));
+        setHashTarget(null);
+      }
+    }
+    setNavigationReady(true);
     window.addEventListener('hashchange', selectRouteFromHash);
-    return () => window.removeEventListener('hashchange', selectRouteFromHash);
+    window.addEventListener('popstate', selectRouteFromHash);
+    return () => {
+      window.removeEventListener('hashchange', selectRouteFromHash);
+      window.removeEventListener('popstate', selectRouteFromHash);
+    };
   }, []);
 
   useEffect(() => {
-    if (!user?.walletAddress || !window.location.hash) return;
-    const timer = window.setTimeout(() => {
-      document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' });
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [user?.walletAddress]);
+    if (!hashTarget || hashTarget === hashScrollHandledRef.current) return;
+    let disposed = false;
+    let observer: MutationObserver | null = null;
+
+    const scrollToTarget = () => {
+      if (disposed) return;
+      const target = document.getElementById(hashTarget);
+      if (target && !target.closest('[hidden]')) {
+        target.scrollIntoView?.({ block: 'start' });
+        hashScrollHandledRef.current = hashTarget;
+        observer?.disconnect();
+        return;
+      }
+      if (observer) return;
+      observer = new MutationObserver(() => scrollToTarget());
+      observer.observe(document.body, { childList: true, subtree: true });
+    };
+
+    scrollToTarget();
+    const timer = window.setTimeout(() => observer?.disconnect(), 5_000);
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [activeRoute, authLoading, hashTarget, navigationReady, user?.walletAddress]);
+
+  function selectRoute(route: MasterRoute) {
+    routeInteractionRef.current = true;
+    setActiveRoute(route);
+    setVisitedRoutes((current) => current.has(route) ? current : new Set([...current, route]));
+    const hash = `#${routeHash(route)}`;
+    hashScrollHandledRef.current = hash.slice(1);
+    setHashTarget(hash.slice(1));
+    if (window.location.hash !== hash) window.history.pushState(window.history.state, '', hash);
+  }
 
   if (authLoading) return <CukieMasterEntrySkeleton />;
   if (!user?.walletAddress) return <CukieMasterEntry />;
@@ -84,15 +142,15 @@ export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: bo
   return (
     <div className="mx-auto w-full max-w-[1480px]">
       <header className="relative overflow-hidden border-b border-white/10 pb-7 pt-1 sm:pb-9">
-        <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full bg-[var(--uki-lilac)]/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full bg-[rgba(228,92,255,0.1)] blur-3xl" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm font-bold text-[var(--uki-lilac)]">Tu espacio Cukie Master</p>
             <h1 className="mt-2 text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">
-              Consulta tu posición y gestiona el siguiente paso
+              Cukie Master
             </h1>
             <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-              Primero revisa tus cupos. Después elige si quieres gestionar UKI o Cukies. Tus créditos tienen su propio apartado para que puedas decidir con calma cómo usarlos.
+              Consulta tu posición y gestiona UKI o Cukies desde una sola vista. Tus créditos tienen su propio apartado para que puedas decidir con calma cómo usarlos.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-3 border-l-2 border-[var(--uki-lilac)] pl-4">
@@ -112,28 +170,35 @@ export function CukieMasterWorkspace({ testnetOnly = false }: { testnetOnly?: bo
 
       <section id="gestionar-cupo" aria-labelledby="gestionar-cupo-title" className="scroll-mt-24 pb-8">
         <JourneyStep number="02" label="Elige qué quieres gestionar" />
-        <div className="mt-4 overflow-hidden rounded-[18px] border border-white/10 bg-black/25">
-          <div className="grid lg:grid-cols-[1.12fr_0.88fr]" role="tablist" aria-label="Vías Cukie Master">
-            {(Object.keys(ROUTES) as MasterRoute[]).map((route) => (
-              <RouteSelector
-                key={route}
-                route={route}
-                active={activeRoute === route}
-                onSelect={setActiveRoute}
-              />
-            ))}
-          </div>
-        </div>
+        <Tabs value={activeRoute} onValueChange={(value) => selectRoute(value as MasterRoute)} className="mt-4 min-w-0">
+          <TabsList aria-label="Vías Cukie Master" className="grid h-auto w-full min-w-0 grid-cols-2 gap-1 rounded-[12px] border border-white/10 bg-black/25 p-1">
+            <TabsTrigger
+              value="uki"
+              className="min-h-11 min-w-0 gap-2 rounded-[9px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+            >
+              <Coins className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
+              <span className="truncate">Gestionar UKI</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="nft"
+              className="min-h-11 min-w-0 gap-2 rounded-[9px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+            >
+              <Gem className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
+              <span className="truncate">Gestionar Cukies</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="uki" forceMount hidden={activeRoute !== 'uki'} className="mt-6 min-w-0 data-[state=inactive]:hidden">
+            {navigationReady && visitedRoutes.has('uki') ? (
+              <UkiStakingPanel testnetOnly={testnetOnly} routePreview={routePreview} />
+            ) : null}
+          </TabsContent>
+          <TabsContent value="nft" forceMount hidden={activeRoute !== 'nft'} className="mt-6 min-w-0 data-[state=inactive]:hidden">
+            {navigationReady && visitedRoutes.has('nft') ? <CukieMasterNftVaultPanel /> : null}
+          </TabsContent>
+        </Tabs>
         <h2 id="gestionar-cupo-title" className="sr-only">Gestiona una vía Cukie Master</h2>
       </section>
-
-      <div role="tabpanel" aria-label={ROUTES[activeRoute].title}>
-        {activeRoute === 'uki' ? (
-          <UkiStakingPanel testnetOnly={testnetOnly} routePreview={routePreview} />
-        ) : (
-          <CukieMasterNftVaultPanel />
-        )}
-      </div>
 
     </div>
   );
@@ -143,7 +208,7 @@ function CukieMasterEntry() {
   return (
     <section aria-labelledby="cukie-master-entry-title" className="mx-auto w-full max-w-[1480px] pb-10">
       <div className="relative overflow-hidden rounded-[22px] border border-[var(--uki-lilac-border)] bg-[#09060f] shadow-[0_28px_90px_rgba(0,0,0,0.42)]">
-        <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-[var(--uki-lilac)]/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-[rgba(228,92,255,0.1)] blur-3xl" />
         <div className="relative grid min-h-[38rem] lg:grid-cols-[1.02fr_0.98fr]">
           <div className="relative z-10 flex flex-col justify-center p-6 sm:p-10 lg:p-12 xl:p-16">
             <div className="flex items-center gap-3 text-sm font-bold text-[var(--uki-lilac)]">
@@ -241,52 +306,8 @@ function JourneyStep({ number, label }: { number: string; label: string }) {
   return (
     <div className="flex items-center gap-3">
       <span className="font-headline text-sm font-black text-[var(--uki-lilac)]">{number}</span>
-      <span className="h-px w-8 bg-[var(--uki-lilac)]/45" aria-hidden="true" />
+      <span className="h-px w-8 bg-[rgba(228,92,255,0.45)]" aria-hidden="true" />
       <p className="text-sm font-bold text-[var(--uki-text)]">{label}</p>
     </div>
-  );
-}
-
-function RouteSelector({
-  active,
-  onSelect,
-  route,
-}: {
-  active: boolean;
-  onSelect: (route: MasterRoute) => void;
-  route: MasterRoute;
-}) {
-  const item = ROUTES[route];
-  const Icon = item.icon;
-
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={() => onSelect(route)}
-      className={`group relative min-w-0 border-b border-white/10 p-5 text-left transition-colors last:border-b-0 lg:border-b-0 lg:border-r lg:last:border-r-0 sm:p-6 ${
-        active ? 'bg-[var(--uki-lilac-soft)]' : 'hover:bg-white/[0.035]'
-      }`}
-    >
-      <span className={`absolute inset-y-0 left-0 w-1 transition-colors ${active ? 'bg-[var(--uki-lilac)]' : 'bg-transparent'}`} />
-      <span className="flex items-start gap-4">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border ${
-          active
-            ? 'border-[var(--uki-lilac)] bg-[var(--uki-lilac)] text-[#09060f]'
-            : 'border-white/15 text-[var(--uki-muted)] group-hover:text-[var(--uki-lilac)]'
-        }`}>
-          <Icon className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="text-xs font-bold text-[var(--uki-lilac)]">{item.eyebrow}</span>
-          <span className="mt-1 flex items-center justify-between gap-3">
-            <span className="font-headline text-xl font-black text-[var(--uki-cream)]">{item.title}</span>
-            <ArrowRight className={`h-5 w-5 shrink-0 transition-transform ${active ? 'text-[var(--uki-lilac)]' : 'text-[var(--uki-muted)] group-hover:translate-x-1'}`} aria-hidden="true" />
-          </span>
-          <span className="mt-2 block text-sm font-semibold text-[var(--uki-muted)]">{item.requirement}</span>
-        </span>
-      </span>
-    </button>
   );
 }
