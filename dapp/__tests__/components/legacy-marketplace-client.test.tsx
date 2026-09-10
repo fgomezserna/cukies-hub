@@ -96,7 +96,7 @@ describe('marketplace publico', () => {
     expect(await screen.findByTestId('uki-checkout')).toHaveTextContent('Checkout UKI disponible');
   });
 
-  it('aplica tipo y generación al tramo Legacy cuando se muestran ambos catálogos', async () => {
+  it('cambia a Solo Legacy antes de aplicar tipo y generación sin metadatos V2', async () => {
     fetchMock.mockResolvedValue({
       json: async () => ({
         status: 'ok',
@@ -117,6 +117,7 @@ describe('marketplace publico', () => {
 
     render(<MarketplaceClient />);
     await screen.findByRole('option', { name: 'Tipo 3' });
+    expect(screen.getByText(/al elegir uno se mostrará solo ese catálogo/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Tipo de Cukie' }), {
       target: { value: '3' },
@@ -128,9 +129,10 @@ describe('marketplace publico', () => {
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(2));
     const requestUrl = String(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0]);
     const query = new URL(requestUrl, 'https://stage.local').searchParams;
-    expect(query.get('scope')).toBe('all');
+    expect(query.get('scope')).toBe('legacy');
     expect(query.get('type')).toBe('3');
     expect(query.get('generation')).toBe('2');
+    expect(screen.getByRole('combobox', { name: 'Origen del anuncio' })).toHaveValue('legacy');
   });
 
   it('evita combinar la red TRON con el catálogo V2 · UKI', async () => {

@@ -240,6 +240,17 @@ export function MarketplaceClient({
     setSelectedUkiOrderId(null);
     resetPagination();
   }
+  function applyLegacyFacet(
+    setter: (value: string) => void,
+    value: string,
+  ) {
+    if (scope === 'all' && value !== 'all') {
+      setScope('legacy');
+      setSelectedUkiOrderId(null);
+    }
+    setter(value);
+    resetPagination();
+  }
   function nextPage() {
     if (!catalog?.hasMore) return;
     setHistory((current) => [...current.slice(0, page + 1), catalog.cursors]);
@@ -316,8 +327,7 @@ export function MarketplaceClient({
                   aria-label="Tipo de Cukie"
                   value={type}
                   onChange={(event) => {
-                    setType(event.target.value);
-                    resetPagination();
+                    applyLegacyFacet(setType, event.target.value);
                   }}
                   className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                 >
@@ -335,8 +345,7 @@ export function MarketplaceClient({
                   aria-label="Generación"
                   value={generation}
                   onChange={(event) => {
-                    setGeneration(event.target.value);
-                    resetPagination();
+                    applyLegacyFacet(setGeneration, event.target.value);
                   }}
                   className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                 >
@@ -379,6 +388,11 @@ export function MarketplaceClient({
           {!priceSortAllowed && (
             <p className="col-span-full text-xs text-amber-100">
               El precio se puede ordenar cuando muestras solo Legacy y una red.
+            </p>
+          )}
+          {scope === 'all' && (
+            <p className="col-span-full text-xs text-slate-400">
+              Tipo y generación pertenecen al catálogo Legacy; al elegir uno se mostrará solo ese catálogo.
             </p>
           )}
           <Button
