@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(() => ({
@@ -106,7 +106,7 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     render(<BreedingClient initialTab="start" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Lectura Legacy BSC verificada. La wallet puede permanecer en otra red hasta que quieras operar.')).toBeInTheDocument();
+      expect(screen.getByText('Lectura Legacy BSC verificada. Puedes consultar estos datos aunque la wallet esté en otra red.')).toBeInTheDocument();
     });
     expect(screen.getByText('0')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
@@ -117,6 +117,47 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     expect(mockSwitchChain).not.toHaveBeenCalled();
     expect(mockWriteContract).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Aprobar cría' })).toBeDisabled();
+  });
+
+  it('permite previsualizar y seleccionar candidatos BSC con la wallet en 97', async () => {
+    const candidate = {
+      id: '29',
+      tokenId: '29',
+      chainId: 56,
+      collectionAddress: null,
+      cukiNumber: 29,
+      owner: '0x00000000000000000000000000000000000000aa',
+      network: 'BSC',
+      origin: 'original',
+      birthNetwork: 'BSC',
+      imageUrl: null,
+      type: 1,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      skills: {},
+      childrenCount: 0,
+      childrenCountTron: 0,
+      childrenCountBsc: 0,
+      parents: [],
+      children: [],
+      history: [],
+      timestamp: null,
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [candidate] }),
+    }) as never;
+
+    render(<BreedingClient initialTab="start" />);
+
+    const candidateButton = await screen.findByRole('button', {
+      name: /Cukie #29/,
+    });
+    expect(candidateButton).not.toBeDisabled();
+    expect(screen.queryByText('La wallet está conectada a una red incorrecta.')).not.toBeInTheDocument();
+    expect(mockSwitchChain).not.toHaveBeenCalled();
+    expect(mockWriteContract).not.toHaveBeenCalled();
   });
 
   it('permite cargar crías activas desde el cliente público 56 sin habilitar escrituras en 97', async () => {
@@ -130,7 +171,26 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
       ['0x00000000000000000000000000000000000000aa'],
     );
     expect(mockLegacyBscReadContract).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeDisabled();
+    const refreshButton = screen.getByRole('button', { name: 'Actualizar' });
+    expect(refreshButton).not.toBeDisabled();
+    fireEvent.click(refreshButton);
+    await waitFor(() => expect(mockReadLegacyBscContract.mock.calls.length).toBeGreaterThan(1));
+    expect(mockSwitchChain).not.toHaveBeenCalled();
+    expect(mockWriteContract).not.toHaveBeenCalled();
+  });
+
+  it('mantiene disponible el reintento de crías activas tras un fallo de lectura', async () => {
+    mockReadLegacyBscContract
+      .mockRejectedValueOnce(new Error('RPC unavailable'))
+      .mockResolvedValueOnce(['B']);
+    render(<BreedingClient initialTab="active" />);
+
+    const refreshButton = await screen.findByRole('button', {
+      name: 'Actualizar',
+    });
+    await waitFor(() => expect(refreshButton).not.toBeDisabled());
+    fireEvent.click(refreshButton);
+    await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
     expect(mockSwitchChain).not.toHaveBeenCalled();
     expect(mockWriteContract).not.toHaveBeenCalled();
   });
@@ -141,7 +201,7 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     render(<BreedingClient initialTab="start" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Lectura Legacy BSC sin verificar. No se muestran ceros mientras falte la respuesta.')).toBeInTheDocument();
+      expect(screen.getByText('Lectura Legacy BSC no disponible ahora. Pulsa Actualizar para reintentar.')).toBeInTheDocument();
     });
     expect(screen.getByText('Puntos').parentElement).toHaveTextContent('-');
     expect(screen.getByText('Máximo de crías').parentElement).toHaveTextContent('-');
