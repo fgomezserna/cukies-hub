@@ -14,6 +14,46 @@ type LegacyTronContractInstance = Record<
   (...args: readonly unknown[]) => LegacyTronContractCall
 >;
 
+export const LEGACY_TRON_MAINNET_RPC_URL = 'https://api.trongrid.io';
+
+function rpcOrigin(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+export function getLegacyTronWeb(): LegacyTronWebLike | null {
+  if (typeof window === 'undefined') return null;
+  const browserWindow = window as Window & {
+    tron?: { tronWeb?: LegacyTronWebLike };
+    tronLink?: { tronWeb?: LegacyTronWebLike };
+    tronWeb?: LegacyTronWebLike;
+  };
+  return browserWindow.tronWeb
+    ?? browserWindow.tronLink?.tronWeb
+    ?? browserWindow.tron?.tronWeb
+    ?? null;
+}
+
+export function getLegacyTronWalletRpcOrigin(
+  tronWeb?: LegacyTronWebLike | null,
+) {
+  return rpcOrigin(tronWeb?.fullNode?.host);
+}
+
+export function isLegacyTronWalletOnRpc(
+  tronWeb: LegacyTronWebLike | null | undefined,
+  expectedRpcUrl: string,
+) {
+  return Boolean(
+    getLegacyTronWalletRpcOrigin(tronWeb)
+    && getLegacyTronWalletRpcOrigin(tronWeb) === rpcOrigin(expectedRpcUrl),
+  );
+}
+
 export type LegacyTronWebLike = {
   ready?: boolean;
   fullNode?: { host?: string };

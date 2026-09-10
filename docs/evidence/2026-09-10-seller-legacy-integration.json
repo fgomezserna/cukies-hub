@@ -1,0 +1,69 @@
+{
+  "observedAt": "2026-09-09T23:57:43.704084+00:00",
+  "scope": "Integración única de elegibilidad Vender y navegación/lecturas Legacy; World346 reservado para una ventana posterior",
+  "base": "d1403a586aa6a6ca92930ad8157b7255abbfb0e3",
+  "validatedCandidate": "a2fc72e384be4fea9a047e169f5863693d92b7b4",
+  "validatedDappTree": "9a1c81fb1081a75bad0e1e30f68209b383769815",
+  "sources": {
+    "seller359": "ee787a4baec582656d9ee825ae1a10dc2e69862b",
+    "legacy358": "1542c25d91ed497fe9b9e38ffbce0f242939c6aa"
+  },
+  "review": {
+    "sourceBranchesPreserved": true,
+    "sourceCommitsAreAncestors": true,
+    "productFiles": 21,
+    "sourceProductOverlap": [],
+    "integrationConflictPaths": [
+      "docs/antes-del-15-seguimiento.md"
+    ],
+    "rootPreserves": [
+      "INFRA365",
+      "World346 provenance and ownership",
+      "NFT recovery362",
+      "Legacy owners and dates"
+    ],
+    "onlyPostMergeTestFix": "Use viem Address for the collection fixture; no assertion or product change"
+  },
+  "validation": {
+    "performedBy": "Luna Max; integration and test diff reviewed by Astra",
+    "lint": "PASS",
+    "typecheck": "PASS after typed fixture correction",
+    "jest": {
+      "suitesPassed": 236,
+      "testsPassed": 1911
+    },
+    "build": {
+      "result": "PASS",
+      "staticPages": 92
+    },
+    "diffCheck": "PASS"
+  },
+  "expectedReleasePlan": {
+    "build": [
+      "dapp"
+    ],
+    "reuse": [
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer",
+      "treasure-hunt"
+    ],
+    "reason": "component-changes"
+  },
+  "protectedWorld": {
+    "branch": "codex/world-stack-integration",
+    "pr": 346,
+    "sha": "f4cae5e307fed2a84acf0de3e33d0dae9b25b0a1",
+    "includedInThisBatch": false
+  },
+  "delivery": {
+    "status": "pending"
+  },
+  "limits": [
+    "Marketplace V2 economic activation remains separate",
+    "Legacy approvals/transfers/relayer stay closed",
+    "No main/production change",
+    "No transaction signatures in this QA"
+  ]
+}

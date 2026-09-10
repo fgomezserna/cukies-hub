@@ -116,6 +116,14 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       ],
     },
     {
+      label: 'Legacy',
+      items: [
+        { href: '/bridge', label: 'Bridge', Icon: Layers3, active: pathname.startsWith('/bridge') || pathname.startsWith('/bridges') },
+        { href: '/breeding', label: 'Crías', Icon: Cookie, active: pathname.startsWith('/breeding') },
+        { href: '/cukiepoints', label: 'Cukie Points', Icon: Coins, active: pathname.startsWith('/cukiepoints') },
+      ],
+    },
+    {
       label: 'Cobros',
       items: [
         { href: '/premios', label: 'Premios', Icon: Gift, active: pathname.startsWith('/premios') },

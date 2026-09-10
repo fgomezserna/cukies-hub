@@ -16,6 +16,7 @@ import { ukiMarketplacePublicConfig } from '@/lib/uki-marketplace/public-config'
 import { DomainValidationError, SchemaNotReadyError } from '@/lib/uki-economy/errors';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
 import { readPoolRecoveryPositions } from '@/lib/uki-economy/cukie-pool/recovery-read';
+import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
 
 import type {
   MyCukieCollectionData,
@@ -32,6 +33,94 @@ type CanonicalCukieDocument = CukiesInventoryDocument & {
 
 type CollectionAction = MyCukieCollectionItem['availableActions'][number];
 
+export type CukieSaleSurface = 'legacy' | 'uki' | null;
+
+export type CukieSaleEligibilityInput = {
+  chainId: number | null | undefined;
+  network: unknown;
+  collectionAddress: unknown;
+  ownerMatches: boolean;
+  custody: MyCukieCollectionItem['custody'];
+  state: MyCukieCollectionItem['state'];
+  marketplace: Pick<UkiMarketplaceEligibilityConfig, 'ready' | 'chainId' | 'collectionAddresses'>;
+};
+
+type UkiMarketplaceEligibilityConfig = Pick<
+  typeof ukiMarketplacePublicConfig,
+  'ready' | 'chainId' | 'collectionAddresses'
+>;
+
+function sameCollection(network: string, actual: string, expected: string) {
+  return network === 'BSC'
+    ? actual.toLowerCase() === expected.toLowerCase()
+    : actual === expected;
+}
+
+/**
+ * Resuelve la identidad de venta antes de exponer una acción o una ruta.
+ * Legacy usa siempre sus contratos existentes; V2 exige BSC con la cadena y
+ * colección exactas de su configuración, además de configuración lista. Las
+ * guardas de propiedad/custodia/estado son deliberadamente conservadoras para
+ * no convertir una lectura ambigua en
+ * una operación de escritura.
+ */
+export function resolveCukieSaleEligibility(input: CukieSaleEligibilityInput): {
+  canSell: boolean;
+  surface: CukieSaleSurface;
+  sellSurfaces: Array<Exclude<CukieSaleSurface, null>>;
+} {
+  const network = typeof input.network === 'string' ? input.network.toUpperCase() : null;
+  const collection = typeof input.collectionAddress === 'string'
+    ? input.collectionAddress
+    : null;
+  if (!network || !collection) return { canSell: false, surface: null, sellSurfaces: [] };
+
+  const guardsPass = input.ownerMatches
+    && input.custody === 'wallet'
+    && input.state === 'available';
+  const legacyCollection = network === 'BSC'
+    ? legacyMarketplaceContracts.bsc.contracts.token
+    : network === 'TRON'
+      ? legacyMarketplaceContracts.tron.contracts.token
+      : null;
+  const legacyIdentity = Boolean(
+    legacyCollection
+    && sameCollection(network, collection, legacyCollection)
+    && ((network === 'BSC' && input.chainId === 56) || (network === 'TRON' && input.chainId == null))
+  );
+
+  // La identidad Legacy BSC56 atribuida a otra cadena no puede convertirse
+  // en V2; una allowlist V2 explícita en BSC56 sí es un destino válido.
+  if (
+    network === 'BSC'
+    && input.chainId !== 56
+    && sameCollection(network, collection, legacyMarketplaceContracts.bsc.contracts.token)
+  ) return { canSell: false, surface: null, sellSurfaces: [] };
+
+  const v2Collection = network === 'BSC'
+    && (input.chainId === 56 || input.chainId === 97)
+    && input.marketplace.chainId === input.chainId
+    && input.marketplace.collectionAddresses.some((address) => sameCollection('BSC', collection, address));
+  const ukiIdentity = v2Collection && input.marketplace.ready;
+  const surfaces = [
+    ...(legacyIdentity ? ['legacy' as const] : []),
+    ...(ukiIdentity ? ['uki' as const] : []),
+  ];
+  if (surfaces.length > 0) {
+    return {
+      canSell: guardsPass,
+      surface: legacyIdentity ? 'legacy' : 'uki',
+      sellSurfaces: guardsPass ? surfaces : [],
+    };
+  }
+
+  // Conserva la superficie V2 como identidad aunque todavía no esté lista,
+  // pero no ofrece el CTA hasta que la configuración sea utilizable.
+  if (v2Collection) return { canSell: false, surface: 'uki', sellSurfaces: [] };
+
+  return { canSell: false, surface: null, sellSurfaces: [] };
+}
+
 function legacySaleKind(document: CanonicalCukieDocument, walletNormalized: string, state: string) {
   if (
     state !== 'listed'
@@ -42,8 +131,23 @@ function legacySaleKind(document: CanonicalCukieDocument, walletNormalized: stri
     && document.marketplaceListingOwnerNormalized.toLowerCase() !== walletNormalized
   ) return null;
   const network = typeof document.network === 'string' ? document.network.toUpperCase() : '';
+  const collection = typeof document.collectionAddressNormalized === 'string'
+    ? document.collectionAddressNormalized
+    : null;
+  const expectedCollection = network === 'BSC'
+    ? legacyMarketplaceContracts.bsc.contracts.token
+    : network === 'TRON'
+      ? legacyMarketplaceContracts.tron.contracts.token
+      : null;
+  if (!collection || !expectedCollection || !sameCollection(network, collection, expectedCollection)) return null;
+  if (network === 'BSC' && document.chainId !== undefined && document.chainId !== 56) return null;
   if (document.marketplaceListingStatus !== 'active' && !['BSC', 'TRON'].includes(network)) return null;
   return 'legacy' as const;
+}
+
+function ownerMatchesWallet(document: CanonicalCukieDocument, walletNormalized: string) {
+  return typeof document.ownerNormalized === 'string'
+    && document.ownerNormalized.toLowerCase() === walletNormalized;
 }
 
 function actionsForItem(input: {
@@ -172,6 +276,7 @@ export async function listMyCukieCollectionFromDb(input: {
   walletAddress: string;
   now?: Date;
   config?: UkiNftVaultPublicConfig;
+  marketplaceConfig?: UkiMarketplaceEligibilityConfig;
 }): Promise<MyCukieCollectionData> {
   const walletNormalized = normalizeWalletAddress(input.walletAddress)?.toLowerCase() ?? null;
   if (!walletNormalized) throw new DomainValidationError('walletAddress no es una dirección EVM válida.');
@@ -358,6 +463,15 @@ export async function listMyCukieCollectionFromDb(input: {
         ? currentMaster ? 'cukie_master' : 'cukie_pool'
       : master ? 'cukie_master' : pool ? 'cukie_pool' : 'wallet';
     const poolState = pool ? poolStatus(pool, now) : null;
+    const saleEligibility = resolveCukieSaleEligibility({
+      chainId: typeof document.chainId === 'number' ? document.chainId : null,
+      network: document.network,
+      collectionAddress: document.collectionAddressNormalized,
+      ownerMatches: ownerMatchesWallet(document, walletNormalized),
+      custody,
+      state,
+      marketplace: input.marketplaceConfig ?? ukiMarketplacePublicConfig,
+    });
     return {
       assetId,
       tokenId: id,
@@ -372,6 +486,10 @@ export async function listMyCukieCollectionFromDb(input: {
       chainId,
       collectionAddress: String(document.collectionAddressNormalized).toLowerCase(),
       saleKind,
+      // Un anuncio activo conserva su origen reconciliado: una orden UKI no
+      // se convierte en Legacy aunque ambas rutas compartan colección y cadena.
+      marketplaceSurface: saleKind ?? saleEligibility.surface,
+      sellSurfaces: saleEligibility.sellSurfaces,
       availableActions: actionsForItem({
         custody,
         state,
@@ -380,9 +498,7 @@ export async function listMyCukieCollectionFromDb(input: {
         saleKind,
         canDepositPool: poolReady,
         canStakeMaster: masterReady,
-        canSell: typeof document.network === 'string'
-          && document.network.toUpperCase() === 'TRON'
-          || (chainId === 56 && ukiMarketplacePublicConfig.ready),
+        canSell: saleEligibility.canSell,
       }),
       recoveryVaultAddress: recoveryPosition?.status === 'custodied'
         ? recoveryPosition.vaultAddress

@@ -13,6 +13,8 @@ describe('legacy marketplace runtime safety', () => {
     expect(runtime).toMatchObject({
       appEnv: 'staging',
       legacyMainnetEnabled: false,
+      legacyMainnetReadEnabled: true,
+      legacyMainnetOperationsEnabled: false,
       legacyMarketplaceActionsEnabled: true,
       bscChainId: 56,
       bscExplorerBaseUrl: 'https://bscscan.com',
@@ -30,6 +32,8 @@ describe('legacy marketplace runtime safety', () => {
     expect(runtime).toEqual({
       appEnv: 'production',
       legacyMainnetEnabled: true,
+      legacyMainnetReadEnabled: true,
+      legacyMainnetOperationsEnabled: true,
       legacyMarketplaceActionsEnabled: true,
       bscChainId: 56,
       bscExplorerBaseUrl: 'https://bscscan.com',
@@ -42,12 +46,16 @@ describe('legacy marketplace runtime safety', () => {
     expect(buildLegacyMarketplaceRuntime({})).toMatchObject({
       appEnv: 'unknown',
       legacyMainnetEnabled: false,
+      legacyMainnetReadEnabled: false,
+      legacyMainnetOperationsEnabled: false,
       legacyMarketplaceActionsEnabled: false,
       bscChainId: null,
     });
     expect(buildLegacyMarketplaceRuntime({ APP_ENV: 'preview' })).toMatchObject({
       appEnv: 'unknown',
       legacyMainnetEnabled: false,
+      legacyMainnetReadEnabled: false,
+      legacyMainnetOperationsEnabled: false,
       legacyMarketplaceActionsEnabled: false,
       bscChainId: null,
     });
@@ -72,9 +80,15 @@ describe('legacy marketplace runtime safety', () => {
     expect(getLegacyPointExplorerUrl(staging, 'BSC', 97, '0xtest')).toBe(
       'https://testnet.bscscan.com/tx/0xtest',
     );
-    expect(getLegacyPointExplorerUrl(staging, 'BSC', 56, '0xmain')).toBeNull();
-    expect(getLegacyPointExplorerUrl(staging, 'BSC', null, '0xlegacy')).toBeNull();
-    expect(getLegacyPointExplorerUrl(staging, 'TRON', null, 'tron-main')).toBeNull();
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', 56, '0xmain')).toBe(
+      'https://bscscan.com/tx/0xmain',
+    );
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', null, '0xlegacy')).toBe(
+      'https://bscscan.com/tx/0xlegacy',
+    );
+    expect(getLegacyPointExplorerUrl(staging, 'TRON', null, 'tron-main')).toBe(
+      'https://tronscan.org/#/transaction/tron-main',
+    );
   });
 
   it('conserva los exploradores legacy exclusivamente en produccion', () => {
