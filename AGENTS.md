@@ -197,6 +197,10 @@ supply it automatically. Never weaken the game's environment/resource guard.
 A World-only release may register images without delivering any running service;
 its no-op must preserve verified web/game identities and the six active digests.
 Do not infer served SHAs from the aggregate commit or an image source SHA.
+Before merging a CI/World-only change, compute the plan for the final candidate
+against the verified durable state, including new test paths. Confirm the
+expected build/reuse set and effective Compose; fixture tests do not replace
+this check. Stop before delivery if the live plan expands the agreed scope.
 Read `docs/deployment-environments.md` for the pipeline and the canonical INFRA
 row in `docs/antes-del-15-seguimiento.md` for current runtime evidence.
 

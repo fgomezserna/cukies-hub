@@ -59,6 +59,7 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/image-ref.mjs',
   'scripts/ci/generate-images-compose.mjs',
   'scripts/ci/world-integration.test.mjs',
+  'scripts/ci/world-runtime-smoke.test.mjs',
 ]);
 
 const DAPP_DOCKERFILE_REFINEMENT_REASON = 'dockerfile-ci-final-dapp-stage-only';
@@ -283,6 +284,7 @@ const WORLD_ROOT_FILES = new Set([
 
 function isWorldRefinementPath(path) {
   if (path === 'scripts/ci/world-runtime-smoke.mjs') return true;
+  if (path === 'scripts/ci/world-runtime-smoke.test.mjs') return true;
   if (path === 'scripts/ci/build-images.mjs') return true;
   if (WORLD_ROOT_FILES.has(path)) return true;
   if (worldAffectedForPath(path).length > 0) return true;
