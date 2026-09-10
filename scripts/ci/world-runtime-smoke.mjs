@@ -9,6 +9,8 @@
  * then delegates all runtime checks to the synthetic local-only harness.
  */
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const entries = [
@@ -16,40 +18,61 @@ const entries = [
   ['WORLD_MATCHMAKING_IMAGE', 'WORLD_MATCHMAKING_SOURCE_SHA', 'world-matchmaking'],
 ];
 
-function required(name) {
-  const value = process.env[name];
+function required(name, env = process.env) {
+  const value = env[name];
   if (!value) throw new Error(`World smoke exige ${name}.`);
   return value;
 }
 
-function docker(args, options = {}) {
-  return execFileSync('docker', args, {
+export function docker(args, options = {}) {
+  const output = execFileSync('docker', args, {
     encoding: 'utf8',
     stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
     ...options,
-  }).trim();
+  });
+  return typeof output === 'string' ? output.trim() : '';
 }
 
-function assertRevision(image, sourceSha, component) {
+export function assertRevision(image, sourceSha, component, dockerImpl = docker) {
   if (!/^[0-9a-f]{40}$/i.test(sourceSha)) throw new Error(`${component} source SHA inválido para smoke.`);
-  const labels = JSON.parse(docker(['image', 'inspect', image, '--format', '{{json .Config.Labels}}']) || '{}');
+  const labels = JSON.parse(dockerImpl(['image', 'inspect', image, '--format', '{{json .Config.Labels}}']) || '{}');
   const actual = labels?.['org.opencontainers.image.revision'] ?? null;
   if (actual !== sourceSha) {
     throw new Error(`${component} OCI revision ${actual ?? '(ausente)'} no coincide con sourceSha ${sourceSha}.`);
   }
 }
 
-for (const [imageName, shaName, component] of entries) {
-  const image = required(imageName);
-  const sourceSha = required(shaName);
-  // CI manifests use immutable registry references. A local opt-in check may
-  // set WORLD_SMOKE_SKIP_PULL while exercising tags built on the workstation.
-  if (process.env.WORLD_SMOKE_SKIP_PULL !== 'true') docker(['pull', image], { stdio: 'inherit' });
-  assertRevision(image, sourceSha, component);
+export function verifyWorldImages({ env = process.env, dockerImpl = docker } = {}) {
+  for (const [imageName, shaName, component] of entries) {
+    const image = required(imageName, env);
+    const sourceSha = required(shaName, env);
+    // CI manifests use immutable registry references. A local opt-in check may
+    // set WORLD_SMOKE_SKIP_PULL while exercising tags built on the workstation.
+    if (env.WORLD_SMOKE_SKIP_PULL !== 'true') dockerImpl(['pull', image], { stdio: 'inherit' });
+    assertRevision(image, sourceSha, component, dockerImpl);
+  }
 }
 
-const harness = fileURLToPath(new URL('../../infrastructure/world/tests/runtime-smoke.mjs', import.meta.url));
-execFileSync(process.execPath, [harness], {
-  stdio: 'inherit',
-  env: process.env,
-});
+export function runWorldRuntimeSmoke({ env = process.env, dockerImpl = docker, execImpl = execFileSync } = {}) {
+  verifyWorldImages({ env, dockerImpl });
+  const harness = fileURLToPath(new URL('../../infrastructure/world/tests/runtime-smoke.mjs', import.meta.url));
+  return execImpl(process.execPath, [harness], {
+    stdio: 'inherit',
+    env,
+  });
+}
+
+function canonicalPath(value, { isUrl = false } = {}) {
+  try {
+    return realpathSync(isUrl ? fileURLToPath(value) : resolve(value));
+  } catch {
+    return null;
+  }
+}
+
+export function isMainModule(moduleUrl, entryPath = process.argv[1]) {
+  if (!entryPath) return false;
+  return canonicalPath(moduleUrl, { isUrl: true }) === canonicalPath(entryPath);
+}
+
+if (isMainModule(import.meta.url)) runWorldRuntimeSmoke();

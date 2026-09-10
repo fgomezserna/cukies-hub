@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-10T03:11:17.235391+00:00",
+  "observedAt": "2026-09-10T03:34:46.761832+00:00",
   "scope": "World port preservation and common-CI integration; runtime and writes remain disabled",
   "source": {
     "pr": 346,
@@ -142,9 +142,108 @@
     }
   },
   "publication": {
-    "status": "root-reviewed; PR and publication gates pending",
-    "registryImagesPublished": false,
-    "worldActivated": false
+    "status": "first publication stopped; stdout and CLI entrypoint corrections reviewed, awaiting new PR/publication",
+    "registryImagesPublished": true,
+    "worldActivated": false,
+    "pr": 372,
+    "candidateHead": "76c5382e8a145f5ece88840bf6724d9f44cfa9d9",
+    "mergeCommit": "25284f97b91cea040cc2d2afa4838a2c87264d93",
+    "mergedAt": "2026-09-10T03:17:11Z",
+    "prCi": {
+      "runId": 34432440415,
+      "result": "SUCCESS",
+      "worldImagesBuiltAndSmokeExecuted": true
+    },
+    "publishCiRunId": 34432744474,
+    "squashTreeEqualsTestedCandidate": true,
+    "releaseRegistered": false,
+    "firstAttempt": {
+      "commit": "25284f97b91cea040cc2d2afa4838a2c87264d93",
+      "ciRunId": 34432744474,
+      "result": "FAILURE",
+      "built": [
+        "world-api",
+        "world-matchmaking"
+      ],
+      "reused": 6,
+      "worldImages": {
+        "world-api": {
+          "digest": "sha256:176e5d241ede4cf3487fd2c585b71ba3a0baa567225d178db5d4cbbc6a737450",
+          "sourceSha": "25284f97b91cea040cc2d2afa4838a2c87264d93"
+        },
+        "world-matchmaking": {
+          "digest": "sha256:2c16c45e24abc3a820aa41b5cc19b2e0735d694cc172ca0d37f5da2d1ecefd32",
+          "sourceSha": "25284f97b91cea040cc2d2afa4838a2c87264d93"
+        }
+      },
+      "failureStep": "Run World runtime smoke for a World image change",
+      "error": "TypeError: Cannot read properties of null (reading trim)",
+      "cause": "execFileSync with inherited stdio returned null after docker pull; helper called trim unconditionally",
+      "bootstrapPersistAndDeliverySteps": "SKIPPED",
+      "deployResultArtifactPresent": false,
+      "failureLogSha256": "4075e3211919650fffb444bf645999bf602eed4bbe0e25b46c0978284a8b04da",
+      "followUp": "Fix stdout handling, preserve mandatory pull/OCI/harness failures, test the real registry path",
+      "allSixActiveReferencesEqualPreflight": true
+    },
+    "stdoutCorrection": {
+      "sourceCommit": "329a01179ffa8949d937a18bbed1876e0557c623",
+      "integratedCommit": "71b34d03e3e080209cb22c6a831548d2c15f3e88",
+      "reviewedAt": "2026-09-10T03:32:14.305122+00:00",
+      "realBuilderSmoke": {
+        "host": "ciadmin@192.168.1.244",
+        "user": "cukies-ci",
+        "builder": "cukies-ci",
+        "platform": "linux/amd64",
+        "skipPull": false,
+        "images": {
+          "world-api": {
+            "image": "192.168.1.207:5000/cukies-hub/world-api:25284f97b91cea040cc2d2afa4838a2c87264d93-b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15@sha256:176e5d241ede4cf3487fd2c585b71ba3a0baa567225d178db5d4cbbc6a737450",
+            "digest": "sha256:176e5d241ede4cf3487fd2c585b71ba3a0baa567225d178db5d4cbbc6a737450"
+          },
+          "world-matchmaking": {
+            "image": "192.168.1.207:5000/cukies-hub/world-matchmaking:25284f97b91cea040cc2d2afa4838a2c87264d93-b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15@sha256:2c16c45e24abc3a820aa41b5cc19b2e0735d694cc172ca0d37f5da2d1ecefd32",
+            "digest": "sha256:2c16c45e24abc3a820aa41b5cc19b2e0735d694cc172ca0d37f5da2d1ecefd32"
+          }
+        },
+        "sourceSha": "25284f97b91cea040cc2d2afa4838a2c87264d93",
+        "exitCode": 0,
+        "pullMarkers": {
+          "apiDigestSeen": true,
+          "matchmakingDigestSeen": true,
+          "matchmakingDownloaded": true
+        },
+        "harnessPass": true,
+        "log": "/tmp/cukies-world372-pull-smoke-fixed.log",
+        "syntheticResidualContainers": [],
+        "syntheticResidualNetworks": [],
+        "tempDirectoryRemoved": true,
+        "builderCachePruned": false,
+        "registryPush": false,
+        "coolifyOrLiveMutation": false,
+        "imageRebuild": false
+      },
+      "tests": {
+        "focusedCommand": "node --test scripts/ci/world-runtime-smoke.test.mjs",
+        "focusedPassed": 5,
+        "focusedFailed": 0,
+        "ciCommand": "node --test scripts/ci/*.test.mjs scripts/assert-staging-only.test.mjs scripts/assert-production.test.mjs scripts/docker-dapp-server.test.mjs scripts/docker-start-game-ci.test.mjs infrastructure/world/tests/compose-profile.test.mjs",
+        "ciPassed": 131,
+        "ciFailed": 0
+      },
+      "rootLogMarkersVerified": true,
+      "logSha256": "97518ebe6cf8289dbc41dc3a2bba09c6da9ba30cb5ff6a5df94958db16e5889e",
+      "entrypointReview": "Resolved by canonical URL/path/realpath comparison; CLI with missing references under a spaced path exits1 instead of skipping.",
+      "entrypointCorrectionSource": "207096dc0f8c4b9e14a80fd882ef767ae3bd9599",
+      "entrypointCorrectionIntegrated": "7fa1c9a512b1a445be1fe4f4aec106ab1c675ebd",
+      "finalTests": {
+        "sourceSha": "207096dc0f8c4b9e14a80fd882ef767ae3bd9599",
+        "focalPassed": 6,
+        "ciSuitePassed": 132,
+        "failed": 0,
+        "rootDiffReview": "PASS",
+        "runtimeGateBodyUnchangedSinceRealPullSmoke": true
+      }
+    }
   },
   "remainingMigration": [
     "World delivery activation and operational image/readiness validation",
@@ -160,5 +259,29 @@
     "diffWhitespace": "PASS",
     "globalAndRepoInstructionBytes": 31016,
     "productGatesNotRepeatedForDocs": true
+  },
+  "preflight": {
+    "observedAt": "2026-09-10T03:15:44.901808+00:00",
+    "artifactSha256": "06a43bd895857bde3788cba253dc6b4c75f632f496133dd3dc2b3c8363dd2f53",
+    "allPass": true,
+    "checks": {
+      "protected13IdsImagesRestartsUnchanged": true,
+      "stageWorkers10": true,
+      "productionContainers3": true,
+      "journalClean": true,
+      "sixReferences": true,
+      "releaseIdentity": true,
+      "configHash": true,
+      "webContainer": true,
+      "gameContainer": true,
+      "webDigest": true,
+      "gameDigest": true,
+      "webGuard": true,
+      "gameGuard": true,
+      "webHealthReady": true,
+      "gameHealthReady": true,
+      "worldRuntimeInactive": true
+    },
+    "sourceArtifact": "/tmp/cukies-world-preflight-20260910.json"
   }
 }
