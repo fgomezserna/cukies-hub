@@ -1,3 +1,5 @@
+import { TronWeb } from 'tronweb';
+
 import { legacyMarketplaceTronAbis } from './abis';
 import {
   legacyMarketplaceContracts,
@@ -13,6 +15,10 @@ type LegacyTronContractInstance = Record<
   string,
   (...args: readonly unknown[]) => LegacyTronContractCall
 >;
+
+type LegacyTronReadWeb = LegacyTronWebLike & {
+  setAddress?: (address: string) => unknown;
+};
 
 export const LEGACY_TRON_MAINNET_RPC_URL = 'https://api.trongrid.io';
 
@@ -64,11 +70,48 @@ export type LegacyTronWebLike = {
     base58?: string;
     hex?: string;
   };
+  setAddress?: (address: string) => unknown;
   contract: (
     abi: unknown,
     address: string,
   ) => LegacyTronContractInstance | Promise<LegacyTronContractInstance>;
 };
+
+let legacyTronReadWeb: LegacyTronReadWeb | null = null;
+let legacyTronReadRpcUrl: string | null = null;
+
+/**
+ * Returns a browser-safe TronWeb instance backed by the configured read RPC.
+ *
+ * This provider is intentionally separate from the wallet's `window.tronWeb`:
+ * callers may set its read address, while wallet context and all write guards
+ * remain the caller's job.
+ */
+export function getLegacyTronReadWeb(address?: string | null) {
+  const readRpcUrl = legacyMarketplaceContracts.tron.readRpcUrl;
+  if (!readRpcUrl) return null;
+
+  if (!legacyTronReadWeb || legacyTronReadRpcUrl !== readRpcUrl) {
+    try {
+      legacyTronReadWeb = new TronWeb({ fullHost: readRpcUrl }) as unknown as LegacyTronReadWeb;
+      legacyTronReadRpcUrl = readRpcUrl;
+    } catch {
+      legacyTronReadWeb = null;
+      legacyTronReadRpcUrl = null;
+      return null;
+    }
+  }
+
+  if (address && typeof legacyTronReadWeb.setAddress === 'function') {
+    try {
+      legacyTronReadWeb.setAddress(address);
+    } catch {
+      return null;
+    }
+  }
+
+  return legacyTronReadWeb;
+}
 
 export async function getTronContractAt(
   tronWeb: LegacyTronWebLike,
