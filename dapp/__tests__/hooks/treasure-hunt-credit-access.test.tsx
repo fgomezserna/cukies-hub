@@ -15,7 +15,7 @@ jest.mock('@/providers/auth-provider', () => ({
   useAuth: () => mockAuthState,
 }));
 
-function statusResponse() {
+function statusResponse(materialization = { balance: 'ready', pool: 'ready' }) {
   return new Response(JSON.stringify({
     data: {
       rule: {
@@ -34,6 +34,7 @@ function statusResponse() {
         reservedCredits: 0,
         blocked: false,
       },
+      materialization,
       currentRun: {
         routes: [
           { status: 'open' },
@@ -93,6 +94,30 @@ describe('useTreasureHuntCreditAccess', () => {
     expect(result.current.canPlay).toBe(false);
     expect(result.current.blocked).toBe(true);
     expect(result.current.costCredits).toBeNull();
+    expect(result.current.ownAvailableCredits).toBeNull();
+    expect(result.current.poolAvailableCredits).toBeNull();
+  });
+
+  it('trata una proyección stale como no verificable aunque el endpoint responda 200', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      statusResponse({ balance: 'ready', pool: 'stale' }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+      },
+    });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useTreasureHuntCreditAccess(), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.ready).toBe(false);
+    expect(result.current.availabilityReason).toBe('projection_unavailable');
+    expect(result.current.creditSource).toBeNull();
+    expect(result.current.canPlay).toBe(false);
     expect(result.current.ownAvailableCredits).toBeNull();
     expect(result.current.poolAvailableCredits).toBeNull();
   });

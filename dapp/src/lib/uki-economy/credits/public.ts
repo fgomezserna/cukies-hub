@@ -11,6 +11,13 @@ import {
   validCreditWallet,
 } from './rules';
 import { isBlockingCreditIncident } from './integrity';
+import {
+  EMPTY_CREDIT_LOT_ACCOUNTING,
+  materializationStateRank,
+  materializeCreditLots,
+  worseMaterializationState,
+  type CreditMaterializationState,
+} from './materialization';
 import type {
   CompetitionCreditRule,
   CreditAccountPeriod,
@@ -52,43 +59,101 @@ function isOpenCreditRun(status: CompetitionCreditRun['status']) {
   return status === 'open' || status === 'open_with_holds';
 }
 
-function summarizeUsableLots(input: {
+type PublicLotMaterialization = {
+  state: CreditMaterializationState;
+  totals: ReturnType<typeof materializeCreditLots>['totals'];
+  usableCredits: number;
+};
+
+function markPublicLotIssue(
+  current: CreditMaterializationState,
+  next: CreditMaterializationState,
+) {
+  return materializationStateRank(current) >= materializationStateRank(next)
+    ? current
+    : next;
+}
+
+function materializePublicLots(input: {
   lots: CreditLot[];
   bucket: CreditLot['bucket'];
   walletNormalized: string;
   periodId: string;
+  route: CreditRoute;
   openRunIdsByRoute: ReadonlyMap<CreditRoute, ReadonlySet<string>>;
   now: Date;
-}) {
-  if (input.lots.length > MAX_PUBLIC_CREDIT_LOTS) {
-    throw new DomainConflictError('La proyeccion publica de lotes de creditos excede el limite seguro.', {
-      reason: 'CREDIT_LOT_PROJECTION_TOO_LARGE',
-    });
-  }
-  const totals: Record<CreditRoute, number> = { uki: 0, nft: 0 };
+}): PublicLotMaterialization {
+  const materialized = materializeCreditLots(input.lots, MAX_PUBLIC_CREDIT_LOTS);
+  let state = materialized.state;
+  let usableCredits = 0;
   for (const lot of input.lots) {
-    const openRunIds = input.openRunIdsByRoute.get(lot.route);
     if (
       lot.bucket !== input.bucket
       || lot.periodId !== input.periodId
-      || !openRunIds?.has(lot.runId)
-      || lot.blocked !== false
+      || lot.route !== input.route
+      || typeof lot.runId !== 'string'
       || (input.bucket === 'own' && lot.walletNormalized !== input.walletNormalized)
       || (input.bucket === 'pool' && lot.walletNormalized !== null)
-      || !(lot.expiresAt instanceof Date)
-      || Number.isNaN(lot.expiresAt.getTime())
-      || lot.expiresAt.getTime() <= input.now.getTime()
     ) {
+      state = markPublicLotIssue(state, 'unknown');
       continue;
     }
-    const availableCredits = exactCredits(
-      lot.availableCredits,
-      `${input.bucket}.${lot.lotId}.availableCredits`,
-    );
-    if (availableCredits <= 0) continue;
-    totals[lot.route] = assertCreditAmount(totals[lot.route] + availableCredits);
+    const inspected = materializeCreditLots([lot], 1);
+    if (inspected.state !== 'ready') continue;
+    if (
+      !(lot.expiresAt instanceof Date)
+      || Number.isNaN(lot.expiresAt.getTime())
+    ) {
+      state = markPublicLotIssue(state, 'unknown');
+      continue;
+    }
+    const openRunIds = input.openRunIdsByRoute.get(input.route);
+    if (
+      !openRunIds?.has(lot.runId)
+      || lot.expiresAt.getTime() <= input.now.getTime()
+      || lot.availableCredits <= 0
+    ) continue;
+    const next = usableCredits + lot.availableCredits;
+    if (!Number.isSafeInteger(next)) {
+      state = markPublicLotIssue(state, 'unknown');
+      continue;
+    }
+    usableCredits = next;
   }
-  return totals;
+  if (state !== 'ready') usableCredits = 0;
+  return { state, totals: materialized.totals, usableCredits };
+}
+
+function projectionState(input: {
+  lotMaterialization: PublicLotMaterialization;
+  projection: Record<string, unknown> | null;
+  expected: Record<string, number>;
+  fields: readonly string[];
+}): CreditMaterializationState {
+  if (input.lotMaterialization.state !== 'ready') {
+    return input.lotMaterialization.state;
+  }
+  if (!input.projection) return 'ready';
+  if (input.projection.blocked === true) return 'blocked';
+  if (input.projection.blocked !== false) return 'unknown';
+  for (const field of input.fields) {
+    const value = input.projection[field];
+    if (!Number.isSafeInteger(value) || (value as number) < 0) return 'unknown';
+    if (value !== input.expected[field]) return 'stale';
+  }
+  return 'ready';
+}
+
+function safeProjectedCredits(
+  projection: Record<string, unknown> | null,
+  field: string,
+  label: string,
+) {
+  if (!projection) return null;
+  if (!Number.isSafeInteger(projection[field]) || (projection[field] as number) < 0) {
+    return null;
+  }
+  return exactCredits(projection[field], label);
 }
 
 export async function getCompetitionCreditWalletStatus(
@@ -231,44 +296,56 @@ export async function getCompetitionCreditWalletStatus(
     ids.add(run.runId);
     openRunIdsByRoute.set(run.route, ids);
   }
-  const openRunIds = [...openRunIdsByRoute.values()].flatMap((ids) => [...ids]);
-  const [ownLots, poolLots]: [CreditLot[], CreditLot[]] = openRunIds.length === 0
-    ? [[], []]
-    : await Promise.all([
-      db.collection<CreditLot>('competition_credit_lots').find({
-        walletNormalized,
-        periodId: period.periodId,
-        route: { $in: routes },
-        runId: { $in: openRunIds },
-        blocked: false,
-        availableCredits: { $gt: 0 },
-        expiresAt: { $gt: now },
-      }).limit(MAX_PUBLIC_CREDIT_LOTS + 1).toArray(),
-      db.collection<CreditLot>('competition_credit_pool_lots').find({
-        periodId: period.periodId,
-        route: { $in: routes },
-        runId: { $in: openRunIds },
-        blocked: false,
-        availableCredits: { $gt: 0 },
-        expiresAt: { $gt: now },
-      }).limit(MAX_PUBLIC_CREDIT_LOTS + 1).toArray(),
-    ]);
-  const usableOwnCredits = summarizeUsableLots({
-    lots: ownLots,
-    bucket: 'own',
-    walletNormalized,
-    periodId: period.periodId,
-    openRunIdsByRoute,
-    now,
-  });
-  const usablePoolCredits = summarizeUsableLots({
-    lots: poolLots,
-    bucket: 'pool',
-    walletNormalized,
-    periodId: period.periodId,
-    openRunIdsByRoute,
-    now,
-  });
+  // Reconcile every lot in the current period, not only lots that happen to
+  // be usable right now. A closed/blocked historical lot must not make an
+  // absent or stale projection look healthy.
+  const [ownLots, poolLots]: [CreditLot[], CreditLot[]] = await Promise.all([
+    db.collection<CreditLot>('competition_credit_lots').find({
+      walletNormalized,
+      periodId: period.periodId,
+      route: { $in: routes },
+    }).limit(MAX_PUBLIC_CREDIT_LOTS + 1).toArray(),
+    db.collection<CreditLot>('competition_credit_pool_lots').find({
+      periodId: period.periodId,
+      route: { $in: routes },
+    }).limit(MAX_PUBLIC_CREDIT_LOTS + 1).toArray(),
+  ]);
+  const ownLotsByRoute = Object.fromEntries(routes.map((route) => [
+    route,
+    ownLots.filter((lot) => lot.route === route),
+  ])) as Record<CreditRoute, CreditLot[]>;
+  const poolLotsByRoute = Object.fromEntries(routes.map((route) => [
+    route,
+    poolLots.filter((lot) => lot.route === route),
+  ])) as Record<CreditRoute, CreditLot[]>;
+  const ownMaterialization = Object.fromEntries(routes.map((route) => [
+    route,
+    ownLots.length > MAX_PUBLIC_CREDIT_LOTS
+      ? { state: 'too_large' as const, totals: { ...EMPTY_CREDIT_LOT_ACCOUNTING }, usableCredits: 0 }
+      : materializePublicLots({
+          lots: ownLotsByRoute[route],
+          bucket: 'own',
+          walletNormalized,
+          periodId: period.periodId,
+          route,
+          openRunIdsByRoute,
+          now,
+        }),
+  ])) as Record<CreditRoute, PublicLotMaterialization>;
+  const poolMaterialization = Object.fromEntries(routes.map((route) => [
+    route,
+    poolLots.length > MAX_PUBLIC_CREDIT_LOTS
+      ? { state: 'too_large' as const, totals: { ...EMPTY_CREDIT_LOT_ACCOUNTING }, usableCredits: 0 }
+      : materializePublicLots({
+          lots: poolLotsByRoute[route],
+          bucket: 'pool',
+          walletNormalized,
+          periodId: period.periodId,
+          route,
+          openRunIdsByRoute,
+          now,
+        }),
+  ])) as Record<CreditRoute, PublicLotMaterialization>;
 
   const configurations = await Promise.all(slots.map(async (slot) => {
     const creditEligibleFrom = exactDate(slot.creditEligibleFrom, 'creditEligibleFrom');
@@ -301,11 +378,13 @@ export async function getCompetitionCreditWalletStatus(
     spentCredits: number | null;
     expiredCredits: number | null;
     blocked: boolean;
+    materialization: { state: CreditMaterializationState };
   };
   type PublicPoolBalance = {
     availableCredits: number;
     reservedCredits: number | null;
     blocked: boolean;
+    materialization: { state: CreditMaterializationState };
   };
   const emptyBalance: PublicBalance = {
     grantedCredits: null,
@@ -315,16 +394,51 @@ export async function getCompetitionCreditWalletStatus(
     spentCredits: null,
     expiredCredits: null,
     blocked: false,
+    materialization: { state: 'ready' },
   };
-  const accountProjectionComplete = routes.every((route) => (
-    accounts.some((candidate) => candidate.route === route)
-  ));
-  const poolProjectionComplete = routes.every((route) => (
-    pools.some((candidate) => candidate.route === route)
-  ));
   const routeStatus = Object.fromEntries(routes.map((route) => {
     const account = accounts.find((candidate) => candidate.route === route);
     const pool = pools.find((candidate) => candidate.route === route);
+    const ownLotState = ownMaterialization[route];
+    const poolLotState = poolMaterialization[route];
+    const accountState = projectionState({
+      lotMaterialization: ownLotState,
+      projection: account as unknown as Record<string, unknown> | null,
+      expected: {
+        grantedCredits: ownLotState.totals.totalCredits,
+        poolDepositedCredits: ownLotState.totals.poolDepositedCredits,
+        availableCredits: ownLotState.totals.availableCredits,
+        reservedCredits: ownLotState.totals.reservedCredits,
+        spentCredits: ownLotState.totals.spentCredits,
+        expiredCredits: ownLotState.totals.expiredCredits,
+      },
+      fields: [
+        'grantedCredits',
+        'poolDepositedCredits',
+        'availableCredits',
+        'reservedCredits',
+        'spentCredits',
+        'expiredCredits',
+      ],
+    });
+    const poolState = projectionState({
+      lotMaterialization: poolLotState,
+      projection: pool as unknown as Record<string, unknown> | null,
+      expected: {
+        contributedCredits: poolLotState.totals.totalCredits,
+        availableCredits: poolLotState.totals.availableCredits,
+        reservedCredits: poolLotState.totals.reservedCredits,
+        spentCredits: poolLotState.totals.spentCredits,
+        expiredCredits: poolLotState.totals.expiredCredits,
+      },
+      fields: [
+        'contributedCredits',
+        'availableCredits',
+        'reservedCredits',
+        'spentCredits',
+        'expiredCredits',
+      ],
+    });
     const watermark = watermarks.find((candidate) => candidate.route === route);
     const openIncidents = routeIncidentCounts.find((candidate) => candidate.route === route)?.count ?? 0;
     const observedThrough = watermark?.observedThrough instanceof Date
@@ -332,25 +446,29 @@ export async function getCompetitionCreditWalletStatus(
       : null;
     return [route, {
       balance: account ? {
-        grantedCredits: exactCredits(account.grantedCredits, `${route}.grantedCredits`),
-        poolDepositedCredits: exactCredits(account.poolDepositedCredits, `${route}.poolDepositedCredits`),
-        availableCredits: usableOwnCredits[route],
-        reservedCredits: exactCredits(account.reservedCredits, `${route}.reservedCredits`),
-        spentCredits: exactCredits(account.spentCredits, `${route}.spentCredits`),
-        expiredCredits: exactCredits(account.expiredCredits, `${route}.expiredCredits`),
+        grantedCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'grantedCredits', `${route}.grantedCredits`),
+        poolDepositedCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'poolDepositedCredits', `${route}.poolDepositedCredits`),
+        availableCredits: accountState === 'ready' ? ownLotState.usableCredits : 0,
+        reservedCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'reservedCredits', `${route}.reservedCredits`),
+        spentCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'spentCredits', `${route}.spentCredits`),
+        expiredCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'expiredCredits', `${route}.expiredCredits`),
         blocked: account.blocked === true,
+        materialization: { state: accountState },
       } : {
         ...emptyBalance,
-        availableCredits: usableOwnCredits[route],
+        availableCredits: accountState === 'ready' ? ownLotState.usableCredits : 0,
+        materialization: { state: accountState },
       },
       pool: pool ? {
-        availableCredits: usablePoolCredits[route],
-        reservedCredits: exactCredits(pool.reservedCredits, `${route}.pool.reservedCredits`),
+        availableCredits: poolState === 'ready' ? poolLotState.usableCredits : 0,
+        reservedCredits: safeProjectedCredits(pool as unknown as Record<string, unknown>, 'reservedCredits', `${route}.pool.reservedCredits`),
         blocked: pool.blocked === true,
+        materialization: { state: poolState },
       } : {
-        availableCredits: usablePoolCredits[route],
+        availableCredits: poolState === 'ready' ? poolLotState.usableCredits : 0,
         reservedCredits: null,
         blocked: false,
+        materialization: { state: poolState },
       },
       grants: {
         healthy: watermark?.status === 'healthy'
@@ -366,6 +484,30 @@ export async function getCompetitionCreditWalletStatus(
     pool: PublicPoolBalance;
     grants: { healthy: boolean; sourceObservedThrough: Date | null; openIncidents: number };
   }>;
+  const accountProjectionComplete = routes.every((route) => (
+    accounts.some((candidate) => (
+      candidate.route === route && routeStatus[route].balance.materialization.state === 'ready'
+    ))
+  ));
+  const poolProjectionComplete = routes.every((route) => (
+    pools.some((candidate) => (
+      candidate.route === route && routeStatus[route].pool.materialization.state === 'ready'
+    ))
+  ));
+  const balanceMaterialization = routes.reduce<CreditMaterializationState>(
+    (state, route) => worseMaterializationState(
+      state,
+      routeStatus[route].balance.materialization.state,
+    ),
+    'ready',
+  );
+  const poolMaterializationState = routes.reduce<CreditMaterializationState>(
+    (state, route) => worseMaterializationState(
+      state,
+      routeStatus[route].pool.materialization.state,
+    ),
+    'ready',
+  );
   const knownOpenIncidents = routeIncidentCounts.reduce((total, item) => total + item.count, 0);
   const openIncidents = knownOpenIncidents + unknownRouteIncidentCount;
   const globallyBlocked = openIncidents > 0 || blockedAccountCount > 0;
@@ -376,7 +518,9 @@ export async function getCompetitionCreditWalletStatus(
     poolDepositedCredits: accountProjectionComplete
       ? routes.reduce((total, route) => total + (routeStatus[route].balance.poolDepositedCredits ?? 0), 0)
       : null,
-    availableCredits: routes.reduce((total, route) => total + routeStatus[route].balance.availableCredits, 0),
+    availableCredits: balanceMaterialization === 'ready'
+      ? routes.reduce((total, route) => total + routeStatus[route].balance.availableCredits, 0)
+      : 0,
     reservedCredits: accountProjectionComplete
       ? routes.reduce((total, route) => total + (routeStatus[route].balance.reservedCredits ?? 0), 0)
       : null,
@@ -387,13 +531,17 @@ export async function getCompetitionCreditWalletStatus(
       ? routes.reduce((total, route) => total + (routeStatus[route].balance.expiredCredits ?? 0), 0)
       : null,
     blocked: routes.some((route) => routeStatus[route].balance.blocked) || globallyBlocked,
+    materialization: { state: balanceMaterialization },
   };
   const poolBalance: PublicPoolBalance = {
-    availableCredits: routes.reduce((total, route) => total + routeStatus[route].pool.availableCredits, 0),
+    availableCredits: poolMaterializationState === 'ready'
+      ? routes.reduce((total, route) => total + routeStatus[route].pool.availableCredits, 0)
+      : 0,
     reservedCredits: poolProjectionComplete
       ? routes.reduce((total, route) => total + (routeStatus[route].pool.reservedCredits ?? 0), 0)
       : null,
     blocked: routes.some((route) => routeStatus[route].pool.blocked),
+    materialization: { state: poolMaterializationState },
   };
   const observed = routes
     .map((route) => routeStatus[route].grants.sourceObservedThrough)
@@ -417,6 +565,10 @@ export async function getCompetitionCreditWalletStatus(
       })),
     },
     period,
+    materialization: {
+      balance: balanceMaterialization,
+      pool: poolMaterializationState,
+    },
     balance,
     pool: poolBalance,
     routes: routeStatus,

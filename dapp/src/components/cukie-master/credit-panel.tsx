@@ -22,6 +22,7 @@ import {
 } from '@/components/cukie-master/credit-history';
 import { useAuth } from '@/providers/auth-provider';
 import { appRuntimeEndpoint, useAppRuntime, useAppRuntimeResource } from '@/providers/app-runtime-provider';
+import type { CreditMaterializationState } from '@/lib/uki-economy/credits/materialization';
 
 type CreditConfiguration = {
   slotId: string;
@@ -35,8 +36,8 @@ type CreditConfiguration = {
 };
 
 type CreditRouteStatus = {
-  balance: { blocked: boolean };
-  pool: { blocked: boolean };
+  balance: { blocked: boolean; materialization: { state: CreditMaterializationState } };
+  pool: { blocked: boolean; materialization: { state: CreditMaterializationState } };
   grants: { healthy: boolean; sourceObservedThrough: string | null; openIncidents: number };
 };
 
@@ -274,6 +275,20 @@ export function CompetitionCreditPanel() {
         || typeof source.balance?.blocked !== 'boolean'
         || typeof source.pool?.blocked !== 'boolean'
       ) return 'unknown';
+      const materializationStates = [
+        source.balance.materialization?.state,
+        source.pool.materialization?.state,
+      ];
+      if (!materializationStates.every((state) => (
+        state === 'ready'
+        || state === 'blocked'
+        || state === 'unknown'
+        || state === 'too_large'
+        || state === 'stale'
+      ))) return 'unknown';
+      if (materializationStates.some((state) => state !== 'ready')) {
+        return materializationStates.includes('blocked') ? 'blocked' : 'unknown';
+      }
       if (source.grants.healthy && !source.balance.blocked && !source.pool.blocked) return 'healthy';
       return 'blocked';
     };

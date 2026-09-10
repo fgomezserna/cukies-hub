@@ -69,10 +69,13 @@ async function loadCredits(
     && status.balance.spentCredits !== null
     && status.balance.poolDepositedCredits !== null
     && status.pool.reservedCredits !== null;
+  const materializationReady = status.materialization.balance === 'ready'
+    && status.materialization.pool === 'ready';
   const healthy = status.grants.healthy
     && !status.balance.blocked
     && !status.pool.blocked
-    && projectionsComplete;
+    && projectionsComplete
+    && materializationReady;
   return {
     data: {
       availableCredits: status.balance.availableCredits,
@@ -89,6 +92,7 @@ async function loadCredits(
       ...(status.balance.blocked ? ['CREDIT_BALANCE_BLOCKED'] : []),
       ...(status.pool.blocked ? ['CREDIT_POOL_BLOCKED'] : []),
       ...(projectionsComplete ? [] : ['CREDIT_BALANCE_PROJECTION_INCOMPLETE']),
+      ...(materializationReady ? [] : ['CREDIT_PROJECTION_MATERIALIZATION_UNAVAILABLE']),
     ],
   };
 }

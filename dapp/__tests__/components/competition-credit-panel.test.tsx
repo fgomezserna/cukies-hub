@@ -76,13 +76,13 @@ function statusResponse() {
         pool: { availableCredits: 400, reservedCredits: 10, blocked: false },
         routes: {
           uki: {
-            balance: { blocked: false },
-            pool: { blocked: false },
+            balance: { blocked: false, materialization: { state: 'ready' } },
+            pool: { blocked: false, materialization: { state: 'ready' } },
             grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
           },
           nft: {
-            balance: { blocked: false },
-            pool: { blocked: false },
+            balance: { blocked: false, materialization: { state: 'ready' } },
+            pool: { blocked: false, materialization: { state: 'ready' } },
             grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
           },
         },

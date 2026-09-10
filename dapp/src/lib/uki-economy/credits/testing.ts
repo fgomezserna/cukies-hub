@@ -12,8 +12,11 @@ import {
   safeCompetitionCreditPeriodScopeId,
   safeCompetitionCreditSettlementPeriodScopeId,
   stableCreditHash,
-  sumExactCredits,
 } from "./rules";
+import {
+  materializeCreditLots,
+  type CreditMaterializationState,
+} from './materialization';
 import {
   isBlockingCreditIncident,
   isBlockingCreditIncidentGlobally,
@@ -525,6 +528,60 @@ export class MemoryCompetitionCreditRepository
     );
   }
 
+  private materializationConflict(
+    id: string,
+    state: CreditMaterializationState,
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    const reason = state === "stale"
+      ? "CREDIT_PROJECTION_STALE"
+      : state === "blocked"
+        ? "CREDIT_LOTS_BLOCKED"
+        : state === "too_large"
+          ? "CREDIT_LOT_PROJECTION_TOO_LARGE"
+          : "CREDIT_LOT_MATERIALIZATION_UNKNOWN";
+    return new DomainConflictError(
+      `La ${kind} ${id} no puede reconciliarse de forma segura (${state}).`,
+      { reason },
+    );
+  }
+
+  private assertProjectionCoherent(
+    id: string,
+    projection: Record<string, unknown>,
+    expected: Record<string, number>,
+    increments: Partial<Record<string, number>>,
+    fields: readonly string[],
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    if (projection.blocked === true) {
+      throw this.materializationConflict(id, "blocked", kind);
+    }
+    if (projection.blocked !== false) {
+      throw this.materializationConflict(id, "unknown", kind);
+    }
+    for (const field of fields) {
+      const current = projection[field];
+      if (!Number.isSafeInteger(current) || (current as number) < 0) {
+        throw this.materializationConflict(id, "unknown", kind);
+      }
+      const delta = increments[field] ?? 0;
+      if (!Number.isSafeInteger(delta)) {
+        throw this.materializationConflict(id, "unknown", kind);
+      }
+      const next = (current as number) + delta;
+      if (!Number.isSafeInteger(next) || next < 0) {
+        throw new DomainConflictError(
+          `La ${kind} ${id} produciria un saldo negativo o inseguro.`,
+          { reason: "CREDIT_PROJECTION_NEGATIVE" },
+        );
+      }
+      if (next !== expected[field]) {
+        throw this.materializationConflict(id, "stale", kind);
+      }
+    }
+  }
+
   private incrementAccount(
     walletNormalized: string,
     periodId: string,
@@ -544,35 +601,28 @@ export class MemoryCompetitionCreditRepository
   ) {
     const id = accountId(walletNormalized, periodId, route);
     let account = this.state.accounts.find((item) => item._id === id);
-    if (!account) {
-      const lots = this.state.ownLots.filter(
+    const materialized = materializeCreditLots(
+      this.state.ownLots.filter(
         (lot) =>
           lot.walletNormalized === walletNormalized &&
           lot.periodId === periodId &&
           lot.route === route,
-      );
+      ),
+      5_000,
+    );
+    if (materialized.state !== "ready") {
+      throw this.materializationConflict(id, materialized.state, "cuenta");
+    }
+    if (!account) {
       const materialization = {
-        grantedCredits: sumExactCredits(lots.map((lot) => lot.totalCredits)),
-        poolDepositedCredits: sumExactCredits(
-          lots.map((lot) => lot.poolDepositedCredits),
-        ),
-        availableCredits: sumExactCredits(
-          lots.map((lot) => lot.availableCredits),
-        ),
-        reservedCredits: sumExactCredits(
-          lots.map((lot) => lot.reservedCredits),
-        ),
-        spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
-        expiredCredits: sumExactCredits(
-          lots.map((lot) => lot.expiredCredits),
-        ),
-        blocked: lots.some((lot) => lot.blocked !== false),
+        grantedCredits: materialized.totals.totalCredits,
+        poolDepositedCredits: materialized.totals.poolDepositedCredits,
+        availableCredits: materialized.totals.availableCredits,
+        reservedCredits: materialized.totals.reservedCredits,
+        spentCredits: materialized.totals.spentCredits,
+        expiredCredits: materialized.totals.expiredCredits,
+        blocked: false,
       };
-      if (materialization.blocked) {
-        throw new DomainConflictError(
-          `La cuenta de creditos ${id} tiene lotes bloqueados.`,
-        );
-      }
       account = {
         _id: id,
         walletNormalized,
@@ -588,6 +638,28 @@ export class MemoryCompetitionCreditRepository
       // this projection to be materialized.
       return;
     }
+    this.assertProjectionCoherent(
+      id,
+      account as unknown as Record<string, unknown>,
+      {
+        grantedCredits: materialized.totals.totalCredits,
+        poolDepositedCredits: materialized.totals.poolDepositedCredits,
+        availableCredits: materialized.totals.availableCredits,
+        reservedCredits: materialized.totals.reservedCredits,
+        spentCredits: materialized.totals.spentCredits,
+        expiredCredits: materialized.totals.expiredCredits,
+      },
+      increments,
+      [
+        "grantedCredits",
+        "poolDepositedCredits",
+        "availableCredits",
+        "reservedCredits",
+        "spentCredits",
+        "expiredCredits",
+      ],
+      "cuenta",
+    );
     for (const [key, value] of Object.entries(increments)) {
       (account as unknown as Record<string, number>)[key] += value ?? 0;
     }
@@ -612,31 +684,24 @@ export class MemoryCompetitionCreditRepository
   ) {
     const id = poolPeriodId(periodId, route);
     let pool = this.state.poolPeriods.find((item) => item._id === id);
-    if (!pool) {
-      const lots = this.state.poolLots.filter(
+    const materialized = materializeCreditLots(
+      this.state.poolLots.filter(
         (lot) => lot.periodId === periodId && lot.route === route,
-      );
+      ),
+      5_000,
+    );
+    if (materialized.state !== "ready") {
+      throw this.materializationConflict(id, materialized.state, "periodo de pool");
+    }
+    if (!pool) {
       const materialization = {
-        contributedCredits: sumExactCredits(
-          lots.map((lot) => lot.totalCredits),
-        ),
-        availableCredits: sumExactCredits(
-          lots.map((lot) => lot.availableCredits),
-        ),
-        reservedCredits: sumExactCredits(
-          lots.map((lot) => lot.reservedCredits),
-        ),
-        spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
-        expiredCredits: sumExactCredits(
-          lots.map((lot) => lot.expiredCredits),
-        ),
-        blocked: lots.some((lot) => lot.blocked !== false),
+        contributedCredits: materialized.totals.totalCredits,
+        availableCredits: materialized.totals.availableCredits,
+        reservedCredits: materialized.totals.reservedCredits,
+        spentCredits: materialized.totals.spentCredits,
+        expiredCredits: materialized.totals.expiredCredits,
+        blocked: false,
       };
-      if (materialization.blocked) {
-        throw new DomainConflictError(
-          `El periodo de pool ${id} tiene lotes bloqueados.`,
-        );
-      }
       pool = {
         _id: id,
         periodId,
@@ -651,6 +716,26 @@ export class MemoryCompetitionCreditRepository
       // this projection to be materialized.
       return;
     }
+    this.assertProjectionCoherent(
+      id,
+      pool as unknown as Record<string, unknown>,
+      {
+        contributedCredits: materialized.totals.totalCredits,
+        availableCredits: materialized.totals.availableCredits,
+        reservedCredits: materialized.totals.reservedCredits,
+        spentCredits: materialized.totals.spentCredits,
+        expiredCredits: materialized.totals.expiredCredits,
+      },
+      increments,
+      [
+        "contributedCredits",
+        "availableCredits",
+        "reservedCredits",
+        "spentCredits",
+        "expiredCredits",
+      ],
+      "periodo de pool",
+    );
     for (const [key, value] of Object.entries(increments)) {
       (pool as unknown as Record<string, number>)[key] += value ?? 0;
     }
