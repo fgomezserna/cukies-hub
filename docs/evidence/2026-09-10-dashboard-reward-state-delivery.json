@@ -1,0 +1,65 @@
+{
+  "recordedAt": "2026-09-10T13:25:18.005426+00:00",
+  "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/387",
+  "sourceCommit": "d191eb63076094ded9aaadff2c12ba8806e846ef",
+  "candidateCommit": "91a2ad798e9ebf3c0af6203a83a44dc245b32707",
+  "mergeCommit": "f9685b93fd841f0eaa6c61ad1e7860d63879087d",
+  "environment": "staging",
+  "deployedAt": "2026-09-10T13:21:32.768Z",
+  "deploymentUuid": "aw8kgo0cw4csssg084ww4w4o",
+  "workflow": {
+    "id": 34481399948,
+    "conclusion": "success"
+  },
+  "health": {
+    "httpStatus": 200,
+    "body": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "staging",
+      "gitSha": "f9685b93fd841f0eaa6c61ad1e7860d63879087d",
+      "gitRef": "staging",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "fqdn": null
+      }
+    }
+  },
+  "validation": {
+    "lint": "pass",
+    "typecheck": "pass",
+    "testSuites": 248,
+    "tests": 2038,
+    "build": "pass, BSC97 with current49publickeys",
+    "initialJestCommand": "Extra separator produced no tests; corrected command pnpm dapp test --runInBand passed."
+  },
+  "containers": {
+    "before": 92,
+    "after": 92,
+    "preserved": 91,
+    "changed": "dapp only",
+    "imageReferencesReused": 7
+  },
+  "publicQa": {
+    "browser": "Edge",
+    "wallet": "0x2678…0c13",
+    "cssWidths": [
+      400,
+      1440
+    ],
+    "documentWidths": [
+      400,
+      1440
+    ],
+    "knownEmptyRewards": "Sin premios asignados",
+    "preparingVisible": false,
+    "horizontalOverflow": false,
+    "viewportRestored": true,
+    "screenshots": "emitted inline; no local PNG claimed"
+  },
+  "limits": [
+    "No wallet signature or economy mutation performed.",
+    "Public account tests known zero; pending, degraded and claimable states are covered by local tests."
+  ]
+}

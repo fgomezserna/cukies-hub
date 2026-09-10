@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-09-10T13:52:10.207Z",
+  "chainId": 97,
+  "address": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
+  "blockNumber": 130226230,
+  "runtimeCodeHash": "0x4597a98d91207ab7abdf44e52acbbebcac108c9c9d9139b203890ceb0b255731",
+  "deploymentBlock": 130192587,
+  "configuration": {
+    "owner": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+    "ukiToken": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+    "router": "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+    "wrappedNative": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+    "feeRecipient": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+    "feeBps": 500,
+    "paused": false,
+    "nativePaymentAllowed": false,
+    "collectionAllowed": true
+  },
+  "status": "prepared-not-yet-published",
+  "reason": "Blank public/runtime marketplace addresses and UKI_MARKETPLACE alias absent in web32 and indexer28",
+  "publicConfigChangedKeys": [
+    "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS",
+    "NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS",
+    "NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS"
+  ],
+  "resources": [
+    32,
+    28
+  ],
+  "alternativePaymentsEnabled": false,
+  "currentStageSha": "f9685b93fd841f0eaa6c61ad1e7860d63879087d",
+  "productionChanged": false,
+  "verification": {
+    "onchainIdentity": "passed",
+    "localMarketplaceGate": "passed"
+  },
+  "limits": [
+    "No signed purchase/list/cancel smoke performed yet",
+    "Indexer source activation and public deployment pending"
+  ]
+}
