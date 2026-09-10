@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-10T05:33:33.500931+00:00",
+  "observedAt": "2026-09-10T06:00:16.601892+00:00",
   "scope": "Pre-publication review of isolated game recovery and Legacy breeding identity candidates; no live state operations",
   "stagingCodeObserved": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
   "stagingChangedByTheseCandidates": false,
@@ -131,7 +131,45 @@
         ]
       }
     ],
-    "nextStep": "Same task corrects LB1-LB4 with canonical ownership evidence or fail-closed unknown, reconciled eligibility, contextual preview and valid TRON identity; no push until root review."
+    "nextStep": "Same task addresses only residual LB2 using canonical per-NFT counter or proven projection coverage; unknown remains excluded. Add focused counter and RPC-boundary regressions, preserve source commits, no worker push; root owns the combined integration and full gates.",
+    "currentCandidate": "7101d637154d33b98535f6dc2ec2fa14cf561a1a",
+    "correctionReview": {
+      "candidate": "7101d637154d33b98535f6dc2ec2fa14cf561a1a",
+      "decision": "changes_requested",
+      "reviewer": "root Astra Max",
+      "addressedInDiff": [
+        "LB1 current canonical ownerOf and maxBreeds read",
+        "LB3 preview cleared on refresh and context change",
+        "LB4 exact TRON identity and validated observed address"
+      ],
+      "remainingFinding": {
+        "id": "LB2",
+        "priority": "P2",
+        "finding": "When numChildren is missing, normalizeCuki derives childrenCount from children.length and eligibility compares that derived value with the same array; partial relations still become verified eligibility without complete history or a current per-NFT counter.",
+        "evidence": [
+          "dapp/src/lib/cukies-data/data.ts:406",
+          "dapp/src/lib/legacy-marketplace/breeding-identity.ts:127"
+        ]
+      },
+      "reproduction": {
+        "suites": 1,
+        "cases": 1,
+        "fixture": "BSC56 canonical NFT29, current ownerOf correct, contractual max1, numChildren absent, children=[31]",
+        "observed": "verified eligible candidate with childrenCount1",
+        "result": "PASS reproduces residual defect, not acceptance",
+        "liveOperations": false
+      },
+      "reportedWorkerGates": {
+        "focalSuites": 3,
+        "focalTests": 18,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Correction candidate, not the final combined staging candidate"
+      },
+      "reportSha256": "b7f8dfd51ae7e9dfc87b0e543074cb8aadc0f878e17bbf0f543440d26d0621c5",
+      "preservedAlternateLocalCombination": "a78b139bc1a4a9e9b7d4118451e404ccfbd74d81",
+      "alternateCombinationPromoted": false
+    }
   },
   "limits": [
     "No production/main changes",
