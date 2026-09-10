@@ -240,7 +240,7 @@ describe('NftVaultRecoveryPanel', () => {
       functionName: 'withdraw',
       args: [collectionAddress, BigInt(7)],
     }));
-    expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: transactionHash });
+    expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: transactionHash, onReplaced: expect.any(Function) });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -504,7 +504,7 @@ describe('NftVaultRecoveryPanel', () => {
       functionName: 'withdraw',
       args: [collectionAddress, BigInt(9)],
     }));
-    expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: transactionHash });
+    expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: transactionHash, onReplaced: expect.any(Function) });
   });
 
   it('no habilita retirada si el reloj local está adelantado pero el bloque aún no llegó al corte', async () => {
