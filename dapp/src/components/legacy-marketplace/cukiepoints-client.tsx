@@ -22,6 +22,7 @@ import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import {
   LEGACY_TRON_MAINNET_RPC_URL,
   getLegacyTronWeb,
+  getLegacyTronReadWeb,
   getLegacyTronWalletRpcOrigin,
   isLegacyTronWalletOnRpc,
   readLegacyTronContract,
@@ -43,6 +44,18 @@ type TronPointsSnapshot = {
   emitted: string | null;
   burned: string | null;
 };
+
+type TronSnapshotStatus = 'idle' | 'loading' | 'ready' | 'partial' | 'unknown';
+
+const EMPTY_TRON_SNAPSHOT: TronPointsSnapshot = {
+  balance: null,
+  total: null,
+  emitted: null,
+  burned: null,
+};
+
+const TRON_READ_ERROR_MESSAGE =
+  'No se pudo verificar TRON ahora. Algunos datos no están disponibles.';
 
 const bscPointsAddress = legacyMarketplaceContracts.bsc.contracts.points;
 const tronPointsAddress = legacyMarketplaceContracts.tron.contracts.points;
@@ -145,12 +158,10 @@ export function CukiePointsClient() {
   const pointsDataRef = useRef<LegacyCukiePointsResponse | null>(null);
   const pointsRequestRef = useRef(0);
   const tronRequestRef = useRef(0);
-  const [tronSnapshot, setTronSnapshot] = useState<TronPointsSnapshot>({
-    balance: null,
-    total: null,
-    emitted: null,
-    burned: null,
-  });
+  const [tronSnapshot, setTronSnapshot] =
+    useState<TronPointsSnapshot>(EMPTY_TRON_SNAPSHOT);
+  const [tronSnapshotStatus, setTronSnapshotStatus] =
+    useState<TronSnapshotStatus>('idle');
 
   const connectedWallets = useMemo(
     () =>
@@ -207,20 +218,34 @@ export function CukiePointsClient() {
     const requestId = tronRequestRef.current + 1;
     tronRequestRef.current = requestId;
     const currentTronWeb = getLegacyTronWeb();
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      const latestAddress =
+        latestTronWeb?.defaultAddress?.base58
+        ?? latestTronWeb?.defaultAddress?.hex;
+      return (
+        requestId === tronRequestRef.current
+        && (!latestAddress || latestAddress === requestAddress)
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+      );
+    };
+
+    setTronSnapshot(EMPTY_TRON_SNAPSHOT);
+    setTronSnapshotStatus('loading');
+    setStatus(null);
+
     if (
       !legacyMarketplaceRuntime.legacyMainnetReadEnabled ||
-      !tronAddress ||
+      !requestAddress ||
       !currentTronWeb ||
       !isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
     ) {
-      setTronSnapshot({
-        balance: null,
-        total: null,
-        emitted: null,
-        burned: null,
-      });
+      setTronSnapshotStatus('unknown');
       if (
-        tronAddress
+        requestAddress
         && currentTronWeb
         && tronWalletRpcOrigin !== LEGACY_TRON_MAINNET_RPC_URL
       ) {
@@ -229,43 +254,64 @@ export function CukiePointsClient() {
       return;
     }
 
+    const readTronWeb = getLegacyTronReadWeb(requestAddress);
+    if (!readTronWeb) {
+      setTronSnapshotStatus('unknown');
+      setStatus(TRON_READ_ERROR_MESSAGE);
+      return;
+    }
+
     try {
-      const [balance, total, emitted, burned] = await Promise.all([
-        readLegacyTronContract<unknown>(currentTronWeb, 'points', 'getPoints', [
-          tronAddress,
+      const results = await Promise.allSettled([
+        readLegacyTronContract<unknown>(readTronWeb, 'points', 'getPoints', [
+          requestAddress,
         ]),
         readLegacyTronContract<unknown>(
-          currentTronWeb,
+          readTronWeb,
           'points',
           'getTotalPoints',
         ),
         readLegacyTronContract<unknown>(
-          currentTronWeb,
+          readTronWeb,
           'points',
           'getTotalPointsEmited',
         ),
         readLegacyTronContract<unknown>(
-          currentTronWeb,
+          readTronWeb,
           'points',
           'getTotalPointsBurned',
         ),
       ]);
-      if (
-        requestId !== tronRequestRef.current
-        || !isLegacyTronWalletOnRpc(
-          getLegacyTronWeb(),
-          LEGACY_TRON_MAINNET_RPC_URL,
-        )
-      ) return;
+
+      if (!contextIsCurrent()) return;
+
+      const valueFor = (result: PromiseSettledResult<unknown>) => {
+        if (result.status !== 'fulfilled' || result.value === null || result.value === undefined) {
+          return null;
+        }
+
+        return formatPointValue(String(result.value));
+      };
+      const failedCount = results.filter((result) => (
+        result.status === 'rejected'
+        || (result.status === 'fulfilled'
+          && (result.value === null || result.value === undefined))
+      )).length;
       setTronSnapshot({
-        balance: formatPointValue(String(balance)),
-        total: formatPointValue(String(total)),
-        emitted: formatPointValue(String(emitted)),
-        burned: formatPointValue(String(burned)),
+        balance: valueFor(results[0]),
+        total: valueFor(results[1]),
+        emitted: valueFor(results[2]),
+        burned: valueFor(results[3]),
       });
-    } catch (error) {
-      if (requestId !== tronRequestRef.current) return;
-      setStatus(getErrorMessage(error));
+      setTronSnapshotStatus(
+        failedCount === 0 ? 'ready' : failedCount === results.length ? 'unknown' : 'partial',
+      );
+      setStatus(failedCount > 0 ? TRON_READ_ERROR_MESSAGE : null);
+    } catch {
+      if (!contextIsCurrent()) return;
+      setTronSnapshot(EMPTY_TRON_SNAPSHOT);
+      setTronSnapshotStatus('unknown');
+      setStatus(TRON_READ_ERROR_MESSAGE);
     }
   }, [tronAddress, tronWalletRpcOrigin]);
 
@@ -463,8 +509,19 @@ export function CukiePointsClient() {
                   >
                     Conectar TRON
                   </Button>
-                )}
+              )}
             </div>
+            <p className="mt-2 text-xs text-slate-500" role="status">
+              {tronSnapshotStatus === 'loading'
+                ? 'Verificando lectura TRON…'
+                : tronSnapshotStatus === 'ready'
+                ? 'Lectura TRON verificada.'
+                : tronSnapshotStatus === 'partial'
+                ? 'Lectura TRON parcial; algunos datos están sin verificar.'
+                : tronSnapshotStatus === 'unknown'
+                ? 'Lectura TRON sin verificar.'
+                : null}
+            </p>
           </div>
         </div>
 

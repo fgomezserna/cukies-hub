@@ -1,6 +1,6 @@
 {
   "observedAt": "2026-09-10T01:57:12.210906+00:00",
-  "status": "reviewed_candidate_pending_staging_delivery",
+  "status": "deployed_to_staging_gameplay_recovery_pending",
   "candidate": "d8559306296c532b4233154e12fd60a775fed438",
   "base": "ddb60f8bb5e62fe3a0886bac9ccb2fef49b4c930",
   "servedDuringDiagnosis": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
@@ -60,12 +60,80 @@
     "J05 image optimizer and J06 gameplay remain unverified by this patch",
     "No replay or live credit reservation was performed during diagnosis",
     "No data, balance, incident, signer or contract changes",
-    "DApp-only release and functional verification still pending"
+    "DApp-only delivery verified; successful game reservation and gameplay still require recovery and functional QA"
   ],
   "diagnosticEvidenceSha256": {
     "cukies-game-entry-log-diagnostic-20260910.json": "766d6dc81524a0756c829932c63470b72b6769b91939bd3f2e003175c9dd6169",
     "cukies-game-entry-reservation-pin-diagnostic-20260910.json": "51a29b5b4c0464841b12dc57737fc6e3eaf12c6e06bfb8047bfc8370db5c21c7",
     "cukies-game-entry-credit-eligibility-diagnostic-20260910.json": "756eaa474b9b6f71df3db701c16321351b837fcd6f8a9b65d05d618024010f9b",
     "cukies-game-entry-credit-containment-diagnostic-20260910.json": "66ba1a3776b0be1dd0878a07e2f22d65182cd14b4471a4b9a9472ec095aa5402"
+  },
+  "updatedAt": "2026-09-10T02:16:47.357411+00:00",
+  "delivery": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/369",
+    "mergeCommit": "0cf0019742373364da5cb0811c3252d1a1cbd007",
+    "ciRunId": 34428083750,
+    "ciConclusion": "success",
+    "build": [
+      "dapp"
+    ],
+    "reuse": [
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer",
+      "treasure-hunt"
+    ],
+    "deploymentUuid": "acow0s8k0448084wsow0w8cw",
+    "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+    "webContainer": "4205eeb697e28a5b7495692b6b49abfa8831f4d0f2a044f607bb9939d4ba130b",
+    "webDigest": "sha256:160195f430a04534344eff32b50fb89d7be177cdb2f261b849302fafdd515963",
+    "gameSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+    "checks": {
+      "protected13Unchanged": true,
+      "journalClean": true,
+      "sixComponentsAndSameConfig": true,
+      "releaseCommit": true,
+      "reuse5References": true,
+      "sameWorkersComposeHash": true,
+      "runtimeGuards": true,
+      "webContainer": true,
+      "webMetadata": true,
+      "webDigest": true,
+      "webHealth": true,
+      "webReady": true,
+      "newWebContainerAndDigest": true,
+      "gameContainer": true,
+      "gameMetadata": true,
+      "gameDigest": true,
+      "gameHealth": true,
+      "gameReady": true,
+      "sameGameContainerAndDigest": true,
+      "buildDappOnly": true,
+      "reuse5": true,
+      "manifestMatchesLive": true,
+      "webOnlyDelivery": true
+    },
+    "postflightSha256": "8cfcbc3a486eff4503022d3a1151db80e4b4c1ba3419d304496342b46144d522"
+  },
+  "rootPublicVerification": {
+    "webReadyAndHealthSha": "0cf0019742373364da5cb0811c3252d1a1cbd007",
+    "gameReadySha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+    "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+    "creditPage": {
+      "url": "https://cukieshub.eurekand.com/credits",
+      "browser": "Edge",
+      "readOnly": true,
+      "walletDisplay": "0x2678…0c13",
+      "personalCredits": 200,
+      "reservedCredits": 0,
+      "usedCredits": 0,
+      "poolContribution": 100,
+      "nftSlots": 3,
+      "nextCutoff": "2026-09-10T02:30:00.000Z"
+    },
+    "gamePlayed": false,
+    "walletSignature": false,
+    "reservationCreated": false
   }
 }

@@ -54,6 +54,7 @@ import {
 
 type BreedingNetwork = 'BSC' | 'TRON';
 export type BreedingTab = 'start' | 'active' | 'completed';
+type BscReadStatus = 'disabled' | 'loading' | 'verified' | 'unknown';
 
 type OnChainBreed = {
   id: string;
@@ -311,6 +312,7 @@ export function BreedingClient({
     LegacyMarketplaceCukiItem[]
   >([]);
   const [activeBreeds, setActiveBreeds] = useState<OnChainBreed[]>([]);
+  const [candidatesReadError, setCandidatesReadError] = useState(false);
   const [parent1, setParent1] = useState<LegacyMarketplaceCukiItem | null>(
     null,
   );
@@ -330,34 +332,45 @@ export function BreedingClient({
   const owner = network === 'BSC' ? address : tronAddress;
   const tronWeb = getLegacyTronWeb();
   const tronWalletRpcOrigin = getLegacyTronWalletRpcOrigin(tronWeb);
-  const bscReady = network === 'BSC' && isConnected && chainId === 56;
+  const readEnabled = legacyMarketplaceRuntime.legacyMainnetReadEnabled;
+  const operationsEnabled = legacyMarketplaceRuntime.legacyMainnetOperationsEnabled;
+  const bscWriteReady = network === 'BSC' && isConnected && chainId === 56;
+  const bscReadAvailable =
+    network === 'BSC' && readEnabled && Boolean(address);
   const tronReady =
     network === 'TRON'
     && isTronConnected
     && isLegacyTronWalletOnRpc(tronWeb, LEGACY_TRON_MAINNET_RPC_URL);
-  const ready = network === 'BSC' ? bscReady : tronReady;
-  const readEnabled = legacyMarketplaceRuntime.legacyMainnetReadEnabled;
-  const operationsEnabled = legacyMarketplaceRuntime.legacyMainnetOperationsEnabled;
   const parentsSelected = Boolean(
     parent1 && parent2 && !sameToken(parent1, parent2),
   );
 
-  const { data: bscMaxBreeds } = useReadContract({
+  const {
+    data: bscMaxBreeds,
+    isLoading: isLoadingBscMaxBreeds,
+    isError: isBscMaxBreedsError,
+    refetch: refetchBscMaxBreeds,
+  } = useReadContract({
     address: bscBreedingAddress,
     abi: legacyMarketplaceBscAbis.breedingPoints,
     functionName: 'getMaxBreedsByCukie',
     query: {
-      enabled: network === 'BSC' && readEnabled,
+      enabled: bscReadAvailable,
     },
     chainId: 56,
   });
-  const { data: bscPoints } = useReadContract({
+  const {
+    data: bscPoints,
+    isLoading: isLoadingBscPoints,
+    isError: isBscPointsError,
+    refetch: refetchBscPoints,
+  } = useReadContract({
     address: bscPointsAddress,
     abi: legacyMarketplaceBscAbis.points,
     functionName: 'getPoints',
     args: address ? [address] : undefined,
     query: {
-      enabled: network === 'BSC' && readEnabled && Boolean(address),
+      enabled: bscReadAvailable,
     },
     chainId: 56,
   });
@@ -367,7 +380,7 @@ export function BreedingClient({
     functionName: 'isApprovedForAll',
     args: address ? [address, bscBreedingAddress] : undefined,
     query: {
-      enabled: network === 'BSC' && readEnabled && Boolean(address),
+      enabled: bscReadAvailable,
     },
     chainId: 56,
   });
@@ -380,29 +393,74 @@ export function BreedingClient({
         ? [BigInt(parent1.tokenId), BigInt(parent2.tokenId)]
         : undefined,
     query: {
-      enabled: network === 'BSC' && readEnabled && Boolean(parent1 && parent2),
+      enabled: bscReadAvailable && Boolean(parent1 && parent2),
     },
     chainId: 56,
   });
 
+  const bscReadStatus: BscReadStatus = useMemo(() => {
+    if (network !== 'BSC' || !readEnabled) return 'disabled';
+    if (!address) return 'unknown';
+
+    const hasLoadingRead =
+      isLoadingBscMaxBreeds
+      || isLoadingBscPoints;
+    if (hasLoadingRead) return 'loading';
+
+    const hasReadError =
+      isBscMaxBreedsError
+      || isBscPointsError;
+    if (hasReadError) return 'unknown';
+
+    const hasRequiredValues =
+      bscMaxBreeds !== undefined && bscPoints !== undefined;
+    return hasRequiredValues ? 'verified' : 'unknown';
+  }, [
+    address,
+    bscMaxBreeds,
+    bscPoints,
+    isBscMaxBreedsError,
+    isBscPointsError,
+    isLoadingBscMaxBreeds,
+    isLoadingBscPoints,
+    network,
+    readEnabled,
+  ]);
+
+  const bscReadVerified = bscReadAvailable && bscReadStatus === 'verified';
+  const readReady = network === 'BSC' ? bscReadAvailable : tronReady;
+  const candidateReadReady =
+    network === 'BSC' ? bscReadVerified : tronReady;
+  const ready = network === 'BSC' ? bscWriteReady : tronReady;
+
   const maxBreeds = useMemo(() => {
-    if (network === 'BSC' && bscMaxBreeds !== undefined) {
+    if (
+      network === 'BSC'
+      && bscReadStatus === 'verified'
+      && bscMaxBreeds !== undefined
+    ) {
       return Number(bscMaxBreeds);
     }
 
-    return tronMaxBreeds;
-  }, [bscMaxBreeds, network, tronMaxBreeds]);
+    return network === 'BSC' ? null : tronMaxBreeds;
+  }, [bscMaxBreeds, bscReadStatus, network, tronMaxBreeds]);
 
   const cost =
     network === 'BSC'
-      ? formatPoints(bscCost as bigint | undefined)
+      ? bscReadStatus === 'verified'
+        ? formatPoints(bscCost as bigint | undefined)
+        : '-'
       : tronCost ?? '-';
   const points =
     network === 'BSC'
-      ? formatPoints(bscPoints as bigint | undefined)
+      ? bscReadStatus === 'verified'
+        ? formatPoints(bscPoints as bigint | undefined)
+        : '-'
       : tronPoints ?? '-';
   const approved =
-    network === 'BSC' ? Boolean(bscApproved) : tronApproved === true;
+    network === 'BSC'
+      ? bscReadStatus === 'verified' && bscApproved === true
+      : tronApproved === true;
   const summaryCards: Array<{
     label: string;
     value: string | number;
@@ -418,14 +476,32 @@ export function BreedingClient({
     { label: 'Máximo de crías', value: maxBreeds ?? '-', Icon: Dna },
   ];
 
+  const retryBscRead = useCallback(async () => {
+    if (!bscReadAvailable) return;
+
+    const refetches = [refetchBscMaxBreeds, refetchBscPoints]
+      .filter((refetch) => typeof refetch === 'function')
+      .map((refetch) => refetch());
+
+    await Promise.allSettled(refetches);
+  }, [bscReadAvailable, refetchBscMaxBreeds, refetchBscPoints]);
+
   const refreshCandidates = useCallback(async () => {
-    if (!owner || maxBreeds === null) {
+    if (!owner || (network === 'BSC' && !bscReadAvailable)) {
       setCandidates([]);
+      setCandidatesReadError(false);
       return;
     }
 
     setIsLoadingCandidates(true);
+    setCandidatesReadError(false);
     try {
+      if (maxBreeds === null) {
+        if (network === 'BSC') await retryBscRead();
+        setCandidates([]);
+        return;
+      }
+
       const query = new URLSearchParams({
         owner,
         network,
@@ -442,12 +518,13 @@ export function BreedingClient({
         (await response.json()) as LegacyBreedingCandidatesResponse;
       setCandidates(payload.items);
     } catch (error) {
-      setStatus(getErrorMessage(error));
+      setCandidatesReadError(true);
+      setStatus('No se han podido cargar candidatos. Pulsa Actualizar para reintentar.');
       setCandidates([]);
     } finally {
       setIsLoadingCandidates(false);
     }
-  }, [maxBreeds, network, owner]);
+  }, [bscReadAvailable, maxBreeds, network, owner, retryBscRead]);
 
   const refreshCompleted = useCallback(async () => {
     const wallets = [address, tronAddress].filter((wallet): wallet is string =>
@@ -481,7 +558,7 @@ export function BreedingClient({
   }, [address, tronAddress]);
 
   const fetchBscActiveBreeds = useCallback(async () => {
-    if (!address || !readEnabled) return [];
+    if (!bscReadAvailable) return [];
 
     const ids =
       (await readLegacyBscContract<readonly bigint[]>(
@@ -506,7 +583,7 @@ export function BreedingClient({
     );
 
     return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
-  }, [address, readEnabled]);
+  }, [address, bscReadAvailable]);
 
   const fetchTronActiveBreeds = useCallback(async () => {
     const currentTronWeb = getLegacyTronWeb();
@@ -572,7 +649,11 @@ export function BreedingClient({
       setActiveBreeds(breeds.filter((breed) => !breed.completed));
     } catch (error) {
       if (requestId !== activeBreedsRequestRef.current) return;
-      setStatus(getErrorMessage(error));
+      setStatus(
+        network === 'BSC'
+          ? 'No se han podido cargar tus crías activas. Pulsa Actualizar para reintentar.'
+          : getErrorMessage(error),
+      );
       setActiveBreeds([]);
     } finally {
       if (requestId === activeBreedsRequestRef.current) setIsLoadingBreeds(false);
@@ -651,6 +732,8 @@ export function BreedingClient({
   useEffect(() => {
     setParent1(null);
     setParent2(null);
+    setCandidates([]);
+    setCandidatesReadError(false);
     setActiveBreeds([]);
     setStatus(null);
   }, [network]);
@@ -888,6 +971,10 @@ export function BreedingClient({
   }
 
   const disabled = isWriting || isSwitchingChain || !operationsEnabled;
+  const showConnectionWarning =
+    network === 'BSC'
+      ? !isConnected || (operationsEnabled && chainId !== 56)
+      : !tronReady;
 
   return (
     <div className="grid gap-6">
@@ -898,6 +985,18 @@ export function BreedingClient({
         >
           Puedes consultar el estado de tus Crías Legacy. Las acciones para
           aprobar, iniciar y abrir una cría estarán disponibles cuando finalice la revisión.
+        </div>
+      )}
+      {network === 'BSC' && readEnabled && (
+        <div
+          role="status"
+          className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-4 text-sm text-lilac-100"
+        >
+          {bscReadStatus === 'loading'
+            ? 'Verificando lectura Legacy BSC…'
+            : bscReadStatus === 'verified'
+            ? 'Lectura Legacy BSC verificada. Puedes consultar estos datos aunque la wallet esté en otra red.'
+            : 'Lectura Legacy BSC no disponible ahora. Pulsa Actualizar para reintentar.'}
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-white/10 bg-black/30 p-3">
@@ -955,16 +1054,20 @@ export function BreedingClient({
         ))}
       </div>
 
-      {!ready && (
+      {showConnectionWarning && (
         <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
           {network === 'BSC' ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span>
                 {!isConnected
                   ? 'Conecta una wallet EVM para cargar tus padres.'
-                  : 'La wallet está en una red incorrecta. Usa BNB Smart Chain para continuar.'}
+                  : bscReadStatus === 'verified'
+                  ? 'La lectura Legacy está verificada. Cambia la red de la wallet para operar.'
+                  : operationsEnabled && chainId !== 56
+                  ? 'Cambia la red de la wallet a BNB Smart Chain para operar. La lectura Legacy se puede reintentar desde aquí.'
+                  : 'La lectura Legacy BSC no está disponible ahora. Pulsa Actualizar para reintentar.'}
               </span>
-              {isConnected && chainId !== 56 && (
+              {operationsEnabled && isConnected && chainId !== 56 && (
                 <Button onClick={() => switchChain({ chainId: 56 })}>
                   Cambiar a BSC
                 </Button>
@@ -1026,7 +1129,7 @@ export function BreedingClient({
                       parent1?.tokenId === cuki.tokenId ||
                       parent2?.tokenId === cuki.tokenId
                     }
-                    disabled={!ready}
+                    disabled={!candidateReadReady}
                     onSelect={() => selectParent(cuki)}
                   />
                 ))
@@ -1034,11 +1137,13 @@ export function BreedingClient({
                 <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
                   {!owner
                     ? 'Conecta una wallet para cargar candidatos.'
-                    : !ready
-                    ? network === 'BSC' && chainId !== 56
-                      ? 'La wallet está conectada a una red incorrecta.'
-                      : 'La fuente de candidatos no está disponible hasta conectar la red seleccionada.'
-                    : 'No hay Cukies disponibles para cría en esta wallet/red.'}
+                    : candidatesReadError
+                    ? 'No se han podido cargar candidatos. Pulsa Actualizar para reintentar.'
+                    : network === 'BSC' && !bscReadVerified
+                    ? 'No se ha podido verificar la lectura Legacy BSC. Pulsa Actualizar para reintentar.'
+                    : network === 'TRON' && !candidateReadReady
+                    ? 'La fuente de candidatos no está disponible hasta conectar la red seleccionada.'
+                    : 'No hay Cukies disponibles para cría en esta wallet.'}
                 </div>
               )}
             </div>
@@ -1109,7 +1214,7 @@ export function BreedingClient({
             </h2>
             <Button
               variant="outline"
-              disabled={isLoadingBreeds || !ready}
+              disabled={isLoadingBreeds || !readReady}
               onClick={() => void refreshActiveBreeds()}
               className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
@@ -1133,7 +1238,11 @@ export function BreedingClient({
               ))
             ) : (
               <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                No hay crías activas cargadas para esta red.
+                {network === 'BSC' && !address
+                  ? 'Conecta una wallet para consultar tus crías activas.'
+                  : network === 'BSC' && bscReadStatus !== 'verified'
+                  ? 'No se ha podido verificar la lectura Legacy BSC. Pulsa Actualizar para reintentar.'
+                  : 'No hay crías activas verificadas para esta wallet.'}
               </div>
             )}
           </div>
