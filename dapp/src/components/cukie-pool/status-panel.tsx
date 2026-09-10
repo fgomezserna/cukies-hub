@@ -29,6 +29,9 @@ import {
   clearPendingNftVaultOperation,
   getNftVaultBrowserStorage,
   loadPendingNftVaultOperations,
+  pendingNftVaultOperationAssetKey,
+  pendingNftVaultOperationMatches,
+  pendingNftVaultOperationMatchesPosition,
   pendingNftVaultStorageKey,
   savePendingNftVaultOperation,
   type NftVaultPendingAction,
@@ -36,6 +39,10 @@ import {
   type NftVaultPendingOperation,
   type NftVaultPendingPhase,
 } from '@/lib/nft-vault/pending-operations';
+import {
+  depositedEpochFromReceipt,
+  inspectPoolDepositPosition,
+} from '@/lib/nft-vault/pending-reconciliation';
 import {
   executeNftTransaction,
   nftTransactionContextFromNullable,
@@ -114,6 +121,10 @@ type CustodialStatus = {
   nftCustody: PoolCustody;
   positions: CustodialPosition[];
   availableAssets: AvailableAsset[];
+  availability?: {
+    status: 'complete' | 'partial';
+    unknownAssets: number;
+  };
   sourceHealthy: boolean;
 };
 
@@ -272,8 +283,19 @@ function projectionMatchesPoolOperation(
   status: PoolStatus,
 ) {
   if (operation.phase !== 'syncing_projection' || status.mode !== 'custodial_vault') return false;
-  const position = status.positions.find((item) => item.assetId === operation.assetId);
-  if (operation.action === 'deposit') return Boolean(position?.lifecycleOpen);
+  const position = status.positions.find((item) => (
+    item.assetId === operation.assetId
+    || pendingNftVaultOperationAssetKey(operation) === item.assetId
+  ));
+  if (operation.action === 'deposit') {
+    // A position with the same token is not enough: an old local operation
+    // may refer to epoch 1 while the vault already contains epoch 2. The
+    // receipt reconciliation fills depositEpoch before this guard can clear.
+    return Boolean(
+      position?.lifecycleOpen
+      && pendingNftVaultOperationMatchesPosition(operation, position)
+    );
+  }
   if (operation.action === 'request_exit') {
     return Boolean(position && (
       position.status === 'exit_requested'
@@ -300,10 +322,19 @@ function mergePendingPoolAssets(
       || operation.walletAddress.toLowerCase() !== status.walletNormalized.toLowerCase()
       || operation.chainId !== status.nftCustody.chainId
       || operation.vaultAddress.toLowerCase() !== status.nftCustody.vaultAddress.toLowerCase()
-      || !availableAssets.every((asset) => asset.assetId !== operation.assetId)
+      || !availableAssets.every((asset) => !(
+        asset.assetId === operation.assetId
+        || pendingNftVaultOperationAssetKey(operation) === asset.assetId
+      ))
     ) continue;
-    if (status.positions.some((position) => position.assetId === operation.assetId)) continue;
-    const previousAsset = previous.availableAssets.find((asset) => asset.assetId === operation.assetId);
+    if (status.positions.some((position) => (
+      position.assetId === operation.assetId
+      || pendingNftVaultOperationAssetKey(operation) === position.assetId
+    ))) continue;
+    const previousAsset = previous.availableAssets.find((asset) => (
+      asset.assetId === operation.assetId
+      || pendingNftVaultOperationAssetKey(operation) === asset.assetId
+    ));
     if (previousAsset) availableAssets.push(previousAsset);
   }
   return availableAssets.length === status.availableAssets.length
@@ -514,6 +545,8 @@ export function CukiePoolStatusPanel() {
       vaultAddress: ukiNftVaults.cukiePoolNftVaultAddress,
     };
   }, [user?.walletAddress]);
+  const pendingContextRef = useRef<NftVaultPendingContext | null>(pendingContext);
+  pendingContextRef.current = pendingContext;
   const pendingKey = useMemo(
     () => pendingContext ? pendingNftVaultStorageKey(pendingContext) : null,
     [pendingContext],
@@ -525,7 +558,10 @@ export function CukiePoolStatusPanel() {
     action: NftVaultPendingAction;
     phase: NftVaultPendingPhase;
     txHash: Hash;
+    depositEpoch?: string;
     context?: NftTransactionContext;
+    expectedOperation?: NftVaultPendingOperation;
+    isCurrent?: () => boolean;
     updateUi?: boolean;
   }) => {
     const storageContext = input.context
@@ -536,10 +572,21 @@ export function CukiePoolStatusPanel() {
       }
       : pendingContext;
     if (!storageContext) return null;
+    if (input.isCurrent && !input.isCurrent()) return null;
     const now = Date.now();
     const storage = getNftVaultBrowserStorage();
-    const previous = loadPendingNftVaultOperations(storage, storageContext)
-      .find((operation) => operation.assetId === input.asset.assetId);
+    const operationAssetKey = pendingNftVaultOperationAssetKey({
+      assetId: input.asset.assetId,
+      chainId: storageContext.chainId,
+      collectionAddress: input.asset.collectionAddress,
+      tokenId: input.asset.tokenId,
+    });
+    const currentOperations = loadPendingNftVaultOperations(storage, storageContext);
+    const previous = currentOperations
+      .find((operation) => pendingNftVaultOperationAssetKey(operation) === operationAssetKey);
+    if (input.expectedOperation && !pendingNftVaultOperationMatches(previous, input.expectedOperation)) {
+      return null;
+    }
     const operation: NftVaultPendingOperation = {
       version: 1,
       ...storageContext,
@@ -551,30 +598,78 @@ export function CukiePoolStatusPanel() {
       txHash: input.txHash,
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
+      ...(input.depositEpoch ?? previous?.depositEpoch
+        ? { depositEpoch: input.depositEpoch ?? previous?.depositEpoch }
+        : {}),
     };
-    savePendingNftVaultOperation(storage, operation);
+    if (!savePendingNftVaultOperation(storage, operation)) return null;
     if (input.updateUi !== false) {
-      setPendingByAsset((current) => ({ ...current, [operation.assetId]: operation }));
+      setPendingByAsset((current) => {
+        if (input.isCurrent && !input.isCurrent()) return current;
+        if (input.expectedOperation) {
+          const currentOperation = Object.values(current)
+            .find((item) => pendingNftVaultOperationAssetKey(item) === operationAssetKey);
+          if (!pendingNftVaultOperationMatches(currentOperation, input.expectedOperation)) return current;
+        }
+        return {
+          ...current,
+          [pendingNftVaultOperationAssetKey(operation)]: operation,
+        };
+      });
     }
     return operation;
   }, [pendingContext]);
 
-  const clearPending = useCallback((assetId: string, input: { context?: NftTransactionContext; updateUi?: boolean } = {}) => {
+  const clearPending = useCallback((assetId: string, input: {
+    context?: NftTransactionContext;
+    expectedOperation?: NftVaultPendingOperation;
+    isCurrent?: () => boolean;
+    updateUi?: boolean;
+  } = {}) => {
     const storageContext = input.context
       ? {
         chainId: input.context.chainId,
         walletAddress: input.context.wallet,
         vaultAddress: input.context.vault,
       }
-      : pendingContext;
+    : pendingContext;
+    if (input.isCurrent && !input.isCurrent()) return;
     if (storageContext) {
-      clearPendingNftVaultOperation(getNftVaultBrowserStorage(), storageContext, assetId);
+      const storage = getNftVaultBrowserStorage();
+      const expectedOperation = input.expectedOperation;
+      if (expectedOperation) {
+        const storedOperation = loadPendingNftVaultOperations(storage, storageContext)
+          .find((operation) => pendingNftVaultOperationAssetKey(operation) === pendingNftVaultOperationAssetKey(expectedOperation));
+        if (!pendingNftVaultOperationMatches(storedOperation, expectedOperation)) return;
+      }
+      clearPendingNftVaultOperation(
+        storage,
+        storageContext,
+        assetId,
+        expectedOperation,
+      );
     }
     if (input.updateUi === false) return;
     setPendingByAsset((current) => {
-      if (!current[assetId]) return current;
+      if (input.isCurrent && !input.isCurrent()) return current;
       const next = { ...current };
-      delete next[assetId];
+      for (const [key, operation] of Object.entries(current)) {
+        if (
+          (input.expectedOperation && !pendingNftVaultOperationMatches(operation, input.expectedOperation))
+          || (
+            !input.expectedOperation
+            && key !== assetId
+            && operation.assetId !== assetId
+            && pendingNftVaultOperationAssetKey(operation) !== assetId
+          )
+        ) continue;
+        if (
+          !input.expectedOperation
+          || key === assetId
+          || operation.assetId === assetId
+          || pendingNftVaultOperationAssetKey(operation) === assetId
+        ) delete next[key];
+      }
       return next;
     });
   }, [pendingContext]);
@@ -587,7 +682,10 @@ export function CukiePoolStatusPanel() {
       return;
     }
     const operations = loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext);
-    setPendingByAsset(Object.fromEntries(operations.map((operation) => [operation.assetId, operation])));
+    setPendingByAsset(Object.fromEntries(operations.map((operation) => [
+      pendingNftVaultOperationAssetKey(operation),
+      operation,
+    ])));
     setHydratedPendingKey(pendingKey);
   }, [pendingContext, pendingKey]);
 
@@ -596,7 +694,10 @@ export function CukiePoolStatusPanel() {
     const syncPendingFromStorage = (event: StorageEvent) => {
       if (event.key !== pendingKey) return;
       const operations = loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext);
-      setPendingByAsset(Object.fromEntries(operations.map((operation) => [operation.assetId, operation])));
+      setPendingByAsset(Object.fromEntries(operations.map((operation) => [
+        pendingNftVaultOperationAssetKey(operation),
+        operation,
+      ])));
     };
     window.addEventListener('storage', syncPendingFromStorage);
     return () => window.removeEventListener('storage', syncPendingFromStorage);
@@ -605,7 +706,9 @@ export function CukiePoolStatusPanel() {
   useEffect(() => {
     if (!status) return;
     for (const operation of Object.values(pendingByAsset)) {
-      if (projectionMatchesPoolOperation(operation, status)) clearPending(operation.assetId);
+      if (projectionMatchesPoolOperation(operation, status)) {
+        clearPending(operation.assetId, { expectedOperation: operation });
+      }
     }
   }, [clearPending, pendingByAsset, status]);
 
@@ -614,40 +717,166 @@ export function CukiePoolStatusPanel() {
     if (Object.keys(pendingByAsset).length === 0) return;
     let disposed = false;
     let running = false;
+    const reconciliationContext = pendingContext;
+    const reconciliationKey = pendingKey;
+    const isReconciliationCurrent = () => {
+      if (disposed) return false;
+      const currentContext = pendingContextRef.current;
+      if (!currentContext || pendingNftVaultStorageKey(currentContext) !== reconciliationKey) return false;
+      return nftTransactionContextMatches(
+        {
+          wallet: reconciliationContext.walletAddress,
+          chainId: reconciliationContext.chainId,
+          vault: reconciliationContext.vaultAddress,
+        },
+        nftTransactionContextFromNullable(writeContextRef.current),
+      );
+    };
+    const currentOperation = (snapshot: NftVaultPendingOperation) => {
+      if (!isReconciliationCurrent()) return null;
+      const candidate = loadPendingNftVaultOperations(
+        getNftVaultBrowserStorage(),
+        reconciliationContext,
+      ).find((item) => pendingNftVaultOperationAssetKey(item) === pendingNftVaultOperationAssetKey(snapshot));
+      return pendingNftVaultOperationMatches(candidate, snapshot) ? candidate : null;
+    };
 
     const reconcile = async () => {
       if (running || disposed) return;
       running = true;
       try {
         const operations = Object.values(pendingByAsset);
-        for (const operation of operations.filter((item) => item.phase === 'awaiting_receipt')) {
+        const transitioned: NftVaultPendingOperation[] = [];
+        for (const snapshot of operations.filter((item) => item.phase === 'awaiting_receipt')) {
           try {
+            const operation = currentOperation(snapshot);
+            if (!operation) continue;
+            if (typeof publicClient.getTransactionReceipt !== 'function') continue;
             const receipt = await publicClient.getTransactionReceipt({ hash: operation.txHash });
-            if (disposed) return;
+            if (!isReconciliationCurrent()) return;
+            const current = currentOperation(operation);
+            if (!current) continue;
             if (receipt.status === 'reverted') {
-              clearPending(operation.assetId);
-              setError(`La transacción del Cukie #${operation.tokenId} fue revertida. Puedes intentarlo de nuevo.`);
+              clearPending(current.assetId, {
+                expectedOperation: current,
+                isCurrent: isReconciliationCurrent,
+              });
+              if (isReconciliationCurrent()) {
+                setError(`La transacción del Cukie #${current.tokenId} fue revertida. Puedes intentarlo de nuevo.`);
+              }
               continue;
             }
-            persistPending({
-              asset: operation,
-              action: operation.action,
-              phase: operation.action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
-              txHash: operation.txHash,
+            const next = persistPending({
+              asset: current,
+              action: current.action,
+              phase: current.action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
+              txHash: current.txHash,
+              depositEpoch: current.action === 'deposit'
+                ? depositedEpochFromReceipt(receipt, current) ?? undefined
+                : undefined,
+              context: {
+                wallet: reconciliationContext.walletAddress,
+                chainId: reconciliationContext.chainId,
+                vault: reconciliationContext.vaultAddress,
+              },
+              expectedOperation: current,
+              isCurrent: isReconciliationCurrent,
             });
+            if (next && next.action !== 'approval') transitioned.push(next);
           } catch {
             // El receipt aún no está disponible y se volverá a consultar.
           }
         }
 
-        if (operations.some((item) => item.phase === 'syncing_projection')) {
+        const syncingOperations = [
+          ...operations.filter((item) => item.phase === 'syncing_projection'),
+          ...transitioned,
+        ];
+        if (syncingOperations.length > 0) {
           try {
             const refreshed = (await refreshStatusQuery()).data;
             if (!refreshed) throw new Error('CUKIE_POOL_UNAVAILABLE');
-            if (disposed) return;
-            for (const operation of operations) {
+            if (!isReconciliationCurrent()) return;
+            for (const snapshot of syncingOperations) {
+              const operation = currentOperation(snapshot);
+              if (!operation) continue;
+              if (operation.action === 'deposit') {
+                // The API projection is preferred, but a successful receipt
+                // may arrive before the indexer. Verify the exact event,
+                // current vault position and epoch before clearing the local
+                // lock so an older deposit can never unlock a newer one.
+                if (projectionMatchesPoolOperation(operation, refreshed)) {
+                  clearPending(operation.assetId, {
+                    expectedOperation: operation,
+                    isCurrent: isReconciliationCurrent,
+                  });
+                  continue;
+                }
+                if (
+                  typeof publicClient.getTransactionReceipt !== 'function'
+                  || typeof publicClient.readContract !== 'function'
+                  || operation.chainId !== ukiNftVaults.chainId
+                  || !ukiNftVaults.cukiePoolNftVaultAddress
+                  || !sameAddress(operation.vaultAddress, ukiNftVaults.cukiePoolNftVaultAddress)
+                  || !sameAddress(operation.walletAddress, user.walletAddress)
+                  || !ukiNftVaults.collectionAddresses.some((collection) => sameAddress(collection, operation.collectionAddress))
+                ) continue;
+                const receipt = await publicClient.getTransactionReceipt({ hash: operation.txHash });
+                if (!isReconciliationCurrent()) return;
+                const currentAfterReceipt = currentOperation(operation);
+                if (!currentAfterReceipt) continue;
+                if (receipt.status === 'reverted') {
+                  clearPending(currentAfterReceipt.assetId, {
+                    expectedOperation: currentAfterReceipt,
+                    isCurrent: isReconciliationCurrent,
+                  });
+                  if (isReconciliationCurrent()) {
+                    setError(`La transacción del Cukie #${currentAfterReceipt.tokenId} fue revertida. Puedes intentarlo de nuevo.`);
+                  }
+                  continue;
+                }
+                const depositEpoch = depositedEpochFromReceipt(receipt, currentAfterReceipt);
+                const operationWithEpoch = depositEpoch && currentAfterReceipt.depositEpoch !== depositEpoch
+                  ? (persistPending({
+                    asset: currentAfterReceipt,
+                    action: currentAfterReceipt.action,
+                    phase: currentAfterReceipt.phase,
+                    txHash: currentAfterReceipt.txHash,
+                    depositEpoch,
+                    context: {
+                      wallet: reconciliationContext.walletAddress,
+                      chainId: reconciliationContext.chainId,
+                      vault: reconciliationContext.vaultAddress,
+                    },
+                    expectedOperation: currentAfterReceipt,
+                    isCurrent: isReconciliationCurrent,
+                  }))
+                  : currentAfterReceipt;
+                if (!operationWithEpoch?.depositEpoch) continue;
+                if (!isReconciliationCurrent()) return;
+                const rawPosition = await publicClient.readContract({
+                  address: operationWithEpoch.vaultAddress as Address,
+                  abi: cukiePoolNftVaultAbi,
+                  functionName: 'positionOf',
+                  args: [operationWithEpoch.collectionAddress as Address, BigInt(operationWithEpoch.tokenId)],
+                });
+                if (!isReconciliationCurrent()) return;
+                const currentAfterPosition = currentOperation(operationWithEpoch);
+                if (!currentAfterPosition) continue;
+                if (inspectPoolDepositPosition(currentAfterPosition, rawPosition)) {
+                  clearPending(currentAfterPosition.assetId, {
+                    expectedOperation: currentAfterPosition,
+                    isCurrent: isReconciliationCurrent,
+                  });
+                  if (isReconciliationCurrent()) void refreshStatusQuery();
+                }
+                continue;
+              }
               if (projectionMatchesPoolOperation(operation, refreshed)) {
-                clearPending(operation.assetId);
+                clearPending(operation.assetId, {
+                  expectedOperation: operation,
+                  isCurrent: isReconciliationCurrent,
+                });
               }
             }
           } catch {
@@ -665,7 +894,7 @@ export function CukiePoolStatusPanel() {
       disposed = true;
       window.clearInterval(interval);
     };
-  }, [clearPending, pendingByAsset, pendingContext, pendingHydrated, persistPending, publicClient, refreshStatusQuery, user?.walletAddress]);
+  }, [clearPending, pendingByAsset, pendingContext, pendingHydrated, pendingKey, persistPending, publicClient, refreshStatusQuery, user?.walletAddress]);
 
   async function writeAndConfirm(
     input: Parameters<typeof writeContractAsync>[0],
@@ -821,7 +1050,15 @@ export function CukiePoolStatusPanel() {
       if (!identityMatches()) return;
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
-          .find((item) => item.assetId === asset.assetId)
+          .find((item) => (
+            item.assetId === asset.assetId
+            || pendingNftVaultOperationAssetKey(item) === pendingNftVaultOperationAssetKey({
+              assetId: asset.assetId,
+              chainId: asset.chainId,
+              collectionAddress: asset.collectionAddress,
+              tokenId: asset.tokenId,
+            })
+          ))
         : null;
       if (persisted) {
         setNotice(persisted.phase === 'approval_confirmed'
@@ -908,7 +1145,10 @@ export function CukiePoolStatusPanel() {
       if (!identityMatches()) return;
       const persisted = pendingContext
         ? loadPendingNftVaultOperations(getNftVaultBrowserStorage(), pendingContext)
-          .find((item) => item.assetId === position.assetId)
+          .find((item) => (
+            item.assetId === position.assetId
+            || pendingNftVaultOperationAssetKey(item) === pendingNftVaultOperationAssetKey(position)
+          ))
         : null;
       if (persisted) {
         setNotice('La operación ya tiene transacción. Seguiremos comprobándola automáticamente; no la repitas.');
@@ -997,6 +1237,11 @@ export function CukiePoolStatusPanel() {
             {status.nftCustody.indexer.status !== 'ready' ? (
               <p role="alert" className="text-sm font-semibold text-amber-300">
                 Estamos actualizando tus Cukies. Los depósitos están bloqueados; aún puedes solicitar la salida o retirar una posición conocida.
+              </p>
+            ) : null}
+            {status.availability?.status === 'partial' && status.availability.unknownAssets > 0 ? (
+              <p role="status" className="text-sm font-semibold text-amber-200">
+                No hemos podido comprobar {status.availability.unknownAssets === 1 ? 'un Cukie' : `${status.availability.unknownAssets} Cukies`} ahora. Mostramos el resto del inventario; ese estado seguirá bloqueado hasta que la lectura de la red sea concluyente.
               </p>
             ) : null}
             {!walletMatches ? (

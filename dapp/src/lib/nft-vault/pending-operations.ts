@@ -16,6 +16,12 @@ export type NftVaultPendingOperation = NftVaultPendingContext & {
   assetId: string;
   collectionAddress: string;
   tokenId: string;
+  /**
+   * Deposit epoch emitted by the vault. It is optional for operations saved
+   * before the receipt was decoded, but once known it prevents a stale
+   * operation for an older deposit from clearing a newer position.
+   */
+  depositEpoch?: string;
   action: NftVaultPendingAction;
   phase: NftVaultPendingPhase;
   txHash: `0x${string}`;
@@ -37,6 +43,111 @@ const HASH_PATTERN = /^0x[0-9a-f]{64}$/i;
 
 function normalizeAddress(address: string) {
   return address.toLowerCase();
+}
+
+function normalizeTokenId(tokenId: string) {
+  if (!/^\d+$/.test(tokenId)) return null;
+  try {
+    return BigInt(tokenId).toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns the only asset identity accepted by the custodial vault API. Older
+ * browser entries used ad-hoc labels, so callers use this value to reconcile
+ * them without trusting the persisted label itself.
+ */
+export function canonicalNftVaultAssetId(input: {
+  chainId: number;
+  collectionAddress: string;
+  tokenId: string;
+}) {
+  const tokenId = normalizeTokenId(input.tokenId);
+  if (!Number.isSafeInteger(input.chainId) || !ADDRESS_PATTERN.test(input.collectionAddress) || tokenId === null) {
+    return null;
+  }
+  return `${input.chainId}:${normalizeAddress(input.collectionAddress)}:${tokenId}`;
+}
+
+/**
+ * Key used by the UI map. It canonicalizes the collection/token identity while
+ * retaining the original assetId in storage for auditability and migration.
+ */
+export function pendingNftVaultOperationAssetKey(operation: Pick<NftVaultPendingOperation, 'assetId' | 'chainId' | 'collectionAddress' | 'tokenId'>) {
+  return canonicalNftVaultAssetId(operation) ?? operation.assetId;
+}
+
+/**
+ * Compares a persisted operation with the snapshot that produced a read.
+ * The asset key alone is insufficient because a later transaction may replace
+ * the pending operation for the same collection/token.
+ */
+export function pendingNftVaultOperationMatches(
+  operation: NftVaultPendingOperation | undefined,
+  expected: Pick<
+    NftVaultPendingOperation,
+    'chainId'
+    | 'walletAddress'
+    | 'vaultAddress'
+    | 'assetId'
+    | 'collectionAddress'
+    | 'tokenId'
+    | 'action'
+    | 'phase'
+    | 'txHash'
+    | 'depositEpoch'
+  >,
+) {
+  if (!operation) return false;
+  return operation.chainId === expected.chainId
+    && normalizeAddress(operation.walletAddress) === normalizeAddress(expected.walletAddress)
+    && normalizeAddress(operation.vaultAddress) === normalizeAddress(expected.vaultAddress)
+    && pendingNftVaultOperationAssetKey(operation) === pendingNftVaultOperationAssetKey(expected)
+    && operation.action === expected.action
+    && operation.phase === expected.phase
+    && operation.txHash.toLowerCase() === expected.txHash.toLowerCase()
+    && (expected.depositEpoch === undefined || operation.depositEpoch === expected.depositEpoch);
+}
+
+export function pendingNftVaultOperationMatchesAsset(
+  operation: Pick<NftVaultPendingOperation, 'chainId' | 'collectionAddress' | 'tokenId' | 'assetId'>,
+  asset: { chainId: number; collectionAddress: string; tokenId: string; assetId: string },
+) {
+  const operationAssetId = canonicalNftVaultAssetId(operation);
+  const assetAssetId = canonicalNftVaultAssetId(asset);
+  return Boolean(
+    operationAssetId
+    && assetAssetId
+    && operationAssetId === assetAssetId
+    && operationAssetId === asset.assetId,
+  );
+}
+
+export function pendingNftVaultOperationMatchesPosition(
+  operation: Pick<NftVaultPendingOperation, 'chainId' | 'walletAddress' | 'vaultAddress' | 'collectionAddress' | 'tokenId' | 'assetId' | 'depositEpoch'>,
+  position: {
+    chainId: number;
+    vaultAddress: string;
+    beneficiaryNormalized: string;
+    collectionAddress: string;
+    tokenId: string;
+    assetId: string;
+    depositEpoch: string;
+  },
+) {
+  if (!pendingNftVaultOperationMatchesAsset(operation, position)) return false;
+  const operationEpoch = operation.depositEpoch ? normalizeTokenId(operation.depositEpoch) : null;
+  const positionEpoch = normalizeTokenId(position.depositEpoch);
+  return Boolean(
+    operation.chainId === position.chainId
+    && normalizeAddress(operation.walletAddress) === normalizeAddress(position.beneficiaryNormalized)
+    && normalizeAddress(operation.vaultAddress) === normalizeAddress(position.vaultAddress)
+    && operationEpoch !== null
+    && positionEpoch !== null
+    && operationEpoch === positionEpoch,
+  );
 }
 
 export function getNftVaultBrowserStorage(): StorageLike {
@@ -74,6 +185,10 @@ function isPendingOperation(value: unknown, context: NftVaultPendingContext): va
     && ADDRESS_PATTERN.test(operation.collectionAddress)
     && typeof operation.tokenId === 'string'
     && /^\d+$/.test(operation.tokenId)
+    && (operation.depositEpoch === undefined
+      || (operation.action === 'deposit'
+        && typeof operation.depositEpoch === 'string'
+        && /^\d+$/.test(operation.depositEpoch)))
     && (
       operation.action === 'approval'
       || operation.action === 'deposit'
@@ -131,8 +246,9 @@ export function savePendingNftVaultOperation(
   try {
     const context: NftVaultPendingContext = operation;
     const current = loadPendingNftVaultOperations(storage, context);
+    const operationKey = pendingNftVaultOperationAssetKey(operation);
     const next = [
-      ...current.filter((item) => item.assetId !== operation.assetId),
+      ...current.filter((item) => pendingNftVaultOperationAssetKey(item) !== operationKey),
       operation,
     ];
     storage.setItem(pendingNftVaultStorageKey(context), JSON.stringify(next));
@@ -146,10 +262,26 @@ export function clearPendingNftVaultOperation(
   storage: StorageLike,
   context: NftVaultPendingContext,
   assetId: string,
+  expected?: Pick<
+    NftVaultPendingOperation,
+    'chainId'
+    | 'walletAddress'
+    | 'vaultAddress'
+    | 'assetId'
+    | 'collectionAddress'
+    | 'tokenId'
+    | 'action'
+    | 'phase'
+    | 'txHash'
+    | 'depositEpoch'
+  >,
 ) {
   try {
     const next = loadPendingNftVaultOperations(storage, context)
-      .filter((item) => item.assetId !== assetId);
+      .filter((item) => {
+        const sameAsset = item.assetId === assetId || pendingNftVaultOperationAssetKey(item) === assetId;
+        return !(sameAsset && (!expected || pendingNftVaultOperationMatches(item, expected)));
+      });
     const key = pendingNftVaultStorageKey(context);
     if (next.length === 0) storage.removeItem(key);
     else storage.setItem(key, JSON.stringify(next));
