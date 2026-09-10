@@ -58,12 +58,192 @@
     "includedInThisBatch": false
   },
   "delivery": {
-    "status": "pending"
+    "status": "verified",
+    "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/366",
+    "mergeSha": "f2818618bd1493b5834c3c6e3fddfedeae193a25",
+    "mergedAt": "2026-09-10T00:00:53Z",
+    "workflowRun": "https://github.com/fgomezserna/cukies-hub/actions/runs/34419415547",
+    "mergedDappTreeMatchesValidatedCandidate": true,
+    "workflowResult": "success",
+    "deploymentUuid": "z8okk8oo8c0w44w8w4w0s8ow",
+    "webSha": "f2818618bd1493b5834c3c6e3fddfedeae193a25",
+    "gameSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+    "webDigest": "sha256:ec56c07e8cb7b18ecbce92ce803e6da5883b2080e1a689432cfd670b36673c74",
+    "decision": {
+      "deliveryMode": "rolling",
+      "web": true,
+      "workers": false,
+      "game": false,
+      "skip": false,
+      "changed": [
+        "dapp"
+      ],
+      "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+    },
+    "protectedContainerIdentitiesUnchanged": 14,
+    "sourceTask": "01a0859a-cf4d-77a0-a137-6db60a0a0f96",
+    "rawPostflightSha256": "117681443a68e6186ff12b88d6c30f53fdfe7fc1755dcae55a69ba2726621bbf",
+    "runtimeGuards": "PASS",
+    "pendingJournal": false,
+    "realDappImageBytes": 610259515
   },
   "limits": [
     "Marketplace V2 economic activation remains separate",
     "Legacy approvals/transfers/relayer stay closed",
     "No main/production change",
     "No transaction signatures in this QA"
-  ]
+  ],
+  "capacityRecovery": {
+    "observedAt": "2026-09-09T23:57:58.565839+00:00",
+    "kind": "Three unused local image copies, registry manifests/config/blobs verified beforehand",
+    "recoveredBytes": 1091788800,
+    "finalSourceFreeBytes": 12370288640,
+    "guardFloorBytes": 10737418240,
+    "stageAndProductionContainerIdentitiesUnchanged": 15,
+    "runtimeGuardsPassed": 5,
+    "capacityHeartbeatAgeSecondsLessThan": 9,
+    "registryAndVolumesUnchanged": true,
+    "rollbackPreserved": true,
+    "sourceTask": "01a0859a-cf4d-77a0-a137-6db60a0a0f96",
+    "rawEvidenceSha256": "cb6545724bb43f5608b07e160ec96e3c91e8f5e6ddae6fb01ec54187f7792b8e"
+  },
+  "publicChecks": {
+    "observedAt": "2026-09-10T00:23:53.992585+00:00",
+    "client": "curl",
+    "checks": [
+      {
+        "path": "/api/health",
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "app": "cukies-hub",
+          "environment": "staging",
+          "gitSha": "f2818618bd1493b5834c3c6e3fddfedeae193a25",
+          "gitRef": "staging",
+          "buildTime": null,
+          "coolify": {
+            "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+            "fqdn": null
+          }
+        }
+      },
+      {
+        "path": "/api/ready",
+        "http": 200,
+        "body": {
+          "status": "ready",
+          "gitSha": "f2818618bd1493b5834c3c6e3fddfedeae193a25",
+          "configHash": "42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b",
+          "imageSha": "f2818618bd1493b5834c3c6e3fddfedeae193a25"
+        }
+      },
+      {
+        "path": "/treasurehunt-game/api/health",
+        "http": 200,
+        "body": {
+          "status": "ok",
+          "app": "treasure-hunt",
+          "environment": "staging",
+          "gitSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+          "coolify": {
+            "resourceUuid": "lc04cw8gs4koo4swwws0c4ss"
+          }
+        }
+      },
+      {
+        "path": "/treasurehunt-game/api/ready",
+        "http": 200,
+        "body": {
+          "status": "ready",
+          "configHash": "42991da7c5313b078c39b0b3f129b00d51d41fce3be8bfb934a5137a1f4c1f9b",
+          "imageSha": "dc4c21e4fe66b1d574046de5177367e35919d427",
+          "gitSha": "dc4c21e4fe66b1d574046de5177367e35919d427"
+        }
+      }
+    ],
+    "transportLimit": "Python urllib returned403 and browser direct /api/ready was blocked; curl responses and normal application pages were verified separately."
+  },
+  "uiVerification": {
+    "observedAt": "2026-09-10T00:23:53.992585+00:00",
+    "environment": "staging",
+    "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "performedBy": "Astra coordinator using CUA Edge browser APIs",
+    "desktopViewport": {
+      "width": 1792,
+      "height": 1017,
+      "scrollWidth": 1792
+    },
+    "navigation": [
+      "/bridge",
+      "/breeding",
+      "/cukiepoints"
+    ],
+    "collection": {
+      "total": 12,
+      "wallet": 3,
+      "pool": 8,
+      "master": 1,
+      "initialLoadingSummaryUsesZeros": true
+    },
+    "marketplaceIdentity": {
+      "tokenId": "98000007",
+      "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+      "chainId": 97,
+      "queryPreserved": true,
+      "v2ConfigurationReady": false,
+      "positiveSaleNotVerified": true
+    },
+    "bridge": {
+      "routeVisible": true,
+      "readModeBlockedByBuildValue": "disabled"
+    },
+    "breeding": {
+      "routeVisible": true,
+      "operationsDisabled": true,
+      "readsBlockedByWalletChainMismatch": true,
+      "unverifiedHeaderShowsPoints0AndMaximum1": true
+    },
+    "cukiePoints": {
+      "routeVisible": true,
+      "bscWalletBalance": 0,
+      "bscTotal": 1205934,
+      "bscMinted": 1358198,
+      "bscBurned": 152264,
+      "tronBalance": "unknown",
+      "observedError": "Request failed with status code 429",
+      "errorSourceNotYetAttributed": true
+    },
+    "mobile": {
+      "verified": false,
+      "reason": "The browser viewport override had no effect; measured width remained1792px. Override reset and temporary tab closed."
+    },
+    "walletOrNetworkChanged": false,
+    "transactionsSigned": false
+  },
+  "configurationFollowup": {
+    "status": "configured_pending_delivery",
+    "key": "NEXT_PUBLIC_CUKIES_BRIDGE_MODE",
+    "before": "disabled",
+    "after": "legacy-readonly",
+    "sourceEnvironment": "cukies-staging",
+    "sourceVariable": "CUKIES_BUILD_ENV_JSON",
+    "expectedConfigHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+    "operationsEnabled": false,
+    "bscChainId": 56,
+    "tronNetwork": "mainnet",
+    "expectedBuild": [
+      "dapp",
+      "treasure-hunt"
+    ],
+    "expectedReuse": [
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer"
+    ],
+    "proposalSha256": "39c82a87a7eeae41ce046edaa319b4cb59c0d84f107ab869897de955e37c43d0",
+    "configuredAt": "2026-09-10T00:22:49Z",
+    "roundtrip": "PASS; all other keys/values/types unchanged",
+    "variableChangeEvidenceSha256": "b9ee1e4de2263f91559e0229ed74f64fffa8b8d07fed355a7dde2205edcc49a4"
+  }
 }
