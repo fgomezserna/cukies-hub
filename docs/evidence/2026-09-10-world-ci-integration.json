@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-10T03:34:46.761832+00:00",
+  "observedAt": "2026-09-10T03:56:50.109672+00:00",
   "scope": "World port preservation and common-CI integration; runtime and writes remain disabled",
   "source": {
     "pr": 346,
@@ -142,7 +142,7 @@
     }
   },
   "publication": {
-    "status": "first publication stopped; stdout and CLI entrypoint corrections reviewed, awaiting new PR/publication",
+    "status": "plan classification corrected and reviewed; exact final-head plan and publication pending",
     "registryImagesPublished": true,
     "worldActivated": false,
     "pr": 372,
@@ -243,6 +243,79 @@
         "rootDiffReview": "PASS",
         "runtimeGateBodyUnchangedSinceRealPullSmoke": true
       }
+    },
+    "smokeCorrectionPr": 373,
+    "smokeCorrectionMerge": "556ee514b5a4484ef9af545a597f664453a98431",
+    "smokeCorrectionPrCi": {
+      "runId": 34433901353,
+      "result": "SUCCESS",
+      "testedHead": "d809c7f855cee6ecdb6141f15c76020425ab5bc0",
+      "squashTreeEqualsTestedHead": true
+    },
+    "secondAttempt": {
+      "commit": "556ee514b5a4484ef9af545a597f664453a98431",
+      "base": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+      "ciRunId": 34434107532,
+      "result": "CANCELLED_BY_COORDINATOR_BEFORE_BUILD",
+      "actualPlanBuild": [
+        "dapp",
+        "chain-indexer",
+        "cuki-card-worker",
+        "schedulers",
+        "cukies-bridge-relayer",
+        "treasure-hunt",
+        "world-api",
+        "world-matchmaking"
+      ],
+      "actualPlanReuse": 0,
+      "expectedPlanBuild": [
+        "world-api",
+        "world-matchmaking"
+      ],
+      "expectedPlanReuse": 6,
+      "cause": "New World smoke test missing from explicit CI orchestration paths; it selected all eight images and disabled World-only refinement",
+      "cancelledAtStep": "Validate affected web application",
+      "buildAndPush": "SKIPPED",
+      "delivery": "SKIPPED",
+      "manifestArtifactPresent": false,
+      "planSha256": "2d1f7bb4ceff4790186b054d3afd96be0f4751d3a7f786823cc1b5612a321b95",
+      "followUp": "Minimal explicit path classification plus exact final-head plan against verified durable state before merge"
+    },
+    "planCorrection": {
+      "sourceCommits": [
+        "70fa033e34ce973722f014af1a342b97fe138d3a",
+        "82bf2060bed3b48a3dc0fc015eb14b0a5d208ec2"
+      ],
+      "integratedHead": "cf435b0a3dbcd5015280cc7ac53d94641a4cd07c",
+      "scope": "Exact World smoke test path classified for first integration and subsequent releases; unknown CI paths remain conservative",
+      "focalPassed": 35,
+      "ciSuitePassed": 133,
+      "failed": 0,
+      "futureWrapperAndTest": {
+        "build": [
+          "world-api",
+          "world-matchmaking"
+        ],
+        "reuse": 6
+      },
+      "testOnly": {
+        "build": [],
+        "reuse": 8
+      },
+      "unknownCiPathBuild": 8,
+      "initialWorkerProbe": {
+        "head": "556ee514b5a4484ef9af545a597f664453a98431",
+        "base": "4a08053070f562a7d8d10bdd8ca6699f0b15adf2",
+        "changedPaths": 230,
+        "build": [
+          "world-api",
+          "world-matchmaking"
+        ],
+        "reuse": 6,
+        "nxProjectsProvided": [],
+        "limit": "Worker local checkout lacked Nx; root will use observed full Nx input for exact final-head verification"
+      },
+      "rootDiffReview": "PASS"
     }
   },
   "remainingMigration": [
