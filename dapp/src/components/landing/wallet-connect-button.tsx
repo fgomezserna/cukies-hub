@@ -228,7 +228,12 @@ export function WalletConnectButton({
       return;
     }
 
-    if (evmConnectors.length === 0 && (evmOnly || !isTronInstalled)) {
+    // Keep an EVM-only request in the EVM dialog even when no injected
+    // connector is currently exposed. The dialog explains the required EVM
+    // connection without surfacing a native TRON option or a misleading
+    // success path; the general flow still uses the concise toast when no
+    // wallet surface is available at all.
+    if (evmConnectors.length === 0 && !evmOnly && !isTronInstalled) {
       toast({
         title: 'Wallet no encontrada',
         description: 'Instala una wallet EVM compatible para conectar.',
