@@ -1,7 +1,11 @@
 jest.mock("@/lib/indexer-db/mongodb", () => ({ getEconomyDb: jest.fn() }));
 
 import { getEconomyDb } from "@/lib/indexer-db/mongodb";
-import { getTreasureHuntWeeklyOverview } from "@/lib/uki-economy/game-economy/treasure-hunt-weekly-public";
+import { treasureHuntResultEligibility } from "@/lib/uki-economy/game-economy/treasure-hunt-policy";
+import {
+  classifyTreasureHuntWeeklyLeaderboard,
+  getTreasureHuntWeeklyOverview,
+} from "@/lib/uki-economy/game-economy/treasure-hunt-weekly-public";
 
 const wallet = "0x1111111111111111111111111111111111111111";
 
@@ -80,5 +84,57 @@ describe("Treasure Hunt weekly public overview", () => {
     for (const call of rankingCalls) {
       expect(call.filter?.creditSource).toEqual({ $in: ["own", "pool"] });
     }
+  });
+
+  it("considera cubierta una partida reciente inferior a la mejor marca", () => {
+    expect(classifyTreasureHuntWeeklyLeaderboard({
+      status: "settled",
+      gameEconomySessionId: "session-lower",
+      scoreRaw: "800",
+      achievedAt: new Date("2026-08-20T11:00:00.000Z"),
+      weeklyBest: {
+        winningGameId: "session-best",
+        scoreRaw: "900",
+        achievedAt: new Date("2026-08-20T10:00:00.000Z"),
+      },
+    })).toBe("covered_by_better");
+  });
+
+  it("considera cubierta una partida empatada posterior", () => {
+    expect(classifyTreasureHuntWeeklyLeaderboard({
+      status: "settled",
+      gameEconomySessionId: "session-later-tie",
+      scoreRaw: "900",
+      achievedAt: new Date("2026-08-20T11:00:00.000Z"),
+      weeklyBest: {
+        winningGameId: "session-earlier-tie",
+        scoreRaw: "900",
+        achievedAt: new Date("2026-08-20T10:00:00.000Z"),
+      },
+    })).toBe("covered_by_better");
+  });
+
+  it("deja pendiente una nueva mejor marca sin proyección", () => {
+    expect(classifyTreasureHuntWeeklyLeaderboard({
+      status: "settled",
+      gameEconomySessionId: "session-new-best",
+      scoreRaw: "117",
+      achievedAt: new Date("2026-09-10T12:00:00.000Z"),
+      weeklyBest: null,
+    })).toBe("pending");
+  });
+
+  it("mantiene pendiente una partida OWN histórica sin weekly best", () => {
+    expect(treasureHuntResultEligibility({
+      status: "settled",
+      creditSource: "own",
+    }).leaderboardEligible).toBe(true);
+    expect(classifyTreasureHuntWeeklyLeaderboard({
+      status: "settled",
+      gameEconomySessionId: "session-own-historical",
+      scoreRaw: "43",
+      achievedAt: new Date("2026-09-08T13:00:00.000Z"),
+      weeklyBest: null,
+    })).toBe("pending");
   });
 });

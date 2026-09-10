@@ -23,7 +23,11 @@ export default function TreasureHuntLatestResult() {
     ? result.creditSource === 'own' ? 'Personales' : 'Del pool'
     : `${result.creditsSpent} ${result.creditSource === 'own' ? 'personales' : 'del pool'}`;
   const weeklyStatus = result.leaderboardEligible
-    ? result.leaderboardRecorded ? 'Sí, esta partida cuenta' : 'Elegible · pendiente de reflejarse'
+    ? result.leaderboardStatus === 'recorded'
+      ? 'Sí, esta partida cuenta'
+      : result.leaderboardStatus === 'covered_by_better'
+        ? 'Se conserva tu mejor puntuación'
+        : 'Elegible · pendiente de reflejarse'
     : 'Fuera del ranking';
   return (
     <section aria-labelledby="treasure-hunt-latest-result-title" className="overflow-hidden rounded-[8px] border border-[var(--uki-lilac-border)] bg-[#0d0914]/94">
@@ -42,7 +46,7 @@ export default function TreasureHuntLatestResult() {
         <div className="px-4 py-3.5"><dt className="text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]">Cukie asignado</dt><dd className="mt-1 text-sm font-black text-[#f2eee7]">{result.cukieSource === 'own' ? 'Propio' : 'Del pool'}</dd><p className="mt-0.5 text-[11px] text-[#969994]">{result.cukieGeneration} · {result.cukieRarity}</p></div>
         <div className="px-4 py-3.5"><dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-[#969994]"><Clock3 className="h-3.5 w-3.5 text-[#ffc240]" /> Recompensa directa</dt><dd className="mt-1 text-sm font-black text-[#ffc240]">{rewardCopy(result.reward.status, result.reward.amountRaw)}</dd><p className="mt-0.5 text-[11px] text-[#969994]">{result.reward.status === 'processing' ? 'Se actualizará automáticamente' : 'Importe asignado al jugador'}</p></div>
       </dl>
-      {completed && (!result.leaderboardEligible || !result.leaderboardRecorded) ? <p className="border-t border-[var(--uki-lilac-border)] px-5 py-3 text-xs text-[#aaa8a2]">Esta partida aún no aparece en la clasificación semanal disponible para este periodo.</p> : null}
+      {completed && result.leaderboardEligible && result.leaderboardStatus === 'pending' ? <p className="border-t border-[var(--uki-lilac-border)] px-5 py-3 text-xs text-[#aaa8a2]">Esta partida aún no aparece en la clasificación semanal disponible para este periodo.</p> : null}
     </section>
   );
 }

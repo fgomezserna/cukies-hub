@@ -4,6 +4,7 @@ import TreasureHuntLatestResult from '@/components/games/treasure-hunt-latest-re
 
 let rewardStatus: 'processing' | 'allocated' = 'allocated';
 let leaderboardRecorded = true;
+let leaderboardStatus: 'recorded' | 'covered_by_better' | 'pending' | 'ineligible' = 'recorded';
 
 jest.mock('lucide-react', () => ({
   ArrowRight: () => null,
@@ -29,6 +30,7 @@ jest.mock('@/hooks/use-treasure-hunt-weekly-overview', () => ({
         cukieGeneration: 'Original',
         cukieRarity: 'Legendario',
         leaderboardEligible: true,
+        leaderboardStatus,
         leaderboardRecorded,
         rewardEligible: true,
         jackpotEligible: true,
@@ -46,6 +48,7 @@ describe('resultado económico de Treasure Hunt', () => {
   beforeEach(() => {
     rewardStatus = 'allocated';
     leaderboardRecorded = true;
+    leaderboardStatus = 'recorded';
   });
 
   it('explica el score, los recursos, el ranking y la recompensa asignada', () => {
@@ -64,10 +67,19 @@ describe('resultado económico de Treasure Hunt', () => {
 
   it('separa la elegibilidad de la presencia ya registrada cuando falta el weekly best', () => {
     leaderboardRecorded = false;
+    leaderboardStatus = 'pending';
     render(<TreasureHuntLatestResult />);
 
     expect(screen.getByText('Elegible · pendiente de reflejarse')).toBeInTheDocument();
     expect(screen.getByText(/aún no aparece en la clasificación semanal/i)).toBeInTheDocument();
+  });
+
+  it('explica que una partida menor conserva la mejor puntuación del periodo', () => {
+    leaderboardStatus = 'covered_by_better';
+    render(<TreasureHuntLatestResult />);
+
+    expect(screen.getByText('Se conserva tu mejor puntuación')).toBeInTheDocument();
+    expect(screen.queryByText(/aún no aparece en la clasificación semanal/i)).not.toBeInTheDocument();
   });
 
   it('indica que el cálculo sigue en curso sin inventar un premio', () => {

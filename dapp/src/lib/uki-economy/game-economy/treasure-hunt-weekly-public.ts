@@ -15,6 +15,7 @@ import type {
 } from "@/lib/uki-economy/rewards/types";
 
 import {
+  shouldReplaceTreasureHuntWeeklyBest,
   getTreasureHuntWeeklyPeriod,
   treasureHuntResultEligibility,
 } from "./treasure-hunt-policy";
@@ -41,6 +42,47 @@ export type TreasureHuntWeeklyRankingEntry = {
   isMe: boolean;
 };
 
+export type TreasureHuntWeeklyLeaderboardStatus =
+  | "recorded"
+  | "covered_by_better"
+  | "pending"
+  | "ineligible";
+
+/**
+ * Tells the public result view whether the latest run is represented by the
+ * wallet's current weekly best. The weekly-best row is already scoped to the
+ * same wallet and period by the caller; this comparison only decides whether
+ * that row covers the run or whether a projection is still missing.
+ */
+export function classifyTreasureHuntWeeklyLeaderboard(input: {
+  status: "settled" | "forfeited";
+  gameEconomySessionId: string;
+  scoreRaw: string;
+  achievedAt: Date;
+  weeklyBest: Pick<TreasureHuntWeeklyBest, "scoreRaw" | "achievedAt" | "winningGameId"> | null;
+}): TreasureHuntWeeklyLeaderboardStatus {
+  if (input.status !== "settled") return "ineligible";
+  if (!input.weeklyBest) return "pending";
+  if (input.weeklyBest.winningGameId === input.gameEconomySessionId) {
+    return "recorded";
+  }
+
+  try {
+    return shouldReplaceTreasureHuntWeeklyBest({
+      currentScoreRaw: input.weeklyBest.scoreRaw,
+      currentAchievedAt: input.weeklyBest.achievedAt,
+      candidateScoreRaw: input.scoreRaw,
+      candidateAchievedAt: input.achievedAt,
+    })
+      ? "pending"
+      : "covered_by_better";
+  } catch {
+    // A malformed candidate or stored row cannot prove that the result is
+    // represented. Keep the conservative pending state for manual review.
+    return "pending";
+  }
+}
+
 export type TreasureHuntWeeklyLatestResult = {
   runId: string;
   status: "settled" | "forfeited";
@@ -54,6 +96,7 @@ export type TreasureHuntWeeklyLatestResult = {
   cukieGeneration: string;
   cukieRarity: string;
   leaderboardEligible: boolean;
+  leaderboardStatus: TreasureHuntWeeklyLeaderboardStatus;
   leaderboardRecorded: boolean;
   rewardEligible: boolean;
   jackpotEligible: boolean;
@@ -145,7 +188,14 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
       gameId: "treasure-hunt",
       creditSource: { $in: ["own", "pool"] as const },
       walletNormalized,
-      winningGameId: run.gameEconomySessionId,
+    }, {
+      sort: {
+        scoreDigits: -1,
+        scoreRaw: -1,
+        achievedAt: 1,
+        winningGameId: 1,
+        _id: 1,
+      },
     }),
   ]);
   const rewardStatus = run.status !== "settled"
@@ -158,6 +208,14 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
   const eligibility = treasureHuntResultEligibility({
     status: run.status,
     creditSource: run.creditSource,
+  });
+  const achievedAt = run.achievedAt ?? run.updatedAt;
+  const leaderboardStatus = classifyTreasureHuntWeeklyLeaderboard({
+    status: run.status,
+    gameEconomySessionId: run.gameEconomySessionId,
+    scoreRaw: run.scoreRaw ?? "0",
+    achievedAt,
+    weeklyBest,
   });
 
   return {
@@ -175,7 +233,8 @@ async function latestResultFor(walletNormalized: string, weeklyPeriodId: string)
     cukieGeneration: run.cukieGeneration,
     cukieRarity: run.cukieRarity,
     ...eligibility,
-    leaderboardRecorded: Boolean(weeklyBest),
+    leaderboardStatus,
+    leaderboardRecorded: leaderboardStatus === "recorded" || leaderboardStatus === "covered_by_better",
     reward: {
       status: rewardStatus,
       amountRaw: rewardStatus === "allocated" ? allocation?.amountRaw ?? "0" : null,
