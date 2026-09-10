@@ -1,0 +1,141 @@
+{
+  "observedAt": "2026-09-10T05:33:33.500931+00:00",
+  "scope": "Pre-publication review of isolated game recovery and Legacy breeding identity candidates; no live state operations",
+  "stagingCodeObserved": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
+  "stagingChangedByTheseCandidates": false,
+  "gameRecovery": {
+    "candidate": "3903aa7cbc9dc11b7ccba787ace551df4fd1373f",
+    "base": "0cf0019742373364da5cb0811c3252d1a1cbd007",
+    "decision": "changes_requested",
+    "reviewer": "root Astra Max",
+    "reviewed": "Complete nine-file diff, new recovery inspector, related engine compensation and Mongo resource ports, reported test coverage",
+    "productTestsRunByReviewer": false,
+    "reportedWorkerGates": {
+      "focalSuites": 5,
+      "focalTests": 59,
+      "fullSuites": 236,
+      "fullTests": 1929,
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "buildStaticPages": 92,
+      "scope": "Original candidate, not integrated staging"
+    },
+    "reportSha256": "4f515efa88180b48eb0ca38d01a8c3e0a2910f6671053d5e47bb84c08d8f1043",
+    "findings": [
+      {
+        "id": "GR1",
+        "priority": "P1",
+        "finding": "The original first-resource failure never created a Cukie binding; requiring both bindings permanently rejects its recovery.",
+        "evidence": [
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1091",
+          "dapp/src/lib/uki-economy/game-economy/resource-ports.ts:684"
+        ]
+      },
+      {
+        "id": "GR2",
+        "priority": "P1",
+        "finding": "A non-null Cukie reservation is checked as both own and pool; the empty alternative always rejects a valid compensated assignment.",
+        "evidence": [
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:841",
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:892"
+        ]
+      },
+      {
+        "id": "GR3",
+        "priority": "P1",
+        "finding": "The component forgets the old resume before persisting the replacement; a failed storage write can lose the stable recovery key and trigger random authority creation.",
+        "evidence": [
+          "dapp/src/components/games/treasure-hunt-game-view.tsx:227",
+          "dapp/src/lib/treasure-hunt-competition/client/game-session-resume.ts:305"
+        ]
+      },
+      {
+        "id": "GR4",
+        "priority": "P2",
+        "finding": "The snapshot includes other sessions using the same credit lots and then blocks recovery if any such reservation is active.",
+        "evidence": [
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:560",
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1209"
+        ]
+      },
+      {
+        "id": "GR5",
+        "priority": "P1",
+        "finding": "New tests exercise HTTP mapping and session starter, but mock the economic server entrypoint; they do not validate the recovery inspector that authorizes replacement.",
+        "evidence": [
+          "dapp/__tests__/api/treasure-hunt-economy-routes.test.ts:16",
+          "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1419"
+        ]
+      }
+    ],
+    "nextStep": "Same task corrects GR1-GR5 with canonical server/component regression tests; preserve original commit, no push until root review, full combined gates once after review",
+    "taskId": "01a0814e-0ea0-7070-877c-701f264243e7"
+  },
+  "legacyBreeding": {
+    "candidate": "1178153140f0b63cb0378f2678096a85e454862c",
+    "base": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
+    "decision": "changes_requested",
+    "taskId": "01a08727-0cdb-7993-bbab-6829bcf3d333",
+    "reportedWorkerGates": {
+      "focalSuites": 3,
+      "focalTests": 13,
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "buildStaticPages": 92,
+      "scope": "Original candidate, not integrated staging"
+    },
+    "reviewer": "Independent Astra Max, findings reviewed by root",
+    "reviewReportSha256": "e45b0578fc41828b8797ff2e76a12e3d801f65930fe0d5cc7daecb6a47be4f3f",
+    "reproduction": {
+      "suites": 2,
+      "cases": 4,
+      "result": "Observed defective behavior reproduced; not acceptance tests",
+      "liveOperations": false,
+      "source": "Isolated Jest fixtures outside repository"
+    },
+    "findings": [
+      {
+        "id": "LB1",
+        "priority": "P1",
+        "finding": "Mongo ownerNormalized and counters are marked verified without evidence of current ownership/projection coverage.",
+        "evidence": [
+          "dapp/src/lib/cukies-data/data.ts:655",
+          "packages/chain-indexer/src/legacy/importer.ts:270"
+        ]
+      },
+      {
+        "id": "LB2",
+        "priority": "P2",
+        "finding": "Imported numChildren=0 overrides two materialized children and incorrectly grants known eligibility.",
+        "evidence": [
+          "dapp/src/lib/cukies-data/data.ts:380",
+          "packages/chain-indexer/src/projectors/index.ts:1137"
+        ]
+      },
+      {
+        "id": "LB3",
+        "priority": "P2",
+        "finding": "Selected parents remain in the preview after a wallet change or refreshed evidence revokes eligibility.",
+        "evidence": [
+          "dapp/src/components/legacy-marketplace/breeding-client.tsx:506",
+          "dapp/src/components/legacy-marketplace/breeding-client.tsx:798"
+        ]
+      },
+      {
+        "id": "LB4",
+        "priority": "P2",
+        "finding": "A lossy uppercase TRON lookup alias is accepted as verified owner even when the address itself is invalid.",
+        "evidence": [
+          "dapp/src/lib/legacy-marketplace/breeding-identity.ts:74",
+          "packages/chain-indexer/src/legacy/importer.ts:264"
+        ]
+      }
+    ],
+    "nextStep": "Same task corrects LB1-LB4 with canonical ownership evidence or fail-closed unknown, reconciled eligibility, contextual preview and valid TRON identity; no push until root review."
+  },
+  "limits": [
+    "No production/main changes",
+    "No database, ledger, balance, incident, cursor or on-chain mutations",
+    "Previously verified NFT recovery and World publication remain closed; candidate review does not reopen them"
+  ]
+}
