@@ -97,3 +97,14 @@ Escala 0–3; juicio de diseño sobre este alcance, no ensayo con usuarios.
 Resultado ponderado: 44/16 = **2,75/3**. Sin criterio crítico ≤1.
 La verificación de publicación se registra por separado con SHA y CI; esta
 evaluación no cierra incidencias de contratos, datos o migración legacy.
+
+## Publicación comprobada
+
+[PR #402](https://github.com/fgomezserna/cukies-hub/pull/402), web `6f755b86`,
+[CI 34531912745](https://github.com/fgomezserna/cukies-hub/actions/runs/34531912745)
+SUCCESS. [Postflight y nueve rutas públicas](../2026-09-10-content-task-tabs-delivery.json)
+verificados: health/ready 200, diez workers sin reinicios, 25 contenedores
+protegidos conservados y producción sin cambios. En Edge con sesión se
+comprobaron tabs, borradores, filtros y disclosures; los valores de prueba se
+restauraron sin guardar y no se firmaron operaciones. El enlace anterior
+`/premios#reward-history-title` abre Historial y enfoca su encabezado.

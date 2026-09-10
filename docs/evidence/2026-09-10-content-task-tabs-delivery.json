@@ -1,0 +1,279 @@
+{
+  "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+  "observedAt": "2026-09-10T21:33:25.074645+00:00",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/402",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34531912745",
+  "release": {
+    "schemaVersion": 1,
+    "environment": "staging",
+    "chainId": "97",
+    "commit": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
+    "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+    "deploymentUuid": "qgcg808sowk44s8cg44g8488",
+    "deliveryMode": "rolling",
+    "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+    "webResourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+    "workersResourceUuid": "u4s804o4wwcckowgk0woo4wg",
+    "gameResourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+    "gameDeploymentUuid": "koccwkw8o8kk8sw08ksw8ow0",
+    "components": {
+      "dapp": {
+        "image": "192.168.1.207:5000/cukies-hub/dapp:6f755b86a207750fd28cb6be558ce8c8cefa098f-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:961a1dd4f941708adf2be7079bb134aa33d3f95f54df01523f6f54d665b31b4b",
+        "digest": "sha256:961a1dd4f941708adf2be7079bb134aa33d3f95f54df01523f6f54d665b31b4b",
+        "tag": "6f755b86a207750fd28cb6be558ce8c8cefa098f-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "chain-indexer": {
+        "image": "192.168.1.207:5000/cukies-hub/chain-indexer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "digest": "sha256:e47efbd4fb33d2593a5a76e53f1c7cb08dea5d56bf08fd8b6e3b5023a8dbc2cf",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cuki-card-worker": {
+        "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "digest": "sha256:619bf2764000782eea8bc9a24d1cf603fcae2591ee8bba56a8138273badce6a9",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "schedulers": {
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "digest": "sha256:25d0c195973cb5a2cf0748c8256aa9adb4d55b775c08a9ca2ed9e63d30f0d5d8",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cukies-bridge-relayer": {
+        "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "digest": "sha256:76414c612975e2eab8ec969d3fb5546e8c30c25008f79d3a5e8c7d0b5a774e7f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "treasure-hunt": {
+        "image": "192.168.1.207:5000/cukies-hub/treasure-hunt:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "digest": "sha256:ba008402d3b47ac4888f1442ec9d692d912f0ef4258d2464c92c590965c45d1f",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-api": {
+        "image": "192.168.1.207:5000/cukies-hub/world-api:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "digest": "sha256:59a3480dd29d5a21e3cebba3ddc1c93049969455f0fb6549d5e8841501dfa1f6",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-matchmaking": {
+        "image": "192.168.1.207:5000/cukies-hub/world-matchmaking:82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27@sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "digest": "sha256:04f2adb66ff48e4f0a307b20c3b9e0b9657fbc9fa6d88a5bbdb9f78690619b4b",
+        "tag": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44-af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "configHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+        "sourceSha": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+        "environment": "staging",
+        "chainId": "97"
+      }
+    },
+    "webCommit": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
+    "gameCommit": "82d5b511fedaa3d9c41aa357d2eee01d2ce0eb44",
+    "previousCommit": "19df664b351f8888b3f23637be10fdffbdabdf1c",
+    "updatedAt": "2026-09-10T21:32:53.967Z"
+  },
+  "health": {
+    "status": "ok",
+    "app": "cukies-hub",
+    "environment": "staging",
+    "gitSha": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
+    "gitRef": "staging",
+    "buildTime": null,
+    "coolify": {
+      "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+      "fqdn": null
+    }
+  },
+  "readyHttpStatus": 200,
+  "journal": "clean",
+  "web": [
+    {
+      "id": "6f2909eb020296a8dbcc3d5d16f0c7a8abad7ae9e50dc9948364efcfccbab679",
+      "name": "rwwsc4kkwc0ck84cgk40s8kk-213208901700",
+      "image": "192.168.1.207:5000/cukies-hub/dapp@sha256:961a1dd4f941708adf2be7079bb134aa33d3f95f54df01523f6f54d665b31b4b",
+      "imageId": "sha256:8c07e968f007dc3f3fe18ea0e6186fe4d97f8f48e49d2b563abd2f3dc0b817ad",
+      "state": "running",
+      "health": "healthy",
+      "restarts": 0
+    }
+  ],
+  "workerCount": 10,
+  "workersRunningNoRestarts": true,
+  "protected": {
+    "total": 25,
+    "preserved": 25,
+    "changed": []
+  },
+  "ui": {
+    "completedAt": "2026-09-10T21:40:54.840103+00:00",
+    "url": "https://cukieshub.eurekand.com",
+    "webCommit": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
+    "browser": "Edge, session connected",
+    "observedViewport": {
+      "width": 1792,
+      "height": 1017
+    },
+    "routes": [
+      {
+        "route": "/premios",
+        "tabs": [
+          "Por cobrar",
+          "Historial"
+        ],
+        "visiblePanels": 1,
+        "overflow": false,
+        "ariaControlsValid": true,
+        "tabHeightPx": 44,
+        "historyNavigation": {
+          "selected": true,
+          "legacyHash": "#reward-history-title",
+          "focusedHeading": "reward-history-title"
+        }
+      },
+      {
+        "route": "/credits",
+        "tabs": [
+          "Reparto",
+          "Historial"
+        ],
+        "visiblePanels": 1,
+        "overflow": false,
+        "ariaControlsValid": true,
+        "tabHeightPx": 44,
+        "draftRoundTrip": {
+          "retained": true,
+          "noticeVisibleInHistory": true,
+          "originalRestored": true,
+          "saved": false
+        }
+      },
+      {
+        "route": "/cukie-hodler",
+        "tabs": [
+          "En el pool",
+          "Aportar Cukies"
+        ],
+        "visiblePanels": 1,
+        "overflow": false,
+        "ariaControlsValid": true,
+        "tabHeightPx": 44,
+        "lists": {
+          "initialDepositedCount": 2,
+          "availableCount": 6,
+          "onlyActiveListVisible": true
+        }
+      },
+      {
+        "route": "/cukie-master",
+        "tabs": [
+          "Gestionar UKI",
+          "Gestionar Cukies"
+        ],
+        "visiblePanels": 1,
+        "overflow": false,
+        "ariaControlsValid": true,
+        "tabHeightPx": 44,
+        "ukiAmountRoundTrip": {
+          "retained": true,
+          "originalRestored": true,
+          "signed": false
+        }
+      },
+      {
+        "route": "/marketplace",
+        "tabs": [
+          "Comprar",
+          "Mis anuncios"
+        ],
+        "visiblePanels": 1,
+        "overflow": false,
+        "ariaControlsValid": true,
+        "tabHeightPx": 44,
+        "catalogFilterRoundTrip": {
+          "retained": true,
+          "originalRestored": true,
+          "sellerViewVisible": true,
+          "signed": false
+        }
+      },
+      {
+        "route": "/bridge",
+        "tabs": [
+          "Preparar",
+          "Seguimiento"
+        ],
+        "visiblePanels": 1,
+        "overflow": false,
+        "ariaControlsValid": true,
+        "tabHeightPx": 44,
+        "trackingView": {
+          "visible": true,
+          "hash": "#seguimiento"
+        }
+      },
+      {
+        "route": "/embajadores",
+        "tabs": [
+          "Mi programa",
+          "Invitados",
+          "Comisiones"
+        ],
+        "visiblePanels": 1,
+        "overflow": false,
+        "ariaControlsValid": true,
+        "tabHeightPx": 44,
+        "views": {
+          "referralsVisible": true,
+          "commissionsVisible": true,
+          "rulesInitiallyClosed": true,
+          "rulesOpenedAndClosed": true
+        }
+      },
+      {
+        "route": "/cukiepoints",
+        "overflow": false,
+        "disclosure": "Datos globales",
+        "initiallyClosed": true,
+        "opensAndCloses": true,
+        "activityStaysVisible": true,
+        "summaryHeightPx": 44
+      },
+      {
+        "route": "/vesting",
+        "overflow": false,
+        "disclosure": "C\u00f3mo funciona tu vesting",
+        "initiallyClosed": true,
+        "opensAndCloses": true,
+        "calendarStaysVisible": true,
+        "summaryHeightPx": 44
+      }
+    ],
+    "signedTransactions": false,
+    "backendWritesFromQA": false,
+    "limits": "Desktop public interaction checks. Responsive checks use local fixtures as documented; this does not certify transactions or resolve economy/indexer incidents."
+  },
+  "signedTransactions": "not_executed"
+}
