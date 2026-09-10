@@ -1,0 +1,92 @@
+{
+  "schema": "cukies.staging-withdrawal-correction.v1",
+  "observedAt": "2026-09-10T11:05:14.805Z",
+  "chainId": 97,
+  "apply": true,
+  "vaultAddress": "0xd405acff1bba872be893e796c39f3eacbde2872b",
+  "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+  "runtimeHash": "0x36c0f9144323fc23ce9ab02063196943f7d633abb207a8df519db35caf26637a",
+  "signer": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+  "periodDurationUnchanged": "86400",
+  "earlierAt": "1788973200",
+  "earlierAtIso": "2026-09-09T17:00:00Z",
+  "reason": "First 30-minute staging cutoff after each existing exit request; only these three historical test positions.",
+  "before": [
+    {
+      "tokenId": "98000001",
+      "beneficiary": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "depositEpoch": "1",
+      "exitRequestedAt": "1788972893",
+      "withdrawableAt": "1789048800",
+      "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b"
+    },
+    {
+      "tokenId": "98000003",
+      "beneficiary": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "depositEpoch": "1",
+      "exitRequestedAt": "1788973022",
+      "withdrawableAt": "1789048800",
+      "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b"
+    },
+    {
+      "tokenId": "98000004",
+      "beneficiary": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "depositEpoch": "1",
+      "exitRequestedAt": "1788973099",
+      "withdrawableAt": "1789048800",
+      "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b"
+    }
+  ],
+  "transactions": [
+    {
+      "tokenId": "98000001",
+      "transactionHash": "0x0110934d3c75af479fb8508bde7a0bd25c7249d137e79e2e464366b3da1c0993",
+      "status": "confirmed",
+      "blockNumber": 130203980,
+      "gasUsed": "35027"
+    },
+    {
+      "tokenId": "98000003",
+      "transactionHash": "0x4727cbd0195ab8a948344325bac9729a26fc6d5f3f3a37cb9c3f61a7966de8a0",
+      "status": "confirmed",
+      "blockNumber": 130203993,
+      "gasUsed": "35027"
+    },
+    {
+      "tokenId": "98000004",
+      "transactionHash": "0x5f3b85d7d5300e7a0c975a163f588d9d4d4a5ab1d3c165e1eb26b70f694d1da7",
+      "status": "confirmed",
+      "blockNumber": 130204008,
+      "gasUsed": "35027"
+    }
+  ],
+  "after": [
+    {
+      "tokenId": "98000001",
+      "beneficiary": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "depositEpoch": "1",
+      "exitRequestedAt": "1788972893",
+      "withdrawableAt": "1788973200",
+      "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b",
+      "lifecycle": "4"
+    },
+    {
+      "tokenId": "98000003",
+      "beneficiary": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "depositEpoch": "1",
+      "exitRequestedAt": "1788973022",
+      "withdrawableAt": "1788973200",
+      "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b",
+      "lifecycle": "4"
+    },
+    {
+      "tokenId": "98000004",
+      "beneficiary": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "depositEpoch": "1",
+      "exitRequestedAt": "1788973099",
+      "withdrawableAt": "1788973200",
+      "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b",
+      "lifecycle": "4"
+    }
+  ]
+}

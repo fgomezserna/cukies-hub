@@ -443,6 +443,8 @@ describe('NftVaultRecoveryPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar posición' }));
 
     await screen.findByText(/Retirable desde/i);
+    expect(screen.getByText(/El plazo se fijó al solicitar la salida/i)).toBeInTheDocument();
+    expect(screen.getByText(/podrás retirarlo desde la fecha indicada/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retirar Cukie' })).not.toBeInTheDocument();
     expect(writeContractAsync).not.toHaveBeenCalled();
   });
