@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-10T06:00:16.601892+00:00",
+  "observedAt": "2026-09-10T06:20:48.127509+00:00",
   "scope": "Pre-publication review of isolated game recovery and Legacy breeding identity candidates; no live state operations",
   "stagingCodeObserved": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
   "stagingChangedByTheseCandidates": false,
@@ -68,8 +68,57 @@
         ]
       }
     ],
-    "nextStep": "Same task corrects GR1-GR5 with canonical server/component regression tests; preserve original commit, no push until root review, full combined gates once after review",
-    "taskId": "01a0814e-0ea0-7070-877c-701f264243e7"
+    "nextStep": "Same task preserves all observed own-epoch evidence and supplies canonical durable-credit/compensation boundary regressions; unsupported or ambiguous paths stay pending. No worker push or live mutation; root combines reviewed source commits and runs full gates once.",
+    "taskId": "01a0814e-0ea0-7070-877c-701f264243e7",
+    "currentCandidate": "4fa4f37cc53936f0312c3525b385d18a37297544",
+    "correctionReview": {
+      "candidate": "4fa4f37cc53936f0312c3525b385d18a37297544",
+      "decision": "changes_requested",
+      "reviewer": "root Astra Max",
+      "reviewed": "Complete six-file correction diff and focused test suite, related resource and session starter helpers",
+      "addressedInDiff": [
+        "GR1 sequential first-resource failure recognition",
+        "GR2 canonical own/pool selection",
+        "GR3 persist replacement before clearing old authority",
+        "GR4 scope active credit exclusion to the own attempt"
+      ],
+      "remainingFindings": [
+        {
+          "id": "GR1",
+          "priority": "P1",
+          "finding": "Multiple own epochs collapse to null while completeness remains true, so partial own effects are treated as proven absence and permit restart.",
+          "evidence": [
+            "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:1583",
+            "dapp/src/lib/uki-economy/game-economy/treasure-hunt-recovery.ts:810"
+          ]
+        },
+        {
+          "id": "GR5",
+          "priority": "P1",
+          "finding": "Recovery tests use a credit failure without durable reservation and manually reconstructed saga/Own/Pool receipts; durable credit compensation, another active player in a shared lot and lost-response effects remain untested.",
+          "evidence": [
+            "dapp/__tests__/lib/treasure-hunt-economy-recovery.test.ts:180",
+            "dapp/__tests__/lib/treasure-hunt-economy-recovery.test.ts:231"
+          ]
+        }
+      ],
+      "reproduction": {
+        "suites": 1,
+        "cases": 1,
+        "fixture": "Terminal first-credit failure with two own epochs referencing the same session and no complete binding/assignment",
+        "observed": "restart",
+        "result": "PASS reproduces residual defect, not acceptance",
+        "liveOperations": false
+      },
+      "reportedWorkerGates": {
+        "focalSuites": 5,
+        "focalTests": 61,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Correction candidate, not final combined staging candidate"
+      },
+      "reportSha256": "f8699c7b3f0b485beb4372ea1ac2574a8c013b92ff379180301160831c1f5880"
+    }
   },
   "legacyBreeding": {
     "candidate": "1178153140f0b63cb0378f2678096a85e454862c",
@@ -131,8 +180,8 @@
         ]
       }
     ],
-    "nextStep": "Same task addresses only residual LB2 using canonical per-NFT counter or proven projection coverage; unknown remains excluded. Add focused counter and RPC-boundary regressions, preserve source commits, no worker push; root owns the combined integration and full gates.",
-    "currentCandidate": "7101d637154d33b98535f6dc2ec2fa14cf561a1a",
+    "nextStep": "Same task addresses only the unproven BSC boundary state and signing-network reset regression, preserving source commits and writes OFF; root reviews the small final diff and owns combined staging publication.",
+    "currentCandidate": "6bf7b8bb3d7847858e39f5953223e05981e2ef80",
     "correctionReview": {
       "candidate": "7101d637154d33b98535f6dc2ec2fa14cf561a1a",
       "decision": "changes_requested",
@@ -169,6 +218,53 @@
       "reportSha256": "b7f8dfd51ae7e9dfc87b0e543074cb8aadc0f878e17bbf0f543440d26d0621c5",
       "preservedAlternateLocalCombination": "a78b139bc1a4a9e9b7d4118451e404ccfbd74d81",
       "alternateCombinationPromoted": false
+    },
+    "latestCorrectionReview": {
+      "candidate": "6bf7b8bb3d7847858e39f5953223e05981e2ef80",
+      "decision": "changes_requested",
+      "reviewer": "Independent Astra Max, findings and report reviewed by root",
+      "reportedWorkerGates": {
+        "focalSuites": 4,
+        "focalTests": 22,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Correction candidate, not final combined staging candidate"
+      },
+      "resolvedInCorrection": [
+        "Current canonical ownerOf",
+        "Exact TRON identity",
+        "Wallet A to B preview reset",
+        "No children.length eligibility fallback; current contractual count"
+      ],
+      "findings": [
+        {
+          "id": "LB2-BOUNDARY",
+          "priority": "P1",
+          "finding": "The inherited BSC +1 was applied to an aggregate Mongo counter; available evidence does not establish that margin for the new per-contract getter. count=max is currently declared verified eligible.",
+          "evidence": [
+            "dapp/src/lib/legacy-marketplace/breeding-identity.ts:154",
+            "/Users/fgomezserna/Proyectos/cukies-world/apps/backend/sync/events/BreedFinish.js:176"
+          ],
+          "nextStep": "Preserve this unproven BSC boundary as unknown/partial and exclude selection until semantics are verified; no contract change or invented rule."
+        },
+        {
+          "id": "LB3-SIGNING-NETWORK",
+          "priority": "P2",
+          "finding": "Changing only the EVM signing chain clears candidate, completed and active lists without refetching the unchanged BSC56 read context.",
+          "evidence": [
+            "dapp/src/components/legacy-marketplace/breeding-client.tsx:800",
+            "dapp/src/components/legacy-marketplace/breeding-client.tsx:570"
+          ],
+          "nextStep": "Separate signing permission/parent invalidation from read inventory; preserve or explicitly reload BSC56 data for the same wallet."
+        }
+      ],
+      "reproduction": {
+        "cases": 5,
+        "result": "One UI regression reproduced, two counter/coverage cases, two RPC parser cases in Node",
+        "liveOperations": false,
+        "initialHarnessIssue": "TRON Buffer/Uint8Array fixture conversion under jsdom; only parser suite rerun in Node successfully, not a product failure"
+      },
+      "reportSha256": "7eae7b9527d80a3b70ae2005a51f897d0964ace9a0651bd3b85bee82230deabd"
     }
   },
   "limits": [
