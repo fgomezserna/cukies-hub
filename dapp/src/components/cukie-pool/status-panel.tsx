@@ -268,7 +268,7 @@ function pendingLabel(operation: NftVaultPendingOperation) {
   if (operation.phase === 'syncing_projection') {
     if (operation.action === 'deposit') return 'Actualizando depósito…';
     if (operation.action === 'request_exit') return 'Actualizando salida…';
-    return 'Actualizando retirada…';
+    return 'Retirada confirmada · actualizando colección…';
   }
   return ({
     approval: 'Confirmando aprobación…',
@@ -282,7 +282,14 @@ function projectionMatchesPoolOperation(
   operation: NftVaultPendingOperation,
   status: PoolStatus,
 ) {
-  if (operation.phase !== 'syncing_projection' || status.mode !== 'custodial_vault') return false;
+  if (
+    operation.phase !== 'syncing_projection'
+    || status.mode !== 'custodial_vault'
+    || !status.sourceHealthy
+    || status.walletNormalized.toLowerCase() !== operation.walletAddress.toLowerCase()
+    || status.nftCustody.chainId !== operation.chainId
+    || !sameAddress(status.nftCustody.vaultAddress, operation.vaultAddress)
+  ) return false;
   const position = status.positions.find((item) => (
     item.assetId === operation.assetId
     || pendingNftVaultOperationAssetKey(operation) === item.assetId
@@ -1167,10 +1174,21 @@ export function CukiePoolStatusPanel() {
 
   const custodialStatus = status?.mode === 'custodial_vault' ? status : null;
   const openPositions = custodialStatus?.positions.filter((item) => item.lifecycleOpen) ?? [];
+  const confirmedWithdrawalCount = openPositions.filter((item) => {
+    const pending = pendingByAsset[item.assetId];
+    return pending?.action === 'withdraw' && pending.phase === 'syncing_projection';
+  }).length;
+  const poolPositionCount = openPositions.length - confirmedWithdrawalCount;
   const activeCount = openPositions.filter((item) => item.status === 'active' && item.ownerRewardEligible).length;
   const activatingCount = openPositions.filter((item) => item.status === 'pending').length;
   const leavingCount = openPositions.filter((item) => item.status === 'exit_requested').length;
-  const withdrawableCount = openPositions.filter((item) => item.status === 'withdrawable').length;
+  const withdrawableCount = openPositions.filter((item) => (
+    item.status === 'withdrawable'
+    && !(
+      pendingByAsset[item.assetId]?.action === 'withdraw'
+      && pendingByAsset[item.assetId]?.phase === 'syncing_projection'
+    )
+  )).length;
   const availableOriginalCount = custodialStatus?.availableAssets.filter((item) => item.generation === 'original').length ?? 0;
   const availableSecondGenerationCount = (custodialStatus?.availableAssets.length ?? 0) - availableOriginalCount;
 
@@ -1299,7 +1317,7 @@ export function CukiePoolStatusPanel() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-                      En el pool · {openPositions.length} en total
+                      En el pool · {poolPositionCount} en total
                     </p>
                     <h3 className="mt-2 text-balance font-headline text-2xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
                       {activeCount === 0
@@ -1343,6 +1361,7 @@ export function CukiePoolStatusPanel() {
               activating={activatingCount}
               leaving={leavingCount}
               withdrawable={withdrawableCount}
+              confirmedWithdrawals={confirmedWithdrawalCount}
             />
 
             <section className="rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
@@ -1353,6 +1372,13 @@ export function CukiePoolStatusPanel() {
                   description="La espera ya terminó. Retíralo desde la sección de Cukies aportados."
                   href="#mis-cukies-aportados"
                   label="Ir a retirar"
+                />
+              ) : confirmedWithdrawalCount > 0 ? (
+                <NextAction
+                  title={`${confirmedWithdrawalCount === 1 ? 'Retirada confirmada' : 'Retiradas confirmadas'}, actualizando colección`}
+                  description="La transacción ya está confirmada en BSC. Estamos actualizando tu colección; no tienes que volver a firmar."
+                  href="#mis-cukies-aportados"
+                  label="Ver estado"
                 />
               ) : leavingCount > 0 ? (
                 <NextAction
@@ -1507,7 +1533,7 @@ export function CukiePoolStatusPanel() {
                   </p>
                 </div>
                 <span className="shrink-0 text-xs font-bold text-[var(--uki-muted)]">
-                  {openPositions.length} en el pool
+                  {poolPositionCount} en el pool{confirmedWithdrawalCount > 0 ? ` · ${confirmedWithdrawalCount} actualizando colección` : ''}
                 </span>
               </div>
               {openPositions.length === 0 ? (
@@ -1517,6 +1543,8 @@ export function CukiePoolStatusPanel() {
                   {openPositions.map((position) => {
                     const working = mutatingAssetId === position.assetId;
                     const pending = pendingByAsset[position.assetId];
+                    const withdrawalConfirmed = pending?.action === 'withdraw'
+                      && pending.phase === 'syncing_projection';
                     const confirmingExit = exitConfirmationId === position.positionId;
                     return (
                     <article id={`pool-cukie-${position.tokenId}`} key={position.positionId} className="min-w-0 scroll-mt-24 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914]">
@@ -1529,10 +1557,11 @@ export function CukiePoolStatusPanel() {
                             className="object-contain p-3"
                           />
                           <span className={`absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black ${positionStatusClass(position.status)}`}>
-                            {position.status === 'active' ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                            {position.status === 'pending' || position.status === 'exit_requested' ? <Clock3 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                            {position.status === 'withdrawable' ? <Unlock className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                            {statusLabel(position.status)}
+                            {withdrawalConfirmed ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {!withdrawalConfirmed && position.status === 'active' ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {!withdrawalConfirmed && (position.status === 'pending' || position.status === 'exit_requested') ? <Clock3 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {!withdrawalConfirmed && position.status === 'withdrawable' ? <Unlock className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {withdrawalConfirmed ? 'Retirada confirmada' : statusLabel(position.status)}
                           </span>
                         </div>
 
@@ -1543,12 +1572,16 @@ export function CukiePoolStatusPanel() {
                               ? `${generationLabel(position.generation)} · ${rarityLabel(position.rarity)}`
                               : 'NFT de tu colección'}
                           </p>
-                          <PositionSchedule position={position} />
+                          {withdrawalConfirmed ? null : <PositionSchedule position={position} />}
                         </div>
                       </div>
 
                       <div className="min-w-0 border-t border-white/10 bg-white/[0.025] p-4 sm:p-5">
-                        {position.status === 'active' && position.ownerRewardEligible ? (
+                        {withdrawalConfirmed ? (
+                          <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                            Retirada confirmada en BSC. Estamos actualizando tu colección; no tienes que volver a firmar.
+                          </p>
+                        ) : position.status === 'active' && position.ownerRewardEligible ? (
                           <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
                             Está disponible para partidas. Si se utiliza en una partida válida, optará al reparto de su generación.
                           </p>
@@ -1649,10 +1682,12 @@ function PoolMovements({
   activating,
   leaving,
   withdrawable,
+  confirmedWithdrawals,
 }: {
   activating: number;
   leaving: number;
   withdrawable: number;
+  confirmedWithdrawals: number;
 }) {
   const movements = [
     {
@@ -1672,6 +1707,12 @@ function PoolMovements({
       value: withdrawable,
       label: 'Listos para retirar',
       detail: 'Necesitan que los devuelvas a tu wallet.',
+    },
+    {
+      key: 'withdrawal-confirmed',
+      value: confirmedWithdrawals,
+      label: 'Retirada confirmada',
+      detail: 'Estamos actualizando tu colección; no tienes que firmar de nuevo.',
     },
   ].filter((movement) => movement.value > 0);
 

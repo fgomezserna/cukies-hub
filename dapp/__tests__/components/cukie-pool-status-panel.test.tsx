@@ -71,6 +71,7 @@ const collectionAddress = '0x3333333333333333333333333333333333333333';
 const otherVaultAddress = '0x4444444444444444444444444444444444444444';
 const approvalHash = `0x${'a'.repeat(64)}` as const;
 const depositHash = `0x${'b'.repeat(64)}` as const;
+const withdrawHash = `0x${'c'.repeat(64)}` as const;
 const user = { walletAddress } as User;
 
 const mutableVaultConfig = ukiNftVaults as unknown as {
@@ -213,6 +214,23 @@ function pendingDeposit(asset = availableAsset()): NftVaultPendingOperation {
     action: 'deposit',
     phase: 'syncing_projection',
     txHash: depositHash,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+
+function pendingWithdraw(asset = availableAsset()): NftVaultPendingOperation {
+  return {
+    version: 1,
+    chainId: 97,
+    walletAddress,
+    vaultAddress,
+    assetId: asset.assetId,
+    collectionAddress: asset.collectionAddress,
+    tokenId: asset.tokenId,
+    action: 'withdraw',
+    phase: 'awaiting_receipt',
+    txHash: withdrawHash,
     createdAt: 1,
     updatedAt: 1,
   };
@@ -785,6 +803,161 @@ describe('CukiePoolStatusPanel', () => {
     expect(await screen.findByRole('button', { name: /Solicitar devolución/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Retirar a mi wallet/i })).toBeEnabled();
     expect(screen.getByText(/Los depósitos están bloqueados/i)).toBeInTheDocument();
+  });
+
+  it('conserva la retirada pendiente tras un receipt success si la siguiente proyección llega degradada', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const asset = availableAsset();
+    const pending = pendingWithdraw(asset);
+    savePendingNftVaultOperation(window.localStorage, pending);
+    const known = poolStatus({ positions: [position({ tokenId: asset.tokenId, status: 'withdrawable' })] });
+    fetchMock
+      .mockResolvedValueOnce(successfulResponse(known))
+      .mockResolvedValueOnce(successfulResponse(poolStatus({ indexerStatus: 'unavailable' })));
+
+    render(<CukiePoolStatusPanel />);
+
+    const button = await screen.findByRole('button', { name: /Retirada confirmada · actualizando colección/i });
+    await waitFor(() => expect(getTransactionReceipt).toHaveBeenCalledWith({ hash: withdrawHash }));
+    expect(await screen.findByText(/Estamos actualizando tus Cukies/i)).toBeInTheDocument();
+    await waitFor(() => expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([expect.objectContaining({ action: 'withdraw', phase: 'syncing_projection', txHash: withdrawHash })]));
+    expect(button).toBeDisabled();
+    expect(screen.getAllByText('Retirada confirmada').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/Retirada confirmada en BSC\. Estamos actualizando tu colección/i)).toBeInTheDocument();
+    expect(screen.getByText(/Retirada confirmada, actualizando colección/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver estado' })).toBeInTheDocument();
+    expect(screen.queryByText('Listo para retirar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Retirada disponible desde/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/La espera terminó\. Retira este Cukie/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ir a retirar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Retirar a mi wallet desde el Cukie Pool/i })).not.toBeInTheDocument();
+  });
+
+  it('limpia la retirada solo cuando la proyección saludable confirma la posición cerrada', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const asset = availableAsset();
+    savePendingNftVaultOperation(window.localStorage, pendingWithdraw(asset));
+    fetchMock
+      .mockResolvedValueOnce(successfulResponse(poolStatus({
+        positions: [position({ tokenId: asset.tokenId, status: 'withdrawable' })],
+      })))
+      .mockResolvedValueOnce(successfulResponse(poolStatus({
+        positions: [position({ tokenId: asset.tokenId, status: 'withdrawn' })],
+      })));
+
+    render(<CukiePoolStatusPanel />);
+
+    await waitFor(() => expect(getTransactionReceipt).toHaveBeenCalledWith({ hash: withdrawHash }));
+    await waitFor(() => expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([]));
+    expect(screen.queryByRole('button', { name: /Retirar a mi wallet desde el Cukie Pool/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Todavía no has aportado ningún Cukie al pool/i)).toBeInTheDocument();
+  });
+
+  it('expone un receipt reverted como fallo y permite reintentar tras limpiar el pending', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'reverted' });
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const asset = availableAsset();
+    savePendingNftVaultOperation(window.localStorage, pendingWithdraw(asset));
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      positions: [position({ tokenId: asset.tokenId, status: 'withdrawable' })],
+    })));
+
+    render(<CukiePoolStatusPanel />);
+
+    await waitFor(() => expect(getTransactionReceipt).toHaveBeenCalledWith({ hash: withdrawHash }));
+    expect(await screen.findByText(/fue revertida\. Puedes intentarlo de nuevo/i)).toBeInTheDocument();
+    expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([]);
+    expect(screen.getByRole('button', { name: /Retirar a mi wallet desde el Cukie Pool/i })).toBeEnabled();
+  });
+
+  it('conserva el pending de retirada si la wallet cambia mientras espera el receipt', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    let accountState = {
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    };
+    mockUseAccount.mockImplementation(() => accountState as unknown as ReturnType<typeof useAccount>);
+    const receipt = deferred<{ status: string }>();
+    const getTransactionReceipt = jest.fn().mockReturnValue(receipt.promise);
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    const pending = pendingWithdraw();
+    savePendingNftVaultOperation(window.localStorage, pending);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      positions: [position({ status: 'withdrawable' })],
+    })));
+
+    const view = render(<CukiePoolStatusPanel />);
+    await waitFor(() => expect(getTransactionReceipt).toHaveBeenCalledWith({ hash: withdrawHash }));
+
+    accountState = { address: walletAddress, chainId: 56, isConnected: true };
+    view.rerender(<CukiePoolStatusPanel />);
+    await act(async () => {
+      receipt.resolve({ status: 'success' });
+      await Promise.resolve();
+    });
+
+    expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([pending]);
   });
 
   it('explains a pending Cukie without presenting it as reward eligible', async () => {
