@@ -192,6 +192,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ...((requireSignedWallet || restoreSession)
             ? {
                 walletType: loginWalletType,
+                ...(restoreSession ? { restoreSession: true } : {}),
                 ...(requireSignedWallet ? { requireSignedWallet: true } : {}),
               }
             : {}),

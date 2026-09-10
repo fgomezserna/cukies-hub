@@ -122,6 +122,7 @@ describe('providers/AuthProvider', () => {
       body: JSON.stringify({
         walletAddress,
         walletType: 'evm',
+        restoreSession: true,
         requireSignedWallet: true,
       }),
     })
@@ -409,6 +410,7 @@ describe('providers/AuthProvider', () => {
       body: JSON.stringify({
         walletAddress,
         walletType: 'evm',
+        restoreSession: true,
         requireSignedWallet: true,
       }),
     })

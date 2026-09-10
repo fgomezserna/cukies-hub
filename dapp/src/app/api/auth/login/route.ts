@@ -13,6 +13,7 @@ import {
   resolveWalletType,
   setWalletSessionCookie,
   verifyWalletSignature,
+  walletSessionMatchesSignedAddress,
   walletSessionMatchesAddress,
 } from '@/lib/wallet-auth';
 import {
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
       message,
       signature,
       requireSignedWallet: requestedSignedWalletMode,
+      restoreSession: requestedRestoreSession,
     } = await request.json();
 
     if (!walletAddress || typeof walletAddress !== 'string') {
@@ -46,6 +48,14 @@ export async function POST(request: Request) {
     const normalizedAddress = normalizeWalletAddress(walletAddress);
     const resolvedWalletType = resolveWalletType(normalizedAddress, walletType);
     const requireSignedWallet = requestedSignedWalletMode === true;
+    const restoreSession = requestedRestoreSession === true;
+
+    if (restoreSession && walletType !== 'evm' && walletType !== 'tron') {
+      return NextResponse.json(
+        { error: 'Wallet type is required to restore a signed wallet session' },
+        { status: 400 },
+      );
+    }
 
     if (
       requireSignedWallet &&
@@ -59,7 +69,9 @@ export async function POST(request: Request) {
 
     const existingSession = await readWalletSession();
     const canReuseExistingSession = Boolean(existingSession && (
-      requireSignedWallet
+      restoreSession
+        ? walletSessionMatchesSignedAddress(existingSession, normalizedAddress, resolvedWalletType)
+        : requireSignedWallet
         ? evmWalletSessionMatchesSignedAddress(existingSession, normalizedAddress)
         : walletSessionMatchesAddress(existingSession, normalizedAddress)
     ));

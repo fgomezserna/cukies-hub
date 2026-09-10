@@ -24,6 +24,20 @@ const user = {
   username: 'wallet-user',
 };
 
+function strictRestoreResponse(
+  body: Record<string, unknown>,
+  signedWalletAddress: string,
+  walletType: 'evm' | 'tron',
+  profileWalletAddress = signedWalletAddress,
+) {
+  const matchesSignedWallet = body.restoreSession === true
+    && body.walletType === walletType
+    && body.walletAddress === signedWalletAddress;
+  return matchesSignedWallet
+    ? { ok: true, status: 200, json: async () => ({ ...user, walletAddress: profileWalletAddress }) } as Response
+    : { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+}
+
 function Probe() {
   const { user: session, walletType } = useAuth();
   return (
@@ -70,9 +84,7 @@ describe('AuthProvider wallet slots', () => {
     } as never);
     mockFetch.mockImplementation(async (_input, init) => {
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {};
-      return body.walletAddress === evmAddress
-        ? { ok: true, status: 200, json: async () => user } as Response
-        : { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+      return strictRestoreResponse(body, evmAddress, 'evm', tronAddress);
     });
 
     const { rerender } = renderAuth();
@@ -82,8 +94,10 @@ describe('AuthProvider wallet slots', () => {
     mockUseAccount.mockReturnValue({ address: evmAddress, isConnected: true } as never);
     rerender(<AuthProvider><Probe /></AuthProvider>);
 
-    await waitFor(() => expect(screen.getByTestId('wallet-address')).toHaveTextContent(evmAddress));
-    expect(screen.getByTestId('wallet-type')).toHaveTextContent('evm');
+    await waitFor(() => {
+      expect(screen.getByTestId('wallet-type')).toHaveTextContent('evm');
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent(tronAddress);
+    });
     expect(mockUseSignMessage().signMessageAsync).not.toHaveBeenCalled();
   });
 
@@ -96,12 +110,7 @@ describe('AuthProvider wallet slots', () => {
     } as never);
     mockFetch.mockImplementation(async (_input, init) => {
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {};
-      if (body.walletType === 'evm' && body.requireSignedWallet) {
-        return { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
-      }
-      return body.walletAddress === tronAddress
-        ? { ok: true, status: 200, json: async () => ({ ...user, walletAddress: tronAddress }) } as Response
-        : { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+      return strictRestoreResponse(body, tronAddress, 'tron', evmAddress);
     });
 
     const { rerender } = renderAuth();
@@ -109,6 +118,7 @@ describe('AuthProvider wallet slots', () => {
     expect(JSON.parse(mockFetch.mock.calls[0][1]?.body as string)).toEqual({
       walletAddress: evmAddress,
       walletType: 'evm',
+      restoreSession: true,
       requireSignedWallet: true,
     });
 
@@ -121,7 +131,7 @@ describe('AuthProvider wallet slots', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('wallet-type')).toHaveTextContent('tron');
-      expect(screen.getByTestId('wallet-address')).toHaveTextContent(tronAddress);
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent(evmAddress);
     });
     expect(mockUseSignMessage().signMessageAsync).not.toHaveBeenCalled();
   });
@@ -135,19 +145,14 @@ describe('AuthProvider wallet slots', () => {
     } as never);
     mockFetch.mockImplementation(async (_input, init) => {
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {};
-      if (body.walletType === 'evm' && body.requireSignedWallet) {
-        return { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
-      }
-      return body.walletAddress === tronAddress
-        ? { ok: true, status: 200, json: async () => ({ ...user, walletAddress: tronAddress }) } as Response
-        : { ok: false, status: 401, json: async () => ({ error: 'Unauthorized' }) } as Response;
+      return strictRestoreResponse(body, tronAddress, 'tron', evmAddress);
     });
 
     renderAuth();
 
     await waitFor(() => {
       expect(screen.getByTestId('wallet-type')).toHaveTextContent('tron');
-      expect(screen.getByTestId('wallet-address')).toHaveTextContent(tronAddress);
+      expect(screen.getByTestId('wallet-address')).toHaveTextContent(evmAddress);
     });
     const requestBodies = mockFetch.mock.calls.map(([, init]) => (
       typeof init?.body === 'string' ? JSON.parse(init.body) : null
@@ -156,11 +161,13 @@ describe('AuthProvider wallet slots', () => {
       expect.objectContaining({
         walletAddress: evmAddress,
         walletType: 'evm',
+        restoreSession: true,
         requireSignedWallet: true,
       }),
       expect.objectContaining({
         walletAddress: tronAddress,
         walletType: 'tron',
+        restoreSession: true,
       }),
     ]));
   });
