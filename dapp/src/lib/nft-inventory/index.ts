@@ -86,6 +86,9 @@ export type NormalizedNftAsset = {
 export type CukiesInventoryDocument = {
   _id?: unknown;
   tokenId?: unknown;
+  chainId?: unknown;
+  collectionAddress?: unknown;
+  collectionAddressNormalized?: unknown;
   owner?: unknown;
   user?: unknown;
   wallet?: unknown;
@@ -105,6 +108,17 @@ export type CukiesInventoryDocument = {
   updatedAt?: unknown;
   /** Ultimo evento que cambio la tenencia, no el ultimo cambio de estado/listing. */
   ownershipEventId?: unknown;
+  ownershipEventBlockNumber?: unknown;
+  ownershipEventLogIndex?: unknown;
+  ownershipEventBlockHash?: unknown;
+  ownershipEventTransactionHash?: unknown;
+  ownershipEventTimestampMs?: unknown;
+  ownershipEventFromNormalized?: unknown;
+  ownershipEventToNormalized?: unknown;
+  ownershipObservedEventId?: unknown;
+  ownershipObservedBlockNumber?: unknown;
+  ownershipObservedLogIndex?: unknown;
+  ownershipObservedBlockHash?: unknown;
   marketplaceListingStatus?: unknown;
   marketplaceListingChain?: unknown;
   marketplaceListingOwnerNormalized?: unknown;

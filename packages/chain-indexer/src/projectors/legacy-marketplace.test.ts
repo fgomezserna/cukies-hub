@@ -4,6 +4,10 @@ import { describe, it } from 'node:test';
 import { normalizeDomainEvent } from '../normalize.js';
 import type { ChainEvent, ContractAlias, EventName } from '../types.js';
 import { projectEvent } from './index.js';
+import {
+  buildNftOwnershipEvidence,
+  decideNftOwnershipProjection,
+} from './nft-ownership.js';
 
 type Document = { _id: string; [key: string]: any };
 type Update = {
@@ -19,12 +23,17 @@ function matches(document: Document, filter: Record<string, any>): boolean {
     const { $or, ...rest } = filter;
     return matches(document, rest) && $or.some((item: Record<string, any>) => matches(document, item));
   }
+  if (Array.isArray(filter.$and)) {
+    const { $and, ...rest } = filter;
+    return matches(document, rest) && $and.every((item: Record<string, any>) => matches(document, item));
+  }
 
   return Object.entries(filter).every(([key, expected]) => {
     const actual = document[key];
     if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
       if ('$exists' in expected) return (actual !== undefined) === expected.$exists;
       if ('$in' in expected) return expected.$in.includes(actual);
+      if ('$lt' in expected) return typeof actual === 'number' && actual < expected.$lt;
     }
     return actual === expected;
   });
@@ -89,6 +98,16 @@ class MemoryCollection {
     return { matchedCount: documents.length, modifiedCount: documents.length };
   }
 
+  async insertOne(document: Document) {
+    if (this.documents.has(document._id)) {
+      const error = new Error('duplicate key') as Error & { code: number };
+      error.code = 11000;
+      throw error;
+    }
+    this.documents.set(document._id, structuredClone(document));
+    return { insertedId: document._id };
+  }
+
   aggregate<T>(pipeline: Array<Record<string, any>>) {
     let rows = [...this.documents.values()];
     for (const stage of pipeline) {
@@ -134,6 +153,7 @@ const pointsAddress = '0x0000000000000000000000000000000000001003';
 const stakingAddress = '0x0000000000000000000000000000000000001004';
 const seller = '0x00000000000000000000000000000000000000AA';
 const buyer = '0x00000000000000000000000000000000000000BB';
+const tronZeroAddress = 'T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb';
 
 function contractAddress(alias: ContractAlias) {
   if (alias === 'MARKETPLACE') return marketplaceAddress;
@@ -164,6 +184,41 @@ function stageEvent(input: {
     timestampMs: input.blockNumber * 1_000,
     args: input.args as never,
     normalized: normalizeDomainEvent('BSC', input.eventName, input.alias, input.args),
+    raw: {},
+    status: 'projecting',
+    attempts: 1,
+    schemaVersion: 1,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+function tronTransferEvent(input: {
+  tokenId: string;
+  from: string;
+  to: string;
+  blockNumber: number;
+  logIndex?: number;
+}): ChainEvent {
+  const logIndex = input.logIndex ?? 0;
+  const args = {
+    tokenId: input.tokenId,
+    from: input.from,
+    to: input.to,
+  };
+  return {
+    _id: `TRON:TOKEN:Transfer:${input.blockNumber}:${logIndex}`,
+    chain: 'TRON',
+    contractAlias: 'TOKEN',
+    contractAddress: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY4',
+    eventName: 'Transfer',
+    txHash: `0x${input.blockNumber.toString(16).padStart(64, '0')}`,
+    logIndex,
+    blockNumber: input.blockNumber,
+    blockHash: `0x${(input.blockNumber + 1).toString(16).padStart(64, '0')}`,
+    timestampMs: input.blockNumber * 1_000,
+    args: args as never,
+    normalized: normalizeDomainEvent('TRON', 'Transfer', 'TOKEN', args),
     raw: {},
     status: 'projecting',
     attempts: 1,
@@ -209,6 +264,94 @@ function listingEvent(tokenId: string, blockNumber: number) {
 }
 
 describe('legacy marketplace Stage projectors', () => {
+  it('keeps BSC ownership identity network-aware', () => {
+    const bscResult = buildNftOwnershipEvidence(stageEvent({
+      eventName: 'Transfer',
+      alias: 'TOKEN',
+      blockNumber: 5,
+      args: { tokenId: 1n, from: seller, to: buyer },
+    }));
+    assert.equal(bscResult.ok, true);
+    if (!bscResult.ok) return;
+
+    assert.equal(
+      decideNftOwnershipProjection(
+        {
+          chain: 'BSC',
+          network: 'tron',
+          chainId: 97,
+          tokenId: bscResult.evidence.tokenId,
+          collectionAddressNormalized: bscResult.evidence.collectionAddressNormalized,
+        },
+        bscResult.evidence,
+      ).kind,
+      'conflict',
+    );
+    assert.equal(
+      decideNftOwnershipProjection(
+        {
+          chain: 'BSC',
+          network: 'bsc',
+          chainId: '97',
+          tokenId: bscResult.evidence.tokenId,
+          collectionAddressNormalized: bscResult.evidence.collectionAddressNormalized.toUpperCase(),
+        },
+        bscResult.evidence,
+      ).kind,
+      'apply',
+    );
+
+    assert.equal(
+      buildNftOwnershipEvidence(tronTransferEvent({
+        tokenId: '1',
+        from: tronZeroAddress,
+        to: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5',
+        blockNumber: 6,
+      })).ok,
+      false,
+    );
+  });
+
+  it('keeps the historical TRON projection format and invalidation path', async () => {
+    const context = memoryStore();
+    const first = tronTransferEvent({
+      tokenId: '1',
+      from: tronZeroAddress,
+      to: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5',
+      blockNumber: 6,
+    });
+    assert.equal(await projectEvent(context.store as never, first), null);
+
+    const projected = context.collections.get('cukies')!.documents.get('1')!;
+    assert.equal(projected.network, 'TRON');
+    assert.equal('chainId' in projected, false);
+    assert.equal(projected.owner, 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY5');
+    assert.equal(projected.ownerNormalized, 'TQ5W8J5G9NQY4Z7YQJY4N4QY4QY4QY4QY5');
+    assert.equal('ownershipEventId' in projected, false);
+    context.collections.get('marketplace_listings')!.documents.set('1', {
+      _id: '1',
+      tokenId: '1',
+      status: 'active',
+    });
+
+    // Some imported legacy documents materialize the same mainnet identity as
+    // an explicit null. The historical update path keeps that value untouched.
+    projected.chainId = null;
+    const next = tronTransferEvent({
+      tokenId: '1',
+      from: projected.owner,
+      to: 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY6',
+      blockNumber: 7,
+    });
+    assert.equal(await projectEvent(context.store as never, next), null);
+    assert.equal(projected.owner, 'TQ5w8J5G9nQy4z7YqJY4N4QY4QY4QY4QY6');
+    assert.equal(projected.ownerNormalized, 'TQ5W8J5G9NQY4Z7YQJY4N4QY4QY4QY4QY6');
+    assert.equal(projected.chainId, null);
+    assert.equal(context.collections.get('marketplace_listings')!.documents.get('1')!.status, 'invalid');
+    assert.equal(context.collections.get('tx_nfts')!.documents.size, 2);
+    assert.equal('ownershipEventId' in projected, false);
+  });
+
   it('requires active owner-bound evidence and invalidates a listing when the Cukie is staked', async () => {
     const context = memoryStore();
     await projectStage(context, listingEvent('1', 10));
@@ -259,6 +402,106 @@ describe('legacy marketplace Stage projectors', () => {
     assert.equal(listed.state, 'available');
     assert.equal(listed.marketplaceListingStatus, 'invalid');
     assert.equal(listed.marketplaceListingInvalidReason, 'transfer');
+    assert.equal(listed.ownershipEventId, 'BSC:97:TOKEN:Transfer:22:0');
+    assert.equal(listed.ownershipEventBlockNumber, 22);
+    assert.equal(listed.ownershipEventLogIndex, 0);
+    assert.equal(listed.ownershipEventFromNormalized, seller.toLowerCase());
+    assert.equal(listed.ownershipEventToNormalized, buyer.toLowerCase());
+  });
+
+  it('keeps ownership identity separate from metadata/listing state and handles replay, self-transfer and late events', async () => {
+    const context = memoryStore();
+    const mint = stageEvent({
+      eventName: 'Transfer',
+      alias: 'TOKEN',
+      blockNumber: 10,
+      args: {
+        tokenId: 9n,
+        from: '0x0000000000000000000000000000000000000000',
+        to: seller,
+      },
+    });
+    await projectStage(context, mint);
+    const minted = context.collections.get('cukies')!.documents.get('9')!;
+    assert.equal(minted.ownershipEventId, mint._id);
+    assert.deepEqual(minted.children, []);
+    assert.deepEqual(minted.parents, [null, null]);
+    assert.deepEqual(minted.history, []);
+
+    await projectStage(context, stageEvent({
+      eventName: 'CukieMetadataConfigured',
+      alias: 'TOKEN',
+      blockNumber: 11,
+      args: { tokenId: 9n, rarity: 4n, generation: 1n },
+    }));
+    await projectStage(context, listingEvent('9', 12));
+    assert.equal(minted.ownershipEventId, mint._id);
+    assert.equal(minted.marketplaceListingStatus, 'active');
+
+    const transfer = stageEvent({
+      eventName: 'Transfer',
+      alias: 'TOKEN',
+      blockNumber: 20,
+      args: { tokenId: 9n, from: seller, to: buyer },
+    });
+    await projectStage(context, transfer);
+    assert.equal(minted.ownershipEventId, transfer._id);
+    assert.equal(minted.ownerNormalized, buyer.toLowerCase());
+
+    await projectStage(context, transfer);
+    assert.equal(minted.ownershipEventId, transfer._id);
+
+    await projectStage(context, stageEvent({
+      eventName: 'Transfer',
+      alias: 'TOKEN',
+      blockNumber: 21,
+      args: { tokenId: 9n, from: buyer, to: buyer },
+    }));
+    assert.equal(minted.ownershipEventId, transfer._id);
+    assert.equal(minted.ownershipObservedEventId, 'BSC:97:TOKEN:Transfer:21:0');
+
+    const late = stageEvent({
+      eventName: 'Transfer',
+      alias: 'TOKEN',
+      blockNumber: 15,
+      args: { tokenId: 9n, from: seller, to: '0x00000000000000000000000000000000000000CC' },
+    });
+    seedVerifiedCursor(context, late);
+    assert.match(String(await projectEvent(context.store as never, late)), /atrasado/);
+    assert.equal(minted.ownerNormalized, buyer.toLowerCase());
+    assert.equal(minted.ownershipEventId, transfer._id);
+  });
+
+  it('rejects a block reorg or two different transfers at the same tuple', async () => {
+    const context = memoryStore();
+    const mint = stageEvent({
+      eventName: 'Transfer',
+      alias: 'TOKEN',
+      blockNumber: 30,
+      args: {
+        tokenId: 10n,
+        from: '0x0000000000000000000000000000000000000000',
+        to: seller,
+      },
+    });
+    await projectStage(context, mint);
+    const transfer = stageEvent({
+      eventName: 'Transfer',
+      alias: 'TOKEN',
+      blockNumber: 31,
+      args: { tokenId: 10n, from: seller, to: buyer },
+    });
+    await projectStage(context, transfer);
+    const reorg = {
+      ...transfer,
+      _id: 'BSC:TOKEN:Transfer:31:0:reorg',
+      blockHash: `0x${'f'.repeat(64)}`,
+    };
+    await assert.rejects(
+      () => projectEvent(context.store as never, reorg),
+      /blockHash distinto|misma tuple/,
+    );
+    assert.equal(context.collections.get('cukies')!.documents.get('10')!.ownershipEventId, transfer._id);
   });
 
   it('materializes cancellation and purchase as terminal listing states', async () => {

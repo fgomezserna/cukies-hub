@@ -14,6 +14,11 @@ import { enqueueCukieMasterRecalculation } from './cukie-master-outbox.js';
 import { projectNftVaultEvent } from './nft-vaults.js';
 import { isMongoDuplicateKey, monotonicAbsoluteUpdate } from './monotonic.js';
 import {
+  buildNftOwnershipEvidence,
+  decideNftOwnershipProjection,
+  nftOwnershipProjectionValues,
+} from './nft-ownership.js';
+import {
   assertLegacyContractIdentity,
   isLegacyEvent,
   legacyListingDocumentId,
@@ -260,7 +265,7 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
 
   const from = stringField(event, 'from');
   const to = stringField(event, 'to');
-  const isMint = field(event, 'isMint') === true;
+  const isMintHint = field(event, 'isMint') === true;
 
   if (event.chain === 'BSC' && isZeroAddress(event, to)) {
     return 'Transfer BSC burn interno; lo resuelve bridge/marketplace/staking';
@@ -270,57 +275,195 @@ async function projectTransfer(store: IndexerStore, event: ChainEvent) {
     return 'Transfer TRON burn interno';
   }
 
-  if (!isMint && (isMonitoredContractAddress(event, from) || isMonitoredContractAddress(event, to))) {
+  if (!isMintHint && (isMonitoredContractAddress(event, from) || isMonitoredContractAddress(event, to))) {
     return 'Transfer interno de contrato monitorizado';
   }
 
-  await invalidateActiveMarketplaceListing(store, event, id, 'transfer', documentId);
+  // TRON remains on the legacy projection path. Its historical documents use
+  // the generic uppercase normalizer for ownerNormalized and do not carry the
+  // BSC ownership tuple/CAS fields. Keep that schema and listing invalidation
+  // unchanged; the canonical ownership algorithm below is BSC-only.
+  if (event.chain === 'TRON') {
+    await invalidateActiveMarketplaceListing(store, event, id, 'transfer', documentId);
+    await collection(store, 'cukies').updateOne(
+      { _id: documentId },
+      {
+        $set: {
+          tokenId: id,
+          ...(legacyIdentity
+            ? {
+                ...(legacyIdentity.chainId === undefined
+                  ? {}
+                  : { chainId: legacyIdentity.chainId }),
+                collectionAddress: legacyIdentity.collectionAddress,
+                collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+              }
+            : {}),
+          user: to,
+          owner: to,
+          ownerNormalized: normalizeAddress(event.chain, to),
+          network: event.chain,
+          state: 'available',
+          price: 0,
+          priceOriginal: '0',
+          updatedAt: now(),
+          timeStamp: event.timestampMs,
+          lastEventId: event._id,
+          ...(isMintHint ? {
+            origin: 'mint',
+            mintEventId: event._id,
+            mintTransactionHash: event.txHash.toLowerCase(),
+            mintBlockNumber: event.blockNumber,
+            mintLogIndex: event.logIndex,
+            mintTimestampMs: event.timestampMs,
+            ...(event.blockHash ? { mintBlockHash: event.blockHash.toLowerCase() } : {}),
+          } : {}),
+        },
+        $setOnInsert: {
+          _id: documentId,
+          ...(!isMintHint ? { origin: 'transfer' } : {}),
+          birthNetwork: event.chain,
+          children: [],
+          parents: [null, null],
+          history: [],
+          createdAt: now(),
+        },
+      },
+      { upsert: true },
+    );
+    await insertNftTx(store, event, {
+      nftType: 'CUKI',
+      tokenId: id,
+      from,
+      to,
+      type: isMintHint ? 'Mint' : 'Gift',
+      price: 0,
+    });
+    return null;
+  }
 
-  await collection(store, 'cukies').updateOne(
-    { _id: documentId },
+  const ownershipEvidence = buildNftOwnershipEvidence(event);
+  if (!ownershipEvidence.ok) return `Transfer rechazado: ${ownershipEvidence.reason}`;
+  const evidence = ownershipEvidence.evidence;
+  const isMint = evidence.isMint;
+  const cukies = collection(store, 'cukies');
+  const current = await cukies.findOne({ _id: documentId });
+  const decision = decideNftOwnershipProjection(current ?? {}, evidence);
+  if (decision.kind === 'conflict') {
+    throw new Error(`Transfer ${documentId} contradice ownership canonico: ${decision.reason}`);
+  }
+
+  if (decision.kind === 'stale') return 'Transfer NFT atrasado ignorado por tuple canonica';
+
+  if (decision.kind === 'duplicate') {
+    await invalidateActiveMarketplaceListing(store, event, id, 'transfer', documentId);
+    await insertNftTx(store, event, {
+      nftType: 'CUKI',
+      tokenId: id,
+      from,
+      to,
+      type: isMint ? 'Mint' : 'Gift',
+      price: 0,
+    });
+    return null;
+  }
+
+  const ownerGuard = evidence.isMint
+    ? {
+        $or: [
+          { ownerNormalized: { $exists: false } },
+          { ownerNormalized: null },
+          { ownerNormalized: evidence.toNormalized },
+        ],
+      }
+    : {
+        $or: [
+          { ownerNormalized: { $exists: false } },
+          { ownerNormalized: evidence.fromNormalized },
+        ],
+      };
+  const chainIdGuard = {
+    $or: [
+      { chainId: { $exists: false } },
+      { chainId: evidence.chainId },
+      { chainId: String(evidence.chainId) },
+    ],
+  };
+  const identityGuard = {
+    $and: [
+      ownerGuard,
+      chainIdGuard,
+      {
+        $or: [
+          { network: { $exists: false } },
+          { network: null },
+          { network: evidence.chain },
+          { network: evidence.chain.toLowerCase() },
+        ],
+      },
+      {
+        $or: [
+          { collectionAddressNormalized: { $exists: false } },
+          { collectionAddressNormalized: evidence.collectionAddressNormalized },
+        ],
+      },
+      {
+        $or: [
+          { tokenId: { $exists: false } },
+          { tokenId: evidence.tokenId },
+        ],
+      },
+    ],
+  };
+  const updated = await monotonicAbsoluteUpdate(
+    cukies,
+    documentId,
+    { blockNumber: evidence.blockNumber, logIndex: evidence.logIndex },
     {
-      $set: {
-        tokenId: id,
-        ...(legacyIdentity
-          ? {
-              chainId: legacyIdentity.chainId,
-              collectionAddress: legacyIdentity.collectionAddress,
-              collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
-            }
-          : {}),
-        ...(bscIdentity ?? {}),
-        user: to,
-        owner: to,
-        ownerNormalized: normalizeAddress(event.chain, to),
-        network: event.chain,
-        state: 'available',
-        price: 0,
-        priceOriginal: '0',
-        updatedAt: now(),
-        timeStamp: event.timestampMs,
-        lastEventId: event._id,
-        ...(isMint ? {
-          origin: 'mint',
-          mintEventId: event._id,
-          mintTransactionHash: event.txHash.toLowerCase(),
-          mintBlockNumber: event.blockNumber,
-          mintLogIndex: event.logIndex,
-          mintTimestampMs: event.timestampMs,
-          ...(event.blockHash ? { mintBlockHash: event.blockHash.toLowerCase() } : {}),
-        } : {}),
-      },
-      $setOnInsert: {
-        _id: documentId,
-        ...(!isMint ? { origin: 'transfer' } : {}),
-        birthNetwork: event.chain,
-        children: [],
-        parents: [null, null],
-        history: [],
-        createdAt: now(),
-      },
+      tokenId: id,
+      ...(legacyIdentity
+        ? {
+            chainId: legacyIdentity.chainId,
+            collectionAddress: legacyIdentity.collectionAddress,
+            collectionAddressNormalized: legacyIdentity.collectionAddressNormalized,
+          }
+        : {}),
+      ...(bscIdentity ?? {}),
+      user: to,
+      owner: to,
+      ownerNormalized: evidence.toNormalized,
+      network: event.chain,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      updatedAt: now(),
+      timeStamp: event.timestampMs,
+      lastEventId: event._id,
+      ...nftOwnershipProjectionValues(evidence, decision, current ?? {}),
+      ...(isMint ? {
+        origin: 'mint',
+        mintEventId: event._id,
+        mintTransactionHash: event.txHash.toLowerCase(),
+        mintBlockNumber: event.blockNumber,
+        mintLogIndex: event.logIndex,
+        mintTimestampMs: event.timestampMs,
+        ...(event.blockHash ? { mintBlockHash: event.blockHash.toLowerCase() } : {}),
+      } : {}),
     },
-    { upsert: true },
+    now(),
+    undefined,
+    identityGuard,
+    {
+      ...(!isMint ? { origin: 'transfer' } : {}),
+      birthNetwork: event.chain,
+      children: [],
+      parents: [null, null],
+      history: [],
+    },
   );
+  if (!updated) return 'Transfer NFT concurrente o atrasado ignorado';
+
+  await invalidateActiveMarketplaceListing(store, event, id, 'transfer', documentId);
 
   await insertNftTx(store, event, {
     nftType: 'CUKI',
