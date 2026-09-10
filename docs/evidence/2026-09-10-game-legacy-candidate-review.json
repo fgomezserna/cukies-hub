@@ -1,12 +1,12 @@
 {
-  "observedAt": "2026-09-10T06:27:40.775238+00:00",
+  "observedAt": "2026-09-10T06:57:06.050615+00:00",
   "scope": "Pre-publication review of isolated game recovery and Legacy breeding identity candidates; no live state operations",
   "stagingCodeObserved": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
   "stagingChangedByTheseCandidates": false,
   "gameRecovery": {
     "candidate": "3903aa7cbc9dc11b7ccba787ace551df4fd1373f",
     "base": "0cf0019742373364da5cb0811c3252d1a1cbd007",
-    "decision": "changes_requested",
+    "decision": "implementation_accepted_pending_combined_verification",
     "reviewer": "root Astra Max",
     "reviewed": "Complete nine-file diff, new recovery inspector, related engine compensation and Mongo resource ports, reported test coverage",
     "productTestsRunByReviewer": false,
@@ -68,9 +68,9 @@
         ]
       }
     ],
-    "nextStep": "Same task preserves all observed own-epoch evidence and supplies canonical durable-credit/compensation boundary regressions; unsupported or ambiguous paths stay pending. No worker push or live mutation; root combines reviewed source commits and runs full gates once.",
+    "nextStep": "Data task frozen. Root validates the combined candidate once, obtains exact-head release plan/preflight, then merges and verifies staging; no direct data repair.",
     "taskId": "01a0814e-0ea0-7070-877c-701f264243e7",
-    "currentCandidate": "4fa4f37cc53936f0312c3525b385d18a37297544",
+    "currentCandidate": "523187439e5ea9ab0f9749a17baef88062737fba",
     "correctionReview": {
       "candidate": "4fa4f37cc53936f0312c3525b385d18a37297544",
       "decision": "changes_requested",
@@ -118,6 +118,34 @@
         "scope": "Correction candidate, not final combined staging candidate"
       },
       "reportSha256": "f8699c7b3f0b485beb4372ea1ac2574a8c013b92ff379180301160831c1f5880"
+    },
+    "finalCorrectionReview": {
+      "candidate": "523187439e5ea9ab0f9749a17baef88062737fba",
+      "reviewer": "root Astra Max",
+      "decision": "implementation_accepted_pending_combined_verification",
+      "reviewed": "Complete final production diff, canonical event producer extraction and focused canonical credit/Own/Pool and authority regression scenarios",
+      "outcome": [
+        "All observed own epochs retain cardinality; orphan/multiple effects fail closed",
+        "Durable credit compensation is validated through binding, reservations, ledger and lots before accepting absence of Cukie effects",
+        "Tests now use the repository event producer and real domain services for credit/Own/Pool, including lost reservation response and partial terminal evidence"
+      ],
+      "reportedWorkerGates": {
+        "focalSuites": 5,
+        "focalTests": 71,
+        "fullSuites": 237,
+        "fullTests": 1950,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "buildStaticPages": 92,
+        "scope": "Isolated Data source only; not attributed to integrated candidate"
+      },
+      "integratedHead": "61464a780f1f7cbec9718d915c0d709736892142",
+      "sourceToIntegrated": {
+        "3903aa7": "4fc085c",
+        "4fa4f37": "99c24ee",
+        "52318743": "61464a7"
+      },
+      "limit": "Legacy pool position already closed by withdrawal remains pending if compensation cannot be proven; no live state mutation during review."
     }
   },
   "legacyBreeding": {
@@ -302,5 +330,26 @@
     "No production/main changes",
     "No database, ledger, balance, incident, cursor or on-chain mutations",
     "Previously verified NFT recovery and World publication remain closed; candidate review does not reopen them"
-  ]
+  ],
+  "combinedIntegration": {
+    "head": "61464a780f1f7cbec9718d915c0d709736892142",
+    "compared": {
+      "data": {
+        "source": "523187439e5ea9ab0f9749a17baef88062737fba",
+        "files": 14,
+        "contentsMatch": true
+      },
+      "legacy": {
+        "source": "5545860191cb7e34a98e4b8218025416229a52da",
+        "files": 8,
+        "contentsMatch": true
+      }
+    },
+    "unexpectedPaths": [],
+    "stagingCode": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
+    "gatesRun": false,
+    "stagingPublication": false,
+    "reviewEvidenceSha256": "ce377927b336f0cdbcbbbc769e641bc6d0b7581672c6026199b712174ba5789a",
+    "decision": "ready_for_combined_verification"
+  }
 }
