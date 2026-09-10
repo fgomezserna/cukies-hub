@@ -146,9 +146,10 @@
   ],
   "areas": {
     "masterAndRuntime": "PR404 published and read-only browser verified; deferred reconciliation covered by component tests",
-    "marketplaceAndClaims": "implementation and root review in progress; delayed reads, context changes and retry controls under regression tests",
-    "poolRecovery": "implementation in progress; chain confirmation, withdrawal epoch and background reconciliation",
-    "bridgeBreeding": "active legacy write paths identified; receipt and refresh follow-up pending"
+    "marketplaceAndClaims": "Marketplace and rewards code reviewed, committed 28aa082; full validation and staging delivery pending. Vesting review correction remains separate.",
+    "poolRecovery": "Code reviewed and committed; 5 focal suites /70 tests passed; full validation and staging delivery pending",
+    "bridgeBreeding": "active legacy write paths identified; receipt and refresh follow-up pending",
+    "myCukies": "Confirmed gap: sale completion performs one immediate inventory request without retry; bounded follow-up queued with Bridge/Breeding"
   },
   "validation": {
     "focal": {
@@ -170,7 +171,24 @@
       "build": "passed",
       "isolatedWorktree": true
     },
-    "public": "PR404 public health SHA d465f95271ced5faa0740dae112f6c9bc7a2f85a, ready200, authenticated Master #98000002 action verified"
+    "public": "PR404 public health SHA d465f95271ced5faa0740dae112f6c9bc7a2f85a, ready200, authenticated Master #98000002 action verified",
+    "secondFocal": {
+      "poolRecovery": {
+        "suites": 5,
+        "tests": 70,
+        "result": "passed",
+        "typecheck": "passed",
+        "lint": "passed without warnings"
+      },
+      "marketplaceClaimsProvider": {
+        "suites": 11,
+        "tests": 94,
+        "result": "passed",
+        "typecheck": "passed",
+        "includesUnpublishedVestingHappyPath": true
+      },
+      "full": "pending isolated candidate validation"
+    }
   },
   "transactionsSignedByAgent": false,
   "dataMutations": false,
@@ -213,5 +231,12 @@
         "newTransactionSigned": false
       }
     }
+  },
+  "followupScope": {
+    "branch": "codex/tx-confirmation-actions-20260911",
+    "poolRecovery": "receipt, custody/epoch and automatic retry",
+    "marketplaceClaims": "receipt replacement, delayed projections, per-operation locks and shared account refresh",
+    "collectionLegacy": "My Cukies sale reconciliation; Bridge source receipt and transit, Breeding receipt and refresh",
+    "vesting": "Receipt-confirmed claim remains locked until released amount proves refreshed state; correction in progress"
   }
 }
