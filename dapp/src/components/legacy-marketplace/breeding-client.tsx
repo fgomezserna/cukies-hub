@@ -17,11 +17,11 @@ import {
 import {
   useAccount,
   useReadContract,
-  useSwitchChain,
   useWriteContract,
 } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
 import {
   legacyBscPublicClient,
@@ -302,14 +302,14 @@ export function BreedingClient({
   initialTab?: BreedingTab;
 }) {
   const { address, chainId, isConnected } = useAccount();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, isPending: isWriting } = useWriteContract();
   const {
     address: tronAddress,
-    connect: connectTron,
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
+    isLoading: isTronLoading,
   } = useTronLink();
+  const { requestWallet } = useWalletCoordinator();
   const [network, setNetwork] = useState<BreedingNetwork>('BSC');
   const [tab, setTab] = useState<BreedingTab>(initialTab);
   const [candidates, setCandidates] = useState<LegacyMarketplaceCukiItem[]>([]);
@@ -877,15 +877,13 @@ export function BreedingClient({
       setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
       return false;
     }
-    if (!isConnected) {
-      setStatus('Conecta una wallet EVM desde el header.');
-      return false;
-    }
-    if (chainId !== 56) {
-      switchChain({ chainId: 56 });
-      return false;
-    }
-    return true;
+    if (isConnected && chainId === 56) return true;
+    void requestWallet({
+      kind: 'evm',
+      targetChainId: 56,
+      reason: 'Conecta una wallet EVM en BNB Smart Chain para operar breeding.',
+    }).catch((error) => setStatus(getErrorMessage(error)));
+    return false;
   }
 
   async function ensureTron() {
@@ -898,8 +896,14 @@ export function BreedingClient({
       setStatus('Instala o activa TronLink para operar breeding en TRON.');
       return false;
     }
-    if (!isTronConnected) {
-      await connectTron();
+    try {
+      await requestWallet({
+        kind: 'tron',
+        targetTronNetwork: 'mainnet',
+        reason: 'Conecta TronLink en TRON Mainnet para operar breeding.',
+      });
+    } catch (error) {
+      setStatus(getErrorMessage(error));
       return false;
     }
     const currentTronWeb = getLegacyTronWeb();
@@ -1044,7 +1048,7 @@ export function BreedingClient({
     setParent2(cuki);
   }
 
-  const disabled = isWriting || isSwitchingChain || !operationsEnabled;
+  const disabled = isWriting || isTronLoading || !operationsEnabled;
   const showConnectionWarning =
     network === 'BSC'
       ? !isConnected || (operationsEnabled && chainId !== 56)
@@ -1142,7 +1146,7 @@ export function BreedingClient({
                   : 'La lectura Legacy BSC no está disponible ahora. Pulsa Actualizar para reintentar.'}
               </span>
               {operationsEnabled && isConnected && chainId !== 56 && (
-                <Button onClick={() => switchChain({ chainId: 56 })}>
+                <Button onClick={() => void ensureBsc()}>
                   Cambiar a BSC
                 </Button>
               )}

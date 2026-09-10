@@ -1,4 +1,9 @@
 import type { LegacyTronWebLike } from './tron';
+import {
+  TRON_MAINNET_CHAIN_ID,
+  resolveTronChainId,
+  type TronWebLike,
+} from '@/lib/tronlink-provider';
 
 export function isSameEvmWallet(left?: string | null, right?: string | null) {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
@@ -40,6 +45,7 @@ function canonicalTronNodeHost(value?: string | null) {
 export type LegacyTronActionContext = {
   address: string;
   nodeHost: string;
+  chainId: string;
 };
 
 export function captureTronActionContext(
@@ -51,10 +57,17 @@ export function captureTronActionContext(
     ?? '';
   const nodeHost = canonicalTronNodeHost(tronWeb.fullNode?.host);
   const expectedHost = canonicalTronNodeHost(expectedMainnetRpcUrl);
-  if (!address || !nodeHost || !expectedHost || nodeHost !== expectedHost) {
+  const chainId = resolveTronChainId(null, tronWeb as unknown as TronWebLike);
+  if (
+    !address
+    || !nodeHost
+    || !expectedHost
+    || nodeHost !== expectedHost
+    || chainId !== TRON_MAINNET_CHAIN_ID
+  ) {
     throw new Error('WALLET_CONTEXT_CHANGED');
   }
-  return { address, nodeHost };
+  return { address, nodeHost, chainId };
 }
 
 export function assertTronActionContext(
@@ -65,9 +78,12 @@ export function assertTronActionContext(
     ?? tronWeb.defaultAddress?.hex
     ?? null;
   const currentNodeHost = canonicalTronNodeHost(tronWeb.fullNode?.host);
+  const currentChainId = resolveTronChainId(null, tronWeb as unknown as TronWebLike);
   if (
     !isSameTronWallet(tronWeb, expected.address, currentAddress)
     || currentNodeHost !== expected.nodeHost
+    || currentChainId !== expected.chainId
+    || currentChainId !== TRON_MAINNET_CHAIN_ID
   ) {
     throw new Error('WALLET_CONTEXT_CHANGED');
   }

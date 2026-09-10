@@ -178,6 +178,9 @@ describe('checkout comprador marketplace UKI', () => {
 
     render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
 
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
     expect(await screen.findByRole('button', { name: 'Autorizar UKI y comprar' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'BNB' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'USDT' })).not.toBeInTheDocument();
@@ -187,6 +190,9 @@ describe('checkout comprador marketplace UKI', () => {
     const onPurchased = jest.fn();
     render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={onPurchased} />);
 
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
     const buyButton = await screen.findByRole('button', { name: 'Autorizar UKI y comprar' });
     fireEvent.click(buyButton);
 
@@ -210,6 +216,9 @@ describe('checkout comprador marketplace UKI', () => {
     render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'BNB' }));
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
     const buyButton = await screen.findByRole('button', { name: 'Confirmar compra con BNB' });
     await waitFor(() => expect(buyButton).toBeEnabled());
     fireEvent.click(buyButton);
@@ -242,6 +251,9 @@ describe('checkout comprador marketplace UKI', () => {
     render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'USDT' }));
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
     const buyButton = await screen.findByRole('button', { name: 'Autorizar USDT y comprar' });
     fireEvent.click(buyButton);
 
@@ -272,7 +284,7 @@ describe('checkout comprador marketplace UKI', () => {
     walletAddress = seller;
     render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
 
-    const button = await screen.findByRole('button', { name: 'Autorizar UKI y comprar' });
+    const button = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
     expect(button).toBeDisabled();
     expect(screen.getByText(/Esta orden pertenece a tu wallet/)).toBeInTheDocument();
   });

@@ -40,6 +40,7 @@ import type {
   UkiMarketplaceOrdersResponse,
 } from '@/lib/uki-marketplace/types';
 import { useAuth } from '@/providers/auth-provider';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 const SELLER_ORDER_LIMIT = 50;
 const INDEXER_RETRY_COUNT = 8;
@@ -150,6 +151,7 @@ export function UkiMarketplaceSellerPanel() {
   const { user, walletType, isLoading: authLoading, fetchUser } = useAuth();
   const { address, chainId, connector, isConnected } = useAccount();
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const { requestWallet } = useWalletCoordinator();
   const { writeContractAsync } = useWriteContract();
   const expectedChainId = ukiMarketplacePublicConfig.chainId;
   const publicClient = usePublicClient({ chainId: expectedChainId ?? undefined });
@@ -688,7 +690,18 @@ export function UkiMarketplaceSellerPanel() {
         <Button
           type="button"
           onClick={() => {
-            if (expectedChainId) switchChain({ chainId: expectedChainId });
+            if (!expectedChainId || (expectedChainId !== 56 && expectedChainId !== 97)) return;
+            void requestWallet({
+              kind: 'evm',
+              targetChainId: expectedChainId,
+              reason: 'Cambia la wallet a la red del marketplace para publicar o gestionar tus anuncios.',
+            }).catch((error) => {
+              if (error instanceof Error && error.message === 'WALLET_COORDINATOR_UNAVAILABLE') {
+                switchChain({ chainId: expectedChainId });
+                return;
+              }
+              setError(transactionError(error));
+            });
           }}
           disabled={isSwitchingChain}
           className="active:scale-[0.98]"

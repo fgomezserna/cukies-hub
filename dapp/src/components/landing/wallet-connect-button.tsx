@@ -6,6 +6,10 @@ import { useAccount, useConnect, useDisconnect, useSwitchChain, type Connector }
 import { useToast } from '@/hooks/use-toast';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useAuth } from '@/providers/auth-provider';
+import {
+  FALLBACK_COORDINATOR,
+  useWalletCoordinator,
+} from '@/providers/wallet-coordinator-context';
 import { useTronLink } from '@/hooks/use-tronlink';
 import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
 import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
@@ -44,6 +48,11 @@ export function WalletConnectButton({
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const { user, isLoading: isAuthLoading, isWaitingForApproval, fetchUser } = useAuth();
   const {
+    requestWallet,
+    disconnectWallet,
+    evm: evmWallet,
+  } = useWalletCoordinator();
+  const {
     address: tronAddress,
     connect: connectTron,
     disconnect: disconnectTron,
@@ -75,12 +84,27 @@ export function WalletConnectButton({
   const isBusy = hasMounted && (
     isPending ||
     isSwitching ||
+    evmWallet.isConnecting ||
     isAuthLoading ||
     isWaitingForApproval ||
     (!evmOnly && isTronLoading)
   );
 
   const handleSwitchToPresaleChain = () => {
+    if (requestWallet !== FALLBACK_COORDINATOR.requestWallet) {
+      void requestWallet({
+        kind: 'evm',
+        targetChainId: UKI_PRESALE_CHAIN_ID as 56 | 97,
+        reason: `Cambia la wallet a ${UKI_PRESALE_CHAIN_LABEL} para continuar.`,
+      }).catch((error: unknown) => {
+        toast({
+          title: 'Cambio de red fallido',
+          description: error instanceof Error ? error.message : `Cambia manualmente a ${UKI_PRESALE_CHAIN_LABEL}.`,
+          variant: 'destructive',
+        });
+      });
+      return;
+    }
     switchChain(
       { chainId: UKI_PRESALE_CHAIN_ID },
       {
@@ -97,9 +121,11 @@ export function WalletConnectButton({
 
   const handleDisconnectActiveWallet = () => {
     if (activeWalletType === 'evm') {
-      disconnect();
+      if (requestWallet !== FALLBACK_COORDINATOR.requestWallet) disconnectWallet('evm');
+      else disconnect();
     } else if (activeWalletType === 'tron') {
-      disconnectTron();
+      if (requestWallet !== FALLBACK_COORDINATOR.requestWallet) disconnectWallet('tron');
+      else disconnectTron();
     }
 
     toast({
@@ -110,10 +136,21 @@ export function WalletConnectButton({
 
   const handleConnectEvm = async (connector: Connector) => {
     try {
-      if (isConnected) {
-        disconnect();
+      if (requestWallet !== FALLBACK_COORDINATOR.requestWallet) {
+        const ready = await requestWallet({
+          kind: 'evm',
+          targetChainId: UKI_PRESALE_CHAIN_ID as 56 | 97,
+          reason: `Conecta una wallet EVM en ${UKI_PRESALE_CHAIN_LABEL} para continuar.`,
+        });
+        await fetchUser(ready.address, {
+          promptForSignature: true,
+          walletType: 'evm',
+        });
+        setIsConnectorDialogOpen(false);
+        return;
       }
 
+      if (isConnected) disconnect();
       const result = await connectAsync({ connector, chainId: UKI_PRESALE_CHAIN_ID });
       const connectedAddress = result.accounts?.[0] ?? address;
 
@@ -136,7 +173,13 @@ export function WalletConnectButton({
 
   const handleConnectTron = async () => {
     try {
-      const connectedAddress = isTronConnected && tronAddress ? tronAddress : await connectTron();
+      const connectedAddress = requestWallet !== FALLBACK_COORDINATOR.requestWallet
+        ? (await requestWallet({
+            kind: 'tron',
+            targetTronNetwork: 'mainnet',
+            reason: 'Conecta TronLink en TRON Mainnet para continuar.',
+          })).address
+        : isTronConnected && tronAddress ? tronAddress : await connectTron();
 
       if (connectedAddress) {
         setIsConnectorDialogOpen(false);
@@ -162,6 +205,11 @@ export function WalletConnectButton({
     if (!hasMounted) return;
     if (isBusy) return;
 
+    if (requestWallet !== FALLBACK_COORDINATOR.requestWallet && isWrongChain) {
+      await handleSwitchToPresaleChain();
+      return;
+    }
+
     if (isWrongChain) {
       setIsConnectorDialogOpen(true);
       return;
@@ -169,15 +217,14 @@ export function WalletConnectButton({
 
     if (activeWalletType && activeAddress) {
       if (!isAuthenticatedWallet) {
-        setIsConnectorDialogOpen(true);
+        await fetchUser(activeAddress, {
+          promptForSignature: true,
+          walletType: activeWalletType,
+        });
         return;
       }
 
-      if (activeWalletType === 'evm') {
-        disconnect();
-      } else {
-        disconnectTron();
-      }
+      handleDisconnectActiveWallet();
       return;
     }
 
@@ -187,6 +234,31 @@ export function WalletConnectButton({
         description: 'Instala una wallet EVM compatible para conectar.',
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (requestWallet !== FALLBACK_COORDINATOR.requestWallet) {
+      try {
+        const preferredKind = !evmOnly && evmConnectors.length === 0 ? 'tron' : 'evm';
+        const ready = await requestWallet(preferredKind === 'tron'
+          ? {
+              kind: 'tron',
+              targetTronNetwork: 'mainnet',
+              reason: 'Conecta TronLink en TRON Mainnet para continuar.',
+            }
+          : {
+              kind: 'evm',
+              targetChainId: UKI_PRESALE_CHAIN_ID as 56 | 97,
+              reason: `Conecta una wallet EVM en ${UKI_PRESALE_CHAIN_LABEL} para continuar.`,
+            });
+        await fetchUser(ready.address, { promptForSignature: true, walletType: ready.kind });
+      } catch (error) {
+        toast({
+          title: 'Conexión fallida',
+          description: error instanceof Error ? error.message : 'Aprueba la conexión e inténtalo de nuevo.',
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
@@ -215,7 +287,7 @@ export function WalletConnectButton({
       </button>
 
       <WalletConnectorDialog
-        open={isConnectorDialogOpen}
+        open={requestWallet === FALLBACK_COORDINATOR.requestWallet && isConnectorDialogOpen}
         onOpenChange={setIsConnectorDialogOpen}
         connectors={evmConnectors}
         onSelectConnector={handleConnectEvm}

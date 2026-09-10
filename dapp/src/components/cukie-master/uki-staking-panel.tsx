@@ -33,6 +33,10 @@ import {
 } from '@/lib/contracts/uki-sale';
 import { useAuth } from '@/providers/auth-provider';
 import { useAppRuntime, useGuardedOperation } from '@/providers/app-runtime-provider';
+import {
+  FALLBACK_COORDINATOR,
+  useWalletCoordinator,
+} from '@/providers/wallet-coordinator-context';
 
 const TOKEN_DECIMALS = 18;
 const DEFAULT_AMOUNT = '20000';
@@ -90,6 +94,7 @@ export function UkiStakingPanel({
   const refreshAfterTransaction = runtime.refreshAfterTransaction;
   const operationGuard = useGuardedOperation('uki-write');
   const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { requestWallet } = useWalletCoordinator();
   const { writeContract, data: txHash, error, isPending, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash: txHash,
@@ -410,18 +415,32 @@ export function UkiStakingPanel({
   }
 
   function switchToConfiguredNetwork() {
-    switchChain(
-      { chainId: UKI_PRESALE_CHAIN_ID },
-      {
-        onError: () => {
-          toast({
-            title: 'No se pudo cambiar la red',
-            description: `Abre tu wallet y acepta el cambio a ${UKI_PRESALE_CHAIN_LABEL}.`,
-            variant: 'destructive',
-          });
+    if (requestWallet === FALLBACK_COORDINATOR.requestWallet) {
+      switchChain(
+        { chainId: UKI_PRESALE_CHAIN_ID },
+        {
+          onError: () => {
+            toast({
+              title: 'No se pudo cambiar la red',
+              description: `Abre tu wallet y acepta el cambio a ${UKI_PRESALE_CHAIN_LABEL}.`,
+              variant: 'destructive',
+            });
+          },
         },
-      },
-    );
+      );
+      return;
+    }
+    void requestWallet({
+      kind: 'evm',
+      targetChainId: UKI_PRESALE_CHAIN_ID as 56 | 97,
+      reason: `Cambia la wallet a ${UKI_PRESALE_CHAIN_LABEL} para continuar con staking.`,
+    }).catch((error) => {
+      toast({
+        title: 'No se pudo cambiar la red',
+        description: `Abre tu wallet y acepta el cambio a ${UKI_PRESALE_CHAIN_LABEL}.`,
+        variant: 'destructive',
+      });
+    });
   }
 
   function handleSubmit() {

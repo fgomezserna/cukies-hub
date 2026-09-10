@@ -9,19 +9,17 @@ import {
   LockKey,
   ShieldCheck,
   ShoppingCart,
-  Wallet,
   WarningCircle,
 } from '@phosphor-icons/react';
 import { formatUnits, type Address, type Hash } from 'viem';
 import {
   useAccount,
   usePublicClient,
-  useSwitchChain,
   useWriteContract,
 } from 'wagmi';
 
-import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Button } from '@/components/ui/button';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import {
   calculateUkiMarketplaceCheckoutBudget,
   UKI_MARKETPLACE_QUOTE_DEADLINE_SECONDS,
@@ -119,12 +117,23 @@ export function UkiMarketplaceBuyerCheckout({
   const { address, chainId, isConnected } = useAccount();
   const expectedChainId = ukiMarketplacePublicConfig.chainId;
   const publicClient = usePublicClient({ chainId: expectedChainId ?? undefined });
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
+  const { requestWallet } = useWalletCoordinator();
   const [currency, setCurrency] = useState<UkiMarketplacePaymentCurrency>('UKI');
   const [quoteState, setQuoteState] = useState<QuoteState>({ kind: 'loading' });
   const [transactionState, setTransactionState] = useState<TransactionState>({ kind: 'idle' });
   const [reloadKey, setReloadKey] = useState(0);
+  const [buyConfirmation, setBuyConfirmation] = useState(false);
+  const [isPreparingBuy, setIsPreparingBuy] = useState(false);
+  const targetChainId = expectedChainId === 56 || expectedChainId === 97
+    ? expectedChainId
+    : null;
+  const walletReady = Boolean(
+    isConnected
+    && address
+    && targetChainId !== null
+    && chainId === targetChainId,
+  );
   const availableCurrencies = CURRENCIES.filter((item) => {
     if (item === 'UKI') return ukiMarketplacePublicConfig.ukiPaymentReady;
     if (item === 'BNB') return ukiMarketplacePublicConfig.bnbPaymentReady;
@@ -441,6 +450,10 @@ export function UkiMarketplaceBuyerCheckout({
     return () => { active = false; };
   }, [configReady, readQuote, reloadKey]);
 
+  useEffect(() => {
+    setBuyConfirmation(false);
+  }, [address, chainId, currency, order.orderId, reloadKey]);
+
   async function writeAndConfirm(input: Parameters<typeof writeContractAsync>[0]) {
     if (!publicClient) throw new Error('No podemos comprobar la red ahora.');
     const hash = await writeContractAsync(input);
@@ -476,14 +489,12 @@ export function UkiMarketplaceBuyerCheckout({
 
   async function buy() {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
-    if (
-      !isConnected
-      || !address
-      || expectedChainId === null
-      || chainId !== expectedChainId
-      || !marketplaceAddress
-      || !publicClient
-    ) return;
+    if (!isConnected || !address || targetChainId === null || chainId !== targetChainId) {
+      setBuyConfirmation(false);
+      setTransactionState({ kind: 'error', message: 'Prepara la wallet y confirma de nuevo antes de comprar.' });
+      return;
+    }
+    if (!marketplaceAddress || !publicClient) return;
     if (sameAddress(address, order.seller)) {
       setTransactionState({ kind: 'error', message: 'El vendedor no puede comprar su propia orden.' });
       return;
@@ -519,7 +530,7 @@ export function UkiMarketplaceBuyerCheckout({
       let hash: Hash;
       if (freshQuote.currency === 'UKI') {
         hash = await writeAndConfirm({
-          chainId: expectedChainId,
+          chainId: targetChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithUki',
@@ -527,7 +538,7 @@ export function UkiMarketplaceBuyerCheckout({
         });
       } else if (freshQuote.currency === 'USDT' && freshQuote.tokenAddress) {
         hash = await writeAndConfirm({
-          chainId: expectedChainId,
+          chainId: targetChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithToken',
@@ -541,7 +552,7 @@ export function UkiMarketplaceBuyerCheckout({
         });
       } else {
         hash = await writeAndConfirm({
-          chainId: expectedChainId,
+          chainId: targetChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithNative',
@@ -570,10 +581,43 @@ export function UkiMarketplaceBuyerCheckout({
       }
 
       setTransactionState({ kind: 'success', hash });
+      setBuyConfirmation(false);
       window.dispatchEvent(new Event('cukies:uki-marketplace:refresh'));
       onPurchased();
     } catch (error: unknown) {
       setTransactionState({ kind: 'error', message: transactionErrorMessage(error) });
+    }
+  }
+
+  async function prepareBuy() {
+    if (buyConfirmation) {
+      await buy();
+      return;
+    }
+    if (ownOrder) {
+      setTransactionState({ kind: 'error', message: 'El vendedor no puede comprar su propia orden.' });
+      return;
+    }
+    if (targetChainId === null) {
+      setTransactionState({ kind: 'error', message: 'La red de compra aún no está configurada.' });
+      return;
+    }
+
+    setIsPreparingBuy(true);
+    setTransactionState({ kind: 'idle' });
+    try {
+      if (!walletReady) {
+        await requestWallet({
+          kind: 'evm',
+          targetChainId,
+          reason: `Compra protegida del Cukie #${order.tokenId}. No se firmará nada hasta confirmar.`,
+        });
+      }
+      setBuyConfirmation(true);
+    } catch (error) {
+      setTransactionState({ kind: 'error', message: transactionErrorMessage(error) });
+    } finally {
+      setIsPreparingBuy(false);
     }
   }
 
@@ -729,37 +773,40 @@ export function UkiMarketplaceBuyerCheckout({
           </div>
 
           <div className="mt-5">
-            {!isConnected ? (
-              <LandingWalletConnectButton className="w-full justify-center" label="Conectar wallet para comprar" />
-            ) : expectedChainId !== null && chainId !== expectedChainId ? (
-              <Button
-                type="button"
-                onClick={() => switchChain({ chainId: expectedChainId })}
-                disabled={isSwitchingChain}
-                className="w-full active:scale-[0.98]"
-              >
-                <Wallet aria-hidden className="mr-2 h-4 w-4" />
-                {isSwitchingChain ? 'Cambiando red…' : 'Cambiar de red'}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={buy}
-                disabled={!quote || busy || ownOrder || insufficientBalance}
-                className="w-full bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
-              >
-                <ShoppingCart aria-hidden className="mr-2 h-4 w-4" weight="fill" />
-                {transactionState.kind === 'approving'
+            {buyConfirmation && (
+              <div role="status" className="mb-3 rounded-[8px] border border-lilac-200/25 bg-lilac-200/[0.08] p-3 text-sm text-lilac-50">
+                <p className="font-bold">Revisa y confirma la compra</p>
+                <p className="mt-1 text-xs leading-5 text-lilac-100/80">
+                  Comprador: {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'wallet pendiente'} · Red: BSC {targetChainId ?? '-'} · Cukie #{order.tokenId}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-lilac-100/70">
+                  La orden, cotización, saldo y autorización se volverán a validar antes de pedir cualquier firma.
+                </p>
+              </div>
+            )}
+            <Button
+              type="button"
+              onClick={() => void prepareBuy()}
+              disabled={!quote || busy || ownOrder || insufficientBalance || isPreparingBuy || (buyConfirmation && !walletReady)}
+              className="w-full bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
+            >
+              <ShoppingCart aria-hidden className="mr-2 h-4 w-4" weight="fill" />
+              {isPreparingBuy
+                ? 'Preparando wallet…'
+                : transactionState.kind === 'approving'
                   ? 'Autorizando…'
                   : transactionState.kind === 'purchasing'
                     ? 'Esperando firma…'
                     : transactionState.kind === 'verifying'
                       ? 'Verificando entrega…'
-                      : needsApproval && quote
-                        ? `Autorizar ${quote.symbol} y comprar`
-                        : `Confirmar compra con ${currency}`}
-              </Button>
-            )}
+                      : buyConfirmation
+                        ? needsApproval && quote
+                          ? `Autorizar ${quote.symbol} y comprar`
+                          : `Confirmar compra con ${currency}`
+                        : walletReady
+                          ? 'Revisar y confirmar compra'
+                          : 'Conectar y revisar compra'}
+            </Button>
           </div>
 
           {ownOrder && (

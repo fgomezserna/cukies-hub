@@ -45,6 +45,7 @@ import {
   type NftTransactionContext,
 } from '@/lib/nft-vault/transaction-lifecycle';
 import { useAuth } from '@/providers/auth-provider';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 const erc721CustodyAbi = [
   { type: 'function', name: 'ownerOf', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ name: '', type: 'address' }] },
@@ -383,6 +384,7 @@ export function CukiePoolStatusPanel() {
   const { user, isLoading: authLoading, walletType } = useAuth();
   const runtime = useAppRuntime();
   const { address, chainId, isConnected } = useAccount();
+  const { requestWallet, openWalletSelector, evm: evmWallet } = useWalletCoordinator();
   const publicClient = usePublicClient({ chainId: ukiNftVaults.chainId ?? undefined });
   const { writeContractAsync } = useWriteContract();
   const operationGuard = useGuardedOperation('pool-write');
@@ -484,6 +486,25 @@ export function CukiePoolStatusPanel() {
     && publicClient,
   );
   const depositsReady = Boolean(identityReady && custody?.indexer.status === 'ready');
+
+  function preparePoolWallet() {
+    const targetChainId = ukiNftVaults.chainId;
+    if (!targetChainId) {
+      setError('La red del Pool aún no está configurada; la operación permanece bloqueada.');
+      return;
+    }
+    if (!walletMatches) {
+      openWalletSelector('evm', 'Conecta la misma wallet con la que has iniciado sesión para operar el Pool.');
+      return;
+    }
+    void requestWallet({
+      kind: 'evm',
+      targetChainId,
+      reason: 'Cambia la wallet a la red configurada para operar el Pool.',
+    }).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : 'No se pudo preparar la wallet para el Pool.');
+    });
+  }
 
   const pendingContext = useMemo<NftVaultPendingContext | null>(() => {
     if (!ukiNftVaults.chainId || !ukiNftVaults.cukiePoolNftVaultAddress || !user?.walletAddress) return null;
@@ -979,14 +1000,36 @@ export function CukiePoolStatusPanel() {
               </p>
             ) : null}
             {!walletMatches ? (
-              <p role="alert" className="text-sm font-semibold text-amber-300">
-                Conecta la misma wallet con la que has iniciado sesión.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3">
+                <p role="alert" className="text-sm font-semibold text-amber-300">
+                  Conecta la misma wallet con la que has iniciado sesión.
+                </p>
+                <button
+                  type="button"
+                  onClick={preparePoolWallet}
+                  disabled={evmWallet.isConnecting}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-[8px] bg-[var(--uki-lilac)] px-3 text-xs font-black uppercase text-black disabled:opacity-50"
+                >
+                  {evmWallet.isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
+                  Conectar wallet
+                </button>
+              </div>
             ) : null}
             {walletMatches && !correctChain ? (
-              <p role="alert" className="text-sm font-semibold text-amber-300">
-                Cambia tu wallet a la red correcta para continuar.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3">
+                <p role="alert" className="text-sm font-semibold text-amber-300">
+                  Cambia tu wallet a la red correcta para continuar.
+                </p>
+                <button
+                  type="button"
+                  onClick={preparePoolWallet}
+                  disabled={evmWallet.isConnecting}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-[8px] bg-[var(--uki-lilac)] px-3 text-xs font-black uppercase text-black disabled:opacity-50"
+                >
+                  {evmWallet.isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />}
+                  Cambiar red
+                </button>
+              </div>
             ) : null}
             {error ? <p role="alert" className="text-sm font-semibold text-amber-300">{error}</p> : null}
             {notice ? (

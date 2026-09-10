@@ -16,12 +16,12 @@ import { formatEther, isAddress, type Address } from 'viem';
 import {
   useAccount,
   useReadContract,
-  useSwitchChain,
   useWriteContract,
 } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
 import { useTronLink } from '@/hooks/use-tronlink';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import {
   legacyMarketplaceBscAbis,
   legacyMarketplaceTronAbis,
@@ -140,11 +140,12 @@ function canConvertTronDestination(value: string) {
 function tronDestinationToSolidityAddress(value: string): Address {
   if (isAddress(value)) return value;
 
-  if (!window.tronWeb?.address?.toHex) {
+  const tronWeb = getLegacyTronWeb();
+  if (!tronWeb?.address?.toHex) {
     throw new Error('TronLink es necesario para convertir destino TRON.');
   }
 
-  const hex = String(window.tronWeb.address.toHex(value));
+  const hex = String(tronWeb.address.toHex(value));
   if (!hex.startsWith('41') || hex.length !== 42) {
     throw new Error('La direccion TRON destino no es valida.');
   }
@@ -282,14 +283,14 @@ function BridgeOperationsClient({
     readOnly,
   } = runtime;
   const { address, chainId, isConnected } = useAccount();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { writeContract, isPending: isWriting } = useWriteContract();
   const {
     address: tronAddress,
-    connect: connectTron,
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
+    isLoading: isTronLoading,
   } = useTronLink();
+  const { requestWallet } = useWalletCoordinator();
   const [sourceNetwork] = useState<BridgeNetwork>('TRON');
   const [destinationOwner, setDestinationOwner] = useState('');
   const [candidates, setCandidates] = useState<LegacyMarketplaceCukiItem[]>([]);
@@ -320,7 +321,7 @@ function BridgeOperationsClient({
     isTronConnected &&
     isLegacyTronWalletOnRpc(tronWeb, tronRpcUrl);
   const ready = sourceNetwork === 'BSC' ? bscReady : tronReady;
-  const disabled = isWriting || isSwitchingChain;
+  const disabled = isWriting || isTronLoading;
 
   const { data: bscBridgePrice } = useReadContract({
     address: bscBridgeAddress,
@@ -544,15 +545,13 @@ function BridgeOperationsClient({
 
   function ensureBsc() {
     if (sourceNetwork !== 'BSC') return false;
-    if (!isConnected) {
-      setStatus('Conecta una wallet EVM desde el header.');
-      return false;
-    }
-    if (chainId !== bscChainId) {
-      switchChain({ chainId: bscChainId });
-      return false;
-    }
-    return true;
+    if (isConnected && chainId === bscChainId) return true;
+    void requestWallet({
+      kind: 'evm',
+      targetChainId: bscChainId,
+      reason: `Conecta una wallet EVM en ${bscNetworkLabel} para iniciar el bridge.`,
+    }).catch((error) => setStatus(getErrorMessage(error)));
+    return false;
   }
 
   async function ensureTron() {
@@ -561,8 +560,14 @@ function BridgeOperationsClient({
       setStatus('Instala o activa TronLink para operar bridge en TRON.');
       return false;
     }
-    if (!isTronConnected) {
-      await connectTron();
+    try {
+      await requestWallet({
+        kind: 'tron',
+        targetTronNetwork: 'mainnet',
+        reason: `Conecta TronLink en ${tronNetworkLabel} para iniciar el bridge.`,
+      });
+    } catch (error) {
+      setStatus(getErrorMessage(error));
       return false;
     }
     const currentTronWeb = getLegacyTronWeb();
@@ -612,11 +617,13 @@ function BridgeOperationsClient({
       return;
     }
 
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    if (!(await ensureTron())) return;
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) return;
     setStatus('Enviando approval del bridge en TRON...');
     try {
       await sendTronContractAt(
-        window.tronWeb,
+        currentTronWeb,
         legacyMarketplaceTronAbis.token,
         tronTokenAddress,
         'setApprovalForAll',
@@ -678,11 +685,13 @@ function BridgeOperationsClient({
       return;
     }
 
-    if (!(await ensureTron()) || !window.tronWeb) return;
+    if (!(await ensureTron())) return;
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) return;
     setStatus('Enviando Cukie al bridge desde TRON...');
     try {
       await sendTronContractAt(
-        window.tronWeb,
+        currentTronWeb,
         cukiesBridgeEndpointAbi,
         tronBridgeAddress,
         'requestBridge',
@@ -798,7 +807,7 @@ function BridgeOperationsClient({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span>Conecta una wallet EVM y usa {bscNetworkLabel}.</span>
               {isConnected && chainId !== bscChainId && (
-                <Button onClick={() => switchChain({ chainId: bscChainId })}>
+                <Button onClick={() => void ensureBsc()}>
                   Cambiar a {bscNetworkLabel}
                 </Button>
               )}
