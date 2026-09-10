@@ -1,12 +1,12 @@
 {
-  "observedAt": "2026-09-10T06:57:06.050615+00:00",
-  "scope": "Pre-publication review of isolated game recovery and Legacy breeding identity candidates; no live state operations",
-  "stagingCodeObserved": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
-  "stagingChangedByTheseCandidates": false,
+  "observedAt": "2026-09-10T07:41:12.663371+00:00",
+  "scope": "Candidate review, combined verification, automatic staging publication and bounded functional UI QA",
+  "stagingCodeObserved": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+  "stagingChangedByTheseCandidates": true,
   "gameRecovery": {
     "candidate": "3903aa7cbc9dc11b7ccba787ace551df4fd1373f",
     "base": "0cf0019742373364da5cb0811c3252d1a1cbd007",
-    "decision": "implementation_accepted_pending_combined_verification",
+    "decision": "published_staging_game_start_completion_reload_verified",
     "reviewer": "root Astra Max",
     "reviewed": "Complete nine-file diff, new recovery inspector, related engine compensation and Mongo resource ports, reported test coverage",
     "productTestsRunByReviewer": false,
@@ -68,7 +68,7 @@
         ]
       }
     ],
-    "nextStep": "Data task frozen. Root validates the combined candidate once, obtains exact-head release plan/preflight, then merges and verifies staging; no direct data repair.",
+    "nextStep": "Recovery implementation and combined delivery are closed. Continue existing J05 asset/optimizer and reward/UX verification as separate bounded work; no repeat historical repair.",
     "taskId": "01a0814e-0ea0-7070-877c-701f264243e7",
     "currentCandidate": "523187439e5ea9ab0f9749a17baef88062737fba",
     "correctionReview": {
@@ -145,13 +145,14 @@
         "4fa4f37": "99c24ee",
         "52318743": "61464a7"
       },
-      "limit": "Legacy pool position already closed by withdrawal remains pending if compensation cannot be proven; no live state mutation during review."
+      "limit": "Legacy pool position already closed by withdrawal remains pending if compensation cannot be proven; no live state mutation during review.",
+      "recordedBeforePublication": true
     }
   },
   "legacyBreeding": {
     "candidate": "1178153140f0b63cb0378f2678096a85e454862c",
     "base": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
-    "decision": "implementation_accepted_pending_combined_verification",
+    "decision": "published_staging_negative_identity_filter_verified_writes_off",
     "taskId": "01a08727-0cdb-7993-bbab-6829bcf3d333",
     "reportedWorkerGates": {
       "focalSuites": 3,
@@ -208,7 +209,7 @@
         ]
       }
     ],
-    "nextStep": "Legacy task frozen with sources intact. Root combines accepted Legacy commits with reviewed Data correction, runs final gates once, then publishes and verifies staging in one window.",
+    "nextStep": "Identity exclusion is verified for the QA wallet. Positive mainnet parents, documented contract boundary semantics, Bread identity and full migration parity remain to verify; writes remain disabled.",
     "currentCandidate": "5545860191cb7e34a98e4b8218025416229a52da",
     "correctionReview": {
       "candidate": "7101d637154d33b98535f6dc2ec2fa14cf561a1a",
@@ -323,13 +324,16 @@
       "fullCombinedGatesRun": false,
       "stagingPublication": false,
       "writesEnabled": false,
-      "limit": "TRON retains existing threshold behavior; no independent proof of complete on-chain eligibility or Legacy parity is claimed."
+      "limit": "TRON retains existing threshold behavior; no independent proof of complete on-chain eligibility or Legacy parity is claimed.",
+      "recordedBeforePublication": true
     }
   },
   "limits": [
-    "No production/main changes",
-    "No database, ledger, balance, incident, cursor or on-chain mutations",
-    "Previously verified NFT recovery and World publication remain closed; candidate review does not reopen them"
+    "No production/main changes; new Hub World runtime and Hub Legacy write actions remain disabled.",
+    "No direct database, ledger, balance, incident or cursor repair. One authorized staging game used normal application services and consumed10 staging test credits.",
+    "No wallet signatures, on-chain transactions or reward claims.",
+    "Previously verified NFT recovery and World publication remain closed; no backfill or replay.",
+    "Functional QA is scoped below; it does not certify reward settlement, every recovery path, mobile UX or complete Legacy parity."
   ],
   "combinedIntegration": {
     "head": "61464a780f1f7cbec9718d915c0d709736892142",
@@ -346,10 +350,657 @@
       }
     },
     "unexpectedPaths": [],
-    "stagingCode": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
-    "gatesRun": false,
-    "stagingPublication": false,
+    "stagingCode": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+    "gatesRun": true,
+    "stagingPublication": true,
     "reviewEvidenceSha256": "ce377927b336f0cdbcbbbc769e641bc6d0b7581672c6026199b712174ba5789a",
-    "decision": "ready_for_combined_verification"
+    "decision": "published_staging_operational_and_bounded_ui_qa_verified",
+    "verifiedCandidateHead": "ec0f34ff2d91b3517f43137d891d204e470d4ccf",
+    "mergeSha": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+    "mergeTreeEqualsVerifiedCandidate": true
+  },
+  "reviewCompletedAt": "2026-09-10T06:57:06.050615+00:00",
+  "publication": {
+    "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/376",
+    "mergeSha": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+    "verifiedCandidateHead": "ec0f34ff2d91b3517f43137d891d204e470d4ccf",
+    "pipeline": {
+      "branch": "staging",
+      "conclusion": "success",
+      "createdAt": "2026-09-10T07:17:23Z",
+      "event": "push",
+      "headSha": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+      "runId": 34449216097,
+      "status": "completed",
+      "updatedAt": "2026-09-10T07:31:17Z",
+      "url": "https://github.com/fgomezserna/cukies-hub/actions/runs/34449216097",
+      "workflow": "Cukies immutable images"
+    },
+    "gates": {
+      "sha": "ec0f34ff2d91b3517f43137d891d204e470d4ccf",
+      "tools": {
+        "node": "v22.22.3",
+        "pnpm": "10.19.0",
+        "git": "git version 2.44.0",
+        "next": "Next.js v15.2.3",
+        "jest": "30.1.0",
+        "typescript": "Version 5.9.2",
+        "prisma": "6.15.0"
+      },
+      "gates": [
+        {
+          "name": "lint",
+          "command": "pnpm dapp lint",
+          "actualArgv": "next lint",
+          "startedAtUtc": "2026-09-10T07:10:58Z",
+          "finishedAtUtc": "2026-09-10T07:11:08Z",
+          "durationSeconds": 10,
+          "exitCode": 0,
+          "status": "PASS",
+          "result": "No ESLint warnings or errors",
+          "log": "/tmp/cukies-recovery-legacy-combined-gates-ready-20260910/lint.log"
+        },
+        {
+          "name": "typecheck",
+          "command": "pnpm dapp typecheck",
+          "actualArgv": "tsc --noEmit",
+          "startedAtUtc": "2026-09-10T07:11:08Z",
+          "finishedAtUtc": "2026-09-10T07:11:28Z",
+          "durationSeconds": 20,
+          "exitCode": 0,
+          "status": "PASS",
+          "log": "/tmp/cukies-recovery-legacy-combined-gates-ready-20260910/typecheck.log"
+        },
+        {
+          "name": "test",
+          "command": "pnpm dapp test --runInBand",
+          "actualArgv": "jest --runInBand",
+          "startedAtUtc": "2026-09-10T07:13:00Z",
+          "finishedAtUtc": "2026-09-10T07:13:48Z",
+          "durationSeconds": 48,
+          "exitCode": 0,
+          "status": "PASS",
+          "executedSuites": 242,
+          "passedSuites": 242,
+          "executedTests": 1975,
+          "passedTests": 1975,
+          "snapshots": 0,
+          "jestTimeSeconds": 45.788,
+          "discoveredTestMatches": 254,
+          "log": "/tmp/cukies-recovery-legacy-combined-gates-ready-20260910/test-correct.log"
+        },
+        {
+          "name": "build",
+          "command": "pnpm dapp build",
+          "actualArgv": "next build",
+          "startedAtUtc": "2026-09-10T07:11:31Z",
+          "finishedAtUtc": "2026-09-10T07:12:28Z",
+          "durationSeconds": 57,
+          "exitCode": 0,
+          "status": "PASS",
+          "nextVersion": "15.2.3",
+          "staticPagesGenerated": 92,
+          "staticPagesExpected": 92,
+          "appRouteRows": 166,
+          "log": "/tmp/cukies-recovery-legacy-combined-gates-ready-20260910/build.log"
+        }
+      ],
+      "supersededTestAttempt": {
+        "command": "pnpm dapp test -- --runInBand",
+        "actualArgv": "jest -- --runInBand",
+        "startedAtUtc": "2026-09-10T07:11:28Z",
+        "finishedAtUtc": "2026-09-10T07:11:31Z",
+        "exitCode": 1,
+        "status": "INVALID_SUPERSEDED",
+        "executedSuites": 0,
+        "executedTests": 0,
+        "diagnosis": "Jest treated --runInBand as a test name pattern (0 matches); retained for audit, excluded from gate result",
+        "log": "/tmp/cukies-recovery-legacy-combined-gates-ready-20260910/test.log"
+      },
+      "git": {
+        "headBefore": "ec0f34ff2d91b3517f43137d891d204e470d4ccf",
+        "headAfter": "ec0f34ff2d91b3517f43137d891d204e470d4ccf",
+        "statusAfter": "/tmp/cukies-recovery-legacy-combined-gates-ready-20260910/git-status-final.txt",
+        "cleanAfter": true,
+        "lockfileSha256BeforeAfter": "a3413f24cc73ed2dfafcb284fc74e843f43eabdc438f964ad230d4e60590926f",
+        "packageJsonSha256BeforeAfter": "874b62713739611e5341dd639f8cb6dd02be827ef44359e2025629cbd7bf4291"
+      }
+    },
+    "preflight": {
+      "observedAt": "2026-09-10T07:04:52.021092+00:00",
+      "base": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
+      "head": "ec0f34ff2d91b3517f43137d891d204e470d4ccf",
+      "nx": {
+        "affected": [
+          "dapp"
+        ],
+        "available": true,
+        "command": "pnpm exec nx show projects --affected --with-target=build --base=3ca331e77e7e6cf01b56a8b263d0fca901e82aac --head=ec0f34ff2d91b3517f43137d891d204e470d4ccf --json",
+        "projects": [
+          "dapp"
+        ],
+        "rawJson": "[\"dapp\"]",
+        "stderr": null,
+        "version": "23.2.0"
+      },
+      "build": [
+        "dapp"
+      ],
+      "reuseCount": 7,
+      "result": "PASS",
+      "sha256": "8952c9bdd6a324045ecf1e66efa1346dcdb4891d8fbd03f501aa7a34e042c18f"
+    },
+    "postflight": {
+      "observedAt": "2026-09-10T07:34:03.834831+00:00",
+      "result": "PASS",
+      "checks": {
+        "all23RestartZero": true,
+        "all23Running": true,
+        "configHashSame": true,
+        "gameRefPreserved": true,
+        "identityResourcesPreserved": true,
+        "journalClean": true,
+        "legacy8Unchanged": true,
+        "noNewWorldRuntime": true,
+        "other22Unchanged": true,
+        "pipelineBuildSuccess": true,
+        "pipelineDeliverySuccess": true,
+        "pipelineSuccess": true,
+        "publicFour200": true,
+        "stateCommitIsMerge": true,
+        "stateEightRefs": true,
+        "webReadyMerge": true,
+        "webReplacedOne": true,
+        "webServesMerge": true,
+        "workersComposeHashPreserved": true,
+        "workersRefsPreserved": true,
+        "worldFlagsOff": true,
+        "worldProfilesOff": true,
+        "worldRefsPreserved": true,
+        "worldSmokeSkipped": true
+      },
+      "exceptions": [],
+      "componentCount": 8,
+      "changedComponents": [
+        "dapp"
+      ],
+      "unchangedComponents": [
+        "chain-indexer",
+        "cuki-card-worker",
+        "cukies-bridge-relayer",
+        "schedulers",
+        "treasure-hunt",
+        "world-api",
+        "world-matchmaking"
+      ],
+      "state": {
+        "chainId": "97",
+        "commit": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+        "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+        "deliveryMode": "rolling",
+        "deploymentUuid": "ckw0484g4s84s00c0scc8cws",
+        "environment": "staging",
+        "gameCommit": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+        "gameDeploymentUuid": "x0oo80800o8wkw04osgs8c8g",
+        "gameResourceUuid": "lc04cw8gs4koo4swwws0c4ss",
+        "previousCommit": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
+        "schemaVersion": 1,
+        "updatedAt": "2026-09-10T07:31:11.004Z",
+        "webCommit": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+        "webResourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb",
+        "workersResourceUuid": "u4s804o4wwcckowgk0woo4wg"
+      },
+      "groups": {
+        "legacyPreexisting": 8,
+        "production": 3,
+        "stagingGame": 1,
+        "stagingWeb": 1,
+        "stagingWorkers": 10
+      },
+      "web": {
+        "baseline": {
+          "containerId": "254767e92ac84b93b2e1a36ff7737c57920f80ca0ddbcb5ce07b2cfb1616de2b",
+          "imageId": "sha256:86eb14206ef84047b42fd59371a5fbb74449c2d42b6e1e498b9a26330eea1d80",
+          "imageRef": "192.168.1.207:5000/cukies-hub/dapp@sha256:3399aee87f1e91477fcb76198b1cb427c9a5977548a3a94410e52d442a8a9372",
+          "restartCount": 0,
+          "status": "running",
+          "health": "healthy"
+        },
+        "post": {
+          "containerId": "d481d8aadc3b80c644b814b02360beeb3f7e06d04908d5085c24953a3ae6c25c",
+          "imageId": "sha256:df3bac012954d07668bd60308b4046b85f52421640d46f519c6691241793979f",
+          "imageRef": "192.168.1.207:5000/cukies-hub/dapp@sha256:31aa1dda661d4d15e0a9e7ef559649c7e2827760e0f613458fc99bf1452aa86d",
+          "restartCount": 0,
+          "status": "running",
+          "health": "healthy"
+        }
+      },
+      "other22": [
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "auth-api-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "chain-indexer-jookw8ow8woks088s44404ok-140252349537",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "chain-indexer-u4s804o4wwcckowgk0woo4wg-230546768063",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "competition-credit-scheduler-u4s804o4wwcckowgk0woo4wg-230546952571",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "cuki-card-worker-legacy-u4s804o4wwcckowgk0woo4wg-230547213559",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "cuki-card-worker-u4s804o4wwcckowgk0woo4wg-230547168925",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "cukie-master-scheduler-u4s804o4wwcckowgk0woo4wg-230546924007",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "cukie-pool-scheduler-u4s804o4wwcckowgk0woo4wg-230547012663",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "dapp-jookw8ow8woks088s44404ok-140252201287",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "data-graphql-api-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "data-rest-api-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "data-rest-learn-api-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "data-rest-ludo-api-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "game-api-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "game-economy-scheduler-u4s804o4wwcckowgk0woo4wg-230546980291",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "lc04cw8gs4koo4swwws0c4ss-003824899977",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "marketplace-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "matchmaking-api-cukiesapistaging",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "reward-accounting-scheduler-u4s804o4wwcckowgk0woo4wg-230547069871",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "reward-batch-publisher-u4s804o4wwcckowgk0woo4wg-230547100653",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": null,
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "tkkggwcosc4gksckcc480cwg-115513710714",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        },
+        {
+          "health": "healthy",
+          "healthSame": true,
+          "idSame": true,
+          "imageIdSame": true,
+          "imageRefSame": true,
+          "name": "weekly-ranking-scheduler-u4s804o4wwcckowgk0woo4wg-230547039158",
+          "present": true,
+          "resourceUuidSame": true,
+          "restartCount": 0,
+          "restartsSame": true,
+          "status": "running"
+        }
+      ],
+      "public": {
+        "observedAt": "2026-09-10T07:32:31.660109+00:00",
+        "probes": [
+          {
+            "json": {
+              "app": "cukies-hub",
+              "environment": "staging",
+              "gitSha": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+              "status": "ok"
+            },
+            "status": 200,
+            "url": "https://cukieshub.eurekand.com/api/health"
+          },
+          {
+            "json": {
+              "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+              "gitSha": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+              "imageSha": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+              "status": "ready"
+            },
+            "status": 200,
+            "url": "https://cukieshub.eurekand.com/api/ready"
+          },
+          {
+            "json": {
+              "app": "treasure-hunt",
+              "environment": "staging",
+              "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+              "status": "ok"
+            },
+            "status": 200,
+            "url": "https://cukieshub.eurekand.com/treasurehunt-game/api/health"
+          },
+          {
+            "json": {
+              "configHash": "b9a493e195bce513fbce162b663f63a48b2f0105d4fb75bf8337eaa049ddcd15",
+              "gitSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+              "imageSha": "11de87e4f65d60826dd1cc76c0a77da2da77f7bc",
+              "status": "ready"
+            },
+            "status": 200,
+            "url": "https://cukieshub.eurekand.com/treasurehunt-game/api/ready"
+          }
+        ]
+      },
+      "worldGuard": {
+        "newWorldRuntimeContainers": [],
+        "stageWorkerComposeProfiles": [
+          "staging-runtime,card-worker,legacy-card-worker"
+        ],
+        "stageWorkerWorldFlags": {
+          "WORLD_GAME_WRITES_ENABLED": [],
+          "WORLD_RUNTIME_ENABLED": []
+        },
+        "writesOff": true
+      },
+      "limits": [
+        "Postflight validates metadata, state, public health/ready and the expected web replacement; it does not prove functional economy/ledger correctness.",
+        "World runtime remains profile-disabled; no World smoke or economic operation was run in this postflight.",
+        "Legacy consumers/ownership and unrelated app resources remain outside this evidence window."
+      ],
+      "sha256": "b09ee59acb8de7f6a8005abd91a19ee6ea3789ccf83c0c07353486f603294eae"
+    },
+    "evidenceHashes": {
+      "gates": "ca116b45e6169197f5673b96d1429d7a04a5b1eb5f04cea7e6766c29563cdd60",
+      "functionalQa": "055552d55a29bbbdcc07c4e02fce8417fd3c2fa2e70b420a1a710139ce9488be"
+    }
+  },
+  "functionalQa": {
+    "observedAt": "2026-09-10T07:41:12.663371+00:00",
+    "tester": "root Astra Max, CUA in existing signed staging Edge session",
+    "applicationSha": "0aad3fee425efac84660d0c8950c6b41bf95d90f",
+    "scope": "One authorized staging test game through normal UI, read-only account and Legacy checks, no direct data repair or on-chain action",
+    "game": {
+      "url": "https://cukieshub.eurekand.com/games/treasure-hunt",
+      "before": "Existing tab showed an unconfirmed-attempt error; after loading the deployed client the same signed wallet could start with its visible 200 personal credits.",
+      "action": "One click on JUGAR CON 10 CRÉDITOS PERSONALES; no movement input, normal 30-second timer expiry.",
+      "result": "RESULTADO CONFIRMADO",
+      "score": 0,
+      "durationSeconds": 30,
+      "creditSource": "personal",
+      "cukieSource": "pool",
+      "creditsCharged": 10,
+      "personalCreditsBefore": 200,
+      "personalCreditsAfter": 190,
+      "poolContributionBeforeAndAfter": 100,
+      "weeklyRanking": "excluded because paid with personal credits",
+      "reload": "Last confirmed result and balance190 persisted; no further charge observed.",
+      "startCompleteAndReload": "PASS",
+      "directReward": "Still shown as Calculándose; payout/reward completion not verified.",
+      "visibleAssetFinding": "The result illustration visibly failed to load. Cause not attributed; continues the existing J05 asset/optimizer scope.",
+      "recoveryTraceLimit": "UI outcome is verified. Exact identity/rotation of the historical terminal session was not captured; domain regression tests cover the controlled recovery paths."
+    },
+    "credits": {
+      "url": "https://cukieshub.eurekand.com/credits",
+      "available": 190,
+      "reserved": 0,
+      "usedInPeriod": 10,
+      "contributedToPool": 100,
+      "activeNftSlots": 3,
+      "nextPeriodPlay": 200,
+      "nextPeriodPool": 100,
+      "visibleHistory": "One preparation and one confirmed game charge at07:35UTC; no direct ledger inspection.",
+      "consistencyWithGame": "PASS"
+    },
+    "master": {
+      "url": "https://cukieshub.eurekand.com/cukie-master",
+      "activeNftSlots": 3,
+      "ukiSlots": 0,
+      "ukiStaked": 5000,
+      "creditsPerPeriod": 300,
+      "consistencyWithCredits": "PASS",
+      "actions": "Navigation only; no approval or staking transaction."
+    },
+    "legacyBreeding": {
+      "url": "https://cukieshub.eurekand.com/breeding",
+      "readNetwork": "BSC mainnet56",
+      "walletSigningNetworkChanged": false,
+      "readStatus": "Lectura Legacy BSC verificada",
+      "points": 0,
+      "maximumBreeds": 1,
+      "candidateState": "No hay candidatos con identidad y elegibilidad Legacy verificables en esta wallet.",
+      "testnetAndUnverifiedCandidatesVisible": false,
+      "refresh": "Operational; stable filtered result without wallet network change.",
+      "approveAndStartButtons": "disabled",
+      "negativeIdentityCase": "PASS",
+      "limits": [
+        "No positive eligible mainnet parent pair in this wallet.",
+        "TRON and BSC boundary contract semantics were not independently certified by this UI check.",
+        "No breeding, approval, opening or signature."
+      ]
+    },
+    "remaining": [
+      "J05 result illustration/optimizer-publicPath investigation remains open.",
+      "Direct reward calculation/settlement is not certified.",
+      "Mobile and full UX variants remain open.",
+      "Legacy writes and complete migration parity remain open."
+    ]
   }
 }
