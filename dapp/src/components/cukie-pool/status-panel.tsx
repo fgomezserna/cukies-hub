@@ -1174,10 +1174,21 @@ export function CukiePoolStatusPanel() {
 
   const custodialStatus = status?.mode === 'custodial_vault' ? status : null;
   const openPositions = custodialStatus?.positions.filter((item) => item.lifecycleOpen) ?? [];
+  const confirmedWithdrawalCount = openPositions.filter((item) => {
+    const pending = pendingByAsset[item.assetId];
+    return pending?.action === 'withdraw' && pending.phase === 'syncing_projection';
+  }).length;
+  const poolPositionCount = openPositions.length - confirmedWithdrawalCount;
   const activeCount = openPositions.filter((item) => item.status === 'active' && item.ownerRewardEligible).length;
   const activatingCount = openPositions.filter((item) => item.status === 'pending').length;
   const leavingCount = openPositions.filter((item) => item.status === 'exit_requested').length;
-  const withdrawableCount = openPositions.filter((item) => item.status === 'withdrawable').length;
+  const withdrawableCount = openPositions.filter((item) => (
+    item.status === 'withdrawable'
+    && !(
+      pendingByAsset[item.assetId]?.action === 'withdraw'
+      && pendingByAsset[item.assetId]?.phase === 'syncing_projection'
+    )
+  )).length;
   const availableOriginalCount = custodialStatus?.availableAssets.filter((item) => item.generation === 'original').length ?? 0;
   const availableSecondGenerationCount = (custodialStatus?.availableAssets.length ?? 0) - availableOriginalCount;
 
@@ -1306,7 +1317,7 @@ export function CukiePoolStatusPanel() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-                      En el pool · {openPositions.length} en total
+                      En el pool · {poolPositionCount} en total
                     </p>
                     <h3 className="mt-2 text-balance font-headline text-2xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
                       {activeCount === 0
@@ -1350,6 +1361,7 @@ export function CukiePoolStatusPanel() {
               activating={activatingCount}
               leaving={leavingCount}
               withdrawable={withdrawableCount}
+              confirmedWithdrawals={confirmedWithdrawalCount}
             />
 
             <section className="rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5">
@@ -1360,6 +1372,13 @@ export function CukiePoolStatusPanel() {
                   description="La espera ya terminó. Retíralo desde la sección de Cukies aportados."
                   href="#mis-cukies-aportados"
                   label="Ir a retirar"
+                />
+              ) : confirmedWithdrawalCount > 0 ? (
+                <NextAction
+                  title={`${confirmedWithdrawalCount === 1 ? 'Retirada confirmada' : 'Retiradas confirmadas'}, actualizando colección`}
+                  description="La transacción ya está confirmada en BSC. Estamos actualizando tu colección; no tienes que volver a firmar."
+                  href="#mis-cukies-aportados"
+                  label="Ver estado"
                 />
               ) : leavingCount > 0 ? (
                 <NextAction
@@ -1514,7 +1533,7 @@ export function CukiePoolStatusPanel() {
                   </p>
                 </div>
                 <span className="shrink-0 text-xs font-bold text-[var(--uki-muted)]">
-                  {openPositions.length} en el pool
+                  {poolPositionCount} en el pool{confirmedWithdrawalCount > 0 ? ` · ${confirmedWithdrawalCount} actualizando colección` : ''}
                 </span>
               </div>
               {openPositions.length === 0 ? (
@@ -1553,7 +1572,7 @@ export function CukiePoolStatusPanel() {
                               ? `${generationLabel(position.generation)} · ${rarityLabel(position.rarity)}`
                               : 'NFT de tu colección'}
                           </p>
-                          <PositionSchedule position={position} />
+                          {withdrawalConfirmed ? null : <PositionSchedule position={position} />}
                         </div>
                       </div>
 
@@ -1663,10 +1682,12 @@ function PoolMovements({
   activating,
   leaving,
   withdrawable,
+  confirmedWithdrawals,
 }: {
   activating: number;
   leaving: number;
   withdrawable: number;
+  confirmedWithdrawals: number;
 }) {
   const movements = [
     {
@@ -1686,6 +1707,12 @@ function PoolMovements({
       value: withdrawable,
       label: 'Listos para retirar',
       detail: 'Necesitan que los devuelvas a tu wallet.',
+    },
+    {
+      key: 'withdrawal-confirmed',
+      value: confirmedWithdrawals,
+      label: 'Retirada confirmada',
+      detail: 'Estamos actualizando tu colección; no tienes que firmar de nuevo.',
     },
   ].filter((movement) => movement.value > 0);
 

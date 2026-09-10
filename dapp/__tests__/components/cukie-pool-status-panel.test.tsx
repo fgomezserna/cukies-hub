@@ -839,8 +839,14 @@ describe('CukiePoolStatusPanel', () => {
       vaultAddress,
     })).toEqual([expect.objectContaining({ action: 'withdraw', phase: 'syncing_projection', txHash: withdrawHash })]));
     expect(button).toBeDisabled();
-    expect(screen.getByText('Retirada confirmada')).toBeInTheDocument();
+    expect(screen.getAllByText('Retirada confirmada').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/Retirada confirmada en BSC\. Estamos actualizando tu colección/i)).toBeInTheDocument();
+    expect(screen.getByText(/Retirada confirmada, actualizando colección/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver estado' })).toBeInTheDocument();
+    expect(screen.queryByText('Listo para retirar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Retirada disponible desde/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/La espera terminó\. Retira este Cukie/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ir a retirar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Retirar a mi wallet desde el Cukie Pool/i })).not.toBeInTheDocument();
   });
 
