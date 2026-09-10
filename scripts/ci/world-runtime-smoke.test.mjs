@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
@@ -107,4 +108,25 @@ test('un fallo del harness conserva el gate obligatorio', () => {
       : JSON.stringify({ 'org.opencontainers.image.revision': images.get(args[2]) }),
     execImpl: () => { throw new Error('harness failed'); },
   }), /harness failed/);
+});
+
+test('la ejecución CLI con espacios en la ruta no omite el gate', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'cukies-world-entry review-'));
+  const script = join(directory, 'world-runtime-smoke.mjs');
+  const env = { ...process.env };
+  delete env.WORLD_API_IMAGE;
+  delete env.WORLD_MATCHMAKING_IMAGE;
+  delete env.WORLD_API_SOURCE_SHA;
+  delete env.WORLD_MATCHMAKING_SOURCE_SHA;
+  delete env.WORLD_SMOKE_SKIP_PULL;
+  try {
+    await copyFile(new URL('./world-runtime-smoke.mjs', import.meta.url), script);
+    assert.throws(() => execFileSync(process.execPath, [script], { env, encoding: 'utf8', stdio: 'pipe' }), (error) => {
+      assert.equal(error.status, 1);
+      assert.match(String(error.stderr ?? ''), /World smoke exige WORLD_API_IMAGE/);
+      return true;
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

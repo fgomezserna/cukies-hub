@@ -9,6 +9,8 @@
  * then delegates all runtime checks to the synthetic local-only harness.
  */
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const entries = [
@@ -60,4 +62,17 @@ export function runWorldRuntimeSmoke({ env = process.env, dockerImpl = docker, e
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) runWorldRuntimeSmoke();
+function canonicalPath(value, { isUrl = false } = {}) {
+  try {
+    return realpathSync(isUrl ? fileURLToPath(value) : resolve(value));
+  } catch {
+    return null;
+  }
+}
+
+export function isMainModule(moduleUrl, entryPath = process.argv[1]) {
+  if (!entryPath) return false;
+  return canonicalPath(moduleUrl, { isUrl: true }) === canonicalPath(entryPath);
+}
+
+if (isMainModule(import.meta.url)) runWorldRuntimeSmoke();
