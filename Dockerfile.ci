@@ -154,8 +154,11 @@ ENV CUKIES_STANDALONE=true \
 COPY . .
 
 RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
-    --mount=type=cache,id=cukies-next-cache-dapp,target=/app/dapp/.next/cache,sharing=locked \
-    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run dapp:build
+    --mount=type=cache,id=cukies-next-cache-dapp,target=/var/cache/cukies-next-dapp,sharing=locked \
+    mkdir -p /app/dapp/.next \
+ && rm -rf /app/dapp/.next/cache \
+ && ln -s /var/cache/cukies-next-dapp /app/dapp/.next/cache \
+ && NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run dapp:build
 
 FROM deps AS treasure-hunt-build
 
@@ -183,8 +186,11 @@ ENV CUKIES_BUILD_ENV_HASH=$CUKIES_BUILD_ENV_HASH \
 COPY . .
 
 RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
-    --mount=type=cache,id=cukies-next-cache-treasure-hunt,target=/app/games/sybil-slayer/.next/cache,sharing=locked \
-    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run sybil-slayer:build
+    --mount=type=cache,id=cukies-next-cache-treasure-hunt,target=/var/cache/cukies-next-treasure-hunt,sharing=locked \
+    mkdir -p /app/games/sybil-slayer/.next \
+ && rm -rf /app/games/sybil-slayer/.next/cache \
+ && ln -s /var/cache/cukies-next-treasure-hunt /app/games/sybil-slayer/.next/cache \
+ && NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run sybil-slayer:build
 
 FROM deps AS chain-indexer-build
 
