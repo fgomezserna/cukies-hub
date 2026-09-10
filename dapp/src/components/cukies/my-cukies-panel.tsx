@@ -55,36 +55,37 @@ function recoveryTimestamp(value: string | null | undefined) {
 
 function collectionState(cukie: MyCukieCollectionItem) {
   if (cukie.custody === 'cukie_pool_recovery') {
+    const recoveryStorageDetail = 'Este depósito sigue guardado y conserva su calendario diario.';
     const requested = Boolean(recoveryTimestamp(cukie.recoveryExitRequestedAt));
     const withdrawableAt = recoveryTimestamp(cukie.recoveryWithdrawableAt);
     const nowSeconds = BigInt(Math.floor(Date.now() / 1_000));
     if (!requested && recoveryTimestamp(cukie.recoveryWithdrawableAt)) {
       return {
         label: 'Estado pendiente de confirmar',
-        detail: 'El estado de salida no se ha podido confirmar. Este NFT no está disponible en tu wallet.',
+        detail: `${recoveryStorageDetail} El estado de salida no se ha podido confirmar y el Cukie no está disponible en tu wallet.`,
       };
     }
     if (!requested) {
       return {
-        label: 'En el Pool',
-        detail: 'Puedes solicitar la retirada de este Cukie cuando quieras.',
+        label: 'Depósito en el Pool',
+        detail: `${recoveryStorageDetail} Puedes solicitar la retirada de este Cukie cuando quieras.`,
       };
     }
     if (!withdrawableAt) {
       return {
         label: 'Salida solicitada · fecha no disponible',
-        detail: 'La solicitud de salida está registrada, pero no hay una fecha verificable para retirarlo todavía.',
+        detail: `${recoveryStorageDetail} La solicitud de salida está registrada, pero no hay una fecha verificable para retirarlo todavía.`,
       };
     }
     if (withdrawableAt.seconds <= nowSeconds) {
       return {
         label: 'Retirada disponible',
-        detail: `La espera terminó. Puedes retirarlo desde ${withdrawableAt.label} UTC.`,
+        detail: `${recoveryStorageDetail} La espera terminó. Puedes retirarlo desde ${withdrawableAt.label} UTC.`,
       };
     }
     return {
       label: 'Salida solicitada',
-      detail: `La retirada estará disponible desde ${withdrawableAt.label} UTC.`,
+      detail: `${recoveryStorageDetail} Podrás retirarlo desde ${withdrawableAt.label} UTC.`,
     };
   }
   if (cukie.state === 'cukie_master') return 'En Cukie Master';
@@ -413,6 +414,9 @@ export function MyCukiesPanel() {
                   <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">
                     Red: {cukie.network ?? 'No disponible'} · Origen: {cukie.origin ?? 'No disponible'}
                   </p>
+                  {cukie.custody === 'cukie_pool_recovery' ? (
+                    <p className="mt-2 text-xs font-black text-amber-200">Depósito histórico del Pool · calendario diario</p>
+                  ) : null}
                   <p className="mt-3 text-xs font-bold text-[var(--uki-lilac)]">{stateLabel(cukie)}</p>
                   <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">{itemActionDescription(cukie)}</p>
                   <div className="mt-5 grid gap-2 sm:grid-cols-2">

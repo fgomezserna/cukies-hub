@@ -892,7 +892,7 @@ export function NftVaultRecoveryPanel({ kind }: { kind: VaultKind }) {
                 </span>
                 {chainTimeVerified && result.position.exitRequestedAt > BigInt(0) ? (
                   <span className="mt-1 block font-semibold normal-case text-[var(--uki-muted)]">
-                    Solicitud registrada el {utcTimestampLabel(result.position.exitRequestedAt)} UTC. El contrato fija la retirada en el siguiente cierre de su periodo; no requiere esperar varios periodos ni al reparto.
+                    Solicitud registrada el {utcTimestampLabel(result.position.exitRequestedAt)} UTC. Este depósito conserva su calendario diario; podrás retirarlo desde la fecha indicada.
                   </span>
                 ) : null}
               </div>
