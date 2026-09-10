@@ -7,7 +7,7 @@ Revision posterior: decisiones de producto sobre staking, Cukie Master, Cukie Po
 
 Este documento sustituye como referencia de producto a los documentos antiguos de `Funcionamiento`, `dudas` y `para comentar`. Si una issue o documento anterior contradice estas reglas, estas reglas prevalecen hasta que producto apruebe una version nueva.
 
-Las reglas de este documento describen el comportamiento objetivo aprobado. No implican por si solas que la funcionalidad ya este desplegada. El estado real y las diferencias respecto a la implementacion se mantienen en `docs/uki-new-economy-db-implementation-map.md`.
+Las reglas de este documento describen el comportamiento objetivo aprobado. No implican por si solas que la funcionalidad ya este desplegada. El estado real y las diferencias respecto a la implementacion se mantienen en `docs/antes-del-15-seguimiento.md`.
 
 ## Reconciliacion con `6. comprobar.docx`
 
@@ -31,6 +31,16 @@ estos puntos, cerrados posteriormente en la conversacion:
 - Los porcentajes, prioridad, cuotas, concurrencia, elegibilidad, gracia y
   rewards son reglas backend versionadas. Los contratos NFT solo fijan
   custodia y, para Cukie Pool, calendario y derecho de retirada.
+
+### Reloj de pruebas de staging
+
+La decision vigente del usuario del 10 de septiembre mantiene los ciclos de
+**30 minutos (1800 segundos)**. La propuesta de reducirlos a 15 minutos fue
+parada por el usuario y no debe reactivarse sin una nueva peticion.
+
+Los periodos derivados, contratos y cantidades conservan sus reglas actuales.
+Una futura transicion debe preservar periodos cerrados, creditos y rewards ya
+registrados, asi como la identidad, calendario y retirada de cada deposito.
 
 ### Guardarrail tecnico de emision
 

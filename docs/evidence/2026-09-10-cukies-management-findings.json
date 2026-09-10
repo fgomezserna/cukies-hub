@@ -9,12 +9,68 @@
       "approval": "Usuario: ahora podemos poner un 5%",
       "scope": "BSC Testnet 97. Produccion sin modificar.",
       "feeChanges": "setFeeConfig onlyOwner, max 1000 bps; cada Order conserva su feeBps al crearse.",
-      "status": "configuracion live vacia; no desplegado por esta revision"
+      "status": "contrato97 desplegado y verificado; configuracion de web/indexer/GH aun no activada"
     },
     "collectionActions": "Mis Cukies ofrece venta/cancelacion Legacy o UKI, staking Master y Pool/retiradas segun propiedad, identidad y custodia reales.",
     "recovery": "Al llegar desde una tarjeta, leer la posicion automaticamente y mostrar accion/plazo/confirmacion, sin pedir token ID ni Comprobar posicion. Nunca firmar por montar una URL.",
     "marketplaceUx": "Reducir cabecera y recuperar claridad y cobertura de filtros Legacy sin truncar etiquetas ni mezclar monedas al ordenar.",
-    "points": "Totales contractuales visibles con historial Global vacio; reconciliar procedencia y cobertura antes de interpretar ausencia como cero movimientos."
+    "points": "Totales contractuales visibles con historial Global vacio; reconciliar procedencia y cobertura antes de interpretar ausencia como cero movimientos.",
+    "cycles15": {
+      "approved": "2026-09-10",
+      "seconds": 900,
+      "previousSeconds": 1800,
+      "scope": "staging",
+      "priority": "none; current calendar retained",
+      "worktree": "/Users/fgomezserna/.codex/worktrees/6e43/cukies-hub",
+      "branch": "codex/staging-cycles-15m-20260910",
+      "status": "stopped by user on 2026-09-10; do not reactivate",
+      "currentSeconds": 1800,
+      "stoppedBy": "user confirmed task already stopped"
+    },
+    "nftCustody": {
+      "reportedAt": "2026-09-10",
+      "wallet": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "chainId": 97,
+      "collection": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+      "userReportedPoolTokens": [
+        "98000002",
+        "98000006"
+      ],
+      "masterCardsReportedAsPool": [
+        "98000001",
+        "98000003",
+        "98000004"
+      ],
+      "pendingPoolToken": "98000006",
+      "depositShownAt": "2026-09-09T12:07:00Z",
+      "participationShownAt": "2026-09-09T12:30:00Z",
+      "observedCopy": "Actualizando deposito",
+      "status": "reported; diagnosis assigned to data/game task",
+      "ownerTask": "01a0814e-0ea0-7070-877c-701f264243e7",
+      "sources": [
+        "codex-clipboard-66118fa0-823e-4359-8699-d67cea81b87b.jpg",
+        "codex-clipboard-1023f6ae-160c-4b41-990e-6e0cc6932f57.jpg"
+      ]
+    },
+    "gameRankingRewards": {
+      "reportedAt": "2026-09-10",
+      "walletConfirmed": true,
+      "wallet": "0x26789b9743d187174C3E3a87729730824a4D0C13",
+      "ranking": "user reports played games missing",
+      "uki": "user suspects earned UKI are not being allocated",
+      "score": null,
+      "finishedAt": null,
+      "status": "queued after NFT custody in the same data/game task",
+      "ownerTask": "01a0814e-0ea0-7070-877c-701f264243e7",
+      "requiredTrace": [
+        "existing positive-score completed game",
+        "identity and eligibility under the current rule",
+        "ranking and campaign/period",
+        "UKI calculation and allocation",
+        "settlement/publication/claim"
+      ],
+      "limit": "prior 0-point QA does not demonstrate positive-score ranking or reward assignment"
+    }
   },
   "marketplacePublicConfiguration": [
     {
@@ -186,7 +242,7 @@
     "Una configuracion vacia no prueba ausencia de un despliegue anterior; inventariarlo antes de desplegar.",
     "El pool ASM/UKI devuelve cotizacion con liquidez de prueba reducida; no acredita compra ASM en Marketplace ni habilita BNB/USDT/USDC.",
     "Los conteos points y tx_points Legacy difieren; no son una reconciliacion ni se deben importar o sumar sin deduplicacion y procedencia.",
-    "No se firmaron transacciones, cambiaron contratos/configuracion ni escribieron bases de datos en esta comprobacion.",
+    "La primera comprobacion fue de solo lectura. Despues se ejecutaron exclusivamente las dos transacciones BSC97 documentadas (deploy y allowlist) del marketplace; ninguna firma mainnet, compra o retirada de la wallet del usuario, ni escritura de DB/configuracion de servicios.",
     "Las correcciones de wallet y Resumen siguen en implementacion aislada; este artefacto no acredita su despliegue."
   ],
   "dashboardReview": {
@@ -199,5 +255,156 @@
       "Cabecera movil390x844 desplaza recursos al pie del viewport y repite copy del proceso interno."
     ],
     "validationReported": "lint/tipos PASS, 2suites/20tests focales; capturas locales sinteticas revisadas, sin deploy."
+  },
+  "marketplaceDeployment": {
+    "script": "deploy-uki-marketplace.testnet.cjs",
+    "network": "bscTestnet",
+    "chainId": 97,
+    "marketplace": {
+      "address": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
+      "deploymentBlock": 130192587,
+      "deploymentTransactionHash": "0x5c850912acfeef75d8dcb032466ef37386887784849fa0fa79db664604d5d1d9",
+      "runtimeCodeHash": "0x4597a98d91207ab7abdf44e52acbbebcac108c9c9d9139b203890ceb0b255731"
+    },
+    "configuration": {
+      "ukiToken": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+      "router": "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+      "wrappedNative": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+      "feeRecipient": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+      "feeBps": 500,
+      "owner": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+      "collectionAllowed": true,
+      "nativePaymentAllowed": false,
+      "paused": false,
+      "collection": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+      "requestedOwner": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+      "pendingOwner": null,
+      "paymentTokensEnabled": [],
+      "nativeRouteEnabled": false,
+      "tokenRouteEnabled": false
+    },
+    "configurationTransactions": {
+      "collectionAllowlist": {
+        "transactionHash": "0x71646ee5bb420aade8b6c91a7be229b4209bb56def66fc67cfd23abce46b0933",
+        "blockNumber": 130192592
+      },
+      "ownershipHandover": null
+    },
+    "env": {
+      "NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
+      "CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
+      "CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK": "130192587",
+      "CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_BSC_BLOCK": "130192587",
+      "CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH": "0x5c850912acfeef75d8dcb032466ef37386887784849fa0fa79db664604d5d1d9",
+      "CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH": "0x4597a98d91207ab7abdf44e52acbbebcac108c9c9d9139b203890ceb0b255731",
+      "NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS": "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+      "NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
+    },
+    "next": [
+      "Verify the exact constructor arguments and source on BscScan Testnet.",
+      "Accept two-step ownership if requestedOwner differs from deployer.",
+      "Keep BNB and USDT checkout disabled until their complete routes are verified on chain 97.",
+      "Load the emitted identity into Stage and run indexer plus signed listing/buy/cancel smoke tests."
+    ]
+  },
+  "marketplaceSourceVerification": {
+    "result": "verified on BscScan Testnet",
+    "url": "https://testnet.bscscan.com/address/0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D#code",
+    "log": "/tmp/cukies-marketplace-testnet-source-verification-20260910.log"
+  },
+  "marketplaceGate": {
+    "command": "pnpm staging:marketplace:verify-local",
+    "exitCode": 0,
+    "contractTests": 17,
+    "dappTests": 62,
+    "indexerTests": 17,
+    "dappTypecheck": "pass",
+    "indexerTypecheck": "pass",
+    "code": "2165a97"
+  },
+  "pointsRootReview": {
+    "observedAt": "2026-09-10T09:44:26.488Z",
+    "db": "cukies-legacy-staging",
+    "total": 23515,
+    "sum": 6151157,
+    "groups": [
+      {
+        "network": "TRON",
+        "type": "Mint",
+        "count": 16171,
+        "sum": 5505861
+      },
+      {
+        "network": "TRON",
+        "type": "Breeding",
+        "count": 4250,
+        "sum": -481640
+      },
+      {
+        "network": "BSC",
+        "type": "Mint",
+        "count": 1868,
+        "sum": 1279200
+      },
+      {
+        "network": "BSC",
+        "type": "Breeding",
+        "count": 1226,
+        "sum": -152264
+      }
+    ],
+    "dateType": "string",
+    "pointsType": "int",
+    "repeatedNetworkTransactionTypeKeys": 1,
+    "recordsInRepeatedKey": 2,
+    "deduplication": "not performed; transaction/type is not a proven event identity",
+    "candidate": "440168bbc69bb6ee5c7d669375392ffbf8bfca9a",
+    "integratedLocally": "485f098",
+    "rootFocalChecks": "4suites/10tests PASS after copy/error handling review",
+    "live": "not deployed"
+  },
+  "cycleCancellationVerification": {
+    "checkedAt": "2026-09-10T10:04:12.893996+00:00",
+    "containers": [
+      {
+        "name": "/rwwsc4kkwc0ck84cgk40s8kk-084231591311",
+        "startedAt": "2026-09-10T08:42:49.927616399Z",
+        "selectedConfig": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_APP_ENV": "staging",
+          "ECONOMY_CYCLE_SECONDS": "1800",
+          "NEXT_PUBLIC_ECONOMY_CYCLE_SECONDS": null,
+          "CUKIE_POOL_CYCLE_SECONDS": null,
+          "CUKIE_MASTER_CYCLE_SECONDS": null,
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97"
+        }
+      },
+      {
+        "name": "/lc04cw8gs4koo4swwws0c4ss-084313314874",
+        "startedAt": "2026-09-10T08:43:25.217161028Z",
+        "selectedConfig": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_APP_ENV": "staging",
+          "ECONOMY_CYCLE_SECONDS": null,
+          "NEXT_PUBLIC_ECONOMY_CYCLE_SECONDS": null,
+          "CUKIE_POOL_CYCLE_SECONDS": null,
+          "CUKIE_MASTER_CYCLE_SECONDS": null,
+          "NEXT_PUBLIC_UKI_CHAIN_ID": null
+        }
+      },
+      {
+        "name": "/chain-indexer-u4s804o4wwcckowgk0woo4wg-230546768063",
+        "startedAt": "2026-09-09T23:09:59.047596944Z",
+        "selectedConfig": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_APP_ENV": null,
+          "ECONOMY_CYCLE_SECONDS": "1800",
+          "NEXT_PUBLIC_ECONOMY_CYCLE_SECONDS": null,
+          "CUKIE_POOL_CYCLE_SECONDS": null,
+          "CUKIE_MASTER_CYCLE_SECONDS": null,
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97"
+        }
+      }
+    ]
   }
 }
