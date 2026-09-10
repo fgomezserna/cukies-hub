@@ -152,7 +152,7 @@ export default function TreasureHuntExperienceShell({
   return (
     <section
       data-treasure-hunt-shell
-      className="uki-landing relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#09060f] text-[var(--uki-cream)]"
+      className="uki-theme relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#09060f] text-[var(--uki-cream)]"
     >
       <header className="relative z-40 shrink-0 border-b border-[var(--uki-lilac-border)] bg-[#09060f]/95">
         <div

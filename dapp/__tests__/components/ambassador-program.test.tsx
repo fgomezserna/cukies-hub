@@ -178,7 +178,7 @@ describe('AmbassadorProgram', () => {
   it('muestra automáticamente los referidos confirmados en preventa', async () => {
     const { container } = render(<AmbassadorProgram />);
     expect(await screen.findByText('Tus invitados')).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass('[background:transparent]');
+    expect(container.firstElementChild).toHaveClass('uki-theme');
     expect(screen.getByText('0x3333…3333')).toBeInTheDocument();
     expect(screen.getByText('Vinculado automáticamente desde la preventa')).toBeInTheDocument();
     expect(screen.getByText(/Recibes el 5% de los premios elegibles/)).toBeInTheDocument();

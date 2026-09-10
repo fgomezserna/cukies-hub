@@ -1,0 +1,806 @@
+{
+  "candidateCodeCommit": "65b3c5b20d1cde499c912d029c0eaf16ca1be898",
+  "base": "56cd2e85e484149093c44385ff485a9de5a2a23b",
+  "sourceInventoryPageCount": 40,
+  "runtime": "local Next.js production build with public configuration; no wallet or database credentials",
+  "observations": [
+    {
+      "route": "/dashboard",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/credits",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukie-hodler",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukies",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/marketplace",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto flex min-h-full w-full max-w-[1480px] flex-col pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukie-master",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/premios",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/vesting",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/como-jugar",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme overflow-x-clip text-[var(--uki-cream)] min-h-full w-full",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/games",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/bridge",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/breeding",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukiepoints",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/embajadores",
+      "width": 1440,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "width": 1440,
+      "appShell": 0,
+      "landing": [
+        {
+          "image": "radial-gradient(circle at 20% 6%, rgba(124, 60, 255, 0.08), rgba(0, 0, 0, 0) 400px), radial-gradient(circle at 78% 18%, rgba(242, 195, 75, 0.13), rgba(0, 0, 0, 0) 352px), linear-gradient(rgb(11, 8, 16), rgb(4, 3, 10) 48%, rgb(7, 3, 10))"
+        }
+      ]
+    },
+    {
+      "route": "/dashboard",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/credits",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukie-hodler",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukies",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/marketplace",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto flex min-h-full w-full max-w-[1480px] flex-col pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukie-master",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/premios",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/vesting",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/como-jugar",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme overflow-x-clip text-[var(--uki-cream)] min-h-full w-full",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/games",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/bridge",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/breeding",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukiepoints",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/embajadores",
+      "width": 390,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "width": 390,
+      "appShell": 0,
+      "landing": [
+        {
+          "image": "radial-gradient(circle at 20% 6%, rgba(124, 60, 255, 0.08), rgba(0, 0, 0, 0) 400px), radial-gradient(circle at 78% 18%, rgba(242, 195, 75, 0.13), rgba(0, 0, 0, 0) 352px), linear-gradient(rgb(11, 8, 16), rgb(4, 3, 10) 48%, rgb(7, 3, 10))"
+        }
+      ]
+    },
+    {
+      "route": "/dashboard",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/credits",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukie-hodler",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukies",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/marketplace",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto flex min-h-full w-full max-w-[1480px] flex-col pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukie-master",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/premios",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/vesting",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/como-jugar",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme overflow-x-clip text-[var(--uki-cream)] min-h-full w-full",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/games",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/bridge",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/breeding",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/cukiepoints",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/embajadores",
+      "width": 320,
+      "mainCount": 1,
+      "bodyOverflow": false,
+      "mainOverflow": false,
+      "landingCount": 0,
+      "roots": [
+        {
+          "tag": "DIV",
+          "class": "uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]",
+          "color": "rgba(0, 0, 0, 0)",
+          "image": "none",
+          "font": "\"Space Grotesk\", \"Space Grotesk Fallback\", Inter, \"Inter Fallback\", sans-serif"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "width": 320,
+      "appShell": 0,
+      "landing": [
+        {
+          "image": "radial-gradient(circle at 20% 6%, rgba(124, 60, 255, 0.08), rgba(0, 0, 0, 0) 400px), radial-gradient(circle at 78% 18%, rgba(242, 195, 75, 0.13), rgba(0, 0, 0, 0) 352px), linear-gradient(rgb(11, 8, 16), rgb(4, 3, 10) 48%, rgb(7, 3, 10))"
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "check": "tests",
+      "command": [
+        "pnpm",
+        "dapp",
+        "test",
+        "--runInBand"
+      ],
+      "exitCode": 0,
+      "seconds": 63.34,
+      "log": "/tmp/cukies-content-backgrounds-gates-20260910-tests.log"
+    },
+    {
+      "check": "lint",
+      "command": [
+        "pnpm",
+        "dapp",
+        "lint"
+      ],
+      "exitCode": 0,
+      "seconds": 7.54,
+      "log": "/tmp/cukies-content-backgrounds-gates-20260910-lint.log"
+    },
+    {
+      "check": "typecheck",
+      "command": [
+        "pnpm",
+        "dapp",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 23.07,
+      "log": "/tmp/cukies-content-backgrounds-gates-20260910-typecheck.log"
+    },
+    {
+      "check": "build",
+      "command": [
+        "pnpm",
+        "dapp",
+        "build"
+      ],
+      "exitCode": 0,
+      "seconds": 63.65,
+      "log": "/tmp/cukies-content-backgrounds-gates-20260910-build.log"
+    }
+  ],
+  "deliveryPlan": {
+    "build": [
+      "dapp"
+    ],
+    "reuseCount": 7
+  },
+  "signedTransactions": false
+}

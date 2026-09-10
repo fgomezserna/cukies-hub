@@ -166,7 +166,7 @@ export default async function IndexerPage({ searchParams }: PageProps) {
     const data = await getViewerData(collection, q, limit);
 
     return (
-      <main className="min-h-screen overflow-y-auto bg-background px-5 py-6 text-foreground md:px-8">
+      <div className="min-h-full overflow-y-auto px-5 py-6 text-foreground md:px-8">
         <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
@@ -278,13 +278,13 @@ export default async function IndexerPage({ searchParams }: PageProps) {
             </CardContent>
           </Card>
         </section>
-      </main>
+      </div>
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
     return (
-      <main className="min-h-screen bg-background px-5 py-6 text-foreground md:px-8">
+      <div className="min-h-full px-5 py-6 text-foreground md:px-8">
         <section className="mx-auto max-w-3xl rounded-[8px] border border-red-300/30 bg-red-950/20 p-6">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-1 h-5 w-5 text-red-200" />
@@ -294,7 +294,7 @@ export default async function IndexerPage({ searchParams }: PageProps) {
             </div>
           </div>
         </section>
-      </main>
+      </div>
     );
   }
 }

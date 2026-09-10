@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function MyCukiesPage() {
   return (
-    <div className="uki-landing mx-auto min-h-full w-full max-w-[1480px] bg-transparent text-[var(--uki-cream)]">
+    <div className="uki-theme mx-auto min-h-full w-full max-w-[1480px] text-[var(--uki-cream)]">
       <MyCukiesPanel />
     </div>
   );

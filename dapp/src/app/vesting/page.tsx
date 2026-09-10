@@ -173,7 +173,7 @@ export default function PublicVestingPage() {
   }
 
   return (
-    <div className="uki-landing min-h-full w-full overflow-hidden bg-transparent text-[var(--uki-cream)]">
+    <div className="uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]">
       <section className="relative z-[2] w-full pb-6">
         <div className="relative overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/20 bg-[#070817]/90 p-5 shadow-[0_0_52px_rgba(228,92,255,0.12)] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(228,92,255,0.20),transparent_24rem)]" aria-hidden="true" />
