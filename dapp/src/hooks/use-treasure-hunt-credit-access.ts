@@ -147,7 +147,7 @@ export function useTreasureHuntCreditAccess() {
   const costCredits = cost?.credits ?? null;
   const ownAvailableCredits = statusUnavailable ? null : query.data?.balance.availableCredits ?? null;
   const poolAvailableCredits = statusUnavailable ? null : query.data?.pool.availableCredits ?? null;
-  const creditSource = nextTreasureHuntCreditSource({
+  const candidateCreditSource = nextTreasureHuntCreditSource({
     costCredits,
     ownAvailableCredits,
     poolAvailableCredits,
@@ -164,9 +164,12 @@ export function useTreasureHuntCreditAccess() {
     queryHasError
     || materializationUnavailable
     || (!statusUnavailable && query.data?.balance.blocked)
-    || (!statusUnavailable && creditSource === 'pool' && query.data?.pool.blocked)
+    || (!statusUnavailable && candidateCreditSource === 'pool' && query.data?.pool.blocked)
     || currentRunBlocked
   );
+  // Keep raw balances available for diagnostics, but never expose a source as
+  // selected while an account/run/pool incident blocks the access decision.
+  const creditSource = blocked ? null : candidateCreditSource;
   const ready = Boolean(!statusUnavailable && query.data && costCredits !== null);
   const bestAvailableSource = Math.max(ownAvailableCredits ?? 0, poolAvailableCredits ?? 0);
   const availabilityReason = materializationUnavailable

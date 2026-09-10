@@ -15,7 +15,14 @@ jest.mock('@/providers/auth-provider', () => ({
   useAuth: () => mockAuthState,
 }));
 
-function statusResponse(materialization = { balance: 'ready', pool: 'ready' }) {
+function statusResponse(
+  materialization = { balance: 'ready', pool: 'ready' },
+  overrides: Partial<{
+    balanceBlocked: boolean;
+    balanceAvailableCredits: number;
+    poolAvailableCredits: number;
+  }> = {},
+) {
   return new Response(JSON.stringify({
     data: {
       rule: {
@@ -24,13 +31,13 @@ function statusResponse(materialization = { balance: 'ready', pool: 'ready' }) {
       },
       balance: {
         poolDepositedCredits: 0,
-        availableCredits: 0,
+        availableCredits: overrides.balanceAvailableCredits ?? 0,
         reservedCredits: 0,
         spentCredits: 0,
-        blocked: false,
+        blocked: overrides.balanceBlocked ?? false,
       },
       pool: {
-        availableCredits: 50,
+        availableCredits: overrides.poolAvailableCredits ?? 50,
         reservedCredits: 0,
         blocked: false,
       },
@@ -120,5 +127,31 @@ describe('useTreasureHuntCreditAccess', () => {
     expect(result.current.canPlay).toBe(false);
     expect(result.current.ownAvailableCredits).toBeNull();
     expect(result.current.poolAvailableCredits).toBeNull();
+  });
+
+  it('no selecciona una fuente ni habilita CTA con balance bloqueado aunque el pool cubra el coste', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      statusResponse(
+        { balance: 'ready', pool: 'ready' },
+        { balanceBlocked: true, balanceAvailableCredits: 0, poolAvailableCredits: 50 },
+      ),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+      },
+    });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useTreasureHuntCreditAccess(), { wrapper });
+
+    await waitFor(() => expect(result.current.blocked).toBe(true));
+    expect(result.current.ownAvailableCredits).toBe(0);
+    expect(result.current.poolAvailableCredits).toBe(50);
+    expect(result.current.creditSource).toBeNull();
+    expect(result.current.canPlay).toBe(false);
+    expect(result.current.isError).toBe(false);
   });
 });
