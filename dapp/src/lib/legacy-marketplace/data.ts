@@ -1137,10 +1137,7 @@ export async function listLegacyCukiePoints(
       offset,
       limit,
       summary: emptySummary,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Legacy CukiePoints unavailable',
+      error: 'No se pudo cargar el historial de Cukie Points.',
     };
   }
 }

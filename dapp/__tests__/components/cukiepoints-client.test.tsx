@@ -119,7 +119,7 @@ describe('CukiePointsClient', () => {
     render(<CukiePointsClient />);
 
     expect(await screen.findByText(
-      'Historial Legacy parcial: esta consulta usa movimientos históricos disponibles y no representa una proyección actual completa.',
+      'Mostramos el historial disponible de Legacy. Algunos movimientos pueden faltar mientras completamos la migración.',
     )).toBeInTheDocument();
     expect(screen.getAllByText('Mint').length).toBeGreaterThan(0);
   });

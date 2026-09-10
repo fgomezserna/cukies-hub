@@ -126,7 +126,7 @@ describe('historial Legacy de Cukie Points', () => {
     await listLegacyCukiePoints({ type: 'ALL' });
     expect(collection.find.mock.calls[0][0]).toEqual({});
 
-    pointsCollection.mockRejectedValueOnce(new Error('legacy unavailable'));
+    pointsCollection.mockRejectedValueOnce(new Error('INTERNAL_DB_CONNECTION_DETAILS'));
     const unavailable = await listLegacyCukiePoints({});
     expect(unavailable).toMatchObject({
       source: 'empty',
@@ -135,6 +135,7 @@ describe('historial Legacy de Cukie Points', () => {
       total: 0,
       summary: { totalPoints: 0, totalTransactions: 0 },
     });
-    expect(unavailable.error).toBe('legacy unavailable');
+    expect(unavailable.error).toBe('No se pudo cargar el historial de Cukie Points.');
+    expect(JSON.stringify(unavailable)).not.toContain('INTERNAL_DB_CONNECTION_DETAILS');
   });
 });

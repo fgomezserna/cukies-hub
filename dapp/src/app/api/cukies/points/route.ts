@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   ].filter((wallet) => wallet.trim().length > 0);
 
   // The current indexer point_transactions collection is not populated for
-  // Legacy history. Use the reconciled historical `points` source explicitly;
+  // Legacy history. Use the inspected historical `points` source explicitly;
   // the adapter marks its coverage as partial instead of presenting it as a
   // current cross-source projection.
   const response = await listLegacyCukiePoints({

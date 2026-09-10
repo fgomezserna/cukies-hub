@@ -636,8 +636,8 @@ export function CukiePointsClient() {
             role="status"
             className="mx-4 mt-4 rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100"
           >
-            Historial Legacy parcial: esta consulta usa movimientos históricos
-            disponibles y no representa una proyección actual completa.
+            Mostramos el historial disponible de Legacy. Algunos movimientos
+            pueden faltar mientras completamos la migración.
           </div>
         )}
 
