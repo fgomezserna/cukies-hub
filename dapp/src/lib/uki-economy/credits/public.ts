@@ -293,15 +293,35 @@ export async function getCompetitionCreditWalletStatus(
     };
   }));
 
-  const emptyBalance = {
-    grantedCredits: 0,
-    poolDepositedCredits: 0,
+  type PublicBalance = {
+    grantedCredits: number | null;
+    poolDepositedCredits: number | null;
+    availableCredits: number;
+    reservedCredits: number | null;
+    spentCredits: number | null;
+    expiredCredits: number | null;
+    blocked: boolean;
+  };
+  type PublicPoolBalance = {
+    availableCredits: number;
+    reservedCredits: number | null;
+    blocked: boolean;
+  };
+  const emptyBalance: PublicBalance = {
+    grantedCredits: null,
+    poolDepositedCredits: null,
     availableCredits: 0,
-    reservedCredits: 0,
-    spentCredits: 0,
-    expiredCredits: 0,
+    reservedCredits: null,
+    spentCredits: null,
+    expiredCredits: null,
     blocked: false,
   };
+  const accountProjectionComplete = routes.every((route) => (
+    accounts.some((candidate) => candidate.route === route)
+  ));
+  const poolProjectionComplete = routes.every((route) => (
+    pools.some((candidate) => candidate.route === route)
+  ));
   const routeStatus = Object.fromEntries(routes.map((route) => {
     const account = accounts.find((candidate) => candidate.route === route);
     const pool = pools.find((candidate) => candidate.route === route);
@@ -319,12 +339,19 @@ export async function getCompetitionCreditWalletStatus(
         spentCredits: exactCredits(account.spentCredits, `${route}.spentCredits`),
         expiredCredits: exactCredits(account.expiredCredits, `${route}.expiredCredits`),
         blocked: account.blocked === true,
-      } : { ...emptyBalance },
+      } : {
+        ...emptyBalance,
+        availableCredits: usableOwnCredits[route],
+      },
       pool: pool ? {
         availableCredits: usablePoolCredits[route],
         reservedCredits: exactCredits(pool.reservedCredits, `${route}.pool.reservedCredits`),
         blocked: pool.blocked === true,
-      } : { availableCredits: 0, reservedCredits: 0, blocked: false },
+      } : {
+        availableCredits: usablePoolCredits[route],
+        reservedCredits: null,
+        blocked: false,
+      },
       grants: {
         healthy: watermark?.status === 'healthy'
           && sourceWatermarkIsFresh(observedThrough ?? undefined, now, rule.sourceFreshnessMs)
@@ -335,27 +362,39 @@ export async function getCompetitionCreditWalletStatus(
       },
     }];
   })) as Record<CreditRoute, {
-    balance: typeof emptyBalance;
-    pool: { availableCredits: number; reservedCredits: number; blocked: boolean };
+    balance: PublicBalance;
+    pool: PublicPoolBalance;
     grants: { healthy: boolean; sourceObservedThrough: Date | null; openIncidents: number };
   }>;
   const knownOpenIncidents = routeIncidentCounts.reduce((total, item) => total + item.count, 0);
   const openIncidents = knownOpenIncidents + unknownRouteIncidentCount;
   const globallyBlocked = openIncidents > 0 || blockedAccountCount > 0;
-  const balance = routes.reduce((total, route) => ({
-    grantedCredits: total.grantedCredits + routeStatus[route].balance.grantedCredits,
-    poolDepositedCredits: total.poolDepositedCredits + routeStatus[route].balance.poolDepositedCredits,
-    availableCredits: total.availableCredits + routeStatus[route].balance.availableCredits,
-    reservedCredits: total.reservedCredits + routeStatus[route].balance.reservedCredits,
-    spentCredits: total.spentCredits + routeStatus[route].balance.spentCredits,
-    expiredCredits: total.expiredCredits + routeStatus[route].balance.expiredCredits,
-    blocked: total.blocked || routeStatus[route].balance.blocked || globallyBlocked,
-  }), { ...emptyBalance });
-  const poolBalance = routes.reduce((total, route) => ({
-    availableCredits: total.availableCredits + routeStatus[route].pool.availableCredits,
-    reservedCredits: total.reservedCredits + routeStatus[route].pool.reservedCredits,
-    blocked: total.blocked || routeStatus[route].pool.blocked,
-  }), { availableCredits: 0, reservedCredits: 0, blocked: false });
+  const balance: PublicBalance = {
+    grantedCredits: accountProjectionComplete
+      ? routes.reduce((total, route) => total + (routeStatus[route].balance.grantedCredits ?? 0), 0)
+      : null,
+    poolDepositedCredits: accountProjectionComplete
+      ? routes.reduce((total, route) => total + (routeStatus[route].balance.poolDepositedCredits ?? 0), 0)
+      : null,
+    availableCredits: routes.reduce((total, route) => total + routeStatus[route].balance.availableCredits, 0),
+    reservedCredits: accountProjectionComplete
+      ? routes.reduce((total, route) => total + (routeStatus[route].balance.reservedCredits ?? 0), 0)
+      : null,
+    spentCredits: accountProjectionComplete
+      ? routes.reduce((total, route) => total + (routeStatus[route].balance.spentCredits ?? 0), 0)
+      : null,
+    expiredCredits: accountProjectionComplete
+      ? routes.reduce((total, route) => total + (routeStatus[route].balance.expiredCredits ?? 0), 0)
+      : null,
+    blocked: routes.some((route) => routeStatus[route].balance.blocked) || globallyBlocked,
+  };
+  const poolBalance: PublicPoolBalance = {
+    availableCredits: routes.reduce((total, route) => total + routeStatus[route].pool.availableCredits, 0),
+    reservedCredits: poolProjectionComplete
+      ? routes.reduce((total, route) => total + (routeStatus[route].pool.reservedCredits ?? 0), 0)
+      : null,
+    blocked: routes.some((route) => routeStatus[route].pool.blocked),
+  };
   const observed = routes
     .map((route) => routeStatus[route].grants.sourceObservedThrough)
     .filter((value): value is Date => value instanceof Date);

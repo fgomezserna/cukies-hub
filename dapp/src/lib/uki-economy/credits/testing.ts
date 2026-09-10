@@ -12,6 +12,7 @@ import {
   safeCompetitionCreditPeriodScopeId,
   safeCompetitionCreditSettlementPeriodScopeId,
   stableCreditHash,
+  sumExactCredits,
 } from "./rules";
 import {
   isBlockingCreditIncident,
@@ -544,23 +545,48 @@ export class MemoryCompetitionCreditRepository
     const id = accountId(walletNormalized, periodId, route);
     let account = this.state.accounts.find((item) => item._id === id);
     if (!account) {
+      const lots = this.state.ownLots.filter(
+        (lot) =>
+          lot.walletNormalized === walletNormalized &&
+          lot.periodId === periodId &&
+          lot.route === route,
+      );
+      const materialization = {
+        grantedCredits: sumExactCredits(lots.map((lot) => lot.totalCredits)),
+        poolDepositedCredits: sumExactCredits(
+          lots.map((lot) => lot.poolDepositedCredits),
+        ),
+        availableCredits: sumExactCredits(
+          lots.map((lot) => lot.availableCredits),
+        ),
+        reservedCredits: sumExactCredits(
+          lots.map((lot) => lot.reservedCredits),
+        ),
+        spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
+        expiredCredits: sumExactCredits(
+          lots.map((lot) => lot.expiredCredits),
+        ),
+        blocked: lots.some((lot) => lot.blocked === true),
+      };
+      if (materialization.blocked) {
+        throw new DomainConflictError(
+          `La cuenta de creditos ${id} tiene lotes bloqueados.`,
+        );
+      }
       account = {
         _id: id,
         walletNormalized,
         periodId,
         route,
-        grantedCredits: 0,
-        poolDepositedCredits: 0,
-        availableCredits: 0,
-        reservedCredits: 0,
-        spentCredits: 0,
-        expiredCredits: 0,
-        blocked: false,
+        ...materialization,
         revision: 0,
         createdAt: clone(now),
         updatedAt: clone(now),
       };
       this.state.accounts.push(account);
+      // The authoritative lot state already includes the delta that caused
+      // this projection to be materialized.
+      return;
     }
     for (const [key, value] of Object.entries(increments)) {
       (account as unknown as Record<string, number>)[key] += value ?? 0;
@@ -587,21 +613,43 @@ export class MemoryCompetitionCreditRepository
     const id = poolPeriodId(periodId, route);
     let pool = this.state.poolPeriods.find((item) => item._id === id);
     if (!pool) {
+      const lots = this.state.poolLots.filter(
+        (lot) => lot.periodId === periodId && lot.route === route,
+      );
+      const materialization = {
+        contributedCredits: sumExactCredits(
+          lots.map((lot) => lot.totalCredits),
+        ),
+        availableCredits: sumExactCredits(
+          lots.map((lot) => lot.availableCredits),
+        ),
+        reservedCredits: sumExactCredits(
+          lots.map((lot) => lot.reservedCredits),
+        ),
+        spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
+        expiredCredits: sumExactCredits(
+          lots.map((lot) => lot.expiredCredits),
+        ),
+        blocked: lots.some((lot) => lot.blocked === true),
+      };
+      if (materialization.blocked) {
+        throw new DomainConflictError(
+          `El periodo de pool ${id} tiene lotes bloqueados.`,
+        );
+      }
       pool = {
         _id: id,
         periodId,
         route,
-        contributedCredits: 0,
-        availableCredits: 0,
-        reservedCredits: 0,
-        spentCredits: 0,
-        expiredCredits: 0,
-        blocked: false,
+        ...materialization,
         revision: 0,
         createdAt: clone(now),
         updatedAt: clone(now),
       };
       this.state.poolPeriods.push(pool);
+      // The authoritative lot state already includes the delta that caused
+      // this projection to be materialized.
+      return;
     }
     for (const [key, value] of Object.entries(increments)) {
       (pool as unknown as Record<string, number>)[key] += value ?? 0;
@@ -950,7 +998,7 @@ export class MemoryCompetitionCreditRepository
       this.state.runs
         .filter(
           (run) =>
-            run.status === "open" &&
+            (run.status === "open" || run.status === "open_with_holds") &&
             run.settlementPeriod.periodId === periodId &&
             run.settlementPeriod.cutoff.getTime() <= now.getTime() &&
             run.settlementPeriod.nextCutoff.getTime() > now.getTime()

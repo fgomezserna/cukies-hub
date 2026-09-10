@@ -125,6 +125,31 @@ describe('TreasureHuntCompetitionBanner', () => {
     );
   });
 
+  it('no anuncia créditos cuando la comprobación pública falla', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      isError: true,
+      ready: false,
+      costCredits: null,
+      availableCredits: null,
+      ownAvailableCredits: null,
+      poolAvailableCredits: null,
+      poolContributedCredits: null,
+      reservedCredits: null,
+      poolReservedCredits: null,
+      creditSource: null,
+      canPlay: false,
+    });
+    render(<TreasureHuntCompetitionBanner />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'No hemos podido comprobar el saldo',
+    );
+    expect(screen.getAllByText('No verificado')).toHaveLength(3);
+    expect(screen.queryByText('10 créditos')).not.toBeInTheDocument();
+    expect(screen.queryByText('480 personales')).not.toBeInTheDocument();
+  });
+
   it('separa intentos disponibles de resultados que cuentan y enlaza a reglas y rankings', () => {
     render(<TreasureHuntCompetitionBanner />);
 

@@ -65,9 +65,14 @@ async function loadCredits(
   now: Date,
 ): Promise<DashboardLoaderResult<DashboardModulePayloads['credits']>> {
   const status = await getCompetitionCreditWalletStatus(walletAddress, now);
+  const projectionsComplete = status.balance.reservedCredits !== null
+    && status.balance.spentCredits !== null
+    && status.balance.poolDepositedCredits !== null
+    && status.pool.reservedCredits !== null;
   const healthy = status.grants.healthy
     && !status.balance.blocked
-    && !status.pool.blocked;
+    && !status.pool.blocked
+    && projectionsComplete;
   return {
     data: {
       availableCredits: status.balance.availableCredits,
@@ -83,6 +88,7 @@ async function loadCredits(
       ...(status.grants.healthy ? [] : ['CREDIT_GRANTS_NOT_FRESH']),
       ...(status.balance.blocked ? ['CREDIT_BALANCE_BLOCKED'] : []),
       ...(status.pool.blocked ? ['CREDIT_POOL_BLOCKED'] : []),
+      ...(projectionsComplete ? [] : ['CREDIT_BALANCE_PROJECTION_INCOMPLETE']),
     ],
   };
 }

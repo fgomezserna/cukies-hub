@@ -18,15 +18,15 @@ type CreditStatus = {
     costs: CreditCost[];
   };
   balance: {
-    poolDepositedCredits: number;
+    poolDepositedCredits: number | null;
     availableCredits: number;
-    reservedCredits: number;
-    spentCredits: number;
+    reservedCredits: number | null;
+    spentCredits: number | null;
     blocked: boolean;
   };
   pool: {
     availableCredits: number;
-    reservedCredits: number;
+    reservedCredits: number | null;
     blocked: boolean;
   };
   currentRun?: {
@@ -52,6 +52,10 @@ export function nextTreasureHuntCreditSource(input: {
 function isCreditStatus(value: unknown): value is CreditStatus {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const candidate = value as Partial<CreditStatus>;
+  const nullableNonNegativeInteger = (number: unknown) => (
+    number === null
+    || (typeof number === 'number' && Number.isSafeInteger(number) && number >= 0)
+  );
   return Boolean(
     candidate.rule
     && typeof candidate.rule.version === 'string'
@@ -64,20 +68,16 @@ function isCreditStatus(value: unknown): value is CreditStatus {
       && typeof cost.active === 'boolean'
     ))
     && candidate.balance
-    && Number.isSafeInteger(candidate.balance.poolDepositedCredits)
-    && candidate.balance.poolDepositedCredits >= 0
+    && nullableNonNegativeInteger(candidate.balance.poolDepositedCredits)
     && Number.isSafeInteger(candidate.balance.availableCredits)
     && candidate.balance.availableCredits >= 0
-    && Number.isSafeInteger(candidate.balance.reservedCredits)
-    && candidate.balance.reservedCredits >= 0
-    && Number.isSafeInteger(candidate.balance.spentCredits)
-    && candidate.balance.spentCredits >= 0
+    && nullableNonNegativeInteger(candidate.balance.reservedCredits)
+    && nullableNonNegativeInteger(candidate.balance.spentCredits)
     && typeof candidate.balance.blocked === 'boolean'
     && candidate.pool
     && Number.isSafeInteger(candidate.pool.availableCredits)
     && candidate.pool.availableCredits >= 0
-    && Number.isSafeInteger(candidate.pool.reservedCredits)
-    && candidate.pool.reservedCredits >= 0
+    && nullableNonNegativeInteger(candidate.pool.reservedCredits)
     && typeof candidate.pool.blocked === 'boolean'
     && (!candidate.currentRun || (
       Array.isArray(candidate.currentRun.routes)
@@ -115,29 +115,34 @@ export function useTreasureHuntCreditAccess() {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
-  const cost = query.data?.rule.costs.find((candidate) => (
+  const queryHasError = Boolean(walletAddress)
+    && (query.isError || query.isRefetchError || Boolean(query.error));
+  const cost = queryHasError ? undefined : query.data?.rule.costs.find((candidate) => (
     candidate.active && candidate.costCode === TREASURE_HUNT_START_COST_CODE
   ));
   const costCredits = cost?.credits ?? null;
-  const ownAvailableCredits = query.data?.balance.availableCredits ?? null;
-  const poolAvailableCredits = query.data?.pool.availableCredits ?? null;
+  const ownAvailableCredits = queryHasError ? null : query.data?.balance.availableCredits ?? null;
+  const poolAvailableCredits = queryHasError ? null : query.data?.pool.availableCredits ?? null;
   const creditSource = nextTreasureHuntCreditSource({
     costCredits,
     ownAvailableCredits,
     poolAvailableCredits,
   });
-  const currentRunStatuses = query.data?.currentRun?.routes.map((run) => run.status) ?? [];
+  const currentRunStatuses = queryHasError
+    ? []
+    : query.data?.currentRun?.routes.map((run) => run.status) ?? [];
   const currentRunBlocked = currentRunStatuses.length > 0
     && currentRunStatuses.every((status) => status === 'blocked');
   const currentRunPending = currentRunStatuses.some((status) => (
     status === 'missing' || status === 'snapshotted' || status === 'processing'
   ));
   const blocked = Boolean(
-    query.data?.balance.blocked
-    || (creditSource === 'pool' && query.data?.pool.blocked)
+    queryHasError
+    || (!queryHasError && query.data?.balance.blocked)
+    || (!queryHasError && creditSource === 'pool' && query.data?.pool.blocked)
     || currentRunBlocked
   );
-  const ready = Boolean(query.data && costCredits !== null);
+  const ready = Boolean(!queryHasError && query.data && costCredits !== null);
   const bestAvailableSource = Math.max(ownAvailableCredits ?? 0, poolAvailableCredits ?? 0);
   const availabilityReason = ready && !blocked && !creditSource
     ? currentRunPending ? 'run_pending' as const : 'insufficient' as const
@@ -154,14 +159,15 @@ export function useTreasureHuntCreditAccess() {
     availableCredits: ownAvailableCredits,
     ownAvailableCredits,
     poolAvailableCredits,
-    poolContributedCredits: query.data?.balance.poolDepositedCredits ?? null,
-    spentCredits: query.data?.balance.spentCredits ?? null,
+    poolContributedCredits: queryHasError ? null : query.data?.balance.poolDepositedCredits ?? null,
+    spentCredits: queryHasError ? null : query.data?.balance.spentCredits ?? null,
     creditSource,
     availabilityReason,
-    reservedCredits: query.data?.balance.reservedCredits ?? null,
-    poolReservedCredits: query.data?.pool.reservedCredits ?? null,
+    reservedCredits: queryHasError ? null : query.data?.balance.reservedCredits ?? null,
+    poolReservedCredits: queryHasError ? null : query.data?.pool.reservedCredits ?? null,
     canPlay: Boolean(
-      ready
+      !queryHasError
+      && ready
       && !blocked
       && creditSource
     ),

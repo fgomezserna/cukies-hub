@@ -39,21 +39,32 @@ function CreditMetric({
 
 export function TreasureHuntCreditModeBanner() {
   const access = useTreasureHuntCreditAccess();
+  const creditUnavailable = access.isError;
   const waitingForRun = access.availabilityReason === 'run_pending';
-  const costLabel = access.costCredits === null ? '—' : `${access.costCredits} créditos`;
+  const costLabel = creditUnavailable
+    ? 'No verificado'
+    : access.costCredits === null
+      ? '—'
+      : `${access.costCredits} créditos`;
   const balanceLabel = !access.walletConnected
     ? 'Conecta tu wallet'
+    : creditUnavailable
+      ? 'No verificado'
     : access.ownAvailableCredits === null
       ? '—'
       : `${access.ownAvailableCredits} personales`;
-  const sourceLabel = access.creditSource === 'own'
+  const sourceLabel = creditUnavailable
+    ? 'No verificado'
+    : access.creditSource === 'own'
     ? 'Personal'
     : access.creditSource === 'pool'
       ? 'Pool · con ranking'
       : waitingForRun
         ? 'Reparto pendiente'
         : 'Sin saldo suficiente';
-  const sourceDetail = access.creditSource === 'own'
+  const sourceDetail = creditUnavailable
+    ? 'No se ha confirmado el saldo'
+    : access.creditSource === 'own'
     ? 'Premio directo · no clasifica'
     : access.creditSource === 'pool'
       ? 'Sí entra en la semana'
@@ -62,6 +73,8 @@ export function TreasureHuntCreditModeBanner() {
         : 'No se iniciará la partida';
   const nextGameCopy = !access.walletConnected
     ? 'Conecta tu wallet para ver qué créditos se usarán y si la partida entrará en el ranking.'
+    : creditUnavailable
+      ? 'No hemos podido comprobar el saldo. No se iniciará ni cobrará ninguna partida mientras siga sin estar disponible.'
     : access.isLoading
       ? 'Estamos comprobando qué saldo se utilizará en tu próxima partida.'
       : access.creditSource === 'pool'
@@ -71,9 +84,13 @@ export function TreasureHuntCreditModeBanner() {
           : waitingForRun
             ? 'El reparto de créditos del periodo aún no está abierto. No se iniciará ni cobrará ninguna partida hasta confirmarlo.'
             : 'No hay una fuente con saldo suficiente para crear la partida.';
-  const contributedDetail = access.poolContributedCredits
-    ? `${access.poolContributedCredits} aportados al pool este periodo`
-    : 'Nada aportado al pool este periodo';
+  const contributedDetail = creditUnavailable
+    ? 'No se ha podido verificar el reparto'
+    : access.poolContributedCredits === null
+      ? 'Reparto no disponible'
+      : access.poolContributedCredits > 0
+        ? `${access.poolContributedCredits} aportados al pool este periodo`
+        : 'Nada aportado al pool este periodo';
 
   return (
     <section
@@ -165,12 +182,13 @@ export function TreasureHuntCreditModeSidebar({
   readonly onStartSinglePlayer: () => void;
 }) {
   const access = useTreasureHuntCreditAccess();
+  const creditUnavailable = access.isError;
   const waitingForRun = access.availabilityReason === 'run_pending';
   const connectedUnavailable = access.walletConnected && (
     access.isLoading || access.isError || access.blocked || !access.ready
   );
   const disabled = connectedUnavailable || (access.walletConnected && !access.canPlay);
-  const isPoolGame = access.creditSource === 'pool';
+  const isPoolGame = !creditUnavailable && access.creditSource === 'pool';
   const modeLabel = isPoolGame
     ? 'Competición semanal'
     : access.creditSource === 'own'
@@ -191,6 +209,8 @@ export function TreasureHuntCreditModeSidebar({
             : `Te faltan ${access.missingCredits} créditos`;
   const introCopy = !access.walletConnected
     ? 'Conecta tu wallet para comprobar el coste, el saldo y si la partida entra en el ranking.'
+    : creditUnavailable
+      ? 'No hemos podido comprobar tus créditos. No se iniciará ni cobrará ninguna partida hasta confirmar el saldo.'
     : access.isLoading
       ? 'Estamos comprobando qué créditos se utilizarán en tu próxima partida.'
       : isPoolGame
@@ -227,20 +247,36 @@ export function TreasureHuntCreditModeSidebar({
           label="Tus créditos personales"
           value={!access.walletConnected
             ? 'Conecta tu wallet'
+            : creditUnavailable
+              ? 'No verificado'
             : access.ownAvailableCredits === null
               ? 'No disponible'
               : `${access.ownAvailableCredits} créditos`}
-          detail={access.poolContributedCredits
-            ? `${access.poolContributedCredits} aportados al pool este periodo`
-            : access.reservedCredits
-              ? `${access.reservedCredits} reservados en partidas abiertas`
-              : 'Saldo libre en este momento'}
+          detail={creditUnavailable
+            ? 'No se ha podido verificar el saldo ni el reparto'
+            : access.poolContributedCredits === null
+              ? access.reservedCredits === null
+                ? 'Reparto no disponible'
+                : access.reservedCredits > 0
+                  ? `${access.reservedCredits} reservados en partidas abiertas`
+                  : 'Reparto no disponible'
+              : access.poolContributedCredits > 0
+                ? `${access.poolContributedCredits} aportados al pool este periodo`
+                : access.reservedCredits
+                  ? `${access.reservedCredits} reservados en partidas abiertas`
+                  : 'Saldo libre en este momento'}
         />
         <SidebarRow
           icon={<Trophy className="h-4 w-4" weight="fill" aria-hidden="true" />}
           label="Ranking de esta partida"
-          value={isPoolGame ? 'Sí, esta partida cuenta' : 'No entra en la clasificación'}
-          detail={isPoolGame
+          value={creditUnavailable
+            ? 'Pendiente de comprobar'
+            : isPoolGame
+              ? 'Sí, esta partida cuenta'
+              : 'No entra en la clasificación'}
+          detail={creditUnavailable
+            ? 'No se ha confirmado la fuente de créditos'
+            : isPoolGame
             ? `${access.poolAvailableCredits ?? 0} créditos disponibles en el pool compartido`
             : 'El sistema utiliza primero tus créditos personales'}
         />

@@ -51,13 +51,13 @@ type CreditStatus = {
   period: { cutoff: string; nextCutoff: string };
   balance: {
     availableCredits: number;
-    reservedCredits: number;
-    spentCredits: number;
-    poolDepositedCredits: number;
-    expiredCredits: number;
+    reservedCredits: number | null;
+    spentCredits: number | null;
+    poolDepositedCredits: number | null;
+    expiredCredits: number | null;
     blocked: boolean;
   };
-  pool: { availableCredits: number; reservedCredits: number; blocked: boolean };
+  pool: { availableCredits: number; reservedCredits: number | null; blocked: boolean };
   routes: Partial<Record<'uki' | 'nft', CreditRouteStatus>>;
   configurations: CreditConfiguration[];
   activeReservations: number;
@@ -851,11 +851,13 @@ export function CompetitionCreditPanel() {
   );
 }
 
-function CurrentBalance({ label, value }: { label: string; value: number }) {
+function CurrentBalance({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="border-b border-white/10 p-4 last:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(3)]:border-b-0 sm:[&:nth-child(4)]:border-b-0 lg:border-b-0 lg:border-r-0">
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--uki-muted)]">{label}</p>
-      <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-lilac)]">{value}</p>
+      <p className="mt-1 font-headline text-2xl font-black text-[var(--uki-lilac)]">
+        {value === null ? 'No disponible' : value}
+      </p>
     </div>
   );
 }

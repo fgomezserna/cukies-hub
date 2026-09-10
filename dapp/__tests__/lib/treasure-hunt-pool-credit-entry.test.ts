@@ -49,6 +49,7 @@ function slot(): CreditSnapshotSlot {
 async function openPoolRun(
   repository: MemoryCompetitionCreditRepository,
   service: ReturnType<typeof createCompetitionCreditService>,
+  requestedStatus: 'open' | 'open_with_holds' = 'open',
 ) {
   await service.configurePool({
     walletAddress: WALLET,
@@ -80,7 +81,13 @@ async function openPoolRun(
     fenceToken: claimed.fenceToken,
     now: new Date('2026-07-10T12:04:00.000Z'),
   });
-  expect(opened.run.status).toBe('open');
+  if (requestedStatus === 'open_with_holds') {
+    const storedRun = repository.state.runs.find((candidate) => candidate.runId === run.runId);
+    expect(storedRun).toBeDefined();
+    if (storedRun) storedRun.status = 'open_with_holds';
+    opened.run.status = 'open_with_holds';
+  }
+  expect(opened.run.status).toBe(requestedStatus);
   expect(repository.state.ownLots[0]).toMatchObject({ availableCredits: 0 });
   expect(repository.state.poolLots[0]).toMatchObject({ availableCredits: 100 });
   return opened.run;
@@ -132,7 +139,9 @@ function creditPortFor(
 }
 
 describe('entrada Treasure Hunt con fallback de créditos al pool', () => {
-  it('prepara la sesión con own=0, reserva el pool una vez y repite por idempotencia', async () => {
+  it.each(['open', 'open_with_holds'] as const)(
+    'prepara la sesión con own=0, reserva el pool una vez y repite por idempotencia (%s)',
+    async (runStatus) => {
     const creditRule = testCompetitionCreditRule();
     const creditRepository = new MemoryCompetitionCreditRepository({
       rule: creditRule,
@@ -141,7 +150,11 @@ describe('entrada Treasure Hunt con fallback de créditos al pool', () => {
     const creditService = createCompetitionCreditService(
       createMemoryCompetitionCreditRunner(creditRepository),
     );
-    const run = await openPoolRun(creditRepository, creditService);
+    const run = await openPoolRun(creditRepository, creditService, runStatus);
+    // Simula una proyección retrasada: la reserva debe seguir siendo autoritativa
+    // y materializar el periodo al aplicar el CAS del lote.
+    creditRepository.state.accounts = [];
+    creditRepository.state.poolPeriods = [];
 
     const baseGameRule = testGameEconomyRule();
     const gameRule = testGameEconomyRule({
@@ -173,11 +186,11 @@ describe('entrada Treasure Hunt con fallback de créditos al pool', () => {
     const createInput = {
       walletAddress: WALLET,
       gameId: 'treasure-hunt',
-      cukieAssetIds: [],
+      cukieAssetIds: [] as string[],
       expectedRuleVersion: 'staging-test-v4',
       idempotencyKey: 'treasure-pool-entry',
       now: RESERVE_AT,
-    } as const;
+    };
 
     const prepared = await gameService.createSession(createInput);
 
@@ -198,6 +211,15 @@ describe('entrada Treasure Hunt con fallback de créditos al pool', () => {
       availableCredits: 90,
       reservedCredits: 10,
     });
+    expect(creditRepository.state.poolPeriods).toEqual([
+      expect.objectContaining({
+        periodId: run.settlementPeriod.periodId,
+        route: 'uki',
+        contributedCredits: 100,
+        availableCredits: 90,
+        reservedCredits: 10,
+      }),
+    ]);
 
     const replay = await gameService.createSession(createInput);
     expect(replay).toEqual(prepared);
@@ -224,5 +246,47 @@ describe('entrada Treasure Hunt con fallback de créditos al pool', () => {
     expect(started.status).toBe('started');
     expect(startedReplay).toEqual(started);
     expect(creditRepository.state.reservations).toHaveLength(1);
+    },
+  );
+
+  it('materializa la cuenta propia desde el lote tras una reserva con proyección ausente', async () => {
+    const creditRule = testCompetitionCreditRule();
+    const creditRepository = new MemoryCompetitionCreditRepository({
+      rule: creditRule,
+      slots: [slot()],
+    });
+    const creditService = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(creditRepository),
+    );
+    await openPoolRun(creditRepository, creditService);
+
+    const ownLot = creditRepository.state.ownLots[0];
+    ownLot.totalCredits = 20;
+    ownLot.poolDepositedCredits = 0;
+    ownLot.availableCredits = 20;
+    creditRepository.state.accounts = [];
+
+    const reservation = await creditService.reserve({
+      walletAddress: WALLET,
+      sessionId: 'own-projection-entry',
+      costCode: 'treasure-hunt:start',
+      expectedRuleVersion: creditRule.version,
+      expectedRuleConfigHash: creditRule.configHash,
+      idempotencyKey: 'own-projection-entry',
+      now: RESERVE_AT,
+    });
+
+    expect(reservation.bucket).toBe('own');
+    expect(creditRepository.state.accounts).toEqual([
+      expect.objectContaining({
+        walletNormalized: WALLET.toLowerCase(),
+        periodId: reservation.periodId,
+        route: 'uki',
+        grantedCredits: ownLot.totalCredits,
+        poolDepositedCredits: ownLot.poolDepositedCredits,
+        availableCredits: 10,
+        reservedCredits: 10,
+      }),
+    ]);
   });
 });

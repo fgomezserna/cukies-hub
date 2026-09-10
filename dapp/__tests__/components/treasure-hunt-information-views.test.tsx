@@ -382,6 +382,33 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(onStartSinglePlayer).not.toHaveBeenCalled();
   });
 
+  it('bloquea el CTA y no promete saldo cuando falla la comprobación', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      isError: true,
+      ready: false,
+      costCredits: null,
+      availableCredits: null,
+      ownAvailableCredits: null,
+      poolAvailableCredits: null,
+      poolContributedCredits: null,
+      reservedCredits: null,
+      poolReservedCredits: null,
+      creditSource: null,
+      canPlay: false,
+      missingCredits: 0,
+    });
+    const onStartSinglePlayer = jest.fn();
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={onStartSinglePlayer} />);
+
+    expect(screen.getByRole('button', { name: 'Créditos no disponibles' })).toBeDisabled();
+    expect(screen.getByText(/No hemos podido comprobar tus créditos/i)).toBeInTheDocument();
+    expect(screen.getByText('No verificado')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente de comprobar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Te faltan/ })).not.toBeInTheDocument();
+    expect(onStartSinglePlayer).not.toHaveBeenCalled();
+  });
+
   it('muestra intentos disponibles y bloquea el juego de una wallet descalificada', () => {
     mockDisqualified = true;
     const onStartSinglePlayer = jest.fn();

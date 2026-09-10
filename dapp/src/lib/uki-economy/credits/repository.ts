@@ -17,6 +17,7 @@ import {
   safeCompetitionCreditPeriodScopeId,
   safeCompetitionCreditSettlementPeriodScopeId,
   stableCreditHash,
+  sumExactCredits,
 } from "./rules";
 import {
   buildCreditSourceHealthEvidenceHash,
@@ -347,6 +348,81 @@ export function createMongoCompetitionCreditRepository(
     );
   }
 
+  type CreditLotMaterialization = Pick<
+    CreditLot,
+    | "totalCredits"
+    | "poolDepositedCredits"
+    | "availableCredits"
+    | "reservedCredits"
+    | "spentCredits"
+    | "expiredCredits"
+    | "blocked"
+  >;
+
+  const creditLotMaterializationProjection = {
+    _id: 0,
+    totalCredits: 1,
+    poolDepositedCredits: 1,
+    availableCredits: 1,
+    reservedCredits: 1,
+    spentCredits: 1,
+    expiredCredits: 1,
+    blocked: 1,
+  } as const;
+
+  async function accountMaterialization(
+    walletNormalized: string,
+    periodId: string,
+    route: CreditRoute,
+  ) {
+    const lots = await collections.ownLots
+      .find(
+        { walletNormalized, periodId, route },
+        { ...options, projection: creditLotMaterializationProjection },
+      )
+      .limit(RECONCILIATION_DOCUMENT_LIMITS.ownLots)
+      .toArray() as CreditLotMaterialization[];
+    if (lots.length >= RECONCILIATION_DOCUMENT_LIMITS.ownLots) {
+      throw new DomainConflictError(
+        `La cuenta de creditos ${walletNormalized}:${periodId}:${route} excede el limite seguro de lotes.`,
+      );
+    }
+    return {
+      grantedCredits: sumExactCredits(lots.map((lot) => lot.totalCredits)),
+      poolDepositedCredits: sumExactCredits(
+        lots.map((lot) => lot.poolDepositedCredits),
+      ),
+      availableCredits: sumExactCredits(lots.map((lot) => lot.availableCredits)),
+      reservedCredits: sumExactCredits(lots.map((lot) => lot.reservedCredits)),
+      spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
+      expiredCredits: sumExactCredits(lots.map((lot) => lot.expiredCredits)),
+      blocked: lots.some((lot) => lot.blocked === true),
+    };
+  }
+
+  async function poolMaterialization(periodId: string, route: CreditRoute) {
+    const lots = await collections.poolLots
+      .find(
+        { periodId, route },
+        { ...options, projection: creditLotMaterializationProjection },
+      )
+      .limit(RECONCILIATION_DOCUMENT_LIMITS.poolLots)
+      .toArray() as CreditLotMaterialization[];
+    if (lots.length >= RECONCILIATION_DOCUMENT_LIMITS.poolLots) {
+      throw new DomainConflictError(
+        `El periodo de pool ${periodId}:${route} excede el limite seguro de lotes.`,
+      );
+    }
+    return {
+      contributedCredits: sumExactCredits(lots.map((lot) => lot.totalCredits)),
+      availableCredits: sumExactCredits(lots.map((lot) => lot.availableCredits)),
+      reservedCredits: sumExactCredits(lots.map((lot) => lot.reservedCredits)),
+      spentCredits: sumExactCredits(lots.map((lot) => lot.spentCredits)),
+      expiredCredits: sumExactCredits(lots.map((lot) => lot.expiredCredits)),
+      blocked: lots.some((lot) => lot.blocked === true),
+    };
+  }
+
   async function incrementAccount(
     walletNormalized: string,
     periodId: string,
@@ -365,28 +441,41 @@ export function createMongoCompetitionCreditRepository(
     now: Date
   ) {
     const id = accountPeriodId(walletNormalized, periodId, route);
-    await collections.accounts.updateOne(
-      { _id: id },
-      {
-        $setOnInsert: {
-          _id: id,
-          walletNormalized,
-          periodId,
-          route,
-          grantedCredits: 0,
-          poolDepositedCredits: 0,
-          availableCredits: 0,
-          reservedCredits: 0,
-          spentCredits: 0,
-          expiredCredits: 0,
-          blocked: false,
-          revision: 0,
-          createdAt: now,
-          updatedAt: now,
+    const existing = await collections.accounts.findOne({ _id: id }, options);
+    if (!existing) {
+      const materialization = await accountMaterialization(
+        walletNormalized,
+        periodId,
+        route,
+      );
+      const seeded = await collections.accounts.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            walletNormalized,
+            periodId,
+            route,
+            ...materialization,
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
         },
-      },
-      { ...options, upsert: true }
-    );
+        { ...options, upsert: true },
+      );
+      if (seeded.upsertedCount === 1) {
+        if (materialization.blocked) {
+          throw new DomainConflictError(
+            `La cuenta de creditos ${id} tiene lotes bloqueados.`,
+          );
+        }
+        // The lot mutation that triggered this call is already reflected in
+        // the materialization. Applying the same delta again would drift the
+        // projection away from the authoritative lots.
+        return;
+      }
+    }
     const updated = await collections.accounts.updateOne(
       { _id: id, blocked: false },
       { $inc: { ...increments, revision: 1 }, $set: { updatedAt: now } },
@@ -415,26 +504,34 @@ export function createMongoCompetitionCreditRepository(
     now: Date
   ) {
     const id = poolPeriodId(periodId, route);
-    await collections.poolPeriods.updateOne(
-      { _id: id },
-      {
-        $setOnInsert: {
-          _id: id,
-          periodId,
-          route,
-          contributedCredits: 0,
-          availableCredits: 0,
-          reservedCredits: 0,
-          spentCredits: 0,
-          expiredCredits: 0,
-          blocked: false,
-          revision: 0,
-          createdAt: now,
-          updatedAt: now,
+    const existing = await collections.poolPeriods.findOne({ _id: id }, options);
+    if (!existing) {
+      const materialization = await poolMaterialization(periodId, route);
+      const seeded = await collections.poolPeriods.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            periodId,
+            route,
+            ...materialization,
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
         },
-      },
-      { ...options, upsert: true }
-    );
+        { ...options, upsert: true },
+      );
+      if (seeded.upsertedCount === 1) {
+        if (materialization.blocked) {
+          throw new DomainConflictError(
+            `El periodo de pool ${id} tiene lotes bloqueados.`,
+          );
+        }
+        // See incrementAccount: the lot mutation is included in the baseline.
+        return;
+      }
+    }
     const updated = await collections.poolPeriods.updateOne(
       { _id: id, blocked: false },
       { $inc: { ...increments, revision: 1 }, $set: { updatedAt: now } },
