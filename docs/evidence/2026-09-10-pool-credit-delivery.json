@@ -1,0 +1,239 @@
+{
+  "checkedAt": "2026-09-10T16:06:51.669Z",
+  "environment": "staging",
+  "pr": 390,
+  "release": {
+    "status": "finished",
+    "environment": "staging",
+    "healthSha": "070cb3736c14dae1156afaf432ee3dc9c9042d4b",
+    "web": {
+      "status": "finished",
+      "deploymentUuid": "xs0ggokw8os0c0ogo8ok4w0o",
+      "commit": "070cb3736c14dae1156afaf432ee3dc9c9042d4b",
+      "imageRepository": "192.168.1.207:5000/cukies-hub/dapp",
+      "imageTag": "sha256-d17eb84b65d8255ac2bd1c716f405429bafbde0f121d08cddb011666d82fa11f",
+      "healthSha": "070cb3736c14dae1156afaf432ee3dc9c9042d4b",
+      "readyStatus": "ready",
+      "environment": "staging",
+      "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk"
+    },
+    "game": null,
+    "workers": {
+      "deploymentUuid": "u80gssccgg4okcccwss4sw8c",
+      "status": "finished",
+      "commit": "070cb3736c14dae1156afaf432ee3dc9c9042d4b"
+    },
+    "decision": {
+      "deliveryMode": "rolling",
+      "web": true,
+      "workers": true,
+      "game": false,
+      "skip": false,
+      "changed": [
+        "dapp",
+        "schedulers"
+      ],
+      "workersComposeHash": "0edb880fbaa36a3fd1a98d837fdc8aca5d81713dc5521dd9b9731e869225acbb"
+    },
+    "recoveredFrom": "r0kkwos848g00oc88s404w8g",
+    "finishedAt": "2026-09-10T16:05:20.255Z"
+  },
+  "ci": {
+    "run": 34493616684,
+    "conclusion": "failure",
+    "attempt1": "Images built; Coolify helper container disappeared before rollout",
+    "attempt2": "Nx cache restore crossed nested BuildKit .next/cache mount; EBUSY",
+    "recovery": "Existing immutable images delivered using repository deliverRelease; temporary API token revoked; durable release reconciled"
+  },
+  "qa": {
+    "checkedAt": "2026-09-10T16:06:51.669Z",
+    "environment": "staging",
+    "sha": "070cb3736c14dae1156afaf432ee3dc9c9042d4b",
+    "wallet": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+    "auth": "dedicated QA EVM signature; session kept in memory",
+    "http": 200,
+    "status": "ok",
+    "balance": {
+      "grantedCredits": null,
+      "poolDepositedCredits": null,
+      "availableCredits": 0,
+      "reservedCredits": null,
+      "spentCredits": null,
+      "expiredCredits": null,
+      "blocked": false,
+      "materialization": {
+        "state": "ready"
+      }
+    },
+    "pool": {
+      "availableCredits": 70,
+      "reservedCredits": null,
+      "blocked": false,
+      "materialization": {
+        "state": "ready"
+      }
+    },
+    "currentRun": {
+      "periodCutoff": "2026-09-10T16:00:00.000Z",
+      "routes": [
+        {
+          "route": "uki",
+          "status": "open"
+        },
+        {
+          "route": "nft",
+          "status": "open"
+        }
+      ]
+    },
+    "gameStarted": false,
+    "creditsConsumed": 0,
+    "onChainTransactions": 0
+  },
+  "workers": [
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-reward-batch-publisher-1",
+      "id": "d0542579ec2f",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+        "APP_ENV": "staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "DATABASE_URL database": "cukies-hub-staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-chain-indexer-1",
+      "id": "3aae102d8d0a",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "CUKIES_DATABASE_URL database": "cukies-legacy-staging",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "APP_ENV": "staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-game-economy-scheduler-1",
+      "id": "8fc2852503ef",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+        "APP_ENV": "staging",
+        "DATABASE_URL database": "cukies-hub-staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-legacy-1",
+      "id": "b1c60ea82b5c",
+      "status": "running",
+      "restarts": 0,
+      "health": null,
+      "runtime": {
+        "CARD_WORKER_LEGACY_STAGING_ENABLED": "true",
+        "APP_ENV": "staging",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CARD_WORKER_DB_NAME": "cukies-legacy-staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-competition-credit-scheduler-1",
+      "id": "4dee56b1f8f6",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "COMPETITION_CREDITS_SCHEDULER_ENABLED": "true",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "APP_ENV": "staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-1",
+      "id": "f899d5772275",
+      "status": "running",
+      "restarts": 0,
+      "health": null,
+      "runtime": {
+        "CARD_WORKER_LEGACY_STAGING_ENABLED": "false",
+        "APP_ENV": "staging",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CARD_WORKER_DB_NAME": "cukieshub-new-staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-reward-accounting-scheduler-1",
+      "id": "0e23e69c09bd",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+        "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false",
+        "APP_ENV": "staging",
+        "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+        "REWARD_POOL_TRANCHES_ENABLED": "false",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-cukie-master-scheduler-1",
+      "id": "dc6747cbc5cb",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "APP_ENV": "staging",
+        "CHAIN_INDEXER_CUKIE_MASTER_ENABLED": "true",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-cukie-pool-scheduler-1",
+      "id": "d25e1ad93c78",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "APP_ENV": "staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "DATABASE_URL database": "cukies-hub-staging",
+        "CUKIE_POOL_RUNTIME_ENABLED": "false"
+      }
+    },
+    {
+      "name": "u4s804o4wwcckowgk0woo4wg-weekly-ranking-scheduler-1",
+      "id": "160f85efb40d",
+      "status": "running",
+      "restarts": 0,
+      "health": "healthy",
+      "runtime": {
+        "DATABASE_URL database": "cukies-hub-staging",
+        "APP_ENV": "staging",
+        "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+        "WEEKLY_RANKING_RUNTIME_ENABLED": "false"
+      }
+    }
+  ],
+  "protected": {
+    "production": "app12/app13 containers preserved",
+    "game31": "fab7910 container preserved",
+    "legacy": "preexisting eight containers preserved"
+  },
+  "limitations": [
+    "Authenticated balance read only; no game started or credits consumed",
+    "Rewards/ranking/publisher runtime gates remain disabled",
+    "Pool and My Cukies recovery-vault summary discrepancy remains open"
+  ]
+}
