@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-10T06:20:48.127509+00:00",
+  "observedAt": "2026-09-10T06:27:40.775238+00:00",
   "scope": "Pre-publication review of isolated game recovery and Legacy breeding identity candidates; no live state operations",
   "stagingCodeObserved": "3ca331e77e7e6cf01b56a8b263d0fca901e82aac",
   "stagingChangedByTheseCandidates": false,
@@ -123,7 +123,7 @@
   "legacyBreeding": {
     "candidate": "1178153140f0b63cb0378f2678096a85e454862c",
     "base": "26ae560eaf65e97f4e577a202c6e98baa4b39ea4",
-    "decision": "changes_requested",
+    "decision": "implementation_accepted_pending_combined_verification",
     "taskId": "01a08727-0cdb-7993-bbab-6829bcf3d333",
     "reportedWorkerGates": {
       "focalSuites": 3,
@@ -180,8 +180,8 @@
         ]
       }
     ],
-    "nextStep": "Same task addresses only the unproven BSC boundary state and signing-network reset regression, preserving source commits and writes OFF; root reviews the small final diff and owns combined staging publication.",
-    "currentCandidate": "6bf7b8bb3d7847858e39f5953223e05981e2ef80",
+    "nextStep": "Legacy task frozen with sources intact. Root combines accepted Legacy commits with reviewed Data correction, runs final gates once, then publishes and verifies staging in one window.",
+    "currentCandidate": "5545860191cb7e34a98e4b8218025416229a52da",
     "correctionReview": {
       "candidate": "7101d637154d33b98535f6dc2ec2fa14cf561a1a",
       "decision": "changes_requested",
@@ -265,6 +265,37 @@
         "initialHarnessIssue": "TRON Buffer/Uint8Array fixture conversion under jsdom; only parser suite rerun in Node successfully, not a product failure"
       },
       "reportSha256": "7eae7b9527d80a3b70ae2005a51f897d0964ace9a0651bd3b85bee82230deabd"
+    },
+    "finalCorrectionReview": {
+      "candidate": "5545860191cb7e34a98e4b8218025416229a52da",
+      "reviewer": "root Astra Max",
+      "decision": "implementation_accepted_pending_combined_verification",
+      "reviewed": "Full final five-file diff, related read/reset effects, added API boundary and signing-network regressions",
+      "outcome": [
+        "Unproven BSC boundary excluded with partial status, without claiming new contract semantics",
+        "Signing-chain change clears parent previews while retaining fixed BSC56 inventory; owner/read-network changes still refresh and revoke selection"
+      ],
+      "reportedWorkerGates": {
+        "focalSuites": 4,
+        "focalTests": 24,
+        "lint": "PASS",
+        "typecheck": "PASS",
+        "scope": "Final isolated Legacy candidate"
+      },
+      "integratedHead": "aad830ccb0cf50fcd251e3ed3840a02d7c1d1ba0",
+      "sourceToIntegrated": {
+        "1178153": "bd38e96",
+        "7101d637": "84cb5f9",
+        "6bf7b8bb": "2cea22f",
+        "55458601": "aad830c"
+      },
+      "sourceFilesMatched": 8,
+      "unexpectedIntegrationPaths": [],
+      "integrationEvidenceSha256": "ea3f0188a99b9dfa71ede5edfd3d3d256855a3aea2fae2b19af56f5bd65fb268",
+      "fullCombinedGatesRun": false,
+      "stagingPublication": false,
+      "writesEnabled": false,
+      "limit": "TRON retains existing threshold behavior; no independent proof of complete on-chain eligibility or Legacy parity is claimed."
     }
   },
   "limits": [
