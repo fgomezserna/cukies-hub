@@ -173,6 +173,10 @@ function poolStatus(input?: {
   serverVaultAddress?: string;
   availableAssets?: ReturnType<typeof availableAsset>[];
   positions?: ReturnType<typeof position>[];
+  availability?: {
+    status: 'complete' | 'partial';
+    unknownAssets: number;
+  };
 }) {
   const indexerStatus = input?.indexerStatus ?? 'ready';
   return {
@@ -187,6 +191,7 @@ function poolStatus(input?: {
     },
     positions: input?.positions ?? [],
     availableAssets: input?.availableAssets ?? [],
+    availability: input?.availability ?? { status: 'complete', unknownAssets: 0 },
     sourceHealthy: indexerStatus === 'ready',
   };
 }
@@ -307,6 +312,26 @@ describe('CukiePoolStatusPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
     await waitFor(() => expect(screen.queryByText(/Estamos actualizando tus Cukies/i)).not.toBeInTheDocument());
+    expect(screen.getByText('1 Cukie para aportar')).toBeInTheDocument();
+  });
+
+  it('explains a partial recovery read without hiding confirmed wallet assets', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({ address: walletAddress, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    mockUsePublicClient.mockReturnValue({
+      simulateContract: jest.fn(),
+      readContract: jest.fn(),
+      waitForTransactionReceipt: jest.fn(),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({
+      availableAssets: [availableAsset('8')],
+      availability: { status: 'partial', unknownAssets: 1 },
+    })));
+
+    render(<CukiePoolStatusPanel />);
+
+    expect(await screen.findByText(/No hemos podido comprobar un Cukie ahora/i)).toBeInTheDocument();
     expect(screen.getByText('1 Cukie para aportar')).toBeInTheDocument();
   });
 

@@ -413,7 +413,10 @@ export async function listCukiePoolWalletPositions(input: {
       collectionAddresses: new Set(collectionAddresses),
       nowSeconds: BigInt(Math.floor(now.getTime() / 1_000)),
     };
-    let availableAssets = [] as Awaited<ReturnType<typeof listAvailableCukiePoolVaultAssets>>;
+    let availableAssets: Awaited<ReturnType<typeof listAvailableCukiePoolVaultAssets>> = {
+      assets: [],
+      recovery: { status: 'complete', unknownAssets: 0 },
+    };
     if (indexerStatus === 'ready') {
       try {
         availableAssets = await listAvailableCukiePoolVaultAssets(
@@ -425,7 +428,10 @@ export async function listCukiePoolWalletPositions(input: {
       } catch (error) {
         if (!(error instanceof SchemaNotReadyError)) throw error;
         indexerStatus = 'unavailable';
-        availableAssets = [];
+        availableAssets = {
+          assets: [],
+          recovery: { status: 'complete', unknownAssets: 0 },
+        };
       }
     }
     const mediaRows = page.length === 0 || indexerStatus !== 'ready'
@@ -471,7 +477,8 @@ export async function listCukiePoolWalletPositions(input: {
           sourceHealthy: true,
         };
       }),
-      availableAssets,
+      availableAssets: availableAssets.assets,
+      availability: availableAssets.recovery,
       nextCursor: positions.length > limit ? page.at(-1)?._id ?? null : null,
       sourceHealthy: indexerStatus === 'ready',
     };

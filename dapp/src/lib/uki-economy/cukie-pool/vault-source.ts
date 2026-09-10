@@ -95,6 +95,20 @@ export type PublicCukiePoolAvailableAsset = {
   canDeposit: true;
 };
 
+/**
+ * Recovery checks run in parallel with the indexed projection. A single
+ * inconclusive ownerOf/positionOf read must not make every known wallet NFT
+ * disappear, but the UI still needs to distinguish a complete inventory from
+ * one with a bounded, per-asset gap.
+ */
+export type CukiePoolAvailableAssetsResult = {
+  assets: PublicCukiePoolAvailableAsset[];
+  recovery: {
+    status: 'complete' | 'partial';
+    unknownAssets: number;
+  };
+};
+
 type CalendarDocument = {
   _id?: unknown;
   chain?: unknown;
@@ -847,7 +861,7 @@ export async function listAvailableCukiePoolVaultAssets(
   walletNormalized: string,
   config: CukiePoolVaultConfig,
   now: Date,
-): Promise<PublicCukiePoolAvailableAsset[]> {
+): Promise<CukiePoolAvailableAssetsResult> {
   if (ukiNftVaults.mode.cukieMaster === 'invalid') {
     return sourceError('la configuracion del vault Cukie Master es invalida.');
   }
@@ -892,7 +906,12 @@ export async function listAvailableCukiePoolVaultAssets(
   if (new Set(preliminary.map((item) => item.assetId)).size !== preliminary.length) {
     return sourceError('el inventario disponible contiene identidades duplicadas.');
   }
-  if (preliminary.length === 0) return [];
+  if (preliminary.length === 0) {
+    return {
+      assets: [],
+      recovery: { status: 'complete', unknownAssets: 0 },
+    };
+  }
 
   const legacyLocks = await db.collection<NftAssetLockDocument>('nft_asset_locks').find({
     assetId: { $in: preliminary.map((item) => item.legacyAssetId) },
@@ -952,6 +971,7 @@ export async function listAvailableCukiePoolVaultAssets(
     ...poolRows.map((row) => String(row.assetId)),
     ...masterRows.map((row) => String(row.assetId)),
   ]);
+  const assetsRequiringRecovery = preliminary.filter((item) => !currentCustody.has(item.assetId));
   const recovery = await readPoolRecoveryPositions({
     walletNormalized,
     activeVaultAddress: config.vaultAddressNormalized,
@@ -959,17 +979,27 @@ export async function listAvailableCukiePoolVaultAssets(
       ? [ukiNftVaults.cukieMasterNftVaultAddress]
       : [],
     activeVaultChainId: config.chainId,
-    assets: preliminary
-      .filter((item) => !currentCustody.has(item.assetId))
+    assets: assetsRequiringRecovery
       .map((item) => ({
         chainId: config.chainId,
         collectionAddress: item.collection,
         tokenId: item.normalized.tokenId!,
       })),
   });
-  if (recovery.some(isPoolRecoverySourceFailure)) {
+  const recoveryByAssetId = new Map(recovery.map((item) => [item.assetId, item]));
+  const recoveryIncomplete = assetsRequiringRecovery.some(
+    (item) => !recoveryByAssetId.has(item.assetId),
+  );
+  const recoveryFailures = recovery.filter(isPoolRecoverySourceFailure);
+  const batchFailure = recoveryIncomplete
+    || recoveryFailures.some((item) => item.reason !== 'POOL_RECOVERY_RPC_READ_FAILED')
+    || (recoveryFailures.length === recovery.length && recoveryFailures.length > 0);
+  if (batchFailure) {
     return sourceError('no se pudo confirmar la custodia on-chain; la fuente queda temporalmente no disponible.');
   }
+  const unknownAssets = assetsRequiringRecovery.filter(
+    (item) => recoveryByAssetId.get(item.assetId)?.status === 'unknown',
+  ).length;
   const unavailable = new Set([
     ...poolRows.map((row) => String(row.assetId)),
     ...masterRows.map((row) => String(row.assetId)),
@@ -982,19 +1012,25 @@ export async function listAvailableCukiePoolVaultAssets(
       .filter((item) => item.status === 'unknown')
       .map((item) => item.assetId),
   ]);
-  return preliminary
-    .filter((item) => !unavailable.has(item.assetId) && !lockedLegacyAssets.has(item.legacyAssetId))
-    .map((item) => ({
-      assetId: item.assetId,
-      chain: 'BSC' as const,
-      chainId: config.chainId,
-      collectionAddress: item.collection,
-      tokenId: item.normalized.tokenId!,
-      imageUrl: item.normalized.imageUrl ?? null,
-      generation: item.normalized.generation as CukiePoolGeneration,
-      rarity: item.normalized.rarity as CukiePoolRarity,
-      custody: 'wallet' as const,
-      status: 'available' as const,
-      canDeposit: true as const,
-    }));
+  return {
+    assets: preliminary
+      .filter((item) => !unavailable.has(item.assetId) && !lockedLegacyAssets.has(item.legacyAssetId))
+      .map((item) => ({
+        assetId: item.assetId,
+        chain: 'BSC' as const,
+        chainId: config.chainId,
+        collectionAddress: item.collection,
+        tokenId: item.normalized.tokenId!,
+        imageUrl: item.normalized.imageUrl ?? null,
+        generation: item.normalized.generation as CukiePoolGeneration,
+        rarity: item.normalized.rarity as CukiePoolRarity,
+        custody: 'wallet' as const,
+        status: 'available' as const,
+        canDeposit: true as const,
+      })),
+    recovery: {
+      status: unknownAssets > 0 ? 'partial' : 'complete',
+      unknownAssets,
+    },
+  };
 }

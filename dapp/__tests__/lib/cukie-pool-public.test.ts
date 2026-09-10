@@ -589,6 +589,77 @@ describe('Cukie Pool public source health', () => {
     });
   });
 
+  it('keeps confirmed wallet assets available when one recovery read is inconclusive', async () => {
+    vaultConfig.ready.cukiePool = true;
+    vaultConfig.mode.cukiePool = 'custodial';
+    vaultConfig.mode.cukieMaster = 'legacy';
+    const inventory = ['10', '11'].map((tokenId, index) => ({
+      _id: tokenId,
+      tokenId,
+      owner: OWNER,
+      ownerNormalized: OWNER,
+      network: 'BSC',
+      state: 'available',
+      chainId: 97,
+      collectionAddressNormalized: COLLECTION,
+      rarity: index + 1,
+      generation: 1,
+    }));
+    const assetId = (tokenId: string) => `97:${COLLECTION}:${tokenId}`;
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => {
+        const operational = healthyOperationalCollection(name);
+        if (operational) return operational;
+        return {
+          find: (filter: Record<string, unknown>) => cursor(
+            name === 'nft_vault_collections'
+              ? [allowlistProjection()]
+              : name === 'cukie_pool_calendar_versions'
+                ? [calendarVersion()]
+                : name === 'cukies'
+                  ? inventory
+                  : [],
+          ),
+        };
+      },
+    });
+    recoveryReadMock.mockResolvedValue([
+      {
+        assetId: assetId('10'),
+        status: 'not_found',
+        vaultAddress: null,
+        beneficialOwner: null,
+        exitRequestedAt: null,
+        withdrawableAt: null,
+      },
+      {
+        assetId: assetId('11'),
+        status: 'unknown',
+        vaultAddress: null,
+        beneficialOwner: null,
+        exitRequestedAt: null,
+        withdrawableAt: null,
+        reason: 'POOL_RECOVERY_RPC_READ_FAILED',
+      },
+    ]);
+
+    await expect(listCukiePoolWalletPositions({
+      walletAddress: OWNER,
+      now: NOW,
+    })).resolves.toMatchObject({
+      sourceHealthy: true,
+      availability: { status: 'partial', unknownAssets: 1 },
+      availableAssets: [{
+        assetId: assetId('10'),
+        tokenId: '10',
+        chainId: 97,
+        custody: 'wallet',
+        status: 'available',
+        canDeposit: true,
+      }],
+    });
+  });
+
   it('keeps canonical recovery positions visible when indexer health is unavailable', async () => {
     vaultConfig.ready.cukiePool = true;
     vaultConfig.mode.cukiePool = 'custodial';

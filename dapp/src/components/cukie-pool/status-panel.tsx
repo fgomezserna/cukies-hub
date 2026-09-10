@@ -114,6 +114,10 @@ type CustodialStatus = {
   nftCustody: PoolCustody;
   positions: CustodialPosition[];
   availableAssets: AvailableAsset[];
+  availability?: {
+    status: 'complete' | 'partial';
+    unknownAssets: number;
+  };
   sourceHealthy: boolean;
 };
 
@@ -997,6 +1001,11 @@ export function CukiePoolStatusPanel() {
             {status.nftCustody.indexer.status !== 'ready' ? (
               <p role="alert" className="text-sm font-semibold text-amber-300">
                 Estamos actualizando tus Cukies. Los depósitos están bloqueados; aún puedes solicitar la salida o retirar una posición conocida.
+              </p>
+            ) : null}
+            {status.availability?.status === 'partial' && status.availability.unknownAssets > 0 ? (
+              <p role="status" className="text-sm font-semibold text-amber-200">
+                No hemos podido comprobar {status.availability.unknownAssets === 1 ? 'un Cukie' : `${status.availability.unknownAssets} Cukies`} ahora. Mostramos el resto del inventario; ese estado seguirá bloqueado hasta que la lectura de la red sea concluyente.
               </p>
             ) : null}
             {!walletMatches ? (
