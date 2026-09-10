@@ -9,8 +9,91 @@ import type {
   CreditReservation,
 } from '../src/lib/uki-economy/credits/types';
 
-const mongoUri = process.env.CREDIT_REAL_MONGO_URI?.trim() ?? '';
-const databaseName = process.env.CREDIT_REAL_MONGO_DB_NAME?.trim() ?? '';
+type RealMongoEnvironment = {
+  mongoUri: string;
+  databaseName: string;
+};
+
+const REAL_MONGO_DATABASE_PATTERN = /^cukies_credit_real_\d+_\d+$/;
+
+/**
+ * Keep the real-Mongo probe hermetic even when it is invoked directly rather
+ * than through the ephemeral-mongod wrapper. This runs before repository
+ * imports and before any database cleanup, so inherited production settings
+ * cannot be used accidentally.
+ */
+export function validateRealMongoEnvironment(
+  env: NodeJS.ProcessEnv = process.env,
+): RealMongoEnvironment {
+  const mongoUri = env.CREDIT_REAL_MONGO_URI;
+  const databaseName = env.CREDIT_REAL_MONGO_DB_NAME;
+
+  if (!mongoUri || mongoUri.trim() !== mongoUri) {
+    throw new Error(
+      'CREDIT_REAL_MONGO_URI es obligatorio y no puede contener espacios; '
+      + 'usa mongodb://127.0.0.1:<port>/?replicaSet=rs0.',
+    );
+  }
+  if (!databaseName || databaseName.trim() !== databaseName) {
+    throw new Error(
+      'CREDIT_REAL_MONGO_DB_NAME es obligatorio y no puede contener espacios.',
+    );
+  }
+  if (!REAL_MONGO_DATABASE_PATTERN.test(databaseName)) {
+    throw new Error(
+      'CREDIT_REAL_MONGO_DB_NAME debe cumplir /^cukies_credit_real_\\d+_\\d+$/; '
+      + 'no se permite una base ajena.',
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(mongoUri);
+  } catch {
+    throw new Error(
+      'CREDIT_REAL_MONGO_URI debe tener exactamente el formato '
+      + 'mongodb://127.0.0.1:<port>/?replicaSet=rs0.',
+    );
+  }
+
+  const port = Number(parsed.port);
+  const canonicalUri = Number.isInteger(port) && port >= 1 && port <= 65_535
+    ? `mongodb://127.0.0.1:${port}/?replicaSet=rs0`
+    : null;
+  if (
+    parsed.protocol !== 'mongodb:'
+    || parsed.hostname !== '127.0.0.1'
+    || parsed.username !== ''
+    || parsed.password !== ''
+    || parsed.pathname !== '/'
+    || parsed.search !== '?replicaSet=rs0'
+    || parsed.hash !== ''
+    || canonicalUri !== mongoUri
+  ) {
+    throw new Error(
+      'CREDIT_REAL_MONGO_URI debe tener exactamente el formato '
+      + 'mongodb://127.0.0.1:<port>/?replicaSet=rs0, sin credenciales ni opciones extra.',
+    );
+  }
+
+  const configuredIndexerUri = env.CHAIN_INDEXER_MONGO_URL;
+  if (configuredIndexerUri !== undefined && configuredIndexerUri !== mongoUri) {
+    throw new Error(
+      'CHAIN_INDEXER_MONGO_URL debe coincidir exactamente con CREDIT_REAL_MONGO_URI.',
+    );
+  }
+  const configuredIndexerDb = env.CHAIN_INDEXER_DB_NAME;
+  if (configuredIndexerDb !== undefined && configuredIndexerDb !== databaseName) {
+    throw new Error(
+      'CHAIN_INDEXER_DB_NAME debe coincidir exactamente con CREDIT_REAL_MONGO_DB_NAME.',
+    );
+  }
+
+  return { mongoUri, databaseName };
+}
+
+let mongoUri = '';
+let databaseName = '';
 
 let mongoCompetitionCreditTransactionRunner!: typeof import('../src/lib/uki-economy/credits/repository').mongoCompetitionCreditTransactionRunner;
 let currentCompetitionCreditPeriod!: typeof import('../src/lib/uki-economy/credits/rules').currentCompetitionCreditPeriod;
@@ -269,14 +352,11 @@ async function blockedHistoricalLots() {
 }
 
 async function main() {
-  if (!mongoUri || !databaseName) {
-    throw new Error(
-      'CREDIT_REAL_MONGO_URI y CREDIT_REAL_MONGO_DB_NAME son obligatorios; usa el harness de mongod local.',
-    );
-  }
-  if (!['127.0.0.1', 'localhost'].some((host) => mongoUri.includes(`://${host}:`))) {
-    throw new Error('La validacion Mongo real solo admite una URI local (127.0.0.1/localhost).');
-  }
+  ({ mongoUri, databaseName } = validateRealMongoEnvironment());
+  // Repository modules read these settings during import. Set missing values
+  // only after strict validation, and never inherit a caller's remote target.
+  process.env.CHAIN_INDEXER_MONGO_URL = mongoUri;
+  process.env.CHAIN_INDEXER_DB_NAME = databaseName;
   const [repositoryModule, rulesModule, testingModule] = await Promise.all([
     import('../src/lib/uki-economy/credits/repository'),
     import('../src/lib/uki-economy/credits/rules'),
