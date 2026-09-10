@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { formatUnits } from 'viem';
 
-import { Panel } from '@/components/landing/primitives';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import type {
   DashboardModule,
@@ -201,6 +200,16 @@ function moduleData<K extends DashboardModuleId>(module: DashboardModule<K>) {
   return module.state === 'unavailable' ? null : module.data;
 }
 
+function isMasterDataReady(module: DashboardModule<'cukieMaster'> | null | undefined) {
+  if (!module || module.state === 'unavailable') return false;
+  return module.data.routes.uki.sourceComplete
+    && module.data.routes.uki.projectionFresh
+    && !module.data.routes.uki.synchronizing
+    && module.data.routes.nft.sourceComplete
+    && module.data.routes.nft.projectionFresh
+    && !module.data.routes.nft.synchronizing;
+}
+
 const MODULE_LABELS: Record<DashboardModuleId, string> = {
   cukieMaster: 'Cukie Master',
   credits: 'Créditos',
@@ -262,22 +271,27 @@ type PrimaryAction = {
 };
 
 function choosePrimaryAction(input: {
-  game: DashboardModulePayloads['game'] | null;
-  credits: DashboardModulePayloads['credits'] | null;
-  master: DashboardModulePayloads['cukieMaster'] | null;
-  rewards: DashboardModulePayloads['rewards'] | null;
-  vesting: DashboardModulePayloads['vesting'] | null;
+  game: DashboardModule<'game'> | null;
+  credits: DashboardModule<'credits'> | null;
+  master: DashboardModule<'cukieMaster'> | null;
+  rewards: DashboardModule<'rewards'> | null;
+  vesting: DashboardModule<'vesting'> | null;
   hasPartialData: boolean;
 }) : PrimaryAction {
-  if (input.game?.enabled && input.game.attemptsRemaining !== null && input.game.attemptsRemaining > 0) {
+  if (input.game?.state === 'ready'
+    && input.game.data.enabled
+    && input.game.data.attemptsRemaining !== null
+    && input.game.data.attemptsRemaining > 0) {
     return {
       href: '/games/treasure-hunt',
       label: 'Jugar ahora',
       title: 'Tienes una partida lista',
-      description: `${integerLabel(input.game.attemptsRemaining)} intentos disponibles. Entra cuando quieras y revisa tus créditos antes de comenzar.`,
+      description: `${integerLabel(input.game.data.attemptsRemaining)} intentos disponibles. Entra cuando quieras y revisa tus créditos antes de comenzar.`,
     };
   }
-  if (hasPositiveRaw(input.rewards?.claimableRaw)) {
+  if (input.rewards?.state === 'ready'
+    && hasPositiveRaw(input.rewards.data.claimableRaw)
+    && input.rewards.data.claimPublished) {
     return {
       href: '/premios',
       label: 'Reclamar premios',
@@ -285,15 +299,28 @@ function choosePrimaryAction(input: {
       description: 'Consulta el detalle y reclama solo los importes que ya estén publicados.',
     };
   }
-  if (input.credits && input.credits.availableCredits > 0) {
+  if (input.rewards?.state === 'ready'
+    && hasPositiveRaw(input.rewards.data.claimableRaw)
+    && !input.rewards.data.claimPublished) {
+    return {
+      href: '/premios',
+      label: 'Consultar premios',
+      title: 'Tus premios están en preparación',
+      description: 'Consulta el detalle; todavía no hay importes publicados para reclamar.',
+    };
+  }
+  if (input.credits?.state === 'ready' && input.credits.data.availableCredits > 0) {
     return {
       href: '/credits',
       label: 'Ver créditos',
       title: 'Tus créditos están listos',
-      description: `${integerLabel(input.credits.availableCredits)} créditos personales disponibles para jugar. El saldo del pool se muestra por separado.`,
+      description: `${integerLabel(input.credits.data.availableCredits)} créditos personales disponibles para jugar. El saldo del pool se muestra por separado.`,
     };
   }
-  if (input.master && input.master.allocatedSlots === 0 && input.master.desiredSlots > 0) {
+  if (input.master?.state === 'ready'
+    && isMasterDataReady(input.master)
+    && input.master.data.allocatedSlots === 0
+    && input.master.data.desiredSlots > 0) {
     return {
       href: '/cukie-master#mi-estado',
       label: 'Revisar cupos',
@@ -301,12 +328,24 @@ function choosePrimaryAction(input: {
       description: 'Consulta las dos rutas de acceso y los recursos que necesitas para obtener un cupo.',
     };
   }
-  if (input.vesting && hasPositiveRaw(input.vesting.releasableRaw)) {
+  if (input.vesting?.state === 'ready'
+    && hasPositiveRaw(input.vesting.data.releasableRaw)
+    && input.vesting.data.configFrozen) {
     return {
       href: '/vesting',
       label: 'Ver desbloqueo',
       title: 'Hay UKI disponibles para liberar',
       description: 'Revisa el calendario y confirma el estado antes de iniciar cualquier acción.',
+    };
+  }
+  if (input.vesting?.state === 'ready'
+    && hasPositiveRaw(input.vesting.data.releasableRaw)
+    && !input.vesting.data.configFrozen) {
+    return {
+      href: '/vesting',
+      label: 'Consultar vesting',
+      title: 'El calendario está pendiente',
+      description: 'Consulta el calendario; la liberación seguirá bloqueada hasta confirmar la configuración.',
     };
   }
   if (input.hasPartialData) {
@@ -352,16 +391,9 @@ export function DashboardOverviewPanel() {
     : null;
   const unavailableModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_UNAVAILABLE') ?? [];
   const reviewModules = summary?.alerts.filter((alert) => alert.code === 'MODULE_DEGRADED') ?? [];
+  const masterModule = summary?.modules.cukieMaster ?? null;
   const master = summary ? moduleData(summary.modules.cukieMaster) : null;
-  const masterDataReady = Boolean(
-    master
-    && master.routes.uki.sourceComplete
-    && master.routes.uki.projectionFresh
-    && !master.routes.uki.synchronizing
-    && master.routes.nft.sourceComplete
-    && master.routes.nft.projectionFresh
-    && !master.routes.nft.synchronizing,
-  );
+  const masterDataReady = isMasterDataReady(masterModule);
   const credits = summary ? moduleData(summary.modules.credits) : null;
   const pool = summary ? moduleData(summary.modules.cukiePool) : null;
   const rewards = summary ? moduleData(summary.modules.rewards) : null;
@@ -369,19 +401,31 @@ export function DashboardOverviewPanel() {
   const vesting = summary ? moduleData(summary.modules.vesting) : null;
   const game = summary ? moduleData(summary.modules.game) : null;
   const primaryAction = summary ? choosePrimaryAction({
-    game,
-    credits,
-    master: masterDataReady ? master : null,
-    rewards,
-    vesting,
+    game: summary.modules.game,
+    credits: summary.modules.credits,
+    master: masterModule,
+    rewards: summary.modules.rewards,
+    vesting: summary.modules.vesting,
     hasPartialData: summary.overallState === 'partial',
   }) : null;
-  const isRefreshing = dashboardResource.isFetching;
+  const [isManualRefreshPending, setIsManualRefreshPending] = useState(false);
+  const isRefreshing = dashboardResource.isFetching || isManualRefreshPending;
+  const refreshDashboardResource = dashboardResource.refresh;
+  const refreshInFlightRef = useRef(false);
+  const refreshDashboard = useCallback(() => {
+    if (isRefreshing || refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+    setIsManualRefreshPending(true);
+    void Promise.resolve(refreshDashboardResource()).finally(() => {
+      refreshInFlightRef.current = false;
+      setIsManualRefreshPending(false);
+    });
+  }, [isRefreshing, refreshDashboardResource]);
   const showStandaloneRefresh = hasSignedEvmSession && !summary;
 
   return (
     <section id="wallet-economy-overview" className="relative z-[2] w-full scroll-mt-24 pb-5">
-      {showStandaloneRefresh ? <RefreshButton isRefreshing={isRefreshing} onRefresh={() => void dashboardResource.refresh()} /> : null}
+      {showStandaloneRefresh ? <RefreshButton isRefreshing={isRefreshing} onRefresh={refreshDashboard} /> : null}
 
       {!authLoading && !hasSignedEvmSession ? (
         <ConnectState walletNeedsSignature={walletNeedsSignature} />
@@ -393,40 +437,37 @@ export function DashboardOverviewPanel() {
 
       {summary ? (
         <div className="space-y-5">
-          <header className="overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/25 bg-[radial-gradient(circle_at_84%_0%,rgba(228,92,255,0.18),transparent_32%),linear-gradient(135deg,rgba(20,10,32,0.96),rgba(7,28,34,0.92))] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.22)] sm:p-7">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <header className="overflow-hidden rounded-[16px] border border-[var(--uki-lilac)]/25 bg-[radial-gradient(circle_at_84%_0%,rgba(228,92,255,0.18),transparent_32%),linear-gradient(135deg,rgba(20,10,32,0.96),rgba(7,28,34,0.92))] p-4 shadow-[0_20px_70px_rgba(0,0,0,0.22)] sm:p-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <p className="uki-label">Tu espacio</p>
-                <h2 className="mt-2 max-w-2xl font-headline text-3xl font-black tracking-[-0.03em] text-[var(--uki-cream)] sm:text-4xl">
+                <h2 className="max-w-2xl font-headline text-2xl font-black tracking-[-0.03em] text-[var(--uki-cream)] sm:text-4xl">
                   Hola, <span>{summary.identity.username || 'Cukie'}</span>
                 </h2>
-                <p className="mt-2 max-w-xl text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">
-                  Aquí tienes lo que puedes usar ahora y el siguiente paso más claro para continuar.
-                </p>
               </div>
-              <div className="flex shrink-0 flex-col gap-2 lg:items-end">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 lg:justify-end">
                 <span
                   title={summary.identity.walletNormalized}
                   aria-label={`Wallet ${summary.identity.walletNormalized}`}
-                  className="inline-flex min-h-10 max-w-full items-center rounded-full border border-white/15 bg-black/20 px-3 text-xs font-bold text-[var(--uki-cream)]"
+                  className="inline-flex min-h-8 max-w-full items-center rounded-full border border-white/15 bg-black/20 px-3 text-[11px] font-bold text-[var(--uki-cream)]"
                 >
                   {shortWallet(summary.identity.walletNormalized)}
                 </span>
-                <span className="text-xs font-semibold text-[var(--uki-muted)]">BNB Smart Chain · {summary.network.environment === 'staging' ? 'Staging' : 'Producción'}</span>
-                <time dateTime={summary.generatedAt} className="text-[11px] font-semibold text-[var(--uki-muted)]">
+                <span className="text-[11px] font-semibold text-[var(--uki-muted)]">BNB Smart Chain</span>
+                <time dateTime={summary.generatedAt} className="text-[10px] font-semibold text-[var(--uki-muted)]">
                   Actualizado {formatUpdatedAt(summary.generatedAt)}
                 </time>
+                <RefreshButton isRefreshing={isRefreshing} onRefresh={refreshDashboard} compact />
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
               {primaryAction ? <PrimaryActionPanel action={primaryAction} /> : null}
-              <MetricStrip summary={summary} />
+              <MetricStrip summary={summary} masterDataReady={masterDataReady} />
             </div>
           </header>
 
           {request.state === 'stale' ? (
-            <div role="status" className="flex flex-col gap-3 rounded-[10px] border border-amber-300/30 bg-amber-300/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div role="status" className="rounded-[10px] border border-amber-300/30 bg-amber-300/10 px-4 py-3">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" aria-hidden="true" />
                 <div>
@@ -434,7 +475,6 @@ export function DashboardOverviewPanel() {
                   <p className="mt-1 text-xs font-semibold text-amber-100/75">Mostramos la última lectura disponible. Inténtalo de nuevo en unos instantes.</p>
                 </div>
               </div>
-              <RefreshButton isRefreshing={isRefreshing} onRefresh={() => void dashboardResource.refresh()} compact />
             </div>
           ) : null}
 
@@ -442,12 +482,12 @@ export function DashboardOverviewPanel() {
 
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
             <section id="dashboard-play" aria-labelledby="dashboard-play-title" className="min-w-0">
-              <SectionIntro titleId="dashboard-play-title" eyebrow="Ahora" title="Tu siguiente jugada" description="La disponibilidad del juego y de tus créditos se mantienen separadas para que decidas con contexto." />
+              <SectionIntro titleId="dashboard-play-title" eyebrow="Ahora" title="Tu siguiente jugada" description="Comprueba tus intentos y créditos antes de jugar." />
               <PlayPanel module={summary.modules.game} game={game} credits={credits} />
             </section>
 
             <section id="dashboard-resources" aria-labelledby="dashboard-resources-title" className="min-w-0">
-              <SectionIntro titleId="dashboard-resources-title" eyebrow="Recursos" title="Lo que tienes" description="Accede a cada fuente sin mezclar créditos personales, pool, cupos ni premios." />
+              <SectionIntro titleId="dashboard-resources-title" eyebrow="Recursos" title="Lo que tienes" description="Gestiona tus créditos, cupos y pool." />
               <div className="mt-4 space-y-3">
                 <DashboardResourceRow
                   id={MODULE_ANCHORS.cukieMaster}
@@ -497,7 +537,7 @@ export function DashboardOverviewPanel() {
           </div>
 
           <section id="dashboard-account-status" aria-labelledby="dashboard-account-status-title" className="min-w-0 border-t border-white/10 pt-5">
-            <SectionIntro titleId="dashboard-account-status-title" eyebrow="Seguimiento" title="Cobros y colección" description="Comprueba qué requiere una acción y qué está simplemente en seguimiento." />
+            <SectionIntro titleId="dashboard-account-status-title" eyebrow="Seguimiento" title="Cobros y colección" description="Consulta tus premios, vesting y colección." />
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <DashboardResourceRow
                 id={MODULE_ANCHORS.rewards}
@@ -611,21 +651,18 @@ function DashboardSkeleton() {
   const skeleton = 'rounded-[5px] bg-white/[0.08] motion-safe:animate-pulse motion-reduce:animate-none';
   return (
     <div data-testid="dashboard-skeleton" aria-busy="true" aria-live="polite" className="space-y-5">
-      <div className="rounded-[16px] border border-white/10 bg-black/20 p-5 sm:p-7">
-        <div className="flex flex-col gap-3">
+      <div className="rounded-[16px] border border-white/10 bg-black/20 p-4 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)]">
             <Loader2 className="h-4 w-4 text-[var(--uki-lilac)] motion-safe:animate-spin" aria-hidden="true" />
             Cargando tu cuenta…
           </p>
-          <span className={`${skeleton} h-3 w-24`} />
-          <span className={`${skeleton} h-10 w-3/4 max-w-md`} />
-          <span className={`${skeleton} h-4 w-full max-w-xl`} />
-          <span className={`${skeleton} h-4 w-2/3 max-w-lg`} />
+          <span className={`${skeleton} h-8 w-36`} />
         </div>
-        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-          <span className={`${skeleton} h-36 w-full`} />
+        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+          <span className={`${skeleton} h-24 w-full`} />
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-white/10 bg-white/10">
-            {Array.from({ length: 4 }, (_, index) => <span key={index} className={`${skeleton} h-16 rounded-none bg-[#100b18]`} />)}
+            {Array.from({ length: 4 }, (_, index) => <span key={index} className={`${skeleton} h-14 rounded-none bg-[#100b18]`} />)}
           </div>
         </div>
       </div>
@@ -750,22 +787,21 @@ function SectionIntro({
 
 function PrimaryActionPanel({ action }: { action: PrimaryAction }) {
   return (
-    <Panel className="border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/[0.08]" innerClassName="relative overflow-hidden p-5 sm:p-6">
-      <div className="absolute -right-12 -top-16 h-36 w-36 rounded-full bg-[var(--uki-lilac)]/15 blur-3xl" aria-hidden="true" />
-      <div className="relative">
-        <p className="uki-label">Próximo paso</p>
-        <h3 className="mt-2 font-headline text-2xl font-black text-[var(--uki-cream)]">{action.title}</h3>
-        <p className="mt-2 max-w-lg text-sm font-semibold leading-relaxed text-[var(--uki-text)]">{action.description}</p>
-        <Link href={action.href} className="uki-button uki-button-primary mt-5 min-h-11 w-fit justify-center px-4">
-          <span>{action.label}</span>
-          <span className="uki-button-icon" aria-hidden="true"><ArrowRight className="h-4 w-4" /></span>
-        </Link>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+      <div className="min-w-0 flex-1">
+        <p className="uki-label">Siguiente</p>
+        <h3 className="mt-1 font-headline text-lg font-black text-[var(--uki-cream)] sm:text-xl">{action.title}</h3>
+        <p className="mt-1 max-w-lg text-xs font-semibold leading-relaxed text-[var(--uki-text)] sm:text-sm">{action.description}</p>
       </div>
-    </Panel>
+      <Link href={action.href} className="uki-button uki-button-primary min-h-10 shrink-0 justify-center px-3 sm:px-4">
+        <span>{action.label}</span>
+        <span className="uki-button-icon" aria-hidden="true"><ArrowRight className="h-4 w-4" /></span>
+      </Link>
+    </div>
   );
 }
 
-function MetricStrip({ summary }: { summary: DashboardSummary }) {
+function MetricStrip({ summary, masterDataReady }: { summary: DashboardSummary; masterDataReady: boolean }) {
   const game = moduleData(summary.modules.game);
   const credits = moduleData(summary.modules.credits);
   const master = moduleData(summary.modules.cukieMaster);
@@ -789,8 +825,8 @@ function MetricStrip({ summary }: { summary: DashboardSummary }) {
     },
     {
       label: 'Cupos activos',
-      value: master ? `${integerLabel(master.allocatedSlots)} / ${integerLabel(master.maxPotentialSlots)}` : 'No disponible',
-      detail: 'Rutas UKI + Originales',
+      value: masterDataReady && master ? `${integerLabel(master.allocatedSlots)} / ${integerLabel(master.maxPotentialSlots)}` : 'No disponible',
+      detail: masterDataReady ? 'Rutas UKI + Originales' : 'Pendientes de confirmar',
     },
     {
       label: 'Premios',
@@ -829,7 +865,7 @@ function PlayPanel({
   const attemptsKnown = game?.attemptsRemaining !== null && game?.attemptsRemaining !== undefined;
   const canPlay = Boolean(game?.enabled && attemptsKnown && game.attemptsRemaining! > 0);
   const gameDescription = module.state === 'unavailable'
-    ? 'La fuente del juego no está disponible ahora.'
+    ? 'No podemos consultar el juego ahora.'
     : !game?.configured
       ? 'El juego todavía no está configurado para esta cuenta.'
       : !game.enabled
@@ -848,7 +884,7 @@ function PlayPanel({
           </span>
           <div className="min-w-0">
             <p className="uki-label">Treasure Hunt</p>
-            <h3 className="mt-1 font-headline text-xl font-black text-[var(--uki-cream)]">Jugar con contexto</h3>
+            <h3 className="mt-1 font-headline text-xl font-black text-[var(--uki-cream)]">Treasure Hunt</h3>
           </div>
         </div>
         <ModuleStatePill module={module} />
