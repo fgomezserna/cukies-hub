@@ -204,7 +204,7 @@ export function WalletConnectorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[92vw] border border-[var(--uki-lilac-border)] bg-[#070817] p-4 text-[var(--uki-cream)] shadow-[0_0_54px_rgba(228,92,255,0.18)] sm:max-w-md">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-[92vw] overflow-y-auto border border-[var(--uki-lilac-border)] bg-[#070817] p-4 text-[var(--uki-cream)] shadow-[0_0_54px_rgba(228,92,255,0.18)] sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-headline text-xl font-black uppercase tracking-[0.04em] text-[var(--uki-cream)]">
             {title}
@@ -233,7 +233,7 @@ export function WalletConnectorDialog({
                     }, `mobile-${wallet.id}`)}
                     className="grid min-h-20 gap-1 rounded-[8px] border border-white/10 bg-white/[0.035] px-2 py-2 text-left transition hover:border-[var(--uki-lilac)]/45 hover:bg-[var(--uki-lilac)]/10 disabled:cursor-not-allowed disabled:opacity-55"
                   >
-                    <span className="flex items-center gap-2">
+                    <span className="flex flex-col items-start gap-1 min-[360px]:flex-row min-[360px]:items-center min-[360px]:gap-2">
                       <Image
                         src={wallet.logoSrc}
                         alt={`${wallet.label} logo`}
@@ -338,6 +338,12 @@ export function WalletConnectorDialog({
           })}
 
           {tronLinkNative ? (
+            <h3 className="px-1 pt-1 text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
+              Wallet TRON
+            </h3>
+          ) : null}
+
+          {tronLinkNative ? (
             <button
               type="button"
               disabled={isBusy || !tronLinkNative.isInstalled}
@@ -352,7 +358,7 @@ export function WalletConnectorDialog({
                   TronLink TRON
                 </span>
                 <span className="mt-0.5 block text-xs font-semibold leading-snug text-[var(--uki-muted)]">
-                  {tronLinkNative.isInstalled ? 'Conexion nativa para wallet TRON.' : 'Instala o activa TronLink.'}
+                  {tronLinkNative.isInstalled ? 'Conecta tu wallet de TRON.' : 'Instala o activa TronLink.'}
                 </span>
               </span>
               {selectedId === 'tronlink-native' || tronLinkNative.isLoading ? (
