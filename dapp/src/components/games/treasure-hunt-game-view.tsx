@@ -223,23 +223,35 @@ export default function TreasureHuntGameView() {
     const priorKey = recoveringParentSessionsRef.current.get(expectedSessionId);
     if (priorKey) return;
     recoveringParentSessionsRef.current.set(expectedSessionId, replacementIdempotencyKey);
-    sendSessionClear(expectedSessionId);
-    if (!finalizeParentSessionRotation(expectedSessionId)) {
-      recoveringParentSessionsRef.current.delete(expectedSessionId);
-      return;
-    }
-    // The server-derived key is persisted before start-session. A retry, a
-    // reload, or a second client therefore resolves the same new authority.
+    // `replace` persists the server-derived key before touching the old iframe
+    // or clearing the UI. A storage failure therefore leaves the old authority
+    // and its resumable state intact; a reload/retry still uses this exact key.
     void sessionStarterRef.current
       ?.replace(ownerUserId, expectedSessionId, replacementIdempotencyKey)
-      .then(() => {
+      .then((replacement) => {
+        if (
+          latestWalletUserIdRef.current !== ownerUserId ||
+          latestParentGameSessionRef.current?.sessionId !== expectedSessionId
+        ) {
+          recoveringParentSessionsRef.current.delete(expectedSessionId);
+          return;
+        }
+        sendSessionClear(expectedSessionId);
+        competitionCoordinator.reset(expectedSessionId);
+        recoveredCompetitionResultsRef.current.forEach((_value, key) => {
+          if (key.startsWith(`${expectedSessionId}:`)) {
+            recoveredCompetitionResultsRef.current.delete(key);
+          }
+        });
+        setParentGameSession({ ...replacement, ownerUserId });
         recoveringParentSessionsRef.current.delete(expectedSessionId);
       })
       .catch(() => {
-        // The pending key remains in sessionStorage. The layout effect retries
-        // it on the next render/reload without rotating another authority.
+        // Keep the old authority and UI. The durable recovery key remains in
+        // sessionStorage, and a later retry/reload reuses it without rotation.
+        recoveringParentSessionsRef.current.delete(expectedSessionId);
       });
-  }, [finalizeParentSessionRotation, sendSessionClear]);
+  }, [competitionCoordinator, sendSessionClear]);
 
   useEffect(() => {
     for (const key of Object.keys(localStorage)) {

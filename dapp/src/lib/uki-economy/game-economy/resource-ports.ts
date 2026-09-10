@@ -32,6 +32,15 @@ import type {
   VerifyGameResultInput,
 } from "./ports";
 import { stableGameEconomyHash, validGameText } from "./rules";
+import {
+  buildGameCukieAssignmentEvidence,
+  buildGameOwnCukieAssignmentEvidence,
+} from "./resource-evidence";
+
+export {
+  buildGameCukieAssignmentEvidence,
+  buildGameOwnCukieAssignmentEvidence,
+} from "./resource-evidence";
 
 type ResourceBinding = {
   _id: string;
@@ -273,53 +282,6 @@ export function buildGameCreditReservationEvidence(
       bucket: reservation.bucket,
       expiresAt: reservation.expiresAt,
       payloadHash: reservation.payloadHash,
-    }),
-  };
-}
-
-export function buildGameCukieAssignmentEvidence(
-  assignment: CukiePoolAssignment,
-): GameResourceReservationResult {
-  return {
-    reservationId: assignment.assignmentId,
-    evidenceHash: stableGameEconomyHash({
-      kind: "game-cukie-pool-assignment-evidence",
-      assignmentId: assignment.assignmentId,
-      sessionId: assignment.sessionId,
-      assignmentKind: assignment.kind,
-      assetId: assignment.assetId,
-      tokenId: assignment.tokenId,
-      ownerNormalized: assignment.ownerNormalized,
-      generation: assignment.generation,
-      rarity: assignment.rarity,
-      ownerRewardEligible: assignment.ownerRewardEligible,
-      assignedAt: assignment.assignedAt,
-      expiresAt: assignment.expiresAt,
-      requestHash: assignment.requestHash,
-    }),
-  };
-}
-
-export function buildGameOwnCukieAssignmentEvidence(
-  assignment: OwnCukieAssignment,
-): GameResourceReservationResult {
-  assertOwnCukieAssignmentIntegrity(assignment);
-  return {
-    reservationId: assignment.assignmentId,
-    evidenceHash: stableGameEconomyHash({
-      kind: "game-cukie-own-assignment-evidence",
-      assignmentId: assignment.assignmentId,
-      sessionId: assignment.sessionId,
-      epochId: assignment.epochId,
-      assetId: assignment.assetId,
-      tokenId: assignment.tokenId,
-      ownerNormalized: assignment.ownerNormalized,
-      ownershipEventId: assignment.ownershipEventId,
-      generation: assignment.generation,
-      rarity: assignment.rarity,
-      assignedAt: assignment.assignedAt,
-      expiresAt: assignment.expiresAt,
-      requestHash: assignment.requestHash,
     }),
   };
 }

@@ -40,8 +40,16 @@ import {
   buildGameResourceReservationResultHash,
   stableGameEconomyHash,
 } from "./rules";
+import {
+  buildGameCukieAssignmentEvidence,
+  buildGameOwnCukieAssignmentEvidence,
+} from "./resource-evidence";
 import { TREASURE_HUNT_ECONOMY_POLICY } from "./treasure-hunt-policy";
-import type { GameEconomyResource, GameEconomySession } from "./types";
+import type {
+  GameEconomyEvent,
+  GameEconomyResource,
+  GameEconomySession,
+} from "./types";
 import type { TreasureHuntEconomyRun } from "./treasure-hunt-types";
 
 /** Public codes deliberately contain no database or reservation details. */
@@ -56,6 +64,7 @@ const MAX_RECOVERY_CREDIT_LEDGER_ENTRIES = 32_768;
 const MAX_RECOVERY_CREDIT_LOTS = 1_024;
 const MAX_RECOVERY_ASSIGNMENTS = 32;
 const MAX_RECOVERY_EVENTS = 128;
+const MAX_RECOVERY_GAME_EVENTS = 128;
 const MAX_RECOVERY_POSITIONS = 8;
 const MAX_RECOVERY_LEASES = 8;
 const MAX_RECOVERY_LOCKS = 8;
@@ -115,6 +124,8 @@ type RecoverySnapshot = {
   creditLedgerComplete: boolean;
   creditLots: CreditLot[];
   creditLotsComplete: boolean;
+  gameEvents: GameEconomyEvent[];
+  gameEventsComplete: boolean;
   ownAssignments: OwnCukieAssignment[];
   ownAssignmentsComplete: boolean;
   ownEpoch: OwnCukieEpoch | null;
@@ -243,6 +254,100 @@ function assertReleasedBinding(
       `El binding ${kind} no coincide con el recurso.`
     );
   }
+}
+
+const GAME_ECONOMY_RESOURCE_STATES = new Set([
+  "not_required",
+  "pending",
+  "active",
+  "consumed",
+  "released",
+]);
+
+const GAME_ECONOMY_SESSION_STATUSES = new Set([
+  "created",
+  "resources_reserved",
+  "started",
+  "submitted",
+  "validated",
+  "settled",
+  "forfeited",
+  "expired",
+  "rejected",
+]);
+
+function assertGameEconomyEventChain(
+  session: GameEconomySession,
+  events: GameEconomyEvent[],
+) {
+  if (events.length !== session.revision + 1 || events.length === 0) {
+    throw new DomainConflictError("Faltan eventos de la saga economica.");
+  }
+  const ordered = [...events].sort((left, right) => left.toRevision - right.toRevision);
+  let previous: GameEconomyEvent | null = null;
+  for (const [index, event] of ordered.entries()) {
+    const immutable = {
+      eventId: event.eventId,
+      sessionId: event.sessionId,
+      fromRevision: event.fromRevision,
+      toRevision: event.toRevision,
+      fromStatus: event.fromStatus,
+      toStatus: event.toStatus,
+      creditState: event.creditState,
+      cukieState: event.cukieState,
+      fenceToken: event.fenceToken,
+      createdAt: event.createdAt,
+    };
+    const expectedEventId = stableGameEconomyHash({
+      kind: "game-economy-session-event-id",
+      sessionId: session.sessionId,
+      toRevision: index,
+    });
+    const expectedPayloadHash = stableGameEconomyHash({
+      kind: "game-economy-session-event",
+      ...immutable,
+    });
+    if (
+      event._id !== event.eventId ||
+      event.eventId !== expectedEventId ||
+      event.payloadHash !== expectedPayloadHash ||
+      event.sessionId !== session.sessionId ||
+      event.toRevision !== index ||
+      event.fromRevision !== (previous ? previous.toRevision : null) ||
+      event.fromStatus !== (previous ? previous.toStatus : null) ||
+      !GAME_ECONOMY_SESSION_STATUSES.has(event.toStatus) ||
+      !GAME_ECONOMY_RESOURCE_STATES.has(event.creditState) ||
+      !GAME_ECONOMY_RESOURCE_STATES.has(event.cukieState) ||
+      !isSafeNonNegativeInteger(event.fenceToken) ||
+      !(event.createdAt instanceof Date) ||
+      Number.isNaN(event.createdAt.getTime()) ||
+      (index === 0 ? event.fenceToken !== 0 : event.fenceToken < 1) ||
+      (index === 0 && (
+        event.fromRevision !== null ||
+        event.fromStatus !== null ||
+        event.toStatus !== "created" ||
+        event.creditState !== (session.rule.credit.required ? "pending" : "not_required") ||
+        event.cukieState !== (session.rule.cukie.required ? "pending" : "not_required") ||
+        event.createdAt.getTime() !== session.createdAt.getTime()
+      )) ||
+      (previous && event.createdAt.getTime() < previous.createdAt.getTime()) ||
+      (previous && event.fenceToken < previous.fenceToken)
+    ) {
+      throw new DomainConflictError("La cadena de eventos de la saga no es canonica.");
+    }
+    previous = event;
+  }
+  const last = ordered.at(-1)!;
+  if (
+    last.toStatus !== session.status ||
+    last.creditState !== session.credit.state ||
+    last.cukieState !== session.cukie.state ||
+    last.fenceToken !== session.fenceToken ||
+    last.createdAt.getTime() !== session.updatedAt.getTime()
+  ) {
+    throw new DomainConflictError("El ultimo evento no coincide con la sesion.");
+  }
+  return ordered;
 }
 
 type CreditLedgerEntryExpectation = {
@@ -542,13 +647,14 @@ function assertCreditLotLedger(
 
 function assertReleasedCredit(
   session: GameEconomySession,
-  binding: GameEconomyResourceBinding,
+  binding: GameEconomyResourceBinding | null,
   reservations: CreditReservation[],
   ledger: CompetitionCreditLedgerEntry[],
   lots: CreditLot[]
 ) {
   const resource = session.credit;
-  const expectedReservationKey = binding.reservationIdempotencyKey;
+  const expectedReservationKey =
+    binding?.reservationIdempotencyKey ?? `${session.sessionId}:credit:reserve`;
   if (resource.reservationId === null) {
     if (reservations.length !== 0 || ledger.length !== 0 || lots.length !== 0) {
       throw new DomainConflictError(
@@ -557,9 +663,16 @@ function assertReleasedCredit(
     }
     return;
   }
-  if (reservations.some((candidate) => candidate.status === "active")) {
+  if (!binding) {
+    throw new DomainConflictError("La reserva de creditos no tiene binding.");
+  }
+  const ownReservation = (candidate: CreditReservation) =>
+    candidate.sessionId === session.sessionId ||
+    candidate.idempotencyKey === expectedReservationKey ||
+    candidate.reservationId === resource.reservationId;
+  if (reservations.some((candidate) => ownReservation(candidate) && candidate.status === "active")) {
     throw new DomainConflictError(
-      "El lote de creditos conserva otra reserva activa."
+      "La sesion conserva otra reserva de creditos activa."
     );
   }
   const matchingReservations = reservations.filter(
@@ -692,6 +805,100 @@ function assertReleasedCredit(
     }
     assertCreditLotLedger(lot, ledger, reservations);
   }
+}
+
+function assertUnattemptedCukie(
+  snapshot: RecoverySnapshot,
+  orderedGameEvents: GameEconomyEvent[],
+) {
+  const { session } = snapshot;
+  const resource = session.cukie;
+  if (
+    resource.reservationId !== null ||
+    resource.evidenceHash !== null ||
+    resource.reservationResultHash !== null ||
+    snapshot.cukieBinding !== null ||
+    snapshot.ownAssignments.length !== 0 ||
+    snapshot.ownEpoch !== null ||
+    snapshot.ownEvents.length !== 0 ||
+    snapshot.poolAssignments.length !== 0 ||
+    snapshot.poolPositions.length !== 0 ||
+    snapshot.poolEvents.length !== 0 ||
+    snapshot.poolVaultLeases.length !== 0 ||
+    snapshot.locks.length !== 0 ||
+    snapshot.lockEvents.length !== 0
+  ) {
+    throw new DomainConflictError("La ausencia del recurso Cukie no es acreditable.");
+  }
+  // The reserve saga is strictly sequential (credit, then Cukie). A missing
+  // Cukie binding is safe to treat as never attempted only when the credit
+  // resource itself has no durable reservation and the immutable session event
+  // chain records credit compensation before the Cukie pending -> released
+  // transition. A missing binding after a successful credit reservation stays
+  // ambiguous and therefore fails closed.
+  if (
+    session.credit.reservationId !== null ||
+    !orderedGameEvents.some(
+      (event, index) =>
+        event.creditState === "released" &&
+        event.cukieState === "pending" &&
+        event.toStatus === "created" &&
+        orderedGameEvents[index + 1]?.creditState === "released" &&
+        orderedGameEvents[index + 1]?.cukieState === "released" &&
+        orderedGameEvents[index + 1]?.toStatus === "created",
+    ) ||
+    orderedGameEvents.some(
+      (event) => event.cukieState !== "pending" && event.cukieState !== "released",
+    )
+  ) {
+    throw new DomainConflictError("La secuencia no acredita que Cukie no se intentara.");
+  }
+}
+
+type CukieRecoverySource = "own" | "pool";
+
+function assertCukieSourceEvidence(
+  session: GameEconomySession,
+  binding: GameEconomyResourceBinding,
+  source: CukieRecoverySource,
+  assignment: OwnCukieAssignment | CukiePoolAssignment,
+) {
+  const evidence = source === "own"
+    ? buildGameOwnCukieAssignmentEvidence(assignment as OwnCukieAssignment)
+    : buildGameCukieAssignmentEvidence(assignment as CukiePoolAssignment);
+  if (
+    evidence.reservationId !== session.cukie.reservationId ||
+    evidence.evidenceHash !== session.cukie.evidenceHash ||
+    binding.reservationId !== evidence.reservationId ||
+    binding.evidenceHash !== evidence.evidenceHash
+  ) {
+    throw new DomainConflictError("La fuente Cukie no coincide con la evidencia de sesion.");
+  }
+}
+
+function resolveCukieSource(snapshot: RecoverySnapshot): CukieRecoverySource {
+  const reservationId = snapshot.session.cukie.reservationId;
+  if (!reservationId) {
+    throw new DomainConflictError("La sesion no tiene reserva Cukie.");
+  }
+  const own = snapshot.ownAssignments;
+  const pool = snapshot.poolAssignments;
+  if (own.length > 1 || pool.length > 1 || (own.length > 0 && pool.length > 0)) {
+    throw new DomainConflictError("La reserva Cukie aparece en dos fuentes.");
+  }
+  if (own.length === 1) {
+    if (own[0].assignmentId !== reservationId) {
+      throw new DomainConflictError("La reserva propia no coincide con la sesion.");
+    }
+    return "own";
+  }
+  if (pool.length === 1) {
+    if (pool[0].assignmentId !== reservationId) {
+      throw new DomainConflictError("La reserva de pool no coincide con la sesion.");
+    }
+    return "pool";
+  }
+  throw new DomainConflictError("La reserva Cukie no tiene fuente canonica.");
 }
 
 function ownReleaseEvidence(
@@ -1038,6 +1245,7 @@ function assessRecovery(
     !snapshot.creditReservationsComplete ||
     !snapshot.creditLedgerComplete ||
     !snapshot.creditLotsComplete ||
+    !snapshot.gameEventsComplete ||
     !snapshot.ownAssignmentsComplete ||
     !snapshot.ownEventsComplete ||
     !snapshot.poolAssignmentsComplete ||
@@ -1085,45 +1293,83 @@ function assessRecovery(
     return pending("terminal_receipt_incomplete");
   }
   try {
+    const orderedGameEvents = assertGameEconomyEventChain(
+      session,
+      snapshot.gameEvents,
+    );
     for (const reservation of snapshot.creditReservations) {
       validateReservationIntegrity(reservation);
     }
-    assertReleasedBinding(snapshot.creditBinding, session, "credit");
-    assertReleasedBinding(snapshot.cukieBinding, session, "cukie");
+    if (snapshot.creditBinding) {
+      assertReleasedBinding(snapshot.creditBinding, session, "credit");
+    } else if (session.credit.reservationId !== null) {
+      throw new DomainConflictError("La reserva de creditos no tiene binding.");
+    }
     assertReleasedCredit(
       session,
-      snapshot.creditBinding!,
+      snapshot.creditBinding,
       snapshot.creditReservations,
       snapshot.creditLedger,
       snapshot.creditLots
     );
-    if (
-      snapshot.ownAssignments.length > 0 &&
-      snapshot.poolAssignments.length > 0
-    ) {
-      throw new DomainConflictError(
-        "La asignacion Cukie aparece en dos fuentes."
-      );
+    if (session.cukie.reservationId === null) {
+      assertUnattemptedCukie(snapshot, orderedGameEvents);
+    } else {
+      if (!snapshot.cukieBinding) {
+        throw new DomainConflictError("La reserva Cukie no tiene binding.");
+      }
+      assertReleasedBinding(snapshot.cukieBinding, session, "cukie");
+      const source = resolveCukieSource(snapshot);
+      if (source === "own") {
+        if (
+          snapshot.poolAssignments.length !== 0 ||
+          snapshot.poolPositions.length !== 0 ||
+          snapshot.poolEvents.length !== 0 ||
+          snapshot.poolVaultLeases.length !== 0
+        ) {
+          throw new DomainConflictError("La fuente de pool conserva efectos inesperados.");
+        }
+        assertCukieSourceEvidence(
+          session,
+          snapshot.cukieBinding,
+          source,
+          snapshot.ownAssignments[0],
+        );
+        assertReleasedOwn(
+          session,
+          snapshot.cukieBinding,
+          snapshot.ownAssignments,
+          snapshot.ownEpoch,
+          snapshot.ownEvents,
+          snapshot.locks,
+          snapshot.lockEvents
+        );
+      } else {
+        if (
+          snapshot.ownAssignments.length !== 0 ||
+          snapshot.ownEpoch !== null ||
+          snapshot.ownEvents.length !== 0
+        ) {
+          throw new DomainConflictError("La fuente propia conserva efectos inesperados.");
+        }
+        assertCukieSourceEvidence(
+          session,
+          snapshot.cukieBinding,
+          source,
+          snapshot.poolAssignments[0],
+        );
+        assertReleasedPool(
+          session,
+          snapshot.cukieBinding,
+          snapshot.poolAssignments,
+          snapshot.poolPositions,
+          snapshot.poolEvents,
+          snapshot.poolVaultLeases,
+          snapshot.locks,
+          snapshot.lockEvents
+        );
+      }
     }
-    assertReleasedOwn(
-      session,
-      snapshot.cukieBinding!,
-      snapshot.ownAssignments,
-      snapshot.ownEpoch,
-      snapshot.ownEvents,
-      snapshot.locks,
-      snapshot.lockEvents
-    );
-    assertReleasedPool(
-      session,
-      snapshot.cukieBinding!,
-      snapshot.poolAssignments,
-      snapshot.poolPositions,
-      snapshot.poolEvents,
-      snapshot.poolVaultLeases,
-      snapshot.locks,
-      snapshot.lockEvents
-    );
     assertNoActiveAssignment(snapshot);
   } catch {
     return pending("underlying_compensation_unproven");
@@ -1162,6 +1408,13 @@ async function readSnapshot(
         { gameEconomySessionId: session.sessionId },
       ],
     }) as Filter<TreasureHuntEconomyRun>
+  );
+
+  const gameEventsRead = await readBounded(
+    input.db
+      .collection<GameEconomyEvent>("game_economy_events")
+      .find({ sessionId: session.sessionId }),
+    MAX_RECOVERY_GAME_EVENTS,
   );
 
   const bindings = input.db.collection<GameEconomyResourceBinding>(
@@ -1309,72 +1562,124 @@ async function readSnapshot(
   const ownAssignments = ownAssignmentsRead.values;
   const poolAssignments = poolAssignmentsRead.values;
 
-  const ownEpoch =
-    ownAssignments.length === 1
-      ? await input.db
-          .collection<OwnCukieEpoch>("game_owned_cukie_epochs")
-          .findOne({ _id: ownAssignments[0].epochId })
-      : null;
-  const ownEventsRead =
-    ownAssignments.length === 1
-      ? await readBounded(
-          input.db
-            .collection<OwnCukieEvent>("game_owned_cukie_events")
-            .find({ assignmentId: ownAssignments[0].assignmentId }),
-          MAX_RECOVERY_EVENTS,
-        )
-      : { values: [] as OwnCukieEvent[], complete: true };
-  const poolEventsRead =
-    poolAssignments.length === 1
-      ? await readBounded(
-          input.db
-            .collection<CukiePoolEvent>("cukie_pool_events")
-            .find({ assignmentId: poolAssignments[0].assignmentId }),
-          MAX_RECOVERY_EVENTS,
-        )
-      : { values: [] as CukiePoolEvent[], complete: true };
-  const poolPositionsRead =
-    poolAssignments.length === 1 && poolAssignments[0].positionId
-      ? await readBounded(
-          input.db
-            .collection<CukiePoolPosition>("cukie_pool_positions")
-            .find({ _id: poolAssignments[0].positionId }),
-          MAX_RECOVERY_POSITIONS,
-        )
-      : { values: [] as CukiePoolPosition[], complete: true };
-  const poolVaultLeasesRead =
-    poolAssignments.length === 1 && poolAssignments[0].positionId
-      ? await readBounded(
-          input.db
-            .collection<CukiePoolVaultAssetLease>(CUKIE_POOL_VAULT_ASSET_LEASES)
-            .find({ _id: poolAssignments[0].positionId }),
-          MAX_RECOVERY_LEASES,
-        )
-      : { values: [] as CukiePoolVaultAssetLease[], complete: true };
+  const ownAssignmentIds = ownAssignments.map((assignment) => assignment.assignmentId);
+  const poolAssignmentIds = poolAssignments.map((assignment) => assignment.assignmentId);
+  const ownEventKeys = [
+    `${session.sessionId}:cukie:reserve`,
+    `${session.sessionId}:cukie:release`,
+  ];
+  const poolEventKeys = ownEventKeys;
+  const ownEpochRead = await readBounded(
+    input.db
+      .collection<OwnCukieEpoch>("game_owned_cukie_epochs")
+      .find({
+        $or: [
+          ...(ownAssignments.length === 1 ? [{ _id: ownAssignments[0].epochId }] : []),
+          { assignmentSessionId: session.sessionId },
+        ],
+      } as Filter<OwnCukieEpoch>),
+    MAX_RECOVERY_ASSIGNMENTS,
+  );
+  const ownEpoch = ownEpochRead.values.length === 1 ? ownEpochRead.values[0] : null;
+  const ownEventsRead = await readBounded(
+    input.db
+      .collection<OwnCukieEvent>("game_owned_cukie_events")
+      .find({
+        $or: [
+          ...(ownAssignmentIds.length > 0 ? [{ assignmentId: { $in: ownAssignmentIds } }] : []),
+          { idempotencyKey: { $in: ownEventKeys } },
+        ],
+      } as Filter<OwnCukieEvent>),
+    MAX_RECOVERY_EVENTS,
+  );
+  const poolEventsRead = await readBounded(
+    input.db
+      .collection<CukiePoolEvent>("cukie_pool_events")
+      .find({
+        $or: [
+          ...(poolAssignmentIds.length > 0 ? [{ assignmentId: { $in: poolAssignmentIds } }] : []),
+          { idempotencyKey: { $in: poolEventKeys } },
+        ],
+      } as Filter<CukiePoolEvent>),
+    MAX_RECOVERY_EVENTS,
+  );
+  const poolPositionIds = poolAssignments
+    .map((assignment) => assignment.positionId)
+    .filter((positionId): positionId is string => Boolean(positionId));
+  const poolPositionsRead = await readBounded(
+    input.db
+      .collection<CukiePoolPosition>("cukie_pool_positions")
+      .find({
+        $or: [
+          ...(poolPositionIds.length > 0 ? [{ _id: { $in: poolPositionIds } }] : []),
+          { assignmentSessionId: session.sessionId },
+        ],
+      } as Filter<CukiePoolPosition>),
+    MAX_RECOVERY_POSITIONS,
+  );
+  const leasePositionIds = [
+    ...new Set([
+      ...poolPositionIds,
+      ...poolPositionsRead.values.map((position) => position.positionId),
+    ]),
+  ];
+  const poolVaultLeasesRead = await readBounded(
+    input.db
+      .collection<CukiePoolVaultAssetLease>(CUKIE_POOL_VAULT_ASSET_LEASES)
+      .find({
+        $or: [
+          { sessionId: session.sessionId },
+          ...(leasePositionIds.length > 0 ? [{ positionId: { $in: leasePositionIds } }] : []),
+          ...(session.cukie.reservationId
+            ? [{ assignmentId: session.cukie.reservationId }]
+            : []),
+        ],
+      } as Filter<CukiePoolVaultAssetLease>),
+    MAX_RECOVERY_LEASES,
+  );
   const ownEvents = ownEventsRead.values;
   const poolEvents = poolEventsRead.values;
   const poolPositions = poolPositionsRead.values;
   const poolVaultLeases = poolVaultLeasesRead.values;
 
   const lockIds = [
-    ...(ownAssignments.length === 1 ? [ownAssignments[0].lockId] : []),
-    ...(poolPositions.length === 1 ? [poolPositions[0].lockId] : []),
+    ...ownAssignments.map((assignment) => assignment.lockId),
+    ...poolPositions.map((position) => position.lockId),
   ].filter(isNonEmptyText);
+  const lockIdempotencyKeys = [
+    `own-cukie:assign-lock:${session.sessionId}:cukie:reserve`,
+    `own-cukie:assign-soft-stake:${session.sessionId}:cukie:reserve`,
+    `own-cukie:terminal-lock:${session.sessionId}:cukie:release`,
+    `cukie-pool:assign-lock:${session.sessionId}:cukie:reserve`,
+    `cukie-pool:return-lock:${session.sessionId}:cukie:release`,
+    `cukie-pool:release-lock:${session.sessionId}:cukie:release`,
+  ];
   const locksRead =
-    lockIds.length > 0
+    lockIds.length > 0 || lockIdempotencyKeys.length > 0
       ? await readBounded(
           input.db
             .collection<NftAssetLockDocument>("nft_asset_locks")
-            .find({ lockId: { $in: lockIds } }),
+            .find({
+              $or: [
+                ...(lockIds.length > 0 ? [{ lockId: { $in: lockIds } }] : []),
+                { sessionId: session.sessionId },
+                { idempotencyKey: { $in: lockIdempotencyKeys } },
+              ],
+            }),
           MAX_RECOVERY_LOCKS,
         )
       : { values: [] as NftAssetLockDocument[], complete: true };
   const lockEventsRead =
-    lockIds.length > 0
+    lockIds.length > 0 || lockIdempotencyKeys.length > 0
       ? await readBounded(
           input.db
             .collection<NftAssetLockEventDocument>("nft_asset_lock_events")
-            .find({ lockId: { $in: lockIds } }),
+            .find({
+              $or: [
+                ...(lockIds.length > 0 ? [{ lockId: { $in: lockIds } }] : []),
+                { idempotencyKey: { $in: lockIdempotencyKeys } },
+              ],
+            }),
           MAX_RECOVERY_LOCK_EVENTS,
         )
       : { values: [] as NftAssetLockEventDocument[], complete: true };
@@ -1392,8 +1697,10 @@ async function readSnapshot(
     creditLedgerComplete: creditLedgerRead.complete,
     creditLots,
     creditLotsComplete,
+    gameEvents: gameEventsRead.values,
+    gameEventsComplete: gameEventsRead.complete,
     ownAssignments,
-    ownAssignmentsComplete: ownAssignmentsRead.complete,
+    ownAssignmentsComplete: ownAssignmentsRead.complete && ownEpochRead.complete,
     ownEpoch,
     ownEvents,
     ownEventsComplete: ownEventsRead.complete,
