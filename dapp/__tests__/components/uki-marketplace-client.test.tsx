@@ -51,7 +51,7 @@ describe('Marketplace UKI público', () => {
     expect(screen.getByText((_, element) => (
       element?.tagName === 'P' && element.textContent === '1000 UKI'
     ))).toBeInTheDocument();
-    expect(screen.getByText('Pago: UKI, BNB o USDT')).toBeInTheDocument();
+    expect(screen.getByText('Precio fijado en UKI')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/marketplace/v1/orders?scope=public&limit=24',
       expect.objectContaining({ cache: 'no-store' }),
