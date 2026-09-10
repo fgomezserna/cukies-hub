@@ -1,0 +1,60 @@
+{
+  "observedAt": "2026-09-10T19:39:22.362641+00:00",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/398",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34520888641",
+  "servedSha": "85f9b58683dee9953539417fecb4eb47222a5a2f",
+  "publicHealth": 200,
+  "publicReady": 200,
+  "journal": "clean",
+  "protectedContainers": {
+    "total": 25,
+    "preserved": 25,
+    "changed": []
+  },
+  "workers": {
+    "count": 10,
+    "runningWithoutRestarts": true
+  },
+  "productionShaUnchanged": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+  "checks": {
+    "suites": 261,
+    "tests": 2132,
+    "lint": "passed",
+    "typecheck": "passed",
+    "build": "passed"
+  },
+  "publicUi": {
+    "url": "https://cukieshub.eurekand.com/cukies",
+    "browser": "Edge",
+    "viewport": [
+      1792,
+      953
+    ],
+    "cardCount": 12,
+    "iconsPresent": true,
+    "cardActionMinHeight": 44,
+    "sheet": {
+      "tokenId": "98000005",
+      "side": "right",
+      "width": 560,
+      "lilac": "#e45cff",
+      "gold": "#f2c34b",
+      "priceInput": "12,5",
+      "sellerAmountUki": "12.5",
+      "buyerFeePercent": 5,
+      "approveEnabled": true,
+      "publishHiddenUntilApproval": true,
+      "alerts": []
+    },
+    "closedWithoutTransaction": true,
+    "focusReturnedTo": "Vender",
+    "horizontalOverflow": false
+  },
+  "localResponsiveQa": "2026-09-10-nft-cards-sale-sheet-qa/README.md",
+  "signedTransactions": "not_executed",
+  "limits": [
+    "Mobile sizes were checked locally with simulated state; no native mobile keyboard test.",
+    "Approval, listing, rejection and pending receipts are covered by automated tests. This delivery does not certify a new on-chain sale.",
+    "No contract, scheduler or 30-minute cycle changes."
+  ]
+}
