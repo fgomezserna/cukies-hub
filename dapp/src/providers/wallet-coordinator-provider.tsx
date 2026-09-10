@@ -160,6 +160,7 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
 
   const rejectPending = useCallback((pending: PendingRequest | null, error: unknown) => {
     if (pending && !isCurrentPending(pending)) return;
+    if (!pending && pendingRequestRef.current) return;
     if (pending) {
       pending.reject(error);
       pendingRequestRef.current = null;
@@ -295,6 +296,7 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
         connector: selectedConnector,
         ...(request?.targetChainId ? { chainId: request.targetChainId } : {}),
       });
+      if (pending ? !isCurrentPending(pending) : pendingRequestRef.current !== null) return;
       if (request?.targetChainId !== undefined && result.chainId !== request.targetChainId) {
         await switchChainAsync({ chainId: request.targetChainId });
       }
@@ -315,6 +317,7 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
       const connectedAddress = tronIsConnected && tronAddress
         ? tronAddress
         : await connectTronLink();
+      if (pending ? !isCurrentPending(pending) : pendingRequestRef.current !== null) return;
       if (!connectedAddress) throw new Error(tronError ?? 'TRON_CONNECTION_FAILED');
       if (request?.targetTronNetwork === 'mainnet') {
         const chainId = tronChainId ?? resolveTronChainId();

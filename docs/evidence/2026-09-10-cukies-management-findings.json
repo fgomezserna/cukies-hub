@@ -70,6 +70,21 @@
         "settlement/publication/claim"
       ],
       "limit": "prior 0-point QA does not demonstrate positive-score ranking or reward assignment"
+    },
+    "withdrawalWaitPeriods": {
+      "reportedAt": "2026-09-10",
+      "tokenIds": [
+        "98000001",
+        "98000003",
+        "98000004"
+      ],
+      "observedWithdrawableAt": "2026-09-10T14:00:00Z",
+      "request": "Independent PR: investigate why withdrawal waits span multiple staging periods.",
+      "expectedRule": "Request in period D becomes withdrawable at the end of D; no wait for reward settlement.",
+      "ownerTask": "01a0814e-0ea0-7070-877c-701f264243e7",
+      "status": "Contract-specific calendar, request event and mutable configuration under review.",
+      "artifact": "codex-clipboard-80e3192e-b9af-4e54-99f8-2bc8b6c02bdd.jpg",
+      "cycle15RemainsCancelled": true
     }
   },
   "marketplacePublicConfiguration": [
@@ -406,5 +421,6 @@
         }
       }
     ]
-  }
+  },
+  "pointsPublicationEvidence": "2026-09-10-cukie-points-publication.json"
 }

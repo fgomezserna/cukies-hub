@@ -91,6 +91,46 @@ describe('WalletCoordinatorProvider pending request fencing', () => {
     delete window.tron;
   });
 
+  it.each(['evm', 'tron'] as const)('no inicia un cambio de red tras completar una conexión %s sustituida', async (kind) => {
+    const connection = deferred<unknown>();
+    mockUseAccount.mockReturnValue({ address: undefined, chainId: undefined, isConnected: false } as never);
+    mockUseConnect.mockReturnValue({ connectAsync: jest.fn(() => connection.promise), connectors: [], isPending: false } as never);
+    mockUseTronLink.mockReturnValue({
+      address: null,
+      chainId: TRON_SHASTA_CHAIN_ID,
+      isConnected: false,
+      isInstalled: true,
+      connect: jest.fn(() => connection.promise),
+      disconnect: jest.fn(),
+    } as never);
+    let api!: WalletCoordinatorContextValue;
+    const view = renderCoordinator((value) => { api = value; });
+    let selection!: Promise<void>;
+    let firstResult!: Promise<unknown>;
+    await act(async () => {
+      firstResult = api.requestWallet(kind === 'evm'
+        ? { kind, targetChainId: 56, reason: 'Primera' }
+        : { kind, targetTronNetwork: 'mainnet', reason: 'Primera' }).catch((error) => error);
+      selection = kind === 'evm' ? api.selectEvmConnector({} as never) : api.selectTronLink();
+    });
+    let replacementSettled = false;
+    await act(async () => {
+      void api.requestWallet(kind === 'evm'
+        ? { kind: 'tron', targetTronNetwork: 'mainnet', reason: 'Nueva' }
+        : { kind: 'evm', targetChainId: 56, reason: 'Nueva' })
+        .then(() => { replacementSettled = true; }, () => { replacementSettled = true; });
+    });
+    await expect(firstResult).resolves.toMatchObject({ message: 'WALLET_REQUEST_REPLACED' });
+    await act(async () => {
+      connection.resolve(kind === 'evm' ? { accounts: [evmAddress], chainId: 97 } : tronAddress);
+      await selection;
+    });
+    expect(switchEvm).not.toHaveBeenCalled();
+    expect(switchTron).not.toHaveBeenCalled();
+    expect(replacementSettled).toBe(false);
+    view.unmount();
+  });
+
   it('no permite que el switch tardío de A resuelva o rechace la solicitud B de otra familia', async () => {
     const evmSwitch = deferred<unknown>();
     const tronSwitch = deferred<unknown>();
