@@ -378,6 +378,26 @@ describe('DashboardOverviewPanel', () => {
     expect(screen.queryByRole('link', { name: /Reclamar premios/i })).not.toBeInTheDocument();
   });
 
+  it('distingue cero conocido de premios en preparación en la franja', async () => {
+    fetchMock.mockResolvedValue(response(summary({
+      rewards: module({ claimableRaw: '0', allocations: 0, claims: 0, claimPublished: false, blockedAllocations: 0 }),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    await screen.findByText('tester');
+    const rewardsMetric = screen.getAllByText('Premios')
+      .map((element) => element.closest('div'))
+      .find((element) => element && within(element).queryByText('Sin premios asignados')) as HTMLElement;
+    expect(rewardsMetric).toBeTruthy();
+    expect(within(rewardsMetric).getByText('Sin asignaciones')).toBeInTheDocument();
+    expect(within(rewardsMetric).queryByText('En preparación')).not.toBeInTheDocument();
+    expect(within(rewardsMetric).queryByText('Importes confirmados')).not.toBeInTheDocument();
+    const metricGrid = rewardsMetric.parentElement;
+    expect(metricGrid).toHaveClass('grid-cols-2');
+    expect(metricGrid).not.toHaveClass('sm:grid-cols-4');
+  });
+
   it('no muestra la wallet completa como texto duplicado', async () => {
     render(<DashboardOverviewPanel />);
 

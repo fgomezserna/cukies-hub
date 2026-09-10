@@ -801,11 +801,35 @@ function PrimaryActionPanel({ action }: { action: PrimaryAction }) {
   );
 }
 
+function rewardsMetric(module: DashboardModule<'rewards'>) {
+  if (module.state === 'unavailable') {
+    return { value: 'No disponible', detail: 'Estado no confirmado' };
+  }
+  if (module.state === 'degraded') {
+    return { value: 'En revisión', detail: 'Revisa el estado' };
+  }
+
+  const { claimableRaw, allocations, claimPublished } = module.data;
+  const hasClaimable = hasPositiveRaw(claimableRaw);
+  if (hasClaimable && claimPublished) {
+    return { value: 'Listos para reclamar', detail: 'Importes confirmados' };
+  }
+  if (hasClaimable || allocations > 0) {
+    return claimPublished
+      ? { value: 'Sin saldo pendiente', detail: 'Importes confirmados' }
+      : { value: 'En preparación', detail: 'Asignaciones pendientes' };
+  }
+  return claimPublished
+    ? { value: 'Sin saldo pendiente', detail: 'Sin saldo pendiente' }
+    : { value: 'Sin premios asignados', detail: 'Sin asignaciones' };
+}
+
 function MetricStrip({ summary, masterDataReady }: { summary: DashboardSummary; masterDataReady: boolean }) {
   const game = moduleData(summary.modules.game);
   const credits = moduleData(summary.modules.credits);
   const master = moduleData(summary.modules.cukieMaster);
   const rewards = moduleData(summary.modules.rewards);
+  const rewardsStatus = rewardsMetric(summary.modules.rewards);
   const metrics = [
     {
       label: 'Para jugar',
@@ -830,17 +854,13 @@ function MetricStrip({ summary, masterDataReady }: { summary: DashboardSummary; 
     },
     {
       label: 'Premios',
-      value: rewards
-        ? hasPositiveRaw(rewards.claimableRaw) && rewards.claimPublished
-          ? 'Listos para reclamar'
-          : rewards.claimPublished ? 'Sin saldo pendiente' : 'En preparación'
-        : 'No disponible',
-      detail: 'Importes confirmados',
+      value: rewardsStatus.value,
+      detail: rewardsStatus.detail,
     },
   ];
   return (
     <div className="overflow-hidden rounded-[11px] border border-white/10 bg-black/20">
-      <div className="grid grid-cols-2 divide-x divide-y divide-white/10 sm:grid-cols-4 sm:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-y divide-white/10">
         {metrics.map((metric) => (
           <div key={metric.label} className="min-w-0 px-3 py-3 sm:px-4 sm:py-4">
             <p className="uki-label break-words leading-tight">{metric.label}</p>
