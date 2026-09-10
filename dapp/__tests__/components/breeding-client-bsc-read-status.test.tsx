@@ -130,6 +130,8 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
       owner: '0x00000000000000000000000000000000000000aa',
       ownerNormalized: '0x00000000000000000000000000000000000000aa',
       identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
       network: 'BSC',
       origin: 'original',
       birthNetwork: 'BSC',
@@ -173,6 +175,8 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
       owner: '0x00000000000000000000000000000000000000aa',
       ownerNormalized: '0x00000000000000000000000000000000000000aa',
       identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
       network: 'BSC',
       origin: 'original',
       birthNetwork: 'BSC',
@@ -239,6 +243,8 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
       owner,
       ownerNormalized: owner.toLowerCase(),
       identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
       network: 'BSC',
       origin: 'original',
       birthNetwork: 'BSC',
@@ -303,6 +309,62 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     });
     expect(screen.getByRole('button', { name: /Cukie #32/ })).toBeInTheDocument();
     expect(screen.queryByText('Cukie #31')).not.toBeInTheDocument();
+  });
+
+  it('revoca el preview de A al cambiar a la wallet B', async () => {
+    const walletA = '0x00000000000000000000000000000000000000aa';
+    const walletB = '0x00000000000000000000000000000000000000bb';
+    const candidate = (tokenId: string, owner: string) => ({
+      id: tokenId,
+      tokenId,
+      chainId: 56,
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      cukiNumber: Number(tokenId),
+      owner,
+      ownerNormalized: owner.toLowerCase(),
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
+      network: 'BSC',
+      origin: 'original',
+      birthNetwork: 'BSC',
+      imageUrl: null,
+      type: 1,
+      state: 'available',
+      price: 0,
+      priceOriginal: '0',
+      skills: {},
+      childrenCount: 0,
+      childrenCountTron: 0,
+      childrenCountBsc: 0,
+      parents: [],
+      children: [],
+      history: [],
+      timestamp: null,
+    });
+    const fetchForWallet = (input: unknown) => {
+      const requestOwner = new URL(String(input), 'http://localhost').searchParams.get('owner');
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          status: 'verified',
+          items: [candidate(requestOwner === walletA ? '31' : '32', requestOwner ?? walletA)],
+        }),
+      });
+    };
+    global.fetch = jest.fn(fetchForWallet) as never;
+    mockUseAccount.mockReturnValue({ address: walletA, chainId: 97, isConnected: true });
+    const view = render(<BreedingClient initialTab="start" />);
+    const parentA = await screen.findByRole('button', { name: /Cukie #31/ });
+    fireEvent.click(parentA);
+    expect(screen.getAllByText('Cukie #31')).toHaveLength(2);
+
+    mockUseAccount.mockReturnValue({ address: walletB, chainId: 97, isConnected: true });
+    view.rerender(<BreedingClient initialTab="start" />);
+    await screen.findByRole('button', { name: /Cukie #32/ });
+    expect(screen.queryByText('Cukie #31')).not.toBeInTheDocument();
+    expect(screen.getByText('Padre 1').parentElement).toHaveTextContent('Sin seleccionar');
+    expect(mockWriteContract).not.toHaveBeenCalled();
   });
 
   it('permite cargar crías activas desde el cliente público 56 sin habilitar escrituras en 97', async () => {

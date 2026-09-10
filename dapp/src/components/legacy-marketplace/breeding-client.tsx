@@ -503,6 +503,8 @@ export function BreedingClient({
     candidatesRequestRef.current = requestId;
     const contextIsCurrent = () => requestId === candidatesRequestRef.current;
 
+    setParent1(null);
+    setParent2(null);
     setCandidates([]);
     setCandidatesReadStatus('loading');
     setCandidatesReadError(false);
@@ -805,7 +807,7 @@ export function BreedingClient({
     setCompletedReadStatus('idle');
     setActiveBreeds([]);
     setStatus(null);
-  }, [network]);
+  }, [chainId, network, owner, tronWalletRpcOrigin]);
 
   useEffect(() => {
     setTab(initialTab);

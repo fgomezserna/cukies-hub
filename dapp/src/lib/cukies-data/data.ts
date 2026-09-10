@@ -38,6 +38,10 @@ import {
   getLegacyPointExplorerUrl,
   legacyMarketplaceRuntime,
 } from '@/lib/legacy-marketplace/runtime';
+import {
+  readLegacyMarketplaceMaxBreeds,
+  readLegacyMarketplaceOwner,
+} from '@/lib/legacy-marketplace/live-marketplace';
 
 type CukiDocument = {
   _id: string;
@@ -118,6 +122,7 @@ type PointDocument = {
 
 const MAX_LIMIT = 60;
 const DEFAULT_LIMIT = 24;
+const MAX_CURRENT_OWNER_READS = 60;
 
 function toStringOrNull(value: unknown) {
   if (typeof value === 'string' && value.length > 0) return value;
@@ -211,6 +216,27 @@ async function getChainEventsCollection() {
 async function getPointsCollection() {
   const db = await getIndexerDb();
   return db.collection<PointDocument>('point_transactions');
+}
+
+async function readCurrentLegacyOwners(items: LegacyMarketplaceCukiItem[]) {
+  const owners: Array<string | null> = Array.from({ length: items.length }, () => null);
+  const readableItems = items.slice(0, MAX_CURRENT_OWNER_READS);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < readableItems.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        owners[index] = await readLegacyMarketplaceOwner(readableItems[index]);
+      } catch {
+        owners[index] = null;
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(8, readableItems.length) }, () => worker()),
+  );
+  return owners;
 }
 
 function getRecordValue(value: unknown, key: string) {
@@ -649,8 +675,34 @@ export async function listBreedingCandidates(
     .limit(Math.min(limit * 3, 180))
     .toArray();
 
-  let hasUnknownIdentity = false;
-  const items = [] as LegacyMarketplaceCukiItem[];
+  if (documents.length > 0) {
+    let currentMaxBreeds: number;
+    try {
+      currentMaxBreeds = await readLegacyMarketplaceMaxBreeds(identity.network);
+    } catch {
+      return {
+        source: 'mongo',
+        items: [],
+        total: 0,
+        maxBreeds,
+        status: 'unknown',
+        error: 'No se pudo verificar la elegibilidad Legacy ahora.',
+      };
+    }
+    if (currentMaxBreeds !== maxBreeds) {
+      return {
+        source: 'mongo',
+        items: [],
+        total: 0,
+        maxBreeds,
+        status: 'partial',
+        error: 'La elegibilidad Legacy ha cambiado. Actualiza para reintentar.',
+      };
+    }
+  }
+
+  let hasUnknownEvidence = false;
+  const pending = [] as LegacyMarketplaceCukiItem[];
   for (const document of documents) {
     const item = normalizeCuki(document);
     const identityKnown = isLegacyBreedingIdentity(document, identity.network);
@@ -658,18 +710,36 @@ export async function listBreedingCandidates(
     const eligibilityKnown = isLegacyBreedingEligibilityKnown(item, maxBreeds);
 
     if (!identityKnown || !ownerKnown || !eligibilityKnown) {
-      hasUnknownIdentity = true;
+      hasUnknownEvidence = true;
       continue;
     }
+    pending.push(item);
+  }
 
-    const verifiedItem = { ...item, identityVerified: true };
+  const currentOwners = await readCurrentLegacyOwners(pending);
+  const items = [] as LegacyMarketplaceCukiItem[];
+  pending.forEach((item, index) => {
+    const currentOwner = currentOwners[index];
+    if (!currentOwner) {
+      hasUnknownEvidence = true;
+      return;
+    }
+
+    const verifiedItem = {
+      ...item,
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf' as const,
+      owner: currentOwner,
+      ownerNormalized: currentOwner,
+    };
     if (isLegacyBreedingCandidate(verifiedItem, identity.network, owner, maxBreeds)) {
       items.push(verifiedItem);
     }
-  }
+  });
 
   const status: LegacyBreedingReadStatus =
-    documents.length === 0 ? 'unknown' : hasUnknownIdentity ? 'partial' : 'verified';
+    documents.length === 0 ? 'unknown' : hasUnknownEvidence ? 'partial' : 'verified';
   const visibleItems = items.slice(0, limit);
 
   return {
@@ -728,28 +798,59 @@ export async function listCompletedBreeds(
     .limit(Math.min((offset + limit) * 3, 180))
     .toArray();
 
-  let hasUnknownIdentity = false;
-  const verifiedDocuments = documents.filter((document) => {
+  let hasUnknownEvidence = false;
+  const pending = documents.flatMap((document) => {
     const identityKnown = isLegacyBreedingIdentity(document, identity.network);
     const ownerKnown = wallets.some((wallet) =>
       isLegacyBreedingOwner(document, identity.network, wallet),
     );
     if (!identityKnown || !ownerKnown) {
-      hasUnknownIdentity = true;
-      return false;
+      hasUnknownEvidence = true;
+      return [];
     }
-    return true;
+    return [{ document, item: normalizeCuki(document) }];
+  });
+  const currentOwners = await readCurrentLegacyOwners(pending.map(({ item }) => item));
+  const verifiedDocuments = pending.flatMap(({ document, item }, index) => {
+    const currentOwner = currentOwners[index];
+    if (!currentOwner) {
+      hasUnknownEvidence = true;
+      return [];
+    }
+    const ownerMatches = wallets.some((wallet) =>
+      isLegacyBreedingOwner(
+        { ...item, owner: currentOwner, ownerNormalized: currentOwner },
+        identity.network,
+        wallet,
+      ),
+    );
+    if (!ownerMatches) return [];
+    return [{ document, item: {
+      ...item,
+      identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf' as const,
+      owner: currentOwner,
+      ownerNormalized: currentOwner,
+    } }];
   });
   const pagedDocuments = verifiedDocuments.slice(offset, offset + limit);
   const hydrated = await Promise.all(
-    pagedDocuments.map((document) => hydrateCukiRelations(document, collection)),
+    pagedDocuments.map(({ document }) => hydrateCukiRelations(document, collection)),
   );
-  const items = hydrated.map((document) => ({
-    ...normalizeCuki(document),
-    identityVerified: true,
-  }));
+  const items = hydrated.map((document, index) => {
+    const verifiedItem = pagedDocuments[index].item;
+    return {
+      ...normalizeCuki(document),
+      owner: verifiedItem.owner,
+      ownerNormalized: verifiedItem.ownerNormalized,
+      identityVerified: verifiedItem.identityVerified,
+      ownershipVerified: verifiedItem.ownershipVerified,
+      ownershipSource: verifiedItem.ownershipSource,
+    };
+  });
   const status: LegacyBreedingReadStatus =
-    documents.length === 0 ? 'unknown' : hasUnknownIdentity ? 'partial' : 'verified';
+    documents.length === 0 ? 'unknown' : hasUnknownEvidence ? 'partial' : 'verified';
 
   return {
     source: 'mongo',

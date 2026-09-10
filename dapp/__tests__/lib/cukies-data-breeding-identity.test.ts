@@ -1,14 +1,24 @@
 jest.mock('server-only', () => ({}));
 jest.mock('@/lib/indexer-db/mongodb', () => ({ getIndexerDb: jest.fn() }));
+jest.mock('@/lib/legacy-marketplace/live-marketplace', () => ({
+  readLegacyMarketplaceOwner: jest.fn(),
+  readLegacyMarketplaceMaxBreeds: jest.fn(),
+}));
 
 import {
   listBreedingCandidates,
   listCompletedBreeds,
 } from '@/lib/cukies-data/data';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
+import {
+  readLegacyMarketplaceMaxBreeds,
+  readLegacyMarketplaceOwner,
+} from '@/lib/legacy-marketplace/live-marketplace';
 import { getIndexerDb } from '@/lib/indexer-db/mongodb';
 
 const mockGetIndexerDb = getIndexerDb as jest.MockedFunction<typeof getIndexerDb>;
+const mockReadLegacyMarketplaceOwner = readLegacyMarketplaceOwner as jest.Mock;
+const mockReadLegacyMarketplaceMaxBreeds = readLegacyMarketplaceMaxBreeds as jest.Mock;
 
 const wallet = '0x00000000000000000000000000000000000000aa';
 const collectionAddress = legacyMarketplaceContracts.bsc.contracts.token;
@@ -62,6 +72,12 @@ describe('identidad Legacy en lecturas de breeding', () => {
     mockGetIndexerDb.mockResolvedValue({
       collection: jest.fn(() => collection),
     } as never);
+    mockReadLegacyMarketplaceOwner.mockClear();
+    mockReadLegacyMarketplaceMaxBreeds.mockClear().mockResolvedValue(1);
+    mockReadLegacyMarketplaceOwner.mockImplementation(async (item: { owner: string | null }) => {
+      if (!item.owner) throw new Error('owner unavailable');
+      return item.owner;
+    });
   });
 
   it('solo publica candidatos BSC 56 con colección y propietario canónicos', async () => {
@@ -100,6 +116,8 @@ describe('identidad Legacy en lecturas de breeding', () => {
       chainId: 56,
       ownerNormalized: wallet.toLowerCase(),
       identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
     });
     expect(collection.find).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -122,6 +140,80 @@ describe('identidad Legacy en lecturas de breeding', () => {
     expect(response.status).toBe('partial');
     expect(response.items).toEqual([]);
     expect(response.error).toMatch(/identidad.*Legacy/i);
+  });
+
+  it('excluye la selección cuando ownerOf no aporta una observación actual', async () => {
+    documents = [makeDocument({ updatedAt: new Date('2000-01-01') })];
+    mockReadLegacyMarketplaceOwner.mockRejectedValue(new Error('RPC unavailable'));
+
+    const candidates = await listBreedingCandidates({
+      owner: wallet,
+      network: 'BSC',
+      maxBreeds: 1,
+    });
+    const completed = await listCompletedBreeds({
+      wallets: [wallet],
+      network: 'BSC',
+    });
+
+    expect(candidates).toMatchObject({ status: 'partial', items: [] });
+    expect(completed).toMatchObject({ status: 'partial', items: [] });
+  });
+
+  it('no trata el maxBreeds de la petición como una prueba contractual', async () => {
+    documents = [makeDocument()];
+    mockReadLegacyMarketplaceMaxBreeds.mockResolvedValue(2);
+
+    const response = await listBreedingCandidates({
+      owner: wallet,
+      network: 'BSC',
+      maxBreeds: 1,
+    });
+
+    expect(response).toMatchObject({ status: 'partial', items: [] });
+    expect(mockReadLegacyMarketplaceOwner).not.toHaveBeenCalled();
+  });
+
+  it('cierra la elegibilidad cuando el contador contradice las relaciones materializadas', async () => {
+    documents = [makeDocument({ numChildren: 0, children: ['30', '31'] })];
+
+    const response = await listBreedingCandidates({
+      owner: wallet,
+      network: 'BSC',
+      maxBreeds: 1,
+    });
+
+    expect(response).toMatchObject({ status: 'partial', items: [] });
+    expect(mockReadLegacyMarketplaceOwner).not.toHaveBeenCalled();
+  });
+
+  it('exige la dirección TRON Base58 exacta y no verifica un alias en mayúsculas', async () => {
+    const tronOwner = legacyMarketplaceContracts.tron.contracts.token;
+    documents = [makeDocument({
+      network: 'TRON',
+      chainId: null,
+      collectionAddressNormalized: tronOwner,
+      owner: tronOwner,
+      user: tronOwner,
+      ownerNormalized: tronOwner.toUpperCase(),
+    })];
+
+    const aliasResponse = await listBreedingCandidates({
+      owner: tronOwner.toUpperCase(),
+      network: 'TRON',
+      maxBreeds: 1,
+    });
+    expect(aliasResponse).toMatchObject({ status: 'partial', items: [] });
+
+    const canonicalResponse = await listBreedingCandidates({
+      owner: tronOwner,
+      network: 'TRON',
+      maxBreeds: 1,
+    });
+    expect(canonicalResponse).toMatchObject({
+      status: 'verified',
+      items: [{ owner: tronOwner, ownershipVerified: true }],
+    });
   });
 
   it('filtra resultados completados por identidad y propiedad Legacy actuales', async () => {
@@ -162,6 +254,8 @@ describe('identidad Legacy en lecturas de breeding', () => {
       chainId: 56,
       ownerNormalized: wallet.toLowerCase(),
       identityVerified: true,
+      ownershipVerified: true,
+      ownershipSource: 'legacy-ownerOf',
     });
   });
 });

@@ -1,5 +1,5 @@
 import { TronWeb } from 'tronweb';
-import { formatEther } from 'viem';
+import { formatEther, isAddress } from 'viem';
 
 import { legacyBscPublicClient } from './bsc';
 import { legacyMarketplaceBscAbis, legacyMarketplaceTronAbis } from './abis';
@@ -163,6 +163,103 @@ export async function readLegacyMarketplaceLiveState(
     marketplace.marketTokens(item.tokenId).call(),
   ]));
   return tronLiveState(item, owner, listing, paused);
+}
+
+/**
+ * Reads the current NFT owner from the canonical Legacy collection.
+ *
+ * This is deliberately read-only and independent from any wallet provider so
+ * callers can use it to validate indexed ownership before offering a preview.
+ */
+export async function readLegacyMarketplaceOwner(
+  item: LegacyMarketplaceCukiItem,
+): Promise<string> {
+  if (item.network === 'BSC') {
+    const owner = await withTimeout(
+      legacyBscPublicClient.readContract({
+        address: legacyMarketplaceContracts.bsc.contracts.token,
+        abi: legacyMarketplaceBscAbis.token,
+        functionName: 'ownerOf',
+        args: [BigInt(item.tokenId)],
+      }),
+    );
+    if (
+      typeof owner !== 'string'
+      || owner.trim().length === 0
+      || !isAddress(owner, { strict: false })
+    ) {
+      throw new Error('INVALID_LEGACY_MARKETPLACE_OWNER');
+    }
+    return owner;
+  }
+  if (item.network !== 'TRON') {
+    throw new Error('INVALID_LEGACY_MARKETPLACE_NETWORK');
+  }
+
+  const tronWeb = new TronWeb({
+    fullHost: process.env.CUKIES_LEGACY_TRON_READ_RPC_URL?.trim()
+      || legacyMarketplaceContracts.tron.readRpcUrl,
+  });
+  tronWeb.setAddress(legacyMarketplaceContracts.tron.contracts.token);
+  const token = tronWeb.contract(
+    legacyMarketplaceTronAbis.token as unknown as Parameters<typeof tronWeb.contract>[0],
+    legacyMarketplaceContracts.tron.contracts.token,
+  );
+  const rawOwner = String(
+    await withTimeout(token.ownerOf(item.tokenId).call()),
+  ).trim();
+  if (!rawOwner) throw new Error('INVALID_LEGACY_MARKETPLACE_OWNER');
+  try {
+    if (/^41[0-9a-fA-F]{40}$/.test(rawOwner)) {
+      const owner = TronWeb.address.fromHex(rawOwner);
+      if (!TronWeb.isAddress(owner)) throw new Error('INVALID_LEGACY_MARKETPLACE_OWNER');
+      return owner;
+    }
+    if (/^0x[0-9a-fA-F]{40}$/.test(rawOwner)) {
+      const owner = TronWeb.address.fromHex(`41${rawOwner.slice(2)}`);
+      if (!TronWeb.isAddress(owner)) throw new Error('INVALID_LEGACY_MARKETPLACE_OWNER');
+      return owner;
+    }
+  } catch {
+    throw new Error('INVALID_LEGACY_MARKETPLACE_OWNER');
+  }
+  if (!TronWeb.isAddress(rawOwner)) {
+    throw new Error('INVALID_LEGACY_MARKETPLACE_OWNER');
+  }
+  return rawOwner;
+}
+
+export async function readLegacyMarketplaceMaxBreeds(
+  network: LegacyMarketplaceUnavailableNetwork,
+): Promise<number> {
+  const raw = network === 'BSC'
+    ? await withTimeout(
+        legacyBscPublicClient.readContract({
+          address: legacyMarketplaceContracts.bsc.contracts.breedingPoints,
+          abi: legacyMarketplaceBscAbis.breedingPoints,
+          functionName: 'getMaxBreedsByCukie',
+        }),
+      )
+    : await (async () => {
+        const tronWeb = new TronWeb({
+          fullHost: process.env.CUKIES_LEGACY_TRON_READ_RPC_URL?.trim()
+            || legacyMarketplaceContracts.tron.readRpcUrl,
+        });
+        tronWeb.setAddress(legacyMarketplaceContracts.tron.contracts.breedingPoints);
+        const breeding = tronWeb.contract(
+          legacyMarketplaceTronAbis.breedingPoints as unknown as Parameters<typeof tronWeb.contract>[0],
+          legacyMarketplaceContracts.tron.contracts.breedingPoints,
+        );
+        return withTimeout(breeding.getMaxBreedsByCukie().call());
+      })();
+
+  try {
+    const value = Number(integer(raw));
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error('INVALID_LEGACY_MAX_BREEDS');
+    return value;
+  } catch {
+    throw new Error('INVALID_LEGACY_MAX_BREEDS');
+  }
 }
 
 async function verifyBscListings(items: LegacyMarketplaceCukiItem[]) {

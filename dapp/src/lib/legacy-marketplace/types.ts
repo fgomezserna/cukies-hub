@@ -58,6 +58,8 @@ export type LegacyMarketplaceCukiItem = {
   owner: string | null;
   ownerNormalized?: string | null;
   identityVerified?: boolean;
+  ownershipVerified?: boolean;
+  ownershipSource?: 'legacy-ownerOf';
   network: LegacyCukiNetwork | string;
   origin: string | null;
   birthNetwork: string | null;

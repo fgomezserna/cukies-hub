@@ -15,11 +15,14 @@ type IdentityRecord = {
   collectionAddress?: unknown;
   collectionAddressNormalized?: unknown;
   identityVerified?: unknown;
+  ownershipVerified?: unknown;
+  ownershipSource?: unknown;
   owner?: unknown;
   ownerNormalized?: unknown;
   state?: unknown;
   origin?: unknown;
   childrenCount?: unknown;
+  children?: unknown;
 };
 
 function normalizedNetwork(value: unknown): LegacyBreedingNetwork | null {
@@ -73,7 +76,7 @@ export function normalizeLegacyBreedingOwner(
   if (!identity || typeof owner !== 'string' || owner.trim().length === 0) return null;
   return identity.network === 'BSC'
     ? owner.trim().toLowerCase()
-    : owner.trim().toUpperCase();
+    : owner.trim();
 }
 
 export function isLegacyBreedingIdentity(
@@ -105,6 +108,17 @@ export function isLegacyBreedingOwner(
   network: unknown,
   owner: unknown,
 ) {
+  const identity = getLegacyBreedingIdentity(network);
+  if (!identity) return false;
+  if (identity.network === 'TRON') {
+    const expected = normalizeLegacyBreedingOwner(network, owner);
+    const actual = typeof record.owner === 'string' ? record.owner.trim() : null;
+    return Boolean(
+      expected
+      && actual
+      && expected === actual,
+    );
+  }
   const expected = normalizeLegacyBreedingOwner(network, owner);
   const actual = normalizeLegacyBreedingOwner(network, record.ownerNormalized);
   return Boolean(expected && actual && expected === actual);
@@ -116,6 +130,9 @@ export function isLegacyBreedingEligibilityKnown(
 ) {
   if (maxBreeds === null || !Number.isFinite(maxBreeds) || maxBreeds < 0) return false;
   if (typeof record.childrenCount !== 'number' || !Number.isFinite(record.childrenCount)) {
+    return false;
+  }
+  if (Array.isArray(record.children) && record.children.length !== record.childrenCount) {
     return false;
   }
   return true;
@@ -142,6 +159,8 @@ export function isLegacyBreedingCandidate(
   maxBreeds: number | null,
 ) {
   return record.state === 'available'
+    && record.ownershipVerified === true
+    && record.ownershipSource === 'legacy-ownerOf'
     && isLegacyBreedingIdentity(record, network)
     && isLegacyBreedingOwner(record, network, owner)
     && isLegacyBreedingEligible(record, network, maxBreeds);
@@ -152,6 +171,8 @@ export function isLegacyCompletedBreed(
   owner: unknown,
 ) {
   return record.origin === 'breed'
+    && record.ownershipVerified === true
+    && record.ownershipSource === 'legacy-ownerOf'
     && isLegacyBreedingIdentity(record)
     && isLegacyBreedingOwner(record, record.network, owner);
 }
