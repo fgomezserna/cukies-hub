@@ -29,9 +29,9 @@ export type NftVaultPendingOperation = NftVaultPendingContext & {
   updatedAt: number;
 };
 
-type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+export type NftVaultStorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-const unavailableStorage: StorageLike = {
+const unavailableStorage: NftVaultStorageLike = {
   getItem: () => null,
   setItem: () => { throw new DOMException('Storage unavailable', 'SecurityError'); },
   removeItem: () => undefined,
@@ -150,12 +150,27 @@ export function pendingNftVaultOperationMatchesPosition(
   );
 }
 
-export function getNftVaultBrowserStorage(): StorageLike {
+export function getNftVaultBrowserStorage(): NftVaultStorageLike {
   if (typeof window === 'undefined') return unavailableStorage;
   try {
     return window.localStorage;
   } catch {
     return unavailableStorage;
+  }
+}
+
+export function getNftVaultStorageSnapshot(
+  storage: NftVaultStorageLike,
+  context: NftVaultPendingContext,
+) {
+  if (storage === unavailableStorage) return { readable: false, raw: null as string | null };
+  try {
+    return {
+      readable: true,
+      raw: storage.getItem(pendingNftVaultStorageKey(context)),
+    };
+  } catch {
+    return { readable: false, raw: null as string | null };
   }
 }
 
@@ -211,7 +226,7 @@ function isPendingOperation(value: unknown, context: NftVaultPendingContext): va
 }
 
 export function loadPendingNftVaultOperations(
-  storage: StorageLike,
+  storage: NftVaultStorageLike,
   context: NftVaultPendingContext,
 ) {
   const key = pendingNftVaultStorageKey(context);
@@ -240,7 +255,7 @@ export function loadPendingNftVaultOperations(
 }
 
 export function savePendingNftVaultOperation(
-  storage: StorageLike,
+  storage: NftVaultStorageLike,
   operation: NftVaultPendingOperation,
 ) {
   try {
@@ -259,7 +274,7 @@ export function savePendingNftVaultOperation(
 }
 
 export function clearPendingNftVaultOperation(
-  storage: StorageLike,
+  storage: NftVaultStorageLike,
   context: NftVaultPendingContext,
   assetId: string,
   expected?: Pick<
@@ -293,9 +308,42 @@ export function clearPendingNftVaultOperation(
 
 export function projectionMatchesPendingOperation(
   operation: NftVaultPendingOperation,
-  asset: { assetId: string; custody: string } | undefined,
+  asset: {
+    assetId: string;
+    custody: string;
+    chainId?: number;
+    collectionAddress?: string;
+    tokenId?: string;
+    depositEpoch?: string | null;
+  } | undefined,
 ) {
-  if (!asset || asset.assetId !== operation.assetId || operation.phase !== 'syncing_projection') return false;
+  if (!asset || operation.phase !== 'syncing_projection') return false;
+  const expectedAssetId = canonicalNftVaultAssetId({
+    chainId: operation.chainId,
+    collectionAddress: operation.collectionAddress,
+    tokenId: operation.tokenId,
+  });
+  const actualAssetId = asset.chainId !== undefined
+    && asset.collectionAddress !== undefined
+    && asset.tokenId !== undefined
+    ? canonicalNftVaultAssetId({
+      chainId: asset.chainId,
+      collectionAddress: asset.collectionAddress,
+      tokenId: asset.tokenId,
+    })
+    : asset.assetId;
+  if (
+    !expectedAssetId
+    || !actualAssetId
+    || expectedAssetId !== actualAssetId
+    || asset.assetId !== actualAssetId
+  ) return false;
+  if (operation.depositEpoch !== undefined) {
+    const assetEpoch = asset.depositEpoch === null || asset.depositEpoch === undefined
+      ? null
+      : normalizeTokenId(asset.depositEpoch);
+    if (assetEpoch === null || assetEpoch !== normalizeTokenId(operation.depositEpoch)) return false;
+  }
   if (operation.action === 'deposit') return asset.custody === 'cukie_master_nft_vault';
   if (operation.action === 'withdraw') return asset.custody === 'wallet';
   return false;

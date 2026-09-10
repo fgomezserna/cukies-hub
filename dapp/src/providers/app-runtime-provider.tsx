@@ -585,26 +585,45 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
   }, [chainId, expectedChainId, requestWallet, switchChainAsync]);
 
   const runRefresh = useCallback(async (resources?: Set<string>, shouldInvalidate = false, waitForInFlight = false) => {
-    if (!runtimeRouteActive || !address || !sessionReady) return;
+    if (!address || !sessionReady) return;
 
     const requestedResources = resources;
+    const refreshIdentity = {
+      address,
+      connectedAddress: connectedAddressNormalized,
+      chainId,
+      sessionReady,
+    };
+    const isRefreshCurrent = () => currentAddressRef.current === refreshIdentity.address
+      && currentConnectedAddressRef.current === refreshIdentity.connectedAddress
+      && currentChainIdRef.current === refreshIdentity.chainId
+      && currentSessionReadyRef.current === refreshIdentity.sessionReady;
     const predicate = ({ queryKey }: { queryKey: readonly unknown[] }) => {
       if (!isRuntimeResourceQuery(queryKey) || queryKey[2] !== address) return false;
       if (isRuntimeStatusQuery(queryKey)) return true;
       return !requestedResources || requestedResources.has(String(queryKey[4]));
     };
-    if (waitForInFlight) {
-      const inFlight = queryClient.getQueryCache()
-        .findAll({ predicate })
-        .filter((query) => query.state.fetchStatus === 'fetching')
-        .map((query) => query.promise);
-      if (inFlight.length > 0) await Promise.allSettled(inFlight);
-    }
-    if (shouldInvalidate) {
-      await queryClient.invalidateQueries({ predicate, refetchType: 'none' });
-    }
-    await queryClient.refetchQueries({ predicate }, { cancelRefetch: false });
-  }, [address, queryClient, runtimeRouteActive, sessionReady]);
+    const queries = queryClient.getQueryCache().findAll({ predicate });
+    await Promise.all(queries.map(async (query) => {
+      if (!isRefreshCurrent()) return;
+      if (waitForInFlight && query.state.fetchStatus === 'fetching') {
+        await Promise.allSettled([query.promise]);
+      }
+      if (!isRefreshCurrent()) return;
+      if (shouldInvalidate) {
+        await queryClient.invalidateQueries({
+          queryKey: query.queryKey,
+          exact: true,
+          refetchType: 'none',
+        });
+      }
+      if (!isRefreshCurrent()) return;
+      await queryClient.refetchQueries(
+        { queryKey: query.queryKey, exact: true, type: 'active' },
+        { cancelRefetch: false },
+      );
+    }));
+  }, [address, chainId, connectedAddressNormalized, queryClient, sessionReady]);
 
   const fetchCanonicalResource = useCallback(async (
     resource: AppRuntimeResource,
