@@ -263,7 +263,7 @@ describe('MyCukiesPanel', () => {
     render(<MyCukiesPanel />);
 
     expect((await screen.findAllByText('Depósito en el Pool')).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Este depósito sigue guardado y conserva su calendario diario/)).toBeInTheDocument();
+    expect(screen.getByText(/Este Cukie sigue depositado en el Pool/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Solicitar retirada' })).toBeInTheDocument();
   });
 

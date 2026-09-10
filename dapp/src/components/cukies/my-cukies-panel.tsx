@@ -55,7 +55,7 @@ function recoveryTimestamp(value: string | null | undefined) {
 
 function collectionState(cukie: MyCukieCollectionItem) {
   if (cukie.custody === 'cukie_pool_recovery') {
-    const recoveryStorageDetail = 'Este depósito sigue guardado y conserva su calendario diario.';
+    const recoveryStorageDetail = 'Este Cukie sigue depositado en el Pool.';
     const requested = Boolean(recoveryTimestamp(cukie.recoveryExitRequestedAt));
     const withdrawableAt = recoveryTimestamp(cukie.recoveryWithdrawableAt);
     const nowSeconds = BigInt(Math.floor(Date.now() / 1_000));
@@ -85,7 +85,7 @@ function collectionState(cukie: MyCukieCollectionItem) {
     }
     return {
       label: 'Salida solicitada',
-      detail: `${recoveryStorageDetail} Podrás retirarlo desde ${withdrawableAt.label} UTC.`,
+      detail: `${recoveryStorageDetail} Podrás retirarlo desde ${withdrawableAt.label} UTC. El plazo se fijó al solicitar la salida.`,
     };
   }
   if (cukie.state === 'cukie_master') return 'En Cukie Master';
@@ -414,9 +414,6 @@ export function MyCukiesPanel() {
                   <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">
                     Red: {cukie.network ?? 'No disponible'} · Origen: {cukie.origin ?? 'No disponible'}
                   </p>
-                  {cukie.custody === 'cukie_pool_recovery' ? (
-                    <p className="mt-2 text-xs font-black text-amber-200">Depósito histórico del Pool · calendario diario</p>
-                  ) : null}
                   <p className="mt-3 text-xs font-bold text-[var(--uki-lilac)]">{stateLabel(cukie)}</p>
                   <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">{itemActionDescription(cukie)}</p>
                   <div className="mt-5 grid gap-2 sm:grid-cols-2">
