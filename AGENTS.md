@@ -67,6 +67,7 @@ This is a pnpm monorepo containing multiple applications:
 - **`games/hyppie-road/`** - Next.js game running on port 9003 (Hyppie Road game)
 - **`games/tower-builder/`** - Tower Builder game
 - **`packages/`** - Shared packages, contracts, chain indexer and card/bridge workers; see `pnpm-workspace.yaml` and each package manifest.
+- **`packages/world-api`, `world-matchmaking`, `world-shared`** - Preserved World port; see `infrastructure/world/README.md` for build, isolation and activation boundaries.
 
 ## Development Commands
 
@@ -108,53 +109,10 @@ pnpm --filter hyppie-road typecheck
 # Build shortcuts from root
 pnpm build:dapp                  # Build main dapp
 pnpm build:sybil-slayer          # Build sybil-slayer game
+pnpm build:world                 # Build shared, API and matchmaking in order
+pnpm typecheck:world             # Check the three World packages
+pnpm test:world                  # Run their tests
 ```
-
-## Technology Stack
-
-### Main Application (dapp)
-- **Framework**: Next.js 15 with App Router
-- **Database**: MongoDB with Prisma ORM
-- **Authentication**: NextAuth v5 with Discord/Twitter OAuth
-- **Styling**: Tailwind CSS with Radix UI components
-- **Web3**: Wagmi + Viem for blockchain integration
-- **AI**: Google Genkit for AI features
-- **Testing**: Jest with React Testing Library
-
-### Games
-- **Framework**: Next.js 15 with App Router
-- **Styling**: Tailwind CSS with custom UI components
-- **State Management**: Zustand (hyppie-road), React hooks (sybil-slayer)
-- **Game Logic**: Custom canvas-based implementations
-
-## Database Schema
-
-The application uses MongoDB with Prisma. Key models include:
-- `User` - User profiles with wallet addresses, social links, XP, referrals
-- `Quest` - Gamification quests with tasks
-- `PointTransaction` - Point earning/spending history
-- `Account/Session` - NextAuth authentication data
-
-## Authentication Flow
-
-Uses NextAuth v5 with:
-- Discord OAuth (primary)
-- Twitter OAuth (secondary)
-- Wallet-based authentication for Web3 users
-
-## Key Application Features
-
-### Main DApp
-- **Dashboard**: User stats, recent activity, featured games
-- **Games**: P2P betting games on Hyperliquid
-- **Leaderboard**: Top players and rankings
-- **Quests**: Gamified reward system
-- **Referrals**: User referral system with rewards
-- **Points**: Virtual currency system
-
-### Games
-- **Sybil Slayer**: Top-down token runner with obstacles (30-second survival)
-- **Hyppie Road**: Betting-style game with game state management
 
 ## Design System
 
@@ -228,14 +186,17 @@ Staging apps 32, 28 and 31 use `.github/workflows/cukies-images.yml`: a push to
 `staging` selects affected components, builds on VM1012 with Nx/BuildKit cache,
 publishes immutable registry digests and updates web32, game31 or workers28.
 Treasure Hunt is a separate Docker Image resource in the same workflow; it stays
-outside `docker-compose.workers.yml`. The six image components are listed in
-`infrastructure/ci/components.json`. Coolify pulls images; keep its Git autodeploy
-OFF and do not start a legacy build manually.
+outside `docker-compose.workers.yml`. The eight image components, including
+World API/matchmaking, are listed in `infrastructure/ci/components.json`.
+Coolify pulls images; keep its Git autodeploy OFF and do not start a legacy build manually.
 
 A game-only delivery must preserve Hub web/workers containers. Keep `webCommit`
 and `gameCommit` separate from the aggregate release commit and each image's
 `sourceSha`. Delivery injects the validated `COOLIFY_BRANCH`; Docker Image does not
 supply it automatically. Never weaken the game's environment/resource guard.
+A World-only release may register images without delivering any running service;
+its no-op must preserve verified web/game identities and the six active digests.
+Do not infer served SHAs from the aggregate commit or an image source SHA.
 Read `docs/deployment-environments.md` for the pipeline and the canonical INFRA
 row in `docs/antes-del-15-seguimiento.md` for current runtime evidence.
 
@@ -257,6 +218,7 @@ Staging services and optional profiles:
 - `cukie-master-scheduler`, `competition-credit-scheduler`, `game-economy-scheduler`, `cukie-pool-scheduler`, `weekly-ranking-scheduler`, `reward-accounting-scheduler` and `reward-batch-publisher`: internal processes sharing the `schedulers` image. Preserve their independent runtime gates and HMAC credentials; a deployment does not authorize enabling them.
 - `cuki-card-worker` and `cuki-card-worker-legacy`: internal NFT render/upload workers sharing the card image, with separate staging data sources and destinations. Generated URLs are content-addressed and immutable.
 - `legacy-chain-indexer` and `cukies-bridge-relayer`: optional profiles; their presence in Compose does not mean they are enabled.
+- `world-api`, `world-matchmaking`, `world-redis`: optional `world-runtime` topology with private Redis, no published ports and runtime/writes disabled. The current delivery removes these services and `world-private` from its effective Compose; flags/profile alone cannot activate World. Activation needs a separately reviewed delivery change, reconciled data/identity and a single writer. Preserve port provenance; do not replace it from another legacy checkout.
 
 Operational rules:
 
@@ -269,34 +231,6 @@ Operational rules:
 - Both card workers require a capacity heartbeat younger than 45 seconds and at least 10 GiB free on Coolify and MinIO. They pause and retry automatically; do not lower the floor or clear volumes to bypass it. Follow the storage recovery section in `docs/deployment-environments.md`.
 - Validate post-deploy with `/api/health`, authenticated `/indexer` views for `chain_indexer_runs` and `card_generation_jobs`, and indexer/both card-worker logs. Inspect only needed metadata; full Docker history or environment output can contain secrets.
 - Use the `coolify-cloudflare` skill when changing Coolify, Traefik labels, domains, tunnels or deployment topology.
-
-## Testing
-
-The main dapp has comprehensive Jest tests covering:
-- API routes (`__tests__/api/`)
-- React components (`__tests__/components/`)
-- Hooks (`__tests__/hooks/`)
-- Utilities (`__tests__/lib/`)
-- Providers (`__tests__/providers/`)
-
-Test configuration excludes API routes and type definitions from coverage.
-
-## File Structure Conventions
-
-### Main App (dapp)
-- `src/app/` - Next.js App Router pages and layouts
-- `src/components/` - React components (layout, UI, shared)
-- `src/lib/` - Utility functions and configurations
-- `src/providers/` - React context providers
-- `src/hooks/` - Custom React hooks
-- `src/types/` - TypeScript type definitions
-- `prisma/` - Database schema and migrations
-
-### Games
-- `src/components/` - Game-specific components
-- `src/hooks/` - Game logic hooks
-- `src/lib/` - Game utilities and logic
-- `src/types/` - Game type definitions
 
 ## Professional GitHub Issue Workflow
 
