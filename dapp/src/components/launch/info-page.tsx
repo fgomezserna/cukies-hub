@@ -57,8 +57,8 @@ export function LaunchInfoPage({
   const Root = isWorkspace ? 'div' : 'main';
 
   return (
-    <Root className={`uki-landing overflow-x-clip text-[var(--uki-cream)] ${
-      isWorkspace ? 'min-h-full w-full bg-transparent' : 'min-h-screen bg-[var(--uki-bg)]'
+    <Root className={`${isWorkspace ? 'uki-theme' : 'uki-landing'} overflow-x-clip text-[var(--uki-cream)] ${
+      isWorkspace ? 'min-h-full w-full' : 'min-h-screen bg-[var(--uki-bg)]'
     }`}>
       {!isWorkspace ? <div className="uki-noise" /> : null}
       {!isWorkspace ? <div className="uki-grid-bg" /> : null}

@@ -346,12 +346,12 @@ body {
     --uki-lilac-strong: #e45cff;
     --uki-lilac-border-strong: rgba(228, 92, 255, 0.28);
     --uki-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  .uki-landing {
     position: relative;
     font-family: var(--font-space-grotesk), var(--font-inter), sans-serif;
     font-variant-numeric: tabular-nums;
+  }
+
+  .uki-landing {
     background:
       radial-gradient(circle at 20% 6%, rgba(124, 60, 255, 0.08), transparent 25rem),
       radial-gradient(circle at 78% 18%, rgba(242, 195, 75, 0.13), transparent 22rem),
@@ -2932,9 +2932,9 @@ body {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .uki-landing *,
-    .uki-landing *::before,
-    .uki-landing *::after {
+    :is(.uki-landing, .uki-theme) *,
+    :is(.uki-landing, .uki-theme) *::before,
+    :is(.uki-landing, .uki-theme) *::after {
       animation-duration: 1ms !important;
       animation-iteration-count: 1 !important;
       scroll-behavior: auto !important;

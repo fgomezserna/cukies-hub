@@ -313,7 +313,7 @@ export default async function MarketplaceDetailPage({
   const explorerUrl = getExplorerUrl(cuki.network, cuki.tokenId);
 
   return (
-    <div className="uki-landing mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-[var(--uki-cream)]">
+    <div className="uki-theme mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-[var(--uki-cream)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/marketplace"

@@ -16,7 +16,7 @@ export default function MarketplacePage() {
   const ukiMarketplaceReady = ukiMarketplacePublicConfig.ready;
 
   return (
-    <div className="uki-landing mx-auto flex min-h-full w-full max-w-[1480px] flex-col bg-transparent pb-10 text-[var(--uki-cream)]">
+    <div className="uki-theme mx-auto flex min-h-full w-full max-w-[1480px] flex-col pb-10 text-[var(--uki-cream)]">
       <header className="border-b border-white/10 pb-7 pt-1 sm:pb-9">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">

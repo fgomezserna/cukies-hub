@@ -39,7 +39,7 @@ const otherGames = [
 
 export default function GamesPage() {
   return (
-    <div className="uki-landing mx-auto min-h-full w-full max-w-[1480px] bg-transparent pb-10 text-[var(--uki-cream)]">
+    <div className="uki-theme mx-auto min-h-full w-full max-w-[1480px] pb-10 text-[var(--uki-cream)]">
       <header className="border-b border-white/10 pb-7 pt-1 sm:pb-9">
         <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]">
           <Gamepad2 className="h-4 w-4" aria-hidden="true" />

@@ -28,7 +28,7 @@ describe('CukieMasterPage', () => {
     expect(screen.getByText('Reglas y preguntas frecuentes')).toBeInTheDocument();
     expect(screen.getByText('En cada cupo puedes consultar cuándo empieza a recibir créditos.')).toBeInTheDocument();
     expect(screen.getByText('¿Cómo funciona la vía con Cukies Originales?')).toBeInTheDocument();
-    expect(container.firstChild).toHaveClass('uki-landing');
+    expect(container.firstChild).toHaveClass('uki-theme');
     expect(container).not.toHaveTextContent(/Stage|Staging|Testnet|chain 97/i);
   });
 

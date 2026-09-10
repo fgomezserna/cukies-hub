@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default function CukieHodlerPage() {
   return (
-    <div className="uki-landing min-h-full w-full overflow-x-clip bg-transparent text-[var(--uki-cream)]">
+    <div className="uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]">
       <div className="mx-auto w-full max-w-[1480px]">
         <header className="relative overflow-hidden border-b border-white/10 pb-7 pt-1 sm:pb-9">
           <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full bg-[var(--uki-lilac)]/10 blur-3xl" />

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RecoverPoolCukiePage() {
   return (
-    <div className="uki-landing min-h-full w-full overflow-x-clip bg-transparent text-[var(--uki-cream)]">
+    <div className="uki-theme min-h-full w-full overflow-x-clip text-[var(--uki-cream)]">
       <div className="mx-auto w-full max-w-[1120px] pb-10">
         <Link
           href="/cukie-hodler#mis-cukies-aportados"

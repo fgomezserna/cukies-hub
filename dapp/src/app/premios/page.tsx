@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function PremiosPage() {
   return (
-    <div className="uki-landing min-h-full w-full overflow-hidden bg-transparent text-[var(--uki-cream)]">
+    <div className="uki-theme min-h-full w-full overflow-hidden text-[var(--uki-cream)]">
       <PremiosContent />
     </div>
   );
