@@ -386,7 +386,10 @@ async function readCukieMasterNftSource(
   }
   const nftWarnings = [...nftInventoryWarnings, ...nftIndexerHealth.warnings];
   const nftCompleteness: CukieMasterSourceCompleteness = {
-    complete: nftWarnings.length === 0 && nftIndexerHealth.healthy,
+    // Indexer warnings can include ancillary TOKEN_V2 alarms. They remain in
+    // the response for observability, while the route completeness gate is
+    // driven by inventory integrity and the health decision itself.
+    complete: nftInventoryWarnings.length === 0 && nftIndexerHealth.healthy,
     warnings: nftWarnings,
     presaleRaw: true,
     vestingRaw: true,

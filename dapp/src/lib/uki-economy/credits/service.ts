@@ -947,9 +947,12 @@ export function createCompetitionCreditService(
         );
       }
       for (const sourceSlot of sourceSlots) validSourceSlotShape(sourceSlot);
+      // `health.healthy` is the source gate. `warnings` may also contain
+      // non-blocking ancillary alarms (for example, historical TOKEN_V2
+      // ownership dead letters) that must remain visible without stopping a
+      // new Cukie Master credit cut.
       if (
         !health.healthy ||
-        health.warnings.length > 0 ||
         !health.observedThrough ||
         !(health.observedThrough instanceof Date) ||
         Number.isNaN(health.observedThrough.getTime()) ||
@@ -1201,7 +1204,6 @@ export function createCompetitionCreditService(
           watermark._id !== CREDIT_SOURCE_WATERMARK_IDS[route] ||
           watermark.status !== "healthy" ||
           !liveHealth.healthy ||
-          liveHealth.warnings.length > 0 ||
           !liveObservedThrough ||
           !liveHealth.sourceRuleVersions ||
           !watermarkObservedThrough ||
