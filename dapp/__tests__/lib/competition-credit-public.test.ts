@@ -585,6 +585,7 @@ describe('competition credit public status conflicts', () => {
     const status = await getCompetitionCreditWalletStatus(wallet, now);
 
     expect(status.routes.uki.balance.materialization).toEqual({ state: 'stale' });
+    expect(status.routes.uki.balance.grantedCredits).toBe(100);
     expect(status.routes.uki.balance.availableCredits).toBe(0);
     expect(status.routes.uki.balance.reservedCredits).toBe(0);
     expect(status.balance.availableCredits).toBe(0);

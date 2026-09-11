@@ -170,7 +170,7 @@ function materializedOrProjectedCredits(
   if (state === 'ready') {
     return exactCredits(materialization.totals[field], label);
   }
-  return safeProjectedCredits(projection, field, label);
+  return safeProjectedCredits(projection, field === 'totalCredits' ? 'grantedCredits' : field, label);
 }
 
 export async function getCompetitionCreditWalletStatus(
