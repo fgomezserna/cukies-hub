@@ -176,8 +176,9 @@ y servida en419371f: CI34621416333SUCCESS y postflight16:32UTC correctos,
 tras272suites/2312tests/lint/tipos. Limita la activación futura por inicio de
 sesión exclusivamente en staging97, sin activar gates. Las tres entregas
 reemplazaron solo DApp y conservaron los diez workers y82contenedores
-protegidos. No quedan PR429/430/431 esperando integración. L2 continúa con
-la fuente NFT actual; L5 está activada para cierre/cobro de periodos nuevos.
+protegidos. No quedan PR429/430/431 esperando integración. L2 entregó PR432
+y corrige un P1 de revisión antes de integrar; L5 está activada para cierre/cobro
+de periodos nuevos.
 L6 terminó el diagnóstico sin parche nuevo; A1 permanece abierto. L7 sigue en cola.
 Modelo de las siete: **Luna Max**, con revisión e integración
 de **Astra Max** en la tarea raíz `01a07aec-6bc1-7203-8f43-357ed4b8931c`.
@@ -225,6 +226,14 @@ enlace actualmente elegible e instrumentación focal si vuelve a fallar.
 | L7 | O1: partidas diarias restantes con Cukies propios elegibles, sin reinicio por transferir. | [#412](https://github.com/fgomezserna/cukies-hub/issues/412) · **11-Sep · Partidas con Cukies propios**, tarea `01a09069-7cdf-71d1-b03d-5d246eacc44e` | En cola; acuse recibido. Matriz diaria y anti-reset pendientes de respuesta; depende de L1/L4. Rama prevista `codex/doc11-own-cukie-quota` → `staging`. |
 
 ### Dependencias, integración y comprobación
+
+Revisión de L2 a las16:40UTC: [PR432](https://github.com/fgomezserna/cukies-hub/pull/432),
+`d7446aaa`, **no aceptada aún**. El diagnóstico distingue tres Transfer TOKEN_V2
+fallidos de la fuente custodial Master al día. La raíz detectó el predicado
+de salud invertido: podía rechazar alarmas accesorias y aceptar errores
+bloqueantes. Se encargó una corrección acotada y tests de la clasificación real,
+con bloqueo de vault/incidentes/cursor y excepción únicamente custodial. No se
+ha desplegado este parche ni descartado dead letters. R2/C2 siguen abiertos.
 
 - Máximo dos implementaciones simultáneas: diagnóstico/corrección de fuentes L2 y cierre/cobro L5.
   L3 y PR431 de L4 están desplegadas; la raíz prepara la activación futura con L5.
