@@ -1,6 +1,6 @@
 {
-  "status": "first-delivery-published-followups-in-progress",
-  "recordedAt": "2026-09-10T23:11:46.331617+00:00",
+  "status": "second-delivery-published-collection-legacy-followup-in-progress",
+  "recordedAt": "2026-09-11T00:03:05.483834+00:00",
   "scope": "Automatic UI convergence after confirmed transactions; staging only",
   "baseCommit": "151c33bf02533963973358a2eb486cc9dc5b6087",
   "servedBaseline": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
@@ -146,8 +146,8 @@
   ],
   "areas": {
     "masterAndRuntime": "PR404 published and read-only browser verified; deferred reconciliation covered by component tests",
-    "marketplaceAndClaims": "Marketplace and rewards code reviewed, committed 28aa082; full validation and staging delivery pending. Vesting review correction remains separate.",
-    "poolRecovery": "Code reviewed and committed; 5 focal suites /70 tests passed; full validation and staging delivery pending",
+    "marketplaceAndClaims": "Marketplace and rewards PR405 published/verified. Vesting final correction implemented, awaiting combined validation with collection/legacy.",
+    "poolRecovery": "PR405 published/verified; receipt and epoch reconciliation, automatic retry, per-NFT pending locks",
     "bridgeBreeding": "active legacy write paths identified; receipt and refresh follow-up pending",
     "myCukies": "Confirmed gap: sale completion performs one immediate inventory request without retry; bounded follow-up queued with Bridge/Breeding"
   },
@@ -188,6 +188,23 @@
         "includesUnpublishedVestingHappyPath": true
       },
       "full": "pending isolated candidate validation"
+    },
+    "secondFull": {
+      "sha": "215d34b0120585fa63a993aea6dce2aace679e89",
+      "suites": 262,
+      "tests": 2191,
+      "testsResult": "passed",
+      "lint": "passed without warnings",
+      "typecheck": "passed",
+      "build": "passed",
+      "isolatedWorktree": true
+    },
+    "vestingFocal": {
+      "suites": 1,
+      "tests": 2,
+      "result": "passed",
+      "lint": "passed without warnings",
+      "typecheck": "not isolated; working Breeding file errors prevented shared tsc; final isolated check pending"
     }
   },
   "transactionsSignedByAgent": false,
@@ -233,10 +250,65 @@
     }
   },
   "followupScope": {
-    "branch": "codex/tx-confirmation-actions-20260911",
+    "branch": "codex/tx-confirmation-collection-20260911",
     "poolRecovery": "receipt, custody/epoch and automatic retry",
     "marketplaceClaims": "receipt replacement, delayed projections, per-operation locks and shared account refresh",
     "collectionLegacy": "My Cukies sale reconciliation; Bridge source receipt and transit, Breeding receipt and refresh",
     "vesting": "Receipt-confirmed claim remains locked until released amount proves refreshed state; correction in progress"
+  },
+  "secondDelivery": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/405",
+    "sourceSha": "215d34b0120585fa63a993aea6dce2aace679e89",
+    "mergeSha": "78fefbf425627e7967c58b7bfceff3f181b716c6",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34544118970",
+    "status": "published-and-verified",
+    "build": [
+      "dapp"
+    ],
+    "reuse": [
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer",
+      "treasure-hunt",
+      "world-api",
+      "world-matchmaking"
+    ],
+    "postflight": {
+      "observedAt": "2026-09-11T00:03:05.483834+00:00",
+      "health": {
+        "status": "ok",
+        "app": "cukies-hub",
+        "environment": "staging",
+        "gitSha": "78fefbf425627e7967c58b7bfceff3f181b716c6",
+        "gitRef": "staging",
+        "buildTime": null,
+        "coolify": {
+          "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+          "fqdn": null
+        }
+      },
+      "readyHttpStatus": 200,
+      "journal": "clean",
+      "workerCount": 10,
+      "workersRunningNoRestarts": true,
+      "protected": {
+        "total": 25,
+        "preserved": 25,
+        "changed": []
+      },
+      "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a"
+    },
+    "imageDigestsMatchManifest": true,
+    "browser": {
+      "routes": [
+        "/cukie-hodler#mi-cukie-pool",
+        "/marketplace"
+      ],
+      "pool": "2 current positions, 6 available wallet NFTs, no pending refresh spinner",
+      "marketplace": "V2 UKI and Legacy BSC/TRON listings with prices loaded",
+      "method": "authenticated read-only navigation after deploy",
+      "limit": "No real wallet transaction signed; delayed reads and pending receipt behavior covered by regression tests"
+    }
   }
 }

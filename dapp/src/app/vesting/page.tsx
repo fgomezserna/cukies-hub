@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatUnits, isAddress } from 'viem';
-import { useAccount, useReadContract, useWriteContract } from 'wagmi';
+import { useAccount, usePublicClient, useReadContract, useSwitchChain, useWriteContract } from 'wagmi';
 import {
   AlertTriangle,
   CalendarClock,
@@ -17,6 +17,14 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { getBscScanTxUrl, ukiSaleContracts, vestingVaultAbi } from '@/lib/contracts/uki-sale';
+import { FALLBACK_COORDINATOR, useWalletCoordinator } from '@/providers/wallet-coordinator-context';
+import {
+  isTransactionRefreshAborted,
+  retryTransactionRefresh,
+  TransactionReplacementError,
+  TransactionReplacementPendingError,
+  waitForConfirmedEvmTransaction,
+} from '@/lib/transaction-refresh';
 
 type Schedule = {
   readonly [index: number]: bigint | undefined;
@@ -34,15 +42,15 @@ function scheduleField(schedule: Schedule | undefined, key: ScheduleField, index
 }
 
 function formatToken(value?: bigint) {
-  if (value === undefined) return '0';
+  if (value === undefined) return '—';
   const numeric = Number(formatUnits(value, 18));
-  if (!Number.isFinite(numeric)) return '0';
+  if (!Number.isFinite(numeric)) return '—';
 
   return numeric.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
-function formatPercent(value: number) {
-  if (!Number.isFinite(value)) return '0';
+function formatPercent(value?: number) {
+  if (value === undefined || !Number.isFinite(value)) return '—';
   return value.toLocaleString('es-ES', { maximumFractionDigits: 2 });
 }
 
@@ -74,43 +82,146 @@ function formatVestingDate(value?: bigint | null) {
   });
 }
 
+type VestingTransactionState =
+  | { kind: 'idle' }
+  | { kind: 'confirming'; hash?: `0x${string}` }
+  | { kind: 'pending'; hash: `0x${string}`; message: string }
+  | { kind: 'success'; hash: `0x${string}`; message?: string }
+  | { kind: 'error'; message: string };
+
+type PendingVestingTransaction = {
+  hash: `0x${string}`;
+  wallet: string;
+  chainId: number;
+  receiptConfirmed?: boolean;
+  baselineReleased?: bigint;
+};
+
 export default function PublicVestingPage() {
-  const { address, isConnected } = useAccount();
-  const { writeContract, data: claimTxHash, isPending } = useWriteContract();
+  const { address, chainId, isConnected } = useAccount();
+  const { switchChain, isPending: switchingChain } = useSwitchChain();
+  const { requestWallet, evm: evmWallet } = useWalletCoordinator();
+  const { writeContractAsync } = useWriteContract();
   const vaultAddress = ukiSaleContracts.vestingVaultAddress;
   const isConfigured = Boolean(vaultAddress && isAddress(vaultAddress));
   const contractAddress = isConfigured ? vaultAddress as `0x${string}` : undefined;
   const accountAddress = address as `0x${string}` | undefined;
+  const publicClient = usePublicClient({ chainId: ukiSaleContracts.chainId });
+  const [claimTxHash, setClaimTxHash] = useState<`0x${string}` | null>(null);
+  const [transactionState, setTransactionState] = useState<VestingTransactionState>({ kind: 'idle' });
+  const [pendingTransaction, setPendingTransaction] = useState<PendingVestingTransaction | null>(null);
+  const mountedRef = useRef(true);
+  const contextRef = useRef<{ address: string | null; chainId: number | null }>({
+    address: address ?? null,
+    chainId: chainId ?? null,
+  });
+  const pendingTransactionRef = useRef<PendingVestingTransaction | null>(null);
+  const refreshAbortRef = useRef<AbortController | null>(null);
+  contextRef.current = { address: address ?? null, chainId: chainId ?? null };
 
-  const { data: totalAllocated, isError: isTotalAllocatedError } = useReadContract({
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const pending = pendingTransactionRef.current;
+    const matches = Boolean(
+      pending
+      && address
+      && pending.wallet.toLowerCase() === address.toLowerCase()
+      && pending.chainId === chainId,
+    );
+    if (matches && pending) {
+      setClaimTxHash(pending.hash);
+      setPendingTransaction(pending);
+      setTransactionState({
+        kind: 'pending',
+        hash: pending.hash,
+        message: pending.receiptConfirmed
+          ? 'Cobro confirmado en la cadena. El calendario aún no refleja el cobro; compruébalo de nuevo sin firmar otra vez.'
+          : 'Cobro enviado. La confirmación aún no llega; compruébalo sin firmar otra vez.',
+      });
+      return;
+    }
+    refreshAbortRef.current?.abort();
+    setClaimTxHash(null);
+    setPendingTransaction(null);
+    setTransactionState((current) => (current.kind === 'idle' ? current : { kind: 'idle' }));
+  }, [address, chainId]);
+
+  function assertLiveContext(expectedAddress: string, expectedChainId: number) {
+    if (
+      !mountedRef.current
+      || !contextRef.current.address
+      || contextRef.current.address.toLowerCase() !== expectedAddress.toLowerCase()
+      || contextRef.current.chainId !== expectedChainId
+    ) throw new Error('WALLET_CONTEXT_CHANGED');
+  }
+
+  function pendingBelongsToCurrent() {
+    const pending = pendingTransactionRef.current;
+    return Boolean(
+      pending
+      && address
+      && pending.wallet.toLowerCase() === address.toLowerCase()
+      && pending.chainId === chainId,
+    );
+  }
+
+  function pendingIsCurrent(pending: PendingVestingTransaction) {
+    const current = pendingTransactionRef.current;
+    return Boolean(
+      current
+      && current.hash.toLowerCase() === pending.hash.toLowerCase()
+      && current.wallet.toLowerCase() === pending.wallet.toLowerCase()
+      && current.chainId === pending.chainId
+      && pendingBelongsToCurrent(),
+    );
+  }
+
+  function isLiveContext(expectedAddress: string, expectedChainId: number) {
+    const current = contextRef.current;
+    return Boolean(
+      mountedRef.current
+      && current.address
+      && current.address.toLowerCase() === expectedAddress.toLowerCase()
+      && current.chainId === expectedChainId,
+    );
+  }
+
+  const { data: totalAllocated, isError: isTotalAllocatedError, refetch: refetchTotalAllocated } = useReadContract({
     chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'totalAllocated',
     query: { enabled: isConfigured },
   });
-  const { data: totalReleased, isError: isTotalReleasedError } = useReadContract({
+  const { data: totalReleased, isError: isTotalReleasedError, refetch: refetchTotalReleased } = useReadContract({
     chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'totalReleased',
     query: { enabled: isConfigured },
   });
-  const { data: unallocated, isError: isUnallocatedError } = useReadContract({
+  const { data: unallocated, isError: isUnallocatedError, refetch: refetchUnallocated } = useReadContract({
     chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'unallocatedBalance',
     query: { enabled: isConfigured },
   });
-  const { data: presaleVestingStart, isError: isPresaleVestingStartError } = useReadContract({
+  const { data: presaleVestingStart, isError: isPresaleVestingStartError, refetch: refetchPresaleVestingStart } = useReadContract({
     chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
     functionName: 'presaleVestingStart',
     query: { enabled: isConfigured },
   });
-  const { data: userSchedule, isError: isScheduleError } = useReadContract({
+  const { data: userSchedule, isError: isScheduleError, refetch: refetchUserSchedule } = useReadContract({
     chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
@@ -118,7 +229,7 @@ export default function PublicVestingPage() {
     args: accountAddress ? [accountAddress] : undefined,
     query: { enabled: isConfigured && Boolean(accountAddress) },
   });
-  const { data: claimable, isError: isClaimableError } = useReadContract({
+  const { data: claimable, isError: isClaimableError, refetch: refetchClaimable } = useReadContract({
     chainId: ukiSaleContracts.chainId,
     address: contractAddress,
     abi: vestingVaultAbi,
@@ -128,15 +239,21 @@ export default function PublicVestingPage() {
   });
 
   const schedule = userSchedule as Schedule | undefined;
-  const totalAmount = scheduleField(schedule, 'totalAmount', 0) ?? BigInt(0);
-  const releasedAmount = scheduleField(schedule, 'releasedAmount', 1) ?? BigInt(0);
-  const claimableAmount = claimable ?? BigInt(0);
-  const vestedAmount = releasedAmount + claimableAmount;
-  const lockedAmount = totalAmount > vestedAmount ? totalAmount - vestedAmount : BigInt(0);
-  const hasPosition = totalAmount > BigInt(0);
-  const unlockProgress = totalAmount > BigInt(0)
+  const totalAmount = scheduleField(schedule, 'totalAmount', 0);
+  const releasedAmount = scheduleField(schedule, 'releasedAmount', 1);
+  const claimableAmount = claimable as bigint | undefined;
+  const vestedAmount = releasedAmount !== undefined && claimableAmount !== undefined
+    ? releasedAmount + claimableAmount
+    : undefined;
+  const lockedAmount = totalAmount !== undefined && vestedAmount !== undefined && totalAmount > vestedAmount
+    ? totalAmount - vestedAmount
+    : totalAmount !== undefined && vestedAmount !== undefined
+      ? BigInt(0)
+      : undefined;
+  const hasPosition = totalAmount !== undefined && totalAmount > BigInt(0);
+  const unlockProgress = totalAmount !== undefined && vestedAmount !== undefined && totalAmount > BigInt(0)
     ? Number((vestedAmount * BigInt(10000)) / totalAmount) / 100
-    : 0;
+    : undefined;
 
   const vestingStart = scheduleField(schedule, 'start', 2);
   const vestingDuration = scheduleField(schedule, 'duration', 4);
@@ -163,13 +280,287 @@ export default function PublicVestingPage() {
     { label: 'Bloqueado', value: `${formatToken(lockedAmount)} UKI`, icon: LockKeyhole },
   ], [claimableAmount, lockedAmount, releasedAmount, totalAmount]);
 
-  function claimAll() {
-    if (!contractAddress) return;
-    writeContract({
-      chainId: ukiSaleContracts.chainId,
-      address: contractAddress,
-      abi: vestingVaultAbi,
-      functionName: 'releaseAll',
+  async function refreshVestingReads(pending: PendingVestingTransaction) {
+    refreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    refreshAbortRef.current = controller;
+    try {
+      const converged = await retryTransactionRefresh(
+        async () => {
+          try {
+            assertLiveContext(pending.wallet, pending.chainId);
+            // Global metadata is useful for the surrounding view, but it must
+            // not hold the account's claim lock while its provider catches up.
+            void Promise.allSettled([
+              refetchTotalAllocated(),
+              refetchTotalReleased(),
+              refetchUnallocated(),
+              refetchPresaleVestingStart(),
+            ]);
+            const results = await Promise.allSettled([
+              refetchUserSchedule(),
+              refetchClaimable(),
+            ]);
+            if (controller.signal.aborted) return false;
+            assertLiveContext(pending.wallet, pending.chainId);
+            if (results.some((result) => result.status === 'rejected')) return false;
+            const reads = results.map((result) => result.status === 'fulfilled' ? result.value : null);
+            if (!reads.every((result) => result && result.status === 'success')) return false;
+            const nextSchedule = reads[0]?.data as Schedule | undefined;
+            const nextReleased = scheduleField(nextSchedule, 'releasedAmount', 1);
+            const baselineReleased = pending.baselineReleased;
+            return baselineReleased !== undefined
+              && nextReleased !== undefined
+              && nextReleased > baselineReleased;
+          } catch (reason) {
+            if (isTransactionRefreshAborted(reason) || (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED')) {
+              throw reason;
+            }
+            // A provider/indexer read can fail transiently. Keep the receipt
+            // authoritative and let the next bounded attempt try again.
+            return false;
+          }
+        },
+        { signal: controller.signal },
+      );
+      if (!mountedRef.current || !pendingIsCurrent(pending)) return;
+      if (converged) {
+        pendingTransactionRef.current = null;
+        setPendingTransaction(null);
+        setTransactionState({
+          kind: 'success',
+          hash: pending.hash,
+          message: 'Cobro confirmado y calendario actualizado.',
+        });
+      } else {
+        setPendingTransaction(pending);
+        setTransactionState({
+          kind: 'pending',
+          hash: pending.hash,
+          message: pending.receiptConfirmed
+            ? 'Cobro confirmado en la cadena. El calendario aún no refleja el cobro; compruébalo de nuevo sin firmar otra vez.'
+            : 'Cobro enviado. La confirmación aún no llega; compruébalo sin firmar otra vez.',
+        });
+      }
+    } catch (reason) {
+      if (isTransactionRefreshAborted(reason) || (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED')) return;
+      // The chain receipt remains authoritative when a read provider is delayed.
+    } finally {
+      if (refreshAbortRef.current === controller) refreshAbortRef.current = null;
+    }
+  }
+
+  async function recheckPendingClaim() {
+    const pending = pendingTransactionRef.current;
+    if (!pending || !publicClient || transactionState.kind === 'confirming') return;
+    try {
+      assertLiveContext(pending.wallet, pending.chainId);
+    } catch {
+      return;
+    }
+
+    if (pending.receiptConfirmed) {
+      setPendingTransaction(pending);
+      setTransactionState({
+        kind: 'pending',
+        hash: pending.hash,
+        message: 'Cobro confirmado en la cadena. Comprobando el calendario sin firmar otra vez…',
+      });
+      void refreshVestingReads(pending);
+      return;
+    }
+
+    setTransactionState({ kind: 'confirming', hash: pending.hash });
+    let receiptConfirmed = false;
+    let confirmedPending: PendingVestingTransaction | null = null;
+    try {
+      const confirmed = await waitForConfirmedEvmTransaction(publicClient, pending.hash);
+      const receipt = confirmed.receipt;
+      if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+      receiptConfirmed = true;
+      confirmedPending = {
+        ...pending,
+        hash: confirmed.hash,
+        receiptConfirmed: true,
+        baselineReleased: pending.baselineReleased,
+      };
+      assertLiveContext(pending.wallet, pending.chainId);
+      setClaimTxHash(confirmed.hash);
+      pendingTransactionRef.current = confirmedPending;
+      setPendingTransaction(confirmedPending);
+      setTransactionState({
+        kind: 'pending',
+        hash: confirmed.hash,
+        message: 'Cobro confirmado en la cadena. El calendario aún no refleja el cobro; compruébalo de nuevo sin firmar otra vez.',
+      });
+      window.dispatchEvent(new CustomEvent('cukies:vesting:refresh', { detail: { hash: confirmed.hash } }));
+      void refreshVestingReads(confirmedPending);
+    } catch (reason) {
+      if (!mountedRef.current) return;
+      if (!isLiveContext(pending.wallet, pending.chainId)) return;
+      if (reason instanceof Error && reason.message === 'TRANSACTION_REVERTED') {
+        pendingTransactionRef.current = null;
+        setPendingTransaction(null);
+        setClaimTxHash(null);
+        setTransactionState({ kind: 'error', message: 'El cobro fue revertido. Puedes volver a intentarlo.' });
+      } else if (reason instanceof TransactionReplacementPendingError) {
+        const updated = { ...pending, hash: reason.hash };
+        pendingTransactionRef.current = updated;
+        setPendingTransaction(updated);
+        setTransactionState({ kind: 'pending', hash: reason.hash, message: 'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.' });
+      } else if (reason instanceof TransactionReplacementError) {
+        pendingTransactionRef.current = null;
+        setPendingTransaction(null);
+        setClaimTxHash(null);
+        setTransactionState({
+          kind: 'error',
+          message: reason.reason === 'cancelled'
+            ? 'La transacción fue cancelada en la wallet. No se ha cobrado ningún vesting.'
+            : 'La transacción fue reemplazada por otra operación. No se ha cobrado ningún vesting.',
+        });
+      } else {
+        const updated = confirmedPending ?? pending;
+        pendingTransactionRef.current = updated;
+        setPendingTransaction(updated);
+        setTransactionState({
+          kind: 'pending',
+          hash: updated.hash,
+          message: receiptConfirmed
+            ? 'Cobro confirmado en la cadena. El calendario aún no refleja el cobro; compruébalo de nuevo sin firmar otra vez.'
+            : 'El cobro sigue pendiente. Puedes volver a comprobarlo sin firmar otra vez.',
+        });
+      }
+    }
+  }
+
+  async function claimAll() {
+    if (!contractAddress || !publicClient || !address || chainId !== ukiSaleContracts.chainId || pendingBelongsToCurrent()) return;
+    const expectedAddress = address;
+    const expectedChainId = ukiSaleContracts.chainId;
+    const baselineReleased = releasedAmount;
+    let submittedHash: `0x${string}` | null = null;
+    let receiptConfirmed = false;
+    try {
+      assertLiveContext(expectedAddress, expectedChainId);
+      setTransactionState({ kind: 'confirming' });
+      const hash = await writeContractAsync({
+        chainId: expectedChainId,
+        address: contractAddress,
+        abi: vestingVaultAbi,
+        functionName: 'releaseAll',
+      });
+      submittedHash = hash;
+      assertLiveContext(expectedAddress, expectedChainId);
+      setClaimTxHash(hash);
+      setTransactionState({ kind: 'confirming', hash });
+      let confirmedHash = hash;
+      let receipt: { status: unknown; transactionHash?: string };
+      try {
+        const confirmed = await waitForConfirmedEvmTransaction(publicClient, hash);
+        receipt = confirmed.receipt;
+        confirmedHash = confirmed.hash;
+        submittedHash = confirmedHash;
+      } catch (reason) {
+        if (reason instanceof TransactionReplacementError || reason instanceof TransactionReplacementPendingError) throw reason;
+        if (!isLiveContext(expectedAddress, expectedChainId)) throw new Error('WALLET_CONTEXT_CHANGED');
+        const pending = { hash, wallet: expectedAddress, chainId: expectedChainId, baselineReleased } satisfies PendingVestingTransaction;
+        pendingTransactionRef.current = pending;
+        if (mountedRef.current) {
+          setPendingTransaction(pending);
+          setTransactionState({ kind: 'pending', hash, message: 'Cobro enviado. La confirmación aún no llega; compruébalo sin firmar otra vez.' });
+        }
+        return;
+      }
+      if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+      receiptConfirmed = true;
+      assertLiveContext(expectedAddress, expectedChainId);
+      setClaimTxHash(confirmedHash);
+      const pending = {
+        hash: confirmedHash,
+        wallet: expectedAddress,
+        chainId: expectedChainId,
+        receiptConfirmed: true,
+        baselineReleased,
+      } satisfies PendingVestingTransaction;
+      pendingTransactionRef.current = pending;
+      setPendingTransaction(pending);
+      setTransactionState({
+        kind: 'pending',
+        hash: confirmedHash,
+        message: 'Cobro confirmado en la cadena. El calendario aún no refleja el cobro; compruébalo de nuevo sin firmar otra vez.',
+      });
+      window.dispatchEvent(new CustomEvent('cukies:vesting:refresh', { detail: { hash: confirmedHash } }));
+      void refreshVestingReads(pending);
+    } catch (reason) {
+      if (!mountedRef.current) return;
+      if (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED') {
+        if (submittedHash) {
+          const pending = {
+            hash: submittedHash,
+            wallet: expectedAddress,
+            chainId: expectedChainId,
+            receiptConfirmed,
+            baselineReleased,
+          } satisfies PendingVestingTransaction;
+          pendingTransactionRef.current = pending;
+          if (isLiveContext(expectedAddress, expectedChainId)) {
+            setPendingTransaction(pending);
+            setTransactionState({
+              kind: 'pending',
+              hash: submittedHash,
+              message: receiptConfirmed
+                ? 'Cobro confirmado en la cadena. El calendario aún no refleja el cobro; compruébalo de nuevo sin firmar otra vez.'
+                : 'Cobro enviado. La confirmación aún no llega; compruébalo sin firmar otra vez.',
+            });
+          }
+        }
+      } else if (!isLiveContext(expectedAddress, expectedChainId)) {
+        if (reason instanceof TransactionReplacementPendingError) {
+          pendingTransactionRef.current = {
+            hash: reason.hash,
+            wallet: expectedAddress,
+            chainId: expectedChainId,
+            baselineReleased,
+          };
+        }
+        return;
+      } else if (reason instanceof Error && reason.message === 'TRANSACTION_REVERTED') {
+        pendingTransactionRef.current = null;
+        setPendingTransaction(null);
+        setClaimTxHash(null);
+        setTransactionState({ kind: 'error', message: 'El cobro fue revertido. Puedes volver a intentarlo.' });
+      } else if (reason instanceof TransactionReplacementPendingError) {
+        const pending = { hash: reason.hash, wallet: expectedAddress, chainId: expectedChainId, baselineReleased } satisfies PendingVestingTransaction;
+        pendingTransactionRef.current = pending;
+        setPendingTransaction(pending);
+        setTransactionState({ kind: 'pending', hash: reason.hash, message: 'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.' });
+      } else if (reason instanceof TransactionReplacementError) {
+        pendingTransactionRef.current = null;
+        setPendingTransaction(null);
+        setClaimTxHash(null);
+        setTransactionState({
+          kind: 'error',
+          message: reason.reason === 'cancelled'
+            ? 'La transacción fue cancelada en la wallet. No se ha cobrado ningún vesting.'
+            : 'La transacción fue reemplazada por otra operación. No se ha cobrado ningún vesting.',
+        });
+      } else {
+        setTransactionState({ kind: 'error', message: 'No se pudo enviar el cobro. Comprueba la wallet y vuelve a intentarlo.' });
+      }
+    }
+  }
+
+  function prepareVestingNetwork() {
+    if (requestWallet === FALLBACK_COORDINATOR.requestWallet) {
+      switchChain({ chainId: ukiSaleContracts.chainId });
+      return;
+    }
+    void requestWallet({
+      kind: 'evm',
+      targetChainId: ukiSaleContracts.chainId as 56 | 97,
+      reason: 'Cambia la wallet a la red BSC del vesting antes de firmar el cobro.',
+    }).catch(() => {
+      // El coordinador mantiene el aviso de wallet/red; no abrimos una firma aquí.
     });
   }
 
@@ -251,11 +642,15 @@ export default function PublicVestingPage() {
               </p>
             </div>
             <Button
-              onClick={claimAll}
-              disabled={!isConfigured || !isConnected || isPending || !claimable || claimable === BigInt(0)}
+              onClick={chainId !== ukiSaleContracts.chainId ? prepareVestingNetwork : claimAll}
+              disabled={!isConfigured || !isConnected || switchingChain || evmWallet.isConnecting || transactionState.kind === 'confirming' || transactionState.kind === 'pending' || Boolean(pendingTransaction && pendingBelongsToCurrent()) || (chainId === ukiSaleContracts.chainId && (claimableAmount === undefined || claimableAmount === BigInt(0)))}
               className="h-11 rounded-[8px] border border-[var(--uki-lilac)]/60 bg-[var(--uki-lilac)] px-5 font-headline text-xs font-black uppercase tracking-[0.1em] text-white shadow-[0_0_18px_rgba(228,92,255,0.22)] hover:bg-[#f19bff]"
             >
-              {isPending ? 'Confirmando...' : 'Reclamar UKI disponible'}
+              {switchingChain || evmWallet.isConnecting
+                ? 'Cambiando red…'
+                : chainId !== ukiSaleContracts.chainId
+                  ? 'Cambiar de red para cobrar'
+                  : transactionState.kind === 'confirming' ? 'Confirmando...' : transactionState.kind === 'pending' ? 'Cobro pendiente' : 'Reclamar UKI disponible'}
             </Button>
           </div>
 
@@ -271,6 +666,26 @@ export default function PublicVestingPage() {
             </a>
           ) : null}
 
+          {chainId !== ukiSaleContracts.chainId && isConnected ? (
+            <p role="alert" className="mt-3 text-sm font-semibold text-amber-100">
+              Cambia a la red BSC configurada para reclamar tu vesting.
+            </p>
+          ) : null}
+          {transactionState.kind === 'pending' ? (
+            <div className="mt-3 flex flex-col gap-2 rounded-[10px] border border-amber-200/25 bg-amber-200/[0.07] p-3 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+              <span>{transactionState.message}</span>
+              <Button type="button" variant="outline" onClick={() => void recheckPendingClaim()} className="shrink-0 border-amber-200/30 text-amber-100">
+                Comprobar cobro
+              </Button>
+            </div>
+          ) : null}
+          {transactionState.kind === 'error' ? (
+            <p role="alert" className="mt-3 text-sm font-semibold text-amber-100">{transactionState.message}</p>
+          ) : null}
+          {transactionState.kind === 'success' ? (
+            <p role="status" className="mt-3 text-sm font-semibold text-emerald-100">{transactionState.message ?? 'Cobro confirmado en la cadena. El calendario se actualizará cuando la lectura esté disponible.'}</p>
+          ) : null}
+
           <div className="mt-6 grid gap-5 lg:grid-cols-[220px_1fr]">
             <div className="flex aspect-square items-center justify-center rounded-[14px] border border-[var(--uki-lilac)]/22 bg-[var(--uki-lilac)]/6">
               <div className="text-center">
@@ -280,7 +695,7 @@ export default function PublicVestingPage() {
             </div>
             <div className="flex flex-col justify-center gap-5">
               <div className="h-3 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: `${Math.min(unlockProgress, 100)}%` }} />
+                <div className="h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: `${unlockProgress === undefined ? 0 : Math.min(unlockProgress, 100)}%` }} />
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
