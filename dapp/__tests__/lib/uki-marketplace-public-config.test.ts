@@ -7,6 +7,7 @@ const router = '0x4444444444444444444444444444444444444444';
 const wbnb = '0x5555555555555555555555555555555555555555';
 const usdt = '0x6666666666666666666666666666666666666666';
 const asm = '0x7777777777777777777777777777777777777777';
+const usdc = '0x8888888888888888888888888888888888888888';
 
 describe('configuración pública del marketplace UKI', () => {
   it('acepta únicamente una identidad completa de Stage en chain 97', () => {
@@ -39,8 +40,12 @@ describe('configuración pública del marketplace UKI', () => {
       routerAddress: router,
       wrappedNativeAddress: wbnb,
       usdtTokenAddress: usdt,
+      asmTokenAddress: asm,
+      usdcTokenAddress: usdc,
       bnbPaymentPath: `${wbnb},${asm},${uki}`,
+      asmPaymentPath: `${asm},${uki}`,
       usdtPaymentPath: `${usdt},${asm},${uki}`,
+      usdcPaymentPath: `${usdc},${usdt},${asm},${uki}`,
     })).toMatchObject({
       ready: true,
       checkoutReady: true,
@@ -51,8 +56,14 @@ describe('configuración pública del marketplace UKI', () => {
       routerAddress: router,
       wrappedNativeAddress: wbnb,
       usdtTokenAddress: usdt,
+      asmTokenAddress: asm,
+      usdcTokenAddress: usdc,
+      asmPaymentReady: true,
+      usdcPaymentReady: true,
       bnbPaymentPath: [wbnb, asm, uki],
+      asmPaymentPath: [asm, uki],
       usdtPaymentPath: [usdt, asm, uki],
+      usdcPaymentPath: [usdc, usdt, asm, uki],
       checkoutIssues: [],
     });
   });

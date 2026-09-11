@@ -30,6 +30,8 @@ export {
 export type {
   IndexedUkiMarketplaceOrder,
   IndexedUkiMarketplaceStatus,
+  UkiMarketplaceAssetIdentity,
+  UkiMarketplaceAssetMetadata,
   UkiMarketplaceDisplayStatus,
   UkiMarketplaceLiveInspection,
   UkiMarketplaceOrderView,

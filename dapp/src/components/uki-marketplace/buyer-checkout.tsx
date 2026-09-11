@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowClockwise,
   CheckCircle,
@@ -9,19 +9,17 @@ import {
   LockKey,
   ShieldCheck,
   ShoppingCart,
-  Wallet,
   WarningCircle,
 } from '@phosphor-icons/react';
 import { formatUnits, type Address, type Hash } from 'viem';
 import {
   useAccount,
   usePublicClient,
-  useSwitchChain,
   useWriteContract,
 } from 'wagmi';
 
-import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Button } from '@/components/ui/button';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 import {
   calculateUkiMarketplaceCheckoutBudget,
   UKI_MARKETPLACE_QUOTE_DEADLINE_SECONDS,
@@ -40,6 +38,13 @@ import {
 } from '@/lib/uki-marketplace/abi';
 import { ukiMarketplacePublicConfig } from '@/lib/uki-marketplace/public-config';
 import type { UkiMarketplaceOrderView } from '@/lib/uki-marketplace/types';
+import {
+  isTransactionRefreshAborted,
+  retryTransactionRefresh,
+  TransactionReplacementError,
+  TransactionReplacementPendingError,
+  waitForConfirmedEvmTransaction,
+} from '@/lib/transaction-refresh';
 
 type Quote = {
   currency: UkiMarketplacePaymentCurrency;
@@ -53,6 +58,12 @@ type Quote = {
   blockTimestamp: bigint;
 };
 
+export type UkiMarketplaceCheckoutAction = {
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+};
+
 type QuoteState =
   | { kind: 'loading' }
   | { kind: 'ready'; quote: Quote }
@@ -64,10 +75,46 @@ type TransactionState =
   | { kind: 'approving'; message: string }
   | { kind: 'purchasing' }
   | { kind: 'verifying'; hash: Hash }
-  | { kind: 'success'; hash: Hash }
+  | { kind: 'pending'; hash: Hash; message: string }
+  | { kind: 'approved'; hash: Hash; message: string }
+  | { kind: 'success'; hash: Hash; message?: string }
   | { kind: 'error'; message: string };
 
-const CURRENCIES: UkiMarketplacePaymentCurrency[] = ['UKI', 'BNB', 'USDT'];
+type PendingCheckout = {
+  hash: Hash;
+  wallet: string;
+  chainId: 56 | 97;
+  orderId: string;
+  kind: 'approval' | 'purchase';
+};
+
+class BroadcastPendingError extends Error {
+  readonly hash: Hash;
+  readonly operation: PendingCheckout['kind'];
+
+  constructor(hash: Hash, operation: PendingCheckout['kind'], cause?: unknown) {
+    super('TRANSACTION_PENDING');
+    this.name = 'BroadcastPendingError';
+    this.hash = hash;
+    this.operation = operation;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+class ReceiptContextChangedError extends Error {
+  readonly hash: Hash;
+  readonly operation: PendingCheckout['kind'];
+
+  constructor(hash: Hash, operation: PendingCheckout['kind'], cause?: unknown) {
+    super('WALLET_CONTEXT_CHANGED');
+    this.name = 'ReceiptContextChangedError';
+    this.hash = hash;
+    this.operation = operation;
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+const CURRENCIES: UkiMarketplacePaymentCurrency[] = ['UKI', 'ASM', 'BNB', 'USDT', 'USDC'];
 
 function sameAddress(left: string, right: string) {
   return left.toLowerCase() === right.toLowerCase();
@@ -82,10 +129,16 @@ function transactionErrorMessage(error: unknown) {
     return 'No tienes saldo suficiente para el pago y el gas.';
   }
   if (/OrderNotPurchasable|orden ya no está activa/i.test(message)) {
-    return 'La orden ya no está disponible. Actualiza el marketplace.';
+    return 'El anuncio ya no está disponible. Actualiza el marketplace.';
   }
   if (/InvalidPaymentBudget|EXCESSIVE_INPUT_AMOUNT|insufficient input amount/i.test(message)) {
     return 'La cotización cambió por encima del máximo protegido. Vuelve a cotizar.';
+  }
+  if (/TRANSACTION_CANCELLED/i.test(message)) {
+    return 'La transacción fue cancelada en la wallet. No se ha completado la operación.';
+  }
+  if (/TRANSACTION_REPLACED/i.test(message)) {
+    return 'La transacción fue reemplazada por otra operación. No se ha completado esta acción.';
   }
   return message.length > 220
     ? 'La operación no pudo completarse. Vuelve a cotizar y revisa la wallet.'
@@ -112,28 +165,151 @@ function CheckoutSkeleton() {
 export function UkiMarketplaceBuyerCheckout({
   order,
   onPurchased,
+  onBusyChange,
+  onActionChange,
 }: {
   order: UkiMarketplaceOrderView;
   onPurchased: () => void;
+  onBusyChange?: (busy: boolean) => void;
+  onActionChange?: (action: UkiMarketplaceCheckoutAction | null) => void;
 }) {
   const { address, chainId, isConnected } = useAccount();
-  const publicClient = usePublicClient({ chainId: 97 });
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
+  const expectedChainId = ukiMarketplacePublicConfig.chainId;
+  const publicClient = usePublicClient({ chainId: expectedChainId ?? undefined });
   const { writeContractAsync } = useWriteContract();
+  const { requestWallet } = useWalletCoordinator();
   const [currency, setCurrency] = useState<UkiMarketplacePaymentCurrency>('UKI');
   const [quoteState, setQuoteState] = useState<QuoteState>({ kind: 'loading' });
   const [transactionState, setTransactionState] = useState<TransactionState>({ kind: 'idle' });
   const [reloadKey, setReloadKey] = useState(0);
+  const [buyConfirmation, setBuyConfirmation] = useState(false);
+  const [isPreparingBuy, setIsPreparingBuy] = useState(false);
+  const mountedRef = useRef(true);
+  const contextRef = useRef<{
+    address: string | null;
+    chainId: number | null;
+    orderId: string;
+    currency: UkiMarketplacePaymentCurrency;
+  }>({
+    address: address ?? null,
+    chainId: chainId ?? null,
+    orderId: order.orderId,
+    currency,
+  });
+  const pendingCheckoutRef = useRef<PendingCheckout | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
+  const refreshAbortRef = useRef<AbortController | null>(null);
+  contextRef.current = {
+    address: address ?? null,
+    chainId: chainId ?? null,
+    orderId: order.orderId,
+    currency,
+  };
+  const targetChainId = expectedChainId === 56 || expectedChainId === 97
+    ? expectedChainId
+    : null;
+  const walletReady = Boolean(
+    isConnected
+    && address
+    && targetChainId !== null
+    && chainId === targetChainId,
+  );
   const availableCurrencies = CURRENCIES.filter((item) => {
     if (item === 'UKI') return ukiMarketplacePublicConfig.ukiPaymentReady;
+    if (item === 'ASM') return ukiMarketplacePublicConfig.asmPaymentReady;
     if (item === 'BNB') return ukiMarketplacePublicConfig.bnbPaymentReady;
-    return ukiMarketplacePublicConfig.usdtPaymentReady;
+    if (item === 'USDT') return ukiMarketplacePublicConfig.usdtPaymentReady;
+    return ukiMarketplacePublicConfig.usdcPaymentReady;
   });
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const pending = pendingCheckoutRef.current;
+    const matches = Boolean(
+      pending
+      && address
+      && sameAddress(pending.wallet, address)
+      && pending.chainId === chainId
+      && pending.orderId === order.orderId
+      && contextRef.current.orderId === pending.orderId,
+    );
+    if (matches && pending) {
+      setPendingCheckout(pending);
+      setTransactionState((current) => {
+        if (current.kind !== 'idle' && current.kind !== 'error') return current;
+        return {
+          kind: 'pending',
+          hash: pending.hash,
+          message: pending.kind === 'purchase'
+            ? 'La compra fue enviada. Comprueba su confirmación sin firmar otra vez.'
+            : 'La autorización fue enviada. Comprueba su confirmación sin firmar otra vez.',
+        };
+      });
+      return;
+    }
+    refreshAbortRef.current?.abort();
+    setPendingCheckout(null);
+    setTransactionState((current) => (
+      current.kind === 'pending' || current.kind === 'success' || current.kind === 'approved'
+        ? { kind: 'idle' }
+        : current
+    ));
+  }, [address, chainId, order.orderId]);
+
+  function assertLiveContext(expectedAddress: string, expectedChainId: 56 | 97) {
+    if (
+      !mountedRef.current
+      || contextRef.current.orderId !== order.orderId
+      || contextRef.current.currency !== currency
+      || contextRef.current.chainId !== expectedChainId
+      || !contextRef.current.address
+      || !sameAddress(contextRef.current.address, expectedAddress)
+    ) {
+      throw new Error('WALLET_CONTEXT_CHANGED');
+    }
+  }
+
+  function rememberPendingCheckout(pending: PendingCheckout) {
+    pendingCheckoutRef.current = pending;
+    if (mountedRef.current) {
+      setPendingCheckout(pending);
+      setTransactionState({
+        kind: 'pending',
+        hash: pending.hash,
+        message: pending.kind === 'purchase'
+          ? 'La compra fue enviada. Comprueba su confirmación sin firmar otra vez.'
+          : 'La autorización fue enviada. Comprueba su confirmación sin firmar otra vez.',
+      });
+    }
+  }
+
+  function clearPendingCheckout() {
+    pendingCheckoutRef.current = null;
+    if (mountedRef.current) setPendingCheckout(null);
+  }
+
+  function pendingBelongsToCurrent() {
+    const pending = pendingCheckoutRef.current;
+    return Boolean(
+      pending
+      && address
+      && sameAddress(pending.wallet, address)
+      && pending.chainId === chainId
+      && pending.orderId === order.orderId,
+    );
+  }
 
   const configReady = ukiMarketplacePublicConfig.ready
     && ukiMarketplacePublicConfig.checkoutReady
     && ukiMarketplacePublicConfig.ukiPaymentReady
-    && ukiMarketplacePublicConfig.chainId === 97
+    && expectedChainId !== null
     && Boolean(ukiMarketplacePublicConfig.marketplaceAddress)
     && Boolean(ukiMarketplacePublicConfig.ukiTokenAddress)
     && Boolean(ukiMarketplacePublicConfig.routerAddress)
@@ -142,9 +318,11 @@ export function UkiMarketplaceBuyerCheckout({
   const readQuote = useCallback(async (): Promise<Quote> => {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
     const configuredUki = ukiMarketplacePublicConfig.ukiTokenAddress;
+    const configuredAsm = ukiMarketplacePublicConfig.asmTokenAddress;
     const configuredRouter = ukiMarketplacePublicConfig.routerAddress;
     const configuredWrappedNative = ukiMarketplacePublicConfig.wrappedNativeAddress;
     const configuredUsdt = ukiMarketplacePublicConfig.usdtTokenAddress;
+    const configuredUsdc = ukiMarketplacePublicConfig.usdcTokenAddress;
     if (
       !configReady
       || !publicClient
@@ -241,7 +419,7 @@ export function UkiMarketplaceBuyerCheckout({
       || !sameAddress(onchainRouter, configuredRouter)
       || !sameAddress(onchainWrappedNative, configuredWrappedNative)
     ) {
-      throw new Error('La identidad on-chain del marketplace no coincide con Stage.');
+      throw new Error('No podemos comprobar la configuración del marketplace.');
     }
     if (paused) throw new Error('El marketplace está pausado temporalmente.');
     if (!collectionAllowed) throw new Error('La colección ya no está habilitada.');
@@ -271,7 +449,7 @@ export function UkiMarketplaceBuyerCheckout({
 
     if (currency === 'BNB') {
       if (!ukiMarketplacePublicConfig.bnbPaymentReady) {
-        throw new Error('El pago con BNB no está habilitado en este Stage.');
+        throw new Error('El pago con BNB no está disponible ahora.');
       }
       tokenAddress = null;
       path = ukiMarketplacePublicConfig.bnbPaymentPath;
@@ -282,7 +460,7 @@ export function UkiMarketplaceBuyerCheckout({
         || !sameAddress(path[0], configuredWrappedNative)
         || !sameAddress(path.at(-1) as Address, configuredUki)
       ) {
-        throw new Error('La ruta BNB → UKI no coincide con el contrato de Stage.');
+        throw new Error('No podemos preparar el cambio de BNB a UKI.');
       }
       const [nativePaymentAllowed, amounts] = await Promise.all([
         publicClient.readContract({
@@ -298,7 +476,7 @@ export function UkiMarketplaceBuyerCheckout({
         }),
       ]);
       if (!nativePaymentAllowed) {
-        throw new Error('El pago con BNB está deshabilitado on-chain en este Stage.');
+        throw new Error('El pago con BNB no está disponible ahora.');
       }
       if (
         amounts.length !== path.length
@@ -308,26 +486,46 @@ export function UkiMarketplaceBuyerCheckout({
         throw new Error('El router devolvió una cotización BNB inválida.');
       }
       quotedPaymentRaw = amounts[0];
-    } else if (currency === 'USDT') {
-      if (!ukiMarketplacePublicConfig.usdtPaymentReady || !configuredUsdt) {
-        throw new Error('El pago con USDT no está habilitado en este Stage.');
+    } else if (currency !== 'UKI') {
+      const tokenConfig = currency === 'ASM'
+        ? {
+            address: configuredAsm,
+            path: ukiMarketplacePublicConfig.asmPaymentPath,
+            ready: ukiMarketplacePublicConfig.asmPaymentReady,
+            label: 'ASM',
+          }
+        : currency === 'USDT'
+          ? {
+              address: configuredUsdt,
+              path: ukiMarketplacePublicConfig.usdtPaymentPath,
+              ready: ukiMarketplacePublicConfig.usdtPaymentReady,
+              label: 'USDT',
+            }
+          : {
+              address: configuredUsdc,
+              path: ukiMarketplacePublicConfig.usdcPaymentPath,
+              ready: ukiMarketplacePublicConfig.usdcPaymentReady,
+              label: 'USDC',
+            };
+      if (!tokenConfig.ready || !tokenConfig.address) {
+        throw new Error(`El pago con ${tokenConfig.label} no está disponible ahora.`);
       }
-      tokenAddress = configuredUsdt;
-      path = ukiMarketplacePublicConfig.usdtPaymentPath;
+      tokenAddress = tokenConfig.address;
+      path = tokenConfig.path;
       if (
         !path[0]
         || !path.at(-1)
-        || !sameAddress(path[0], configuredUsdt)
+        || !sameAddress(path[0], tokenConfig.address)
         || !sameAddress(path.at(-1) as Address, configuredUki)
       ) {
-        throw new Error('La ruta USDT → UKI no coincide con el contrato de Stage.');
+        throw new Error(`No podemos preparar el cambio de ${tokenConfig.label} a UKI.`);
       }
       const [allowed, amounts, tokenDecimals, tokenSymbol] = await Promise.all([
         publicClient.readContract({
           address: marketplaceAddress,
           abi: ukiMarketplaceReadAbi,
           functionName: 'paymentTokenAllowed',
-          args: [configuredUsdt],
+          args: [tokenConfig.address],
         }),
         publicClient.readContract({
           address: configuredRouter,
@@ -336,27 +534,27 @@ export function UkiMarketplaceBuyerCheckout({
           args: [ukiPrice, path],
         }),
         publicClient.readContract({
-          address: configuredUsdt,
+          address: tokenConfig.address,
           abi: ukiMarketplaceErc20Abi,
           functionName: 'decimals',
         }),
         publicClient.readContract({
-          address: configuredUsdt,
+          address: tokenConfig.address,
           abi: ukiMarketplaceErc20Abi,
           functionName: 'symbol',
         }),
       ]);
-      if (!allowed) throw new Error('USDT no está habilitado como moneda de pago.');
+      if (!allowed) throw new Error(`${tokenConfig.label} no está habilitado como moneda de pago.`);
       if (
         amounts.length !== path.length
         || amounts.at(-1) !== ukiPrice
         || amounts[0] <= BigInt(0)
       ) {
-        throw new Error('El router devolvió una cotización USDT inválida.');
+        throw new Error(`El router devolvió una cotización ${tokenConfig.label} inválida.`);
       }
-      if (tokenDecimals > 36) throw new Error('Los decimales de USDT no son válidos.');
+      if (tokenDecimals > 36) throw new Error(`Los decimales de ${tokenConfig.label} no son válidos.`);
       decimals = tokenDecimals;
-      symbol = tokenSymbol || 'USDT';
+      symbol = tokenSymbol || tokenConfig.label;
       quotedPaymentRaw = amounts[0];
     } else {
       const [tokenDecimals, tokenSymbol] = await Promise.all([
@@ -424,7 +622,11 @@ export function UkiMarketplaceBuyerCheckout({
       return () => { active = false; };
     }
     setQuoteState({ kind: 'loading' });
-    setTransactionState({ kind: 'idle' });
+    setTransactionState((current) => (
+      current.kind === 'idle' || current.kind === 'error'
+        ? { kind: 'idle' }
+        : current
+    ));
     readQuote()
       .then((quote) => {
         if (active) setQuoteState({ kind: 'ready', quote });
@@ -440,15 +642,41 @@ export function UkiMarketplaceBuyerCheckout({
     return () => { active = false; };
   }, [configReady, readQuote, reloadKey]);
 
-  async function writeAndConfirm(input: Parameters<typeof writeContractAsync>[0]) {
-    if (!publicClient) throw new Error('No se puede verificar BSC Testnet.');
+  useEffect(() => {
+    setBuyConfirmation(false);
+  }, [address, chainId, currency, order.orderId, reloadKey]);
+
+  async function writeAndConfirm(
+    input: Parameters<typeof writeContractAsync>[0],
+    expectedAddress: string,
+    operation: PendingCheckout['kind'],
+  ) {
+    if (!publicClient) throw new Error('No podemos comprobar la red ahora.');
+    assertLiveContext(expectedAddress, targetChainId!);
     const hash = await writeContractAsync(input);
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== 'success') throw new Error('La transacción revirtió on-chain.');
-    return hash;
+    let confirmedHash = hash;
+    let receipt;
+    try {
+      const confirmed = await waitForConfirmedEvmTransaction(publicClient, hash);
+      receipt = confirmed.receipt;
+      confirmedHash = confirmed.hash;
+    } catch (reason) {
+      if (reason instanceof TransactionReplacementError) throw reason;
+      if (reason instanceof TransactionReplacementPendingError) {
+        throw new BroadcastPendingError(reason.hash, operation, reason);
+      }
+      throw new BroadcastPendingError(hash, operation, reason);
+    }
+    if (receipt.status !== 'success') throw new Error('La operación no se ha completado.');
+    try {
+      assertLiveContext(expectedAddress, targetChainId!);
+    } catch (reason) {
+      throw new ReceiptContextChangedError(confirmedHash, operation, reason);
+    }
+    return confirmedHash;
   }
 
-  async function ensureAllowance(quote: Quote) {
+  async function ensureAllowance(quote: Quote, expectedAddress: string) {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
     if (!quote.tokenAddress || !marketplaceAddress || quote.allowanceRaw === null) return;
     if (quote.allowanceRaw >= quote.budget.maxTotalRaw) return;
@@ -456,45 +684,48 @@ export function UkiMarketplaceBuyerCheckout({
     if (quote.allowanceRaw > BigInt(0)) {
       setTransactionState({ kind: 'approving', message: `Restableciendo autorización de ${quote.symbol}…` });
       await writeAndConfirm({
-        chainId: 97,
+        chainId: expectedChainId!,
         address: quote.tokenAddress,
         abi: ukiMarketplaceErc20Abi,
         functionName: 'approve',
         args: [marketplaceAddress, BigInt(0)],
-      });
+      }, expectedAddress, 'approval');
     }
     setTransactionState({ kind: 'approving', message: `Autorizando el máximo exacto en ${quote.symbol}…` });
     await writeAndConfirm({
-      chainId: 97,
+      chainId: expectedChainId!,
       address: quote.tokenAddress,
       abi: ukiMarketplaceErc20Abi,
       functionName: 'approve',
       args: [marketplaceAddress, quote.budget.maxTotalRaw],
-    });
+    }, expectedAddress, 'approval');
   }
 
   async function buy() {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
-    if (
-      !isConnected
-      || !address
-      || chainId !== 97
-      || !marketplaceAddress
-      || !publicClient
-    ) return;
+    if (!isConnected || !address || targetChainId === null || chainId !== targetChainId) {
+      setBuyConfirmation(false);
+      setTransactionState({ kind: 'error', message: 'Prepara la wallet y confirma de nuevo antes de comprar.' });
+      return;
+    }
+    if (!marketplaceAddress || !publicClient) return;
     if (sameAddress(address, order.seller)) {
-      setTransactionState({ kind: 'error', message: 'El vendedor no puede comprar su propia orden.' });
+      setTransactionState({ kind: 'error', message: 'Este anuncio pertenece a tu wallet; otra wallet puede comprarlo.' });
       return;
     }
 
+    const expectedAddress = address;
+    const expectedChainId = targetChainId;
+    if (pendingBelongsToCurrent()) return;
     try {
       setTransactionState({ kind: 'purchasing' });
       let freshQuote = await readQuote();
       if (freshQuote.balanceRaw !== null && freshQuote.balanceRaw < freshQuote.budget.maxTotalRaw) {
         throw new Error(`Saldo ${freshQuote.symbol} insuficiente para el máximo protegido.`);
       }
-      await ensureAllowance(freshQuote);
+      await ensureAllowance(freshQuote, expectedAddress);
 
+      assertLiveContext(expectedAddress, expectedChainId);
       freshQuote = await readQuote();
       if (freshQuote.balanceRaw !== null && freshQuote.balanceRaw < freshQuote.budget.maxTotalRaw) {
         throw new Error(`Saldo ${freshQuote.symbol} insuficiente para la cotización actualizada.`);
@@ -503,7 +734,7 @@ export function UkiMarketplaceBuyerCheckout({
         freshQuote.tokenAddress
         && (freshQuote.allowanceRaw ?? BigInt(0)) < freshQuote.budget.maxTotalRaw
       ) {
-        await ensureAllowance(freshQuote);
+        await ensureAllowance(freshQuote, expectedAddress);
         freshQuote = await readQuote();
         if ((freshQuote.allowanceRaw ?? BigInt(0)) < freshQuote.budget.maxTotalRaw) {
           throw new Error('La autorización del token no cubre el máximo protegido.');
@@ -517,15 +748,15 @@ export function UkiMarketplaceBuyerCheckout({
       let hash: Hash;
       if (freshQuote.currency === 'UKI') {
         hash = await writeAndConfirm({
-          chainId: 97,
+          chainId: targetChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithUki',
           args: [order.orderId],
-        });
-      } else if (freshQuote.currency === 'USDT' && freshQuote.tokenAddress) {
+        }, expectedAddress, 'purchase');
+      } else if (freshQuote.currency !== 'BNB' && freshQuote.tokenAddress) {
         hash = await writeAndConfirm({
-          chainId: 97,
+          chainId: targetChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithToken',
@@ -536,42 +767,230 @@ export function UkiMarketplaceBuyerCheckout({
             freshQuote.path,
             deadline,
           ],
-        });
+        }, expectedAddress, 'purchase');
       } else {
         hash = await writeAndConfirm({
-          chainId: 97,
+          chainId: targetChainId,
           address: marketplaceAddress,
           abi: ukiMarketplaceWriteAbi,
           functionName: 'buyWithNative',
           args: [order.orderId, freshQuote.path, deadline],
           value: freshQuote.budget.maxTotalRaw,
-        } as unknown as Parameters<typeof writeContractAsync>[0]);
+        } as unknown as Parameters<typeof writeContractAsync>[0], expectedAddress, 'purchase');
       }
 
-      setTransactionState({ kind: 'verifying', hash });
-      const [finalState, finalOwner] = await Promise.all([
-        publicClient.readContract({
-          address: marketplaceAddress,
-          abi: ukiMarketplaceReadAbi,
-          functionName: 'orderState',
-          args: [order.orderId],
-        }),
-        publicClient.readContract({
-          address: order.collectionAddress,
-          abi: ukiMarketplaceNftReadAbi,
-          functionName: 'ownerOf',
-          args: [BigInt(order.tokenId)],
-        }),
-      ]);
-      if (Number(finalState) !== 2 || !sameAddress(finalOwner, address)) {
-        throw new Error('El receipt fue correcto, pero no pudo verificarse la entrega atómica.');
-      }
-
+      clearPendingCheckout();
       setTransactionState({ kind: 'success', hash });
-      window.dispatchEvent(new Event('cukies:uki-marketplace:refresh'));
-      onPurchased();
+      setBuyConfirmation(false);
+      try {
+        assertLiveContext(expectedAddress, expectedChainId);
+      } catch {
+        setTransactionState({
+          kind: 'success',
+          hash,
+          message: 'Compra confirmada en la cadena. La wallet o la red cambió antes de actualizar esta vista.',
+        });
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', { detail: { hash } }));
+      try {
+        onPurchased();
+      } catch {
+        // A parent refresh callback must not turn a confirmed purchase into an error.
+      }
+      void refreshPurchasedState(expectedAddress, expectedChainId);
     } catch (error: unknown) {
+      if (!mountedRef.current) return;
+      if (error instanceof BroadcastPendingError) {
+        rememberPendingCheckout({
+          hash: error.hash,
+          wallet: expectedAddress,
+          chainId: expectedChainId,
+          orderId: order.orderId,
+          kind: error.operation,
+        });
+        return;
+      }
+      if (error instanceof ReceiptContextChangedError) {
+        clearPendingCheckout();
+        setBuyConfirmation(false);
+        setTransactionState({
+          kind: error.operation === 'purchase' ? 'success' : 'approved',
+          hash: error.hash,
+          message: error.operation === 'purchase'
+            ? 'Compra confirmada en la cadena. La wallet o la red cambió antes de actualizar esta vista.'
+            : 'Autorización confirmada en la cadena. Vuelve a conectar la wallet original para continuar.',
+        });
+        return;
+      }
+      if (error instanceof Error && error.message === 'WALLET_CONTEXT_CHANGED') {
+        setTransactionState({
+          kind: 'error',
+          message: 'La wallet o la red cambió antes de completar la compra. Comprueba la cuenta original antes de volver a intentarlo.',
+        });
+        return;
+      }
+      clearPendingCheckout();
       setTransactionState({ kind: 'error', message: transactionErrorMessage(error) });
+    }
+  }
+
+  async function refreshPurchasedState(
+    expectedAddress: string,
+    expectedChainId: 56 | 97,
+  ) {
+    const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
+    if (!marketplaceAddress || !publicClient) return;
+    refreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    refreshAbortRef.current = controller;
+    try {
+      const converged = await retryTransactionRefresh(
+        async () => {
+          assertLiveContext(expectedAddress, expectedChainId);
+          try {
+            const [finalState, finalOwner] = await Promise.all([
+              publicClient!.readContract({
+                address: marketplaceAddress,
+                abi: ukiMarketplaceReadAbi,
+                functionName: 'orderState',
+                args: [order.orderId],
+              }),
+              publicClient!.readContract({
+                address: order.collectionAddress,
+                abi: ukiMarketplaceNftReadAbi,
+                functionName: 'ownerOf',
+                args: [BigInt(order.tokenId)],
+              }),
+            ]);
+            assertLiveContext(expectedAddress, expectedChainId);
+            return Number(finalState) === 2 && sameAddress(finalOwner, expectedAddress);
+          } catch {
+            return false;
+          }
+        },
+        { signal: controller.signal },
+      );
+      if (converged && mountedRef.current) setReloadKey((value) => value + 1);
+    } catch (reason) {
+      if (!isTransactionRefreshAborted(reason) && !(reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED')) {
+        // The chain receipt remains decisive; a delayed read must not turn it into a failure.
+      }
+    } finally {
+      if (refreshAbortRef.current === controller) refreshAbortRef.current = null;
+    }
+  }
+
+  async function recheckPendingCheckout() {
+    const pending = pendingCheckoutRef.current;
+    if (!pending || !publicClient || transactionState.kind === 'verifying') return;
+    try {
+      assertLiveContext(pending.wallet, pending.chainId);
+    } catch {
+      setTransactionState({
+        kind: 'pending',
+        hash: pending.hash,
+        message: 'La wallet o la red cambió. Vuelve a conectar la cuenta original para comprobar esta transacción.',
+      });
+      return;
+    }
+    setTransactionState({ kind: 'verifying', hash: pending.hash });
+    try {
+      const confirmed = await waitForConfirmedEvmTransaction(publicClient, pending.hash);
+      const receipt = confirmed.receipt;
+      if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+      const confirmedHash = confirmed.hash;
+      pending.hash = confirmedHash;
+      try {
+        assertLiveContext(pending.wallet, pending.chainId);
+      } catch {
+        clearPendingCheckout();
+        setBuyConfirmation(pending.kind === 'approval');
+        setTransactionState({
+          kind: pending.kind === 'purchase' ? 'success' : 'approved',
+          hash: confirmedHash,
+          message: pending.kind === 'purchase'
+            ? 'Compra confirmada en la cadena. La wallet o la red cambió antes de actualizar esta vista.'
+            : 'Autorización confirmada en la cadena. La wallet o la red cambió; vuelve a conectar la cuenta original para continuar.',
+        });
+        return;
+      }
+      clearPendingCheckout();
+      if (pending.kind === 'purchase') {
+        setTransactionState({ kind: 'success', hash: confirmedHash });
+        setBuyConfirmation(false);
+        window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', { detail: { hash: confirmedHash } }));
+        try {
+          onPurchased();
+        } catch {
+          // The receipt remains authoritative if the parent refresh callback fails.
+        }
+        void refreshPurchasedState(pending.wallet, pending.chainId);
+      } else {
+        setBuyConfirmation(true);
+        setTransactionState({
+          kind: 'approved',
+          hash: confirmedHash,
+          message: 'Autorización confirmada. Revisa y confirma la compra cuando estés listo.',
+        });
+        setReloadKey((value) => value + 1);
+      }
+    } catch (error: unknown) {
+      if (!mountedRef.current) return;
+      if (error instanceof Error && error.message === 'TRANSACTION_REVERTED') {
+        clearPendingCheckout();
+        setTransactionState({ kind: 'error', message: 'La transacción fue revertida. No se ha completado ninguna compra.' });
+      } else if (error instanceof TransactionReplacementPendingError) {
+        const updated = { ...pending, hash: error.hash };
+        pendingCheckoutRef.current = updated;
+        setPendingCheckout(updated);
+        setTransactionState({
+          kind: 'pending',
+          hash: error.hash,
+          message: 'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.',
+        });
+      } else if (error instanceof TransactionReplacementError) {
+        clearPendingCheckout();
+        setTransactionState({ kind: 'error', message: transactionErrorMessage(error) });
+      } else {
+        setTransactionState({
+          kind: 'pending',
+          hash: pending.hash,
+          message: 'La transacción sigue pendiente. Puedes volver a comprobarla sin firmar otra vez.',
+        });
+      }
+    }
+  }
+
+  async function prepareBuy() {
+    if (buyConfirmation) {
+      await buy();
+      return;
+    }
+    if (ownOrder) {
+      setTransactionState({ kind: 'error', message: 'Este anuncio pertenece a tu wallet; otra wallet puede comprarlo.' });
+      return;
+    }
+    if (targetChainId === null) {
+      setTransactionState({ kind: 'error', message: 'La red de compra aún no está configurada.' });
+      return;
+    }
+
+    setIsPreparingBuy(true);
+    setTransactionState({ kind: 'idle' });
+    try {
+      if (!walletReady) {
+        await requestWallet({
+          kind: 'evm',
+          targetChainId,
+          reason: `Compra protegida del Cukie #${order.tokenId}. No se firmará nada hasta confirmar.`,
+        });
+      }
+      setBuyConfirmation(true);
+    } catch (error) {
+      setTransactionState({ kind: 'error', message: transactionErrorMessage(error) });
+    } finally {
+      setIsPreparingBuy(false);
     }
   }
 
@@ -589,17 +1008,59 @@ export function UkiMarketplaceBuyerCheckout({
   );
   const busy = transactionState.kind === 'approving'
     || transactionState.kind === 'purchasing'
-    || transactionState.kind === 'verifying';
+    || transactionState.kind === 'verifying'
+    || transactionState.kind === 'pending';
+  const actionLabel = isPreparingBuy
+    ? 'Preparando wallet…'
+    : transactionState.kind === 'approving'
+      ? 'Autorizando…'
+      : transactionState.kind === 'purchasing'
+        ? 'Esperando firma…'
+        : transactionState.kind === 'verifying'
+          ? 'Verificando entrega…'
+          : transactionState.kind === 'pending'
+            ? 'Transacción pendiente'
+            : buyConfirmation
+              ? needsApproval && quote
+                ? `Autorizar ${quote.symbol} y comprar`
+                : `Confirmar compra con ${currency}`
+              : walletReady
+                ? 'Revisar y confirmar compra'
+                : 'Conectar y revisar compra';
+  const actionDisabled = !quote
+    || busy
+    || ownOrder
+    || insufficientBalance
+    || isPreparingBuy
+    || (buyConfirmation && !walletReady);
+  const prepareBuyRef = useRef<() => void>(() => undefined);
+  prepareBuyRef.current = () => void prepareBuy();
+
+  useEffect(() => {
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
+
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
+
+  useEffect(() => {
+    if (!onActionChange) return;
+    onActionChange({
+      disabled: actionDisabled,
+      label: actionLabel,
+      onClick: () => prepareBuyRef.current(),
+    });
+  }, [actionDisabled, actionLabel, onActionChange]);
+
+  useEffect(() => () => onActionChange?.(null), [onActionChange]);
 
   return (
-    <div className="border-t border-cyan-200/15 bg-[#081210] px-4 py-5 sm:px-5">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(17rem,0.75fr)]">
+    <div className="grid gap-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-lilac-100">
                 <ShoppingCart aria-hidden className="h-4 w-4" weight="duotone" />
-                Compra protegida · BSC Testnet
+                Compra protegida
               </p>
               <h4 className="mt-1 font-headline text-xl font-bold text-white">
                 Elige cómo pagar el Cukie #{order.tokenId}
@@ -618,7 +1079,7 @@ export function UkiMarketplaceBuyerCheckout({
               className="text-slate-300 active:scale-[0.98]"
             >
               <ArrowClockwise aria-hidden className="mr-2 h-4 w-4" />
-              Recotizar
+              Actualizar precio
             </Button>
           </div>
 
@@ -638,7 +1099,7 @@ export function UkiMarketplaceBuyerCheckout({
                 onClick={() => setCurrency(item)}
                 disabled={busy}
                 className={currency === item
-                  ? 'rounded-[8px] border border-cyan-200/45 bg-cyan-200/[0.12] px-3 py-2 text-sm font-bold text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-300 ease-out active:scale-[0.98]'
+                  ? 'rounded-[8px] border border-lilac-200/45 bg-lilac-200/[0.12] px-3 py-2 text-sm font-bold text-lilac-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-300 ease-out active:scale-[0.98]'
                   : 'rounded-[8px] border border-white/10 bg-white/[0.025] px-3 py-2 text-sm font-semibold text-slate-400 transition duration-300 ease-out hover:border-white/20 hover:text-white active:scale-[0.98]'}
               >
                 {item}
@@ -652,12 +1113,13 @@ export function UkiMarketplaceBuyerCheckout({
               <div className="rounded-[8px] border border-amber-200/20 bg-amber-200/[0.06] p-4">
                 <p className="flex items-center gap-2 font-semibold text-amber-100">
                   <WarningCircle aria-hidden className="h-5 w-5" weight="duotone" />
-                  El checkout aún no está configurado en este Stage
+                  La compra no está disponible ahora
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-400">
                   El anuncio puede consultarse, pero no se habilitará una firma hasta que
-                  marketplace, router, UKI y WBNB coincidan con el contrato Testnet.
-                  BNB y USDT se habilitan por separado cuando sus rutas están verificadas.
+                  todos los datos necesarios estén disponibles.
+                  Cada moneda se habilita por separado cuando su contrato, allowlist y ruta
+                  de liquidez están verificadas.
                 </p>
               </div>
             )}
@@ -665,7 +1127,7 @@ export function UkiMarketplaceBuyerCheckout({
               <div role="alert" className="rounded-[8px] border border-red-300/20 bg-red-300/[0.06] p-4">
                 <p className="flex items-center gap-2 font-semibold text-red-100">
                   <WarningCircle aria-hidden className="h-5 w-5" weight="duotone" />
-                  La orden no puede comprarse ahora
+                  El anuncio no puede comprarse ahora
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-300">{quoteState.message}</p>
               </div>
@@ -695,11 +1157,11 @@ export function UkiMarketplaceBuyerCheckout({
                   </strong>
                 </div>
                 <div className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-lilac-100">
                     <LockKey aria-hidden className="h-4 w-4" />
                     Máximo autorizado
                   </span>
-                  <strong className="font-mono text-base tabular-nums text-cyan-50">
+                  <strong className="font-mono text-base tabular-nums text-lilac-50">
                     {formatAmount(quote.budget.maxTotalRaw, quote.decimals)} {quote.symbol}
                   </strong>
                 </div>
@@ -708,61 +1170,52 @@ export function UkiMarketplaceBuyerCheckout({
           </div>
         </div>
 
-        <aside className="min-w-0 border-t border-white/10 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+        <aside className="min-w-0 border-t border-white/10 pt-5">
           <div className="grid gap-3 text-sm text-slate-400">
             <p className="flex items-start gap-2">
-              <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cyan-100" weight="duotone" />
-              Se vuelven a comprobar orden, propietario, permisos, precio, nonce y caducidad antes de pagar.
+              <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-lilac-100" weight="duotone" />
+              Se vuelven a comprobar anuncio, propietario, permisos, precio y caducidad antes de pagar.
             </p>
             <p className="flex items-start gap-2">
-              <HourglassMedium aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cyan-100" weight="duotone" />
+              <HourglassMedium aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-lilac-100" weight="duotone" />
               {currency === 'UKI'
                 ? 'El total es exacto y no necesita swap.'
                 : 'El máximo incluye 1 % de protección y la cotización caduca en 10 minutos.'}
             </p>
             <p className="flex items-start gap-2">
-              <Coins aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cyan-100" weight="duotone" />
+              <Coins aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-lilac-100" weight="duotone" />
               El sobrante del máximo se devuelve; nunca se cambia el precio UKI del vendedor.
             </p>
           </div>
 
           <div className="mt-5">
-            {!isConnected ? (
-              <LandingWalletConnectButton className="w-full justify-center" label="Conectar wallet para comprar" />
-            ) : chainId !== 97 ? (
+            {buyConfirmation && (
+              <div role="status" className="mb-3 rounded-[8px] border border-lilac-200/25 bg-lilac-200/[0.08] p-3 text-sm text-lilac-50">
+                <p className="font-bold">Revisa y confirma la compra</p>
+                <p className="mt-1 text-xs leading-5 text-lilac-100/80">
+                  Comprador: {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'wallet pendiente'} · Red: {targetChainId === 97 ? 'BSC Testnet' : targetChainId === 56 ? 'BSC' : 'pendiente'} · Cukie #{order.tokenId}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-lilac-100/70">
+                  El anuncio, la cotización, el saldo y la autorización se volverán a validar antes de pedir cualquier firma.
+                </p>
+              </div>
+            )}
+            {!onActionChange && (
               <Button
                 type="button"
-                onClick={() => switchChain({ chainId: 97 })}
-                disabled={isSwitchingChain}
-                className="w-full active:scale-[0.98]"
-              >
-                <Wallet aria-hidden className="mr-2 h-4 w-4" />
-                {isSwitchingChain ? 'Cambiando red…' : 'Cambiar a BSC Testnet'}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={buy}
-                disabled={!quote || busy || ownOrder || insufficientBalance}
-                className="w-full bg-cyan-200 text-[#071110] hover:bg-cyan-100 active:scale-[0.98]"
+                onClick={() => void prepareBuy()}
+                disabled={actionDisabled}
+                className="w-full bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
               >
                 <ShoppingCart aria-hidden className="mr-2 h-4 w-4" weight="fill" />
-                {transactionState.kind === 'approving'
-                  ? 'Autorizando…'
-                  : transactionState.kind === 'purchasing'
-                    ? 'Esperando firma…'
-                    : transactionState.kind === 'verifying'
-                      ? 'Verificando entrega…'
-                      : needsApproval && quote
-                        ? `Autorizar ${quote.symbol} y comprar`
-                        : `Confirmar compra con ${currency}`}
+                {actionLabel}
               </Button>
             )}
           </div>
 
           {ownOrder && (
             <p role="alert" className="mt-3 text-sm leading-5 text-amber-100">
-              Esta orden pertenece a tu wallet; solo otra wallet puede comprarla.
+              Este anuncio pertenece a tu wallet; solo otra wallet puede comprarlo.
             </p>
           )}
           {insufficientBalance && quote && (
@@ -772,9 +1225,29 @@ export function UkiMarketplaceBuyerCheckout({
             </p>
           )}
           {transactionState.kind === 'approving' && (
-            <p aria-live="polite" className="mt-3 text-sm leading-5 text-cyan-100">
+            <p aria-live="polite" className="mt-3 text-sm leading-5 text-lilac-100">
               {transactionState.message}
             </p>
+          )}
+          {transactionState.kind === 'approved' && (
+            <div aria-live="polite" className="mt-4 rounded-[8px] border border-lilac-200/20 bg-lilac-200/[0.06] p-3 text-sm text-lilac-50">
+              <p className="font-semibold">{transactionState.message}</p>
+              <p className="mt-1 font-mono text-xs text-slate-400">
+                Autorización {transactionState.hash.slice(0, 10)}…
+              </p>
+            </div>
+          )}
+          {transactionState.kind === 'pending' && (
+            <div aria-live="polite" className="mt-4 rounded-[8px] border border-amber-200/25 bg-amber-200/[0.07] p-3">
+              <p className="text-sm font-semibold text-amber-100">{transactionState.message}</p>
+              <button
+                type="button"
+                onClick={() => void recheckPendingCheckout()}
+                className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-[8px] border border-amber-200/30 px-3 text-xs font-black uppercase tracking-[0.06em] text-amber-100"
+              >
+                <ArrowClockwise aria-hidden className="h-4 w-4" /> Comprobar transacción
+              </button>
+            </div>
           )}
           {transactionState.kind === 'error' && (
             <p role="alert" className="mt-3 text-sm leading-5 text-red-100">
@@ -787,15 +1260,15 @@ export function UkiMarketplaceBuyerCheckout({
                 <CheckCircle aria-hidden className="h-5 w-5" weight="fill" />
                 Compra y entrega verificadas
               </p>
-              <p className="mt-1 text-sm leading-5 text-slate-300">
-                La orden quedó vendida y el Cukie ya pertenece a tu wallet.
-              </p>
+                <p className="mt-1 text-sm leading-5 text-slate-300">
+                {transactionState.message ?? 'El anuncio quedó vendido y el Cukie ya pertenece a tu wallet.'}
+                </p>
               {ukiMarketplacePublicConfig.explorerBaseUrl && (
                 <a
                   href={`${ukiMarketplacePublicConfig.explorerBaseUrl}/tx/${transactionState.hash}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-2 inline-flex font-mono text-xs text-cyan-100 underline decoration-cyan-200/30 underline-offset-4"
+                  className="mt-2 inline-flex font-mono text-xs text-lilac-100 underline decoration-lilac-200/30 underline-offset-4"
                 >
                   Ver transacción {transactionState.hash.slice(0, 10)}…
                 </a>
@@ -811,7 +1284,6 @@ export function UkiMarketplaceBuyerCheckout({
             </p>
           )}
         </aside>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowClockwise,
   CaretDown,
@@ -9,13 +9,17 @@ import {
   Cube,
   ShieldCheck,
 } from '@phosphor-icons/react';
+import Link from 'next/link';
+import { useAccount } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
-import { UkiMarketplaceBuyerCheckout } from './buyer-checkout';
+import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
+import { UkiMarketplacePurchaseSheet } from './purchase-sheet';
 import type {
   UkiMarketplaceOrderView,
   UkiMarketplaceOrdersResponse,
 } from '@/lib/uki-marketplace';
+import { retryTransactionRefresh } from '@/lib/transaction-refresh';
 
 const PAGE_LIMIT = 24;
 
@@ -25,8 +29,26 @@ type FeedState =
   | { kind: 'unavailable' }
   | { kind: 'error' };
 
-function shortAddress(address: string) {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+function stableOrderSignature(order: UkiMarketplaceOrderView) {
+  return [
+    order.orderId,
+    order.collectionAddress,
+    order.tokenId,
+    order.seller,
+    order.buyer,
+    order.status,
+    order.ukiPriceRaw,
+    order.paymentAmountRaw,
+  ];
+}
+
+function targetOrderSignature(
+  orders: UkiMarketplaceOrderView[] | null,
+  orderId: string | null,
+) {
+  if (!orderId) return null;
+  const target = (orders ?? []).find((order) => order.orderId.toLowerCase() === orderId);
+  return target ? JSON.stringify(stableOrderSignature(target)) : 'missing';
 }
 
 function formatUkiAmount(raw: string) {
@@ -36,6 +58,16 @@ function formatUkiAmount(raw: string) {
   const fraction = padded.slice(-18).slice(0, 4).replace(/0+$/, '');
   const grouped = BigInt(integer || '0').toLocaleString('es-ES');
   return fraction ? `${grouped},${fraction}` : grouped;
+}
+
+function ukiSellerManagementHref(order: UkiMarketplaceOrderView) {
+  const query = new URLSearchParams({
+    tokenId: order.tokenId,
+    collection: order.collectionAddress,
+    chainId: String(order.chainId),
+    orderId: order.orderId,
+  });
+  return `/marketplace?${query.toString()}#mis-anuncios`;
 }
 
 function formatExpiry(value: string) {
@@ -73,7 +105,7 @@ function EmptyFeed() {
   return (
     <div className="grid min-h-56 place-items-center px-6 py-12 text-center">
       <div className="max-w-md">
-        <Cube aria-hidden className="mx-auto h-8 w-8 text-cyan-200" weight="duotone" />
+        <Cube aria-hidden className="mx-auto h-8 w-8 text-lilac-200" weight="duotone" />
         <h3 className="mt-4 font-headline text-xl font-bold text-white">
           Todavía no hay Cukies publicados en UKI
         </h3>
@@ -88,20 +120,27 @@ function EmptyFeed() {
 
 function OrderRow({
   order,
-  expanded,
-  onToggle,
+  open,
+  onOpenChange,
   onPurchased,
 }: {
   order: UkiMarketplaceOrderView;
-  expanded: boolean;
-  onToggle: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onPurchased: () => void;
 }) {
+  const { address } = useAccount();
+  const ownOrder = Boolean(address && address.toLowerCase() === order.seller.toLowerCase());
   return (
-    <div>
-      <article className="grid gap-4 px-4 py-5 transition duration-300 ease-out hover:bg-cyan-300/[0.035] sm:grid-cols-[4rem_minmax(0,1fr)_minmax(12rem,auto)] sm:items-center sm:px-5">
-        <div className="grid h-16 w-16 place-items-center rounded-[8px] border border-cyan-200/15 bg-cyan-200/[0.055] text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-          <Cube aria-hidden className="h-7 w-7" weight="duotone" />
+    <>
+      <article className="grid gap-4 px-4 py-5 transition duration-300 ease-out hover:bg-lilac-300/[0.035] sm:grid-cols-[4rem_minmax(0,1fr)_minmax(12rem,auto)] sm:items-center sm:px-5">
+        <div className="relative h-16 w-16 overflow-hidden rounded-[8px] border border-lilac-200/15 bg-lilac-200/[0.055] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          <CukiImage
+            src={order.imageUrl ?? null}
+            alt={`Cukie #${order.tokenId}`}
+            sizes="64px"
+            className="object-contain p-1"
+          />
         </div>
 
         <div className="min-w-0">
@@ -109,14 +148,12 @@ function OrderRow({
             <h3 className="font-headline text-lg font-bold text-white">
               Cukie #{order.tokenId}
             </h3>
-            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200/20 bg-cyan-200/[0.06] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-100">
+            <span className="inline-flex items-center gap-1 rounded-full border border-lilac-200/20 bg-lilac-200/[0.06] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-lilac-100">
               <CheckCircle aria-hidden className="h-3.5 w-3.5" weight="fill" />
               Validado en vivo
             </span>
           </div>
-          <p className="mt-1 truncate font-mono text-xs text-slate-500">
-            Colección {shortAddress(order.collectionAddress)} · vendedor {shortAddress(order.seller)}
-          </p>
+          <p className="mt-1 text-xs text-slate-400">Red {order.chainId === 97 ? 'BSC Testnet' : 'BSC'} · anuncio UKI</p>
           <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-400">
             <Clock aria-hidden className="h-3.5 w-3.5" />
             Expira {formatExpiry(order.expiresAt)}
@@ -128,28 +165,39 @@ function OrderRow({
             Precio del vendedor
           </p>
           <p className="mt-1 font-mono text-xl font-bold tabular-nums text-white">
-            {formatUkiAmount(order.ukiPriceRaw)} <span className="text-sm text-cyan-100">UKI</span>
+            {formatUkiAmount(order.ukiPriceRaw)} <span className="text-sm text-lilac-100">UKI</span>
           </p>
-          <p className="mt-1 text-xs text-slate-500">Pago: UKI, BNB o USDT</p>
-          <Button
-            type="button"
-            size="sm"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            className="mt-3 min-w-32 bg-cyan-200 text-[#071110] hover:bg-cyan-100 active:scale-[0.98]"
-          >
-            {expanded ? 'Cerrar compra' : 'Comprar'}
-            <CaretDown
-              aria-hidden
-              className={`ml-2 h-4 w-4 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
-            />
-          </Button>
+          <p className="mt-1 text-xs text-slate-500">Precio fijado en UKI</p>
+          {ownOrder ? (
+            <Link
+              href={ukiSellerManagementHref(order)}
+              className="mt-3 inline-flex min-h-9 items-center justify-center rounded-md bg-lilac-200 px-3 text-sm font-bold text-[#0d0914] hover:bg-lilac-100"
+            >
+              Gestionar anuncio
+            </Link>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => onOpenChange(true)}
+              aria-haspopup="dialog"
+              className="mt-3 min-w-32 bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
+            >
+              Comprar
+              <CaretDown aria-hidden className="ml-2 h-4 w-4 -rotate-90" />
+            </Button>
+          )}
         </div>
       </article>
-      {expanded && (
-        <UkiMarketplaceBuyerCheckout order={order} onPurchased={onPurchased} />
-      )}
-    </div>
+      {!ownOrder ? (
+        <UkiMarketplacePurchaseSheet
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+          onPurchased={onPurchased}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -157,10 +205,15 @@ export function UkiMarketplaceClient() {
   const [state, setState] = useState<FeedState>({ kind: 'loading' });
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const eventRefreshAbortRef = useRef<AbortController | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ kind: 'loading' });
+    eventRefreshAbortRef.current?.abort();
+    const previousState = stateRef.current;
+    if (previousState.kind !== 'ready') setState({ kind: 'loading' });
 
     fetch(`/api/marketplace/v1/orders?scope=public&limit=${PAGE_LIMIT}`, {
       cache: 'no-store',
@@ -170,11 +223,11 @@ export function UkiMarketplaceClient() {
         const payload = await response.json() as UkiMarketplaceOrdersResponse;
         if (controller.signal.aborted) return;
         if (response.status === 503) {
-          setState({ kind: 'unavailable' });
+          if (previousState.kind !== 'ready') setState({ kind: 'unavailable' });
           return;
         }
         if (!response.ok || payload.status !== 'ok') {
-          setState({ kind: 'error' });
+          if (previousState.kind !== 'ready') setState({ kind: 'error' });
           return;
         }
         setState({ kind: 'ready', orders: payload.data.orders });
@@ -182,25 +235,74 @@ export function UkiMarketplaceClient() {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         if (error instanceof Error && error.name === 'AbortError') return;
-        setState({ kind: 'error' });
+        if (previousState.kind !== 'ready') setState({ kind: 'error' });
       });
 
     return () => controller.abort();
   }, [reloadKey]);
 
   useEffect(() => {
-    const refresh = () => setReloadKey((value) => value + 1);
+    let active = true;
+    const refresh = (event: Event) => {
+      eventRefreshAbortRef.current?.abort();
+      const controller = new AbortController();
+      eventRefreshAbortRef.current = controller;
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as { hash?: string; orderId?: string }
+        : null;
+      const hasExpectedChange = Boolean(detail?.hash);
+      const targetOrderId = typeof detail?.orderId === 'string' ? detail.orderId.toLowerCase() : null;
+      const baselineTarget = targetOrderSignature(
+        stateRef.current.kind === 'ready' ? stateRef.current.orders : null,
+        targetOrderId,
+      );
+      void retryTransactionRefresh(
+        async () => {
+          if (!active || controller.signal.aborted) return true;
+          try {
+            const response = await fetch(`/api/marketplace/v1/orders?scope=public&limit=${PAGE_LIMIT}`, {
+              cache: 'no-store',
+              signal: controller.signal,
+            });
+            const payload = await response.json() as UkiMarketplaceOrdersResponse;
+            if (!active || controller.signal.aborted) return true;
+            if (!response.ok || payload.status !== 'ok') return false;
+            const nextOrders = payload.data.orders;
+            setState({ kind: 'ready', orders: nextOrders });
+            if (!hasExpectedChange) return true;
+            if (targetOrderId) {
+              return targetOrderSignature(nextOrders, targetOrderId) !== baselineTarget;
+            }
+            // A hash without an affected order cannot prove that a different
+            // row in the feed is the transaction's projection. Keep polling
+            // through the bounded window instead of declaring convergence.
+            return false;
+          } catch (reason) {
+            if (!active || controller.signal.aborted) return true;
+            if (reason instanceof Error && reason.name === 'AbortError') return true;
+            return false;
+          }
+        },
+        { signal: controller.signal },
+      ).catch(() => {
+        // Unmount or a newer transaction event cancels the refresh loop.
+      });
+    };
     window.addEventListener('cukies:uki-marketplace:refresh', refresh);
-    return () => window.removeEventListener('cukies:uki-marketplace:refresh', refresh);
+    return () => {
+      active = false;
+      eventRefreshAbortRef.current?.abort();
+      window.removeEventListener('cukies:uki-marketplace:refresh', refresh);
+    };
   }, []);
 
   return (
     <div className="overflow-hidden rounded-[8px] border border-white/10 bg-[#0c1514]/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-cyan-100">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-lilac-100">
             <ShieldCheck aria-hidden className="h-4 w-4" weight="duotone" />
-            BSC Testnet · chain 97
+            Compra segura
           </div>
           <h2 className="mt-1 font-headline text-2xl font-bold text-white">
             Marketplace UKI
@@ -230,10 +332,8 @@ export function UkiMarketplaceClient() {
             <OrderRow
               key={order.orderId}
               order={order}
-              expanded={selectedOrderId === order.orderId}
-              onToggle={() => setSelectedOrderId((current) => (
-                current === order.orderId ? null : order.orderId
-              ))}
+              open={selectedOrderId === order.orderId}
+              onOpenChange={(open) => setSelectedOrderId(open ? order.orderId : null)}
               onPurchased={() => setReloadKey((value) => value + 1)}
             />
           ))}
@@ -242,15 +342,14 @@ export function UkiMarketplaceClient() {
       {(state.kind === 'unavailable' || state.kind === 'error') && (
         <div className="grid min-h-56 place-items-center px-6 py-12 text-center">
           <div className="max-w-lg">
-            <ShieldCheck aria-hidden className="mx-auto h-8 w-8 text-cyan-200" weight="duotone" />
+            <ShieldCheck aria-hidden className="mx-auto h-8 w-8 text-lilac-200" weight="duotone" />
             <h3 className="mt-4 font-headline text-xl font-bold text-white">
               {state.kind === 'unavailable'
-                ? 'El marketplace UKI aún no está activo en este Stage'
+                ? 'El marketplace UKI no está disponible ahora'
                 : 'No se pudo consultar el marketplace UKI'}
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              No se publica inventario si falta la dirección verificada del contrato o
-              no puede comprobarse el estado on-chain. El mercado Legacy permanece separado.
+              Tus activos permanecen protegidos. Inténtalo de nuevo dentro de unos instantes.
             </p>
           </div>
         </div>

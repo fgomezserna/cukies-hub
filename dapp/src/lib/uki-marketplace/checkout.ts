@@ -3,7 +3,7 @@ import type { Address } from 'viem';
 export const UKI_MARKETPLACE_SLIPPAGE_BPS = 100;
 export const UKI_MARKETPLACE_QUOTE_DEADLINE_SECONDS = 10 * 60;
 
-export type UkiMarketplacePaymentCurrency = 'UKI' | 'BNB' | 'USDT';
+export type UkiMarketplacePaymentCurrency = 'UKI' | 'ASM' | 'BNB' | 'USDT' | 'USDC';
 
 export type UkiMarketplaceCheckoutBudget = {
   quotedPaymentRaw: bigint;
