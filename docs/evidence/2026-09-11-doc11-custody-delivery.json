@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/fgomezserna/cukies-hub/issues/419",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/425",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34609723488",
+  "observedAt": "2026-09-11T14:33:42.534924+00:00",
+  "gitSha": "f4134d714f1662e7d8251c51ad60462f050cd99f",
+  "health": {
+    "status": "ok",
+    "app": "cukies-hub",
+    "environment": "staging",
+    "gitSha": "f4134d714f1662e7d8251c51ad60462f050cd99f",
+    "gitRef": "staging",
+    "buildTime": null,
+    "coolify": {
+      "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+      "fqdn": null
+    }
+  },
+  "readyHttpStatus": 200,
+  "journal": "clean",
+  "changedComponents": [
+    "dapp"
+  ],
+  "changedWorkers": [],
+  "protected": {
+    "total": 82,
+    "preserved": 82,
+    "changed": []
+  },
+  "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+  "runtime": {
+    "cycleSeconds": 1800,
+    "publisherKeyPresentInWeb": false,
+    "publisherKeyPresentOnlyInPublisher": true,
+    "financialGates": "off"
+  },
+  "validation": {
+    "productCandidate": "2a4707c",
+    "suites": 271,
+    "tests": 2282,
+    "lint": "passed",
+    "typecheck": "passed",
+    "buildAndDeploy": "CI34609723488 passed"
+  },
+  "currentCustody": {
+    "observedAt": "2026-09-11T14:36:04.586Z",
+    "chainId": 97,
+    "collection": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+    "blockNumber": "130424039",
+    "counts": {
+      "wallet": 11,
+      "pool": 1
+    },
+    "owners": [
+      {
+        "tokenId": "98000001",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000002",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000003",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000004",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000005",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000006",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000007",
+        "owner": "0x359b8FC829eB6D320DF6301C8F323AF9AE773B41"
+      },
+      {
+        "tokenId": "98000008",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000009",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000010",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000011",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000012",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      }
+    ],
+    "currentPoolPositions": [
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000007:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000007",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000007:epoch:1",
+        "tokenId": "98000007",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "pending_activation",
+        "lifecycleOpen": true,
+        "custody": "cukie_pool_nft_vault",
+        "status": "active"
+      }
+    ],
+    "currentMasterPositions": [],
+    "identityChecks": {
+      "duplicateOpenAssetIds": [],
+      "duplicateOpenTokenIdentity": [],
+      "openAssetOverlap": [],
+      "masterTokenOverlap": [],
+      "note": "La colision tokenId puede ser benigna entre colecciones; assetId incluye chainId+collection. Un overlap assetId entre vaults es fallo."
+    },
+    "note": "Las ocho filas históricas del vault no representan ocho posiciones abiertas. La única posición Pool actual es98000007; los otros once NFT están en la wallet. No se presupone que el censo de07:29UTC siga vigente."
+  },
+  "productQa": {
+    "signedTransactions": false,
+    "browserAuthenticated": "not verified: CUA getTab for the existing authenticated Cukie Master tab timed out twice; no wallet signed or reconnected",
+    "pendingReceiptReplay": "covered by regression tests, not recreated against user assets"
+  },
+  "limits": [
+    "No nueva transacción del usuario ejecutada; el estado histórico de su pending local no está disponible.",
+    "Censo on-chain/Mongo actual verificado; recorrido autenticado posterior al despliegue queda pendiente antes de cerrar419."
+  ]
+}
