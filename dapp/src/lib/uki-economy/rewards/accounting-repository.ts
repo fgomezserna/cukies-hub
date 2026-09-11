@@ -5,7 +5,11 @@ import { rewardAccountingDayId, rewardAccountingDayStart, rewardAccountingWeek, 
 import type { ClientSession, Db } from "mongodb";
 
 import { DomainConflictError } from "../errors";
-import { getTreasureHuntWeeklyPeriod } from "../game-economy/treasure-hunt-policy";
+import {
+  firstTreasureHuntFullPeriodStartAtOrAfter,
+  getTreasureHuntWeeklyPeriod,
+  resolveTreasureHuntForwardActivationAt,
+} from "../game-economy/treasure-hunt-policy";
 import { formatRawAmount, parseRawAmount } from "../money";
 import { getIsoWeekPeriodId } from "../periods";
 import {
@@ -85,6 +89,7 @@ export interface RewardAccountingRepository {
   findNextClosableRewardDay(
     ruleVersion: string,
     now: Date,
+    forwardActivationAt?: Date,
   ): Promise<{ dayId: string; startsAt: Date } | null>;
   listDailyAccounting(startsOn: string, endsBefore: string): Promise<DailyRewardAccounting[]>;
   findFirstSafeLotteryEntropy(
@@ -444,7 +449,7 @@ export function createMongoRewardAccountingRepository(
           .toArray(),
       })));
     },
-    async findNextClosableRewardDay(ruleVersion, now) {
+    async findNextClosableRewardDay(ruleVersion, now, forwardActivationAt) {
       const rule = await rules.findOne({ scope: "reward_allocations", version: ruleVersion }, options);
       if (!rule) throw new DomainConflictError(`No existe la regla reward ${ruleVersion}.`);
       const calendar = rule.emissionBudget.calendar;
@@ -453,9 +458,16 @@ export function createMongoRewardAccountingRepository(
         status: "sealed",
         dayId: { $regex: calendar ? /^C(1800|3600)-D:/ : CANONICAL_REWARD_DAY_ID },
       }, { ...options, sort: { dayId: -1 } });
-      const startsAt = latest
+      const latestStart = latest
         ? new Date(rewardAccountingDayStart(latest.dayId, rule.emissionBudget.dayBoundarySecondUtc, calendar).getTime() + economyCycleDurationMs(calendar))
         : firstRewardDayStart(rule.activeFrom, rule.emissionBudget.dayBoundarySecondUtc, calendar);
+      const activationAt = forwardActivationAt ?? resolveTreasureHuntForwardActivationAt();
+      const firstEligibleStart = activationAt
+        ? firstTreasureHuntFullPeriodStartAtOrAfter(activationAt, "daily", calendar)
+        : null;
+      const startsAt = firstEligibleStart && firstEligibleStart.getTime() > latestStart.getTime()
+        ? firstEligibleStart
+        : latestStart;
       const effectiveUntil = rule.supersededAt ?? rule.activeUntil;
       if (effectiveUntil && startsAt.getTime() >= effectiveUntil.getTime()) return null;
       const closesAt = new Date(startsAt.getTime() + economyCycleDurationMs(calendar) + economyCycleDelayMs(2, calendar));
@@ -689,17 +701,28 @@ function assertReplay<T extends { payloadHash: string }>(
 export class RewardAccountingService {
   constructor(private readonly runTransaction: RewardAccountingTransactionRunner) {}
 
-  nextWeeklyPeriod(input: { ruleVersion: string; now: Date }) {
+  nextWeeklyPeriod(input: {
+    ruleVersion: string;
+    now: Date;
+    forwardActivationAt?: Date;
+  }) {
     return this.runTransaction(async (repository) => {
       const now = validRewardDate(input.now, "now");
       const rule = await repository.findRewardRuleByVersion(input.ruleVersion);
       if (!rule) throw new DomainConflictError(`No existe la regla reward ${input.ruleVersion}.`);
       assertRewardRule(rule);
       const calendar = rule.emissionBudget.calendar;
+      const activationAt = input.forwardActivationAt ?? resolveTreasureHuntForwardActivationAt();
       const firstContainingPeriod = getTreasureHuntWeeklyPeriod(rule.activeFrom, calendar);
       let startsAt = firstContainingPeriod.startsAt.getTime() < rule.activeFrom.getTime()
         ? new Date(firstContainingPeriod.startsAt.getTime() + 7 * economyCycleDurationMs(calendar))
         : firstContainingPeriod.startsAt;
+      const firstEligibleStart = activationAt
+        ? firstTreasureHuntFullPeriodStartAtOrAfter(activationAt, "weekly", calendar)
+        : null;
+      if (firstEligibleStart && firstEligibleStart.getTime() > startsAt.getTime()) {
+        startsAt = firstEligibleStart;
+      }
       const effectiveUntil = [rule.activeUntil, rule.supersededAt]
         .filter((value): value is Date => value instanceof Date)
         .sort((left, right) => left.getTime() - right.getTime())[0];
@@ -732,12 +755,24 @@ export class RewardAccountingService {
     dayId: string;
     ruleVersion: string;
     sealedAt: Date;
+    forwardActivationAt?: Date;
   }) {
     return this.runTransaction(async (repository) => {
       const current = await repository.findDaily(input.dayId);
       if (current) return current;
       const candidateRule = await repository.findRewardRuleByVersion(input.ruleVersion);
       const startsAt = rewardAccountingDayStart(input.dayId, candidateRule?.emissionBudget.dayBoundarySecondUtc, candidateRule?.emissionBudget.calendar);
+      const activationAt = input.forwardActivationAt ?? resolveTreasureHuntForwardActivationAt();
+      if (
+        activationAt
+        && startsAt.getTime() < firstTreasureHuntFullPeriodStartAtOrAfter(
+          activationAt,
+          "daily",
+          candidateRule?.emissionBudget.calendar,
+        ).getTime()
+      ) {
+        throw new DomainConflictError(`El dia ${input.dayId} es anterior a la frontera forward.`);
+      }
       const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
       if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${input.dayId}.`);
       const {
@@ -766,14 +801,28 @@ export class RewardAccountingService {
     ruleVersion: string;
     now: Date;
     includePriorWeekly: boolean;
+    forwardActivationAt?: Date;
   }) {
     return this.runTransaction(async (repository) => {
-      const candidate = await repository.findNextClosableRewardDay(input.ruleVersion, input.now);
+      const activationAt = input.forwardActivationAt ?? resolveTreasureHuntForwardActivationAt();
+      const candidate = await repository.findNextClosableRewardDay(
+        input.ruleVersion,
+        input.now,
+        activationAt,
+      );
       if (!candidate) return null;
       const { dayId, startsAt } = candidate;
       const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
       if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${dayId}.`);
       const calendar = rule.emissionBudget.calendar;
+      if (
+        activationAt
+        && startsAt.getTime() < firstTreasureHuntFullPeriodStartAtOrAfter(
+          activationAt,
+          "daily",
+          calendar,
+        ).getTime()
+      ) return null;
       const endsAt = new Date(startsAt.getTime() + economyCycleDurationMs(calendar));
       const readiness = await repository.dailyReadiness(startsAt, endsAt);
       if (
@@ -803,8 +852,17 @@ export class RewardAccountingService {
         repository.listDailyAmbassadorSnapshots(startsAt, endsAt),
       ]);
       // A delayed lottery/weekly close must not silently erase its first tranche
-      // when the daily scheduler catches up before the weekly scheduler.
-      if (calendar && startsAt.getTime() >= new Date(calendar.anchorAt).getTime() + 7 * economyCycleDurationMs(calendar) && !priorWeekly) {
+      // when the daily scheduler catches up before the weekly scheduler. Once a
+      // forward fence deliberately skips the historical week, however, the
+      // first eligible daily period has no historical tranche to consume.
+      const firstEligibleWeeklyStart = activationAt
+        ? firstTreasureHuntFullPeriodStartAtOrAfter(activationAt, "weekly", calendar)
+        : null;
+      const priorWeeklyRequired = calendar
+        && startsAt.getTime() >= new Date(calendar.anchorAt).getTime() + 7 * economyCycleDurationMs(calendar)
+        && (!firstEligibleWeeklyStart
+          || startsAt.getTime() - 7 * economyCycleDurationMs(calendar) >= firstEligibleWeeklyStart.getTime());
+      if (priorWeeklyRequired && !priorWeekly) {
         throw new DomainConflictError(`El dia ${dayId} sigue pendiente del cierre weekly que financia su tramo.`);
       }
       const ambassadorBySource = legacyAmbassadorBySource;
@@ -859,6 +917,7 @@ export class RewardAccountingService {
     startsAt: Date;
     ruleVersion: string;
     now: Date;
+    forwardActivationAt?: Date;
   }) {
     return this.runTransaction(async (repository) => {
       const current = await repository.findWeekly(input.periodId);
@@ -868,6 +927,17 @@ export class RewardAccountingService {
       const rule = await repository.findRewardRule(input.ruleVersion, startsAt);
       if (!rule) throw new DomainConflictError(`No existe regla ${input.ruleVersion} para ${input.periodId}.`);
       const calendar = rule.emissionBudget.calendar;
+      const activationAt = input.forwardActivationAt ?? resolveTreasureHuntForwardActivationAt();
+      if (
+        activationAt
+        && startsAt.getTime() < firstTreasureHuntFullPeriodStartAtOrAfter(
+          activationAt,
+          "weekly",
+          calendar,
+        ).getTime()
+      ) {
+        throw new DomainConflictError(`El periodo ${input.periodId} es anterior a la frontera forward.`);
+      }
       const schedule = rewardAccountingWeek(input.periodId, calendar);
       const { endsAt, payoutAt } = schedule;
       if (

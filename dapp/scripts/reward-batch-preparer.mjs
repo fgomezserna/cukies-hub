@@ -24,6 +24,7 @@ try {
     chainId: config.chainId,
     tokenAddress: config.tokenAddress,
     distributorAddress: config.distributorAddress,
+    forwardActivationAt: new Date(config.forwardActivationAt),
     maxCandidates: config.maxCandidates,
     now: new Date(),
   });

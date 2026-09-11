@@ -219,7 +219,7 @@ export class MemoryGameEconomyRepository implements GameEconomyRepository {
     return clone(next);
   }
 
-  async listExpiredSessions(now: Date, limit: number) {
+  async listExpiredSessions(now: Date, limit: number, forwardActivationAt?: Date) {
     const nonTerminal = new Set<GameEconomySessionStatus>([
       "created",
       "resources_reserved",
@@ -233,6 +233,8 @@ export class MemoryGameEconomyRepository implements GameEconomyRepository {
           (item) =>
             nonTerminal.has(item.status) &&
             item.expiresAt.getTime() <= now.getTime()
+            && (forwardActivationAt === undefined
+              || item.createdAt.getTime() >= forwardActivationAt.getTime())
         )
         .sort(
           (left, right) =>
@@ -243,7 +245,7 @@ export class MemoryGameEconomyRepository implements GameEconomyRepository {
     );
   }
 
-  async listRecoverableSessions(now: Date, limit: number) {
+  async listRecoverableSessions(now: Date, limit: number, forwardActivationAt?: Date) {
     return clone(
       this.state.sessions
         .filter((item) => (
@@ -255,6 +257,10 @@ export class MemoryGameEconomyRepository implements GameEconomyRepository {
             && item.operation
             && item.operation.leaseExpiresAt.getTime() <= now.getTime()
           )
+        ))
+        .filter((item) => (
+          forwardActivationAt === undefined
+          || item.createdAt.getTime() >= forwardActivationAt.getTime()
         ))
         .sort((left, right) => (
           left.updatedAt.getTime() - right.updatedAt.getTime()

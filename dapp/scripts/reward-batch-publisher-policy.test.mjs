@@ -10,6 +10,7 @@ import {
 
 const PRIVATE_KEY = `0x${'11'.repeat(32)}`;
 const SIGNER = '0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A';
+const FORWARD_ACTIVATION_AT = '2026-08-20T16:00:00.000Z';
 
 function environment(overrides = {}) {
   return {
@@ -22,6 +23,7 @@ function environment(overrides = {}) {
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
     NEXT_PUBLIC_UKI_CHAIN_ID: '97',
     CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
+    REWARD_FORWARD_ACTIVATION_AT: FORWARD_ACTIVATION_AT,
     CHAIN_INDEXER_MONGO_URL: 'mongodb://user:secret@mongo:27017/cukieshub-new-staging',
     CHAIN_INDEXER_BSC_RPC_URL: 'https://rpc.example.test',
     NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x1111111111111111111111111111111111111111',
@@ -44,6 +46,7 @@ function preparerEnvironment(overrides = {}) {
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
     NEXT_PUBLIC_UKI_CHAIN_ID: '97',
     CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
+    REWARD_FORWARD_ACTIVATION_AT: FORWARD_ACTIVATION_AT,
     CHAIN_INDEXER_MONGO_URL: 'mongodb://user:secret@mongo:27017/cukieshub-new-staging',
     NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x1111111111111111111111111111111111111111',
     CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS:
@@ -67,6 +70,7 @@ test('carga solo un publicador testnet aislado y no expone la clave', () => {
   assert.equal(config.signerAddress, SIGNER);
   assert.equal(config.chainId, 97);
   assert.equal(config.databaseName, 'cukieshub-new-staging');
+  assert.equal(config.forwardActivationAt, FORWARD_ACTIVATION_AT);
   const publicConfig = publicRewardBatchPublisherConfig(config);
   assert.equal('privateKey' in publicConfig, false);
   assert.equal('mongoUrl' in publicConfig, false);
@@ -78,6 +82,7 @@ test('prepara drafts en staging sin RPC, signer ni clave privada', () => {
   assert.equal(config.chainId, 97);
   assert.equal(config.databaseName, 'cukieshub-new-staging');
   assert.equal(config.maxCandidates, 50);
+  assert.equal(config.forwardActivationAt, FORWARD_ACTIVATION_AT);
   assert.equal('privateKey' in config, false);
   assert.equal('rpcUrl' in config, false);
   const publicConfig = publicRewardBatchPreparerConfig(config);
@@ -96,6 +101,21 @@ test('el preparador exige opt-in manual y publicador apagado', () => {
       REWARD_BATCH_PUBLISHER_ENABLED: 'true',
     })),
     /PUBLISHER_ENABLED=false/,
+  );
+  assert.throws(
+    () => loadRewardBatchPreparerConfig(preparerEnvironment({
+      REWARD_FORWARD_ACTIVATION_AT: undefined,
+    })),
+    /REWARD_FORWARD_ACTIVATION_AT es obligatorio/,
+  );
+});
+
+test('el fence de publicacion exige una fecha UTC canonica', () => {
+  assert.throws(
+    () => loadRewardBatchPublisherConfig(environment({
+      REWARD_FORWARD_ACTIVATION_AT: '2026-08-20T16:00:00Z',
+    })),
+    /ISO UTC canonica/,
   );
 });
 

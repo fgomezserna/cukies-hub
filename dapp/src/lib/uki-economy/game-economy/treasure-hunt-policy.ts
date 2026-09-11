@@ -64,6 +64,53 @@ export function assertTreasureHuntStagingRuntime(
   };
 }
 
+/**
+ * Resolves the staging-only forward fence shared by normal economy workers.
+ * Production deliberately returns undefined so its existing catch-up
+ * selection remains unchanged. The value is immutable operational input and
+ * must use the same canonical UTC representation as the runtime loader.
+ */
+export function resolveTreasureHuntForwardActivationAt(
+  environment: Record<string, string | undefined> = process.env,
+) {
+  if (environment.APP_ENV !== "staging") return undefined;
+  assertTreasureHuntStagingRuntime(environment);
+  const normalized = environment.REWARD_FORWARD_ACTIVATION_AT?.trim();
+  if (!normalized) {
+    throw new TypeError("REWARD_FORWARD_ACTIVATION_AT es obligatorio para el runtime forward-only.");
+  }
+  const activationAt = new Date(normalized);
+  if (Number.isNaN(activationAt.getTime()) || activationAt.toISOString() !== normalized) {
+    throw new TypeError("REWARD_FORWARD_ACTIVATION_AT debe ser una fecha ISO UTC canonica.");
+  }
+  return activationAt;
+}
+
+export type TreasureHuntPeriodCadence = "daily" | "weekly";
+
+/**
+ * A mid-period activation must not create a partial accounting period. The
+ * first eligible period is the one whose canonical start is at or after the
+ * activation instant; an exact boundary remains eligible immediately.
+ */
+export function firstTreasureHuntFullPeriodStartAtOrAfter(
+  at: Date,
+  cadence: TreasureHuntPeriodCadence,
+  calendar?: EconomyCycleCalendar,
+) {
+  if (!(at instanceof Date) || Number.isNaN(at.getTime())) {
+    throw new TypeError("La frontera forward debe ser una fecha valida.");
+  }
+  const period = cadence === "daily"
+    ? getTreasureHuntDailyPeriod(at, calendar)
+    : getTreasureHuntWeeklyPeriod(at, calendar);
+  return new Date(
+    period.startsAt.getTime() >= at.getTime()
+      ? period.startsAt.getTime()
+      : period.endsAt.getTime(),
+  );
+}
+
 function validDate(value: Date, label: string) {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
     throw new TypeError(`${label} debe ser una fecha valida.`);
