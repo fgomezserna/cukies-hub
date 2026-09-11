@@ -178,6 +178,7 @@ type VaultPositionDocument = {
   exitPeriodId?: unknown;
   withdrawableAt?: unknown;
   exitCalendarVersion?: unknown;
+  lastBlockNumber?: unknown;
 };
 
 type CukiesVaultInventoryDocument = CukiesInventoryDocument & {
@@ -895,6 +896,44 @@ function recoveryDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function blockNumberValue(value: unknown) {
+  try {
+    if (typeof value === 'bigint' && value >= BigInt(0)) return value;
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+    if (typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value)) return BigInt(value);
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function projectionLastBlocks(rows: Record<string, unknown>[]) {
+  const result = new Map<string, bigint | null>();
+  for (const row of rows) {
+    if (typeof row.assetId !== 'string') continue;
+    const blockNumber = blockNumberValue(row.lastBlockNumber);
+    const previous = result.get(row.assetId);
+    if (previous === undefined || previous === null || blockNumber === null) {
+      result.set(row.assetId, previous === undefined ? blockNumber : null);
+      continue;
+    }
+    result.set(row.assetId, previous > blockNumber ? previous : blockNumber);
+  }
+  return result;
+}
+
+function hasFreshWalletRecoveryProof(
+  item: PoolRecoveryInspection,
+  projectionBlocks: ReadonlyMap<string, bigint | null>,
+) {
+  if (item.status !== 'not_found' || item.reason === 'POOL_RECOVERY_NO_PROBE') return false;
+  const observedBlockNumber = blockNumberValue(item.observedBlockNumber);
+  if (observedBlockNumber === null) return false;
+  const projectionBlockNumber = projectionBlocks.get(item.assetId);
+  return projectionBlockNumber === undefined
+    || (projectionBlockNumber !== null && observedBlockNumber >= projectionBlockNumber);
+}
+
 export async function listAvailableCukiePoolVaultAssets(
   db: Db,
   walletNormalized: string,
@@ -1004,6 +1043,8 @@ export async function listAvailableCukiePoolVaultAssets(
     assetIds,
   }))) return sourceError('la proyeccion abierta de Cukie Master no es canonica.');
 
+  const projectionBlocks = projectionLastBlocks([...poolRows, ...masterRows]);
+
   // Probe every candidate, including assets with an open indexed projection.
   // A stale Pool/Master row must not keep a withdrawn NFT blocked after the
   // collection ownerOf read has already confirmed that it is back in the
@@ -1039,7 +1080,7 @@ export async function listAvailableCukiePoolVaultAssets(
   ).length;
   const confirmedWalletAssetIds = new Set(
     recovery
-      .filter((item) => item.status === 'not_found' && item.reason !== 'POOL_RECOVERY_NO_PROBE')
+      .filter((item) => hasFreshWalletRecoveryProof(item, projectionBlocks))
       .map((item) => item.assetId),
   );
   const recoveryAssets = preliminary.flatMap((item) => {

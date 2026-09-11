@@ -33,7 +33,10 @@ import { CUKIE_MASTER_ORIGINAL_RARITY_POINTS } from '../rules';
 import { listCanonicalCukieMasterNftPositions } from './nft-vault-source';
 import { createMongoCukieMasterRepository } from './repository';
 import { createCukieMasterService } from './service';
-import { readPoolRecoveryPositions } from '../cukie-pool/recovery-read';
+import {
+  readPoolRecoveryPositions,
+  type PoolRecoveryInspection,
+} from '../cukie-pool/recovery-read';
 
 export type CukieMasterNftOperation = 'soft_stake' | 'unstake';
 
@@ -77,6 +80,7 @@ type CustodialCukiesInventoryDocument = CukiesInventoryDocument & {
 type OpenNftVaultPositionDocument = {
   assetId?: unknown;
   lifecycleOpen?: unknown;
+  lastBlockNumber?: unknown;
 };
 
 type CustodialInventoryConfig = {
@@ -222,6 +226,44 @@ function tokenIdQueryCandidates(tokenId: string) {
   return Number.isSafeInteger(numeric) && String(numeric) === tokenId
     ? [tokenId, numeric]
     : [tokenId];
+}
+
+function blockNumberValue(value: unknown) {
+  try {
+    if (typeof value === 'bigint' && value >= BigInt(0)) return value;
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+    if (typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value)) return BigInt(value);
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function projectionLastBlocks(rows: OpenNftVaultPositionDocument[]) {
+  const result = new Map<string, bigint | null>();
+  for (const row of rows) {
+    if (typeof row.assetId !== 'string') continue;
+    const blockNumber = blockNumberValue(row.lastBlockNumber);
+    const previous = result.get(row.assetId);
+    if (previous === undefined || previous === null || blockNumber === null) {
+      result.set(row.assetId, previous === undefined ? blockNumber : null);
+      continue;
+    }
+    result.set(row.assetId, previous > blockNumber ? previous : blockNumber);
+  }
+  return result;
+}
+
+function hasFreshWalletRecoveryProof(
+  item: PoolRecoveryInspection,
+  projectionBlocks: ReadonlyMap<string, bigint | null>,
+) {
+  if (item.status !== 'not_found' || item.reason === 'POOL_RECOVERY_NO_PROBE') return false;
+  const observedBlockNumber = blockNumberValue(item.observedBlockNumber);
+  if (observedBlockNumber === null) return false;
+  const projectionBlockNumber = projectionBlocks.get(item.assetId);
+  return projectionBlockNumber === undefined
+    || (projectionBlockNumber !== null && observedBlockNumber >= projectionBlockNumber);
 }
 
 function staleCustodyState(value: unknown) {
@@ -487,6 +529,7 @@ export async function custodialInventoryFromDb(
       tokenId: candidate.tokenId,
     })),
   });
+  const projectionBlocks = projectionLastBlocks([...masterPositions, ...poolPositions]);
   // The indexer projection can lag a confirmed ERC-721 transfer back to the
   // wallet. An ownerOf(wallet) result can clear only the stale custodial row;
   // it does not invalidate unrelated off-chain reservations. Unknown or
@@ -494,7 +537,7 @@ export async function custodialInventoryFromDb(
   // deposit.
   const confirmedWalletAssetIds = new Set(
     recovery
-      .filter((item) => item.status === 'not_found' && item.reason !== 'POOL_RECOVERY_NO_PROBE')
+      .filter((item) => hasFreshWalletRecoveryProof(item, projectionBlocks))
       .map((item) => item.assetId),
   );
   const documentsForInventory = documents.map((document) => {

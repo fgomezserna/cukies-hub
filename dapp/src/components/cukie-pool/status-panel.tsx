@@ -1359,6 +1359,13 @@ export function CukiePoolStatusPanel() {
         return;
       }
       if (latestBlock < receiptBlock) return;
+      // Deposit/exit confirmation must resolve the current contract state:
+      // a receipt block can still show the position before a later withdrawal.
+      // Withdraw confirmation remains receipt-scoped so its epoch cannot be
+      // confused with a newer deposit of the same NFT.
+      const stateBlock = confirmedOperation.action === 'withdraw'
+        ? receiptBlock
+        : latestBlock;
       if (confirmedOperation.action === 'deposit') {
         const receiptEpoch = depositedEpochFromReceipt(resolvedReceipt, confirmedOperation);
         const depositEpoch = receiptEpoch ?? confirmedOperation.depositEpoch;
@@ -1389,7 +1396,7 @@ export function CukiePoolStatusPanel() {
             abi: cukiePoolNftVaultAbi,
             functionName: 'positionOf',
             args: [operation.collectionAddress as Address, BigInt(operation.tokenId)],
-            blockNumber: receiptBlock,
+            blockNumber: stateBlock,
           });
         } catch {
           // A withdrawn/terminal position can make positionOf revert. The
@@ -1410,7 +1417,7 @@ export function CukiePoolStatusPanel() {
             abi: erc721CustodyAbi,
             functionName: 'ownerOf',
             args: [BigInt(current.tokenId)],
-            blockNumber: receiptBlock,
+            blockNumber: stateBlock,
           });
         } catch {
           return;
@@ -1433,7 +1440,7 @@ export function CukiePoolStatusPanel() {
           abi: cukiePoolNftVaultAbi,
           functionName: 'positionOf',
           args: [operation.collectionAddress as Address, BigInt(operation.tokenId)],
-          blockNumber: receiptBlock,
+          blockNumber: stateBlock,
         });
         if (!isReconciliationCurrent()) return;
         const current = currentOperation(operation);

@@ -123,6 +123,7 @@ function openMasterPosition(tokenId: string) {
       observedAt: now,
     },
     lastEventId: `deposit:${tokenId}`,
+    lastBlockNumber: 123,
     updatedAt: now,
   };
 }
@@ -317,6 +318,7 @@ describe('Cukie Master custodial inventory identity', () => {
     mockRecovery.mockResolvedValueOnce([{
       assetId,
       status: 'not_found',
+      observedBlockNumber: '500',
       vaultAddress: null,
       beneficialOwner: null,
       exitRequestedAt: null,
@@ -326,7 +328,7 @@ describe('Cukie Master custodial inventory identity', () => {
     const inventory = await custodialInventoryFromDb(fakeDb({
       cukies: [metadata('stale-pool', tokenId, collectionA, { state: 'in_pool' })],
       cukie_master_nft_positions: [],
-      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true }],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true, lastBlockNumber: 500 }],
       nft_asset_locks: [],
     }), wallet, now, undefined, config([collectionA]));
 
@@ -336,6 +338,51 @@ describe('Cukie Master custodial inventory identity', () => {
       canDeposit: true,
       blockers: [],
     }]);
+  });
+
+  it('does not clear a Pool projection when ownerOf is older than its last indexed block', async () => {
+    const tokenId = '26';
+    const assetId = `97:${collectionA}:${tokenId}`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'not_found',
+      observedBlockNumber: '499',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('stale-pool-older-read', tokenId, collectionA, { state: 'in_pool' })],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true, lastBlockNumber: 500 }],
+      nft_asset_locks: [],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(inventory).toEqual([]);
+  });
+
+  it('does not treat a not_found result without an observed block as proof', async () => {
+    const tokenId = '27';
+    const assetId = `97:${collectionA}:${tokenId}`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'not_found',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('stale-pool-unobserved', tokenId, collectionA, { state: 'in_pool' })],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true, lastBlockNumber: 500 }],
+      nft_asset_locks: [],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(inventory).toEqual([]);
   });
 
   it('does not clear a stale Pool projection when no recovery probe ran', async () => {

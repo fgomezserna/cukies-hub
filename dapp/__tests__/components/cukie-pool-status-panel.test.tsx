@@ -686,6 +686,66 @@ describe('CukiePoolStatusPanel', () => {
     expect(readContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'ownerOf' }));
   });
 
+  it('resuelve un depósito pendiente en el bloque actual después de una retirada posterior', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const asset = availableAsset();
+    const pending = { ...pendingDeposit(asset), depositEpoch: '1' };
+    savePendingNftVaultOperation(window.localStorage, pending);
+    const getTransactionReceipt = jest.fn().mockResolvedValue({
+      status: 'success',
+      blockNumber: BigInt(100),
+    });
+    const getBlockNumber = jest.fn().mockResolvedValue(BigInt(120));
+    const readContract = jest.fn().mockImplementation((request: { functionName?: string; blockNumber?: bigint }) => {
+      if (request.functionName === 'positionOf') {
+        // At the receipt block the deposit still existed; at the current
+        // block a later withdrawal has closed it.
+        return request.blockNumber === BigInt(100)
+          ? Promise.resolve({
+            beneficialOwner: walletAddress,
+            depositEpoch: BigInt(1),
+            depositedAt: BigInt(100),
+            activationAt: BigInt(200),
+          })
+          : Promise.resolve(null);
+      }
+      return Promise.resolve(request.blockNumber === BigInt(100) ? vaultAddress : walletAddress);
+    });
+    mockUsePublicClient.mockReturnValue({
+      readContract,
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+      getBlockNumber,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [asset] })));
+
+    render(<CukiePoolStatusPanel />);
+
+    await waitFor(() => expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([]));
+    expect(readContract).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'positionOf',
+      blockNumber: BigInt(120),
+    }));
+    expect(readContract).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'ownerOf',
+      blockNumber: BigInt(120),
+    }));
+    expect(readContract).not.toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'ownerOf',
+      blockNumber: BigInt(100),
+    }));
+  });
+
   it('no libera un depósito con un lector atrasado y reintenta cuando alcanza el bloque del receipt', async () => {
     configureVault();
     mockUseAuth.mockReturnValue(authValue(user, 'evm'));
