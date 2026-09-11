@@ -251,6 +251,63 @@ export type RewardEmissionBudgetReason =
   | "LIFETIME_CAP_EXCEEDED";
 
 /**
+ * Version of the only operator-assisted path allowed to recover a source
+ * after the reservation window. The command carries the identifiers, while
+ * the complete immutable plan is resolved out of band and verified against
+ * the source, rule and budget caps before anything is persisted.
+ */
+export const REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_VERSION =
+  "reward-late-settlement-v1" as const;
+
+export type RewardLateSettlementRecoveryRequest = {
+  sessionId: string;
+  periodId: string;
+  expectedRuleVersion: string;
+  recoveryCaseId: string;
+  approvalId: string;
+  planHash: string;
+};
+
+/**
+ * Immutable approval material for a late settlement. `sourceIds` and
+ * `sourceTotalRawById` keep the recovery bounded to the reviewed census; the
+ * optional evidence maps allow a reviewer to pin the exact calculation
+ * hashes when they are available. No field in this plan grants publication or
+ * claim authority.
+ */
+export type RewardLateSettlementRecoveryPlan = {
+  planVersion: typeof REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_VERSION;
+  recoveryCaseId: string;
+  approvalId: string;
+  planHash: string;
+  approvedAt: Date;
+  approvedBy: string;
+  databaseName: string;
+  chainId: number;
+  cycleSeconds: number;
+  sourceIds: string[];
+  periodIds: string[];
+  sourceTotalRawById: Record<string, string>;
+  expectedRuleVersion: string;
+  expectedRuleConfigHash: string;
+  dailyCapRaw: string;
+  lifetimeCapRaw: string;
+  sourceSetHashById?: Record<string, string>;
+  calculationInputHashById?: Record<string, string>;
+  calculationOutputHashById?: Record<string, string>;
+};
+
+/** Metadata persisted on the canonical budget event for a recovered source. */
+export type RewardEmissionBudgetOperatorRecovery = {
+  recoveryCaseId: string;
+  approvalId: string;
+  planHash: string;
+  originalReason: "DAY_CLOSED";
+  approvedAt: Date;
+  approvedBy: string;
+};
+
+/**
  * Decision inmutable y global por source. Tambien actua como fence de replay:
  * una fuente rechazada no puede reaparecer con otra fecha, regla o reparto.
  */
@@ -286,6 +343,7 @@ export type RewardEmissionBudgetEvent = {
   calculationKind: RewardAllocation["calculationKind"];
   calculationInputHash: string;
   calculationOutputHash: string;
+  operatorRecovery?: RewardEmissionBudgetOperatorRecovery;
   payloadHash: string;
   createdAt: Date;
 };
@@ -323,6 +381,8 @@ export type RewardAllocationSetInput = {
     inputHash: string;
     outputHash: string;
   };
+  /** Solo lo rellena el comando de recuperación tras resolver un plan aprobado. */
+  recoveryPlan?: RewardLateSettlementRecoveryPlan;
   now: Date;
 };
 

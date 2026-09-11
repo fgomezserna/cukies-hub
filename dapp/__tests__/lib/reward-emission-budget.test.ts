@@ -1,4 +1,7 @@
-import { validateRewardEmissionBudgetEvent } from "@/lib/uki-economy/rewards/emission-budget";
+import {
+  rewardLateSettlementRecoveryPlanHash,
+  validateRewardEmissionBudgetEvent,
+} from "@/lib/uki-economy/rewards/emission-budget";
 import { RewardAllocationService } from "@/lib/uki-economy/rewards/service";
 import {
   createMemoryRewardTransactionRunner,
@@ -8,6 +11,7 @@ import {
 import type {
   RewardAllocationSetInput,
   RewardEmissionBudgetConfig,
+  RewardLateSettlementRecoveryPlan,
   RewardRule,
 } from "@/lib/uki-economy/rewards/types";
 
@@ -64,6 +68,36 @@ function subject(rule: RewardRule) {
     createMemoryRewardTransactionRunner(repository),
   );
   return { repository, service };
+}
+
+function recoveryPlan(input: {
+  rule: RewardRule;
+  sourceId: string;
+  periodId: string;
+  sourceTotalRaw: string;
+  approvedAt?: Date;
+}): RewardLateSettlementRecoveryPlan {
+  const unsigned = {
+    planVersion: "reward-late-settlement-v1" as const,
+    recoveryCaseId: "recovery-case-418",
+    approvalId: "approval-418",
+    approvedAt: input.approvedAt ?? new Date("2026-07-10T12:00:00.000Z"),
+    approvedBy: "operator-rewards",
+    databaseName: "cukieshub-new-staging",
+    chainId: 97,
+    cycleSeconds: 1800,
+    sourceIds: [input.sourceId],
+    periodIds: [input.periodId],
+    sourceTotalRawById: { [input.sourceId]: input.sourceTotalRaw },
+    expectedRuleVersion: input.rule.version,
+    expectedRuleConfigHash: input.rule.configHash,
+    dailyCapRaw: input.rule.emissionBudget.dailyCapRaw,
+    lifetimeCapRaw: input.rule.emissionBudget.lifetimeCapRaw,
+  };
+  return {
+    ...unsigned,
+    planHash: rewardLateSettlementRecoveryPlanHash(unsigned),
+  };
 }
 
 describe("reward emission budget", () => {
@@ -224,6 +258,94 @@ describe("reward emission budget", () => {
     });
     expect(repository.state.emissionBudgetStates).toHaveLength(0);
     expect(repository.state.emissionBudgetDays).toHaveLength(0);
+  });
+
+  it("recupera un DAY_CLOSED solo con el plan inmutable y conserva el fence", async () => {
+    const rule = ruleWithBudget({ dailyCapRaw: "100", lifetimeCapRaw: "1000" });
+    const { repository, service } = subject(rule);
+    const sourceId = "game-a:late-recovery";
+    const input = allocationInput({
+      rule,
+      sourceId,
+      amountRaw: "10",
+      ruleEffectiveAt: new Date("2026-07-10T12:00:00.000Z"),
+      now: new Date("2026-07-11T00:00:00.000Z"),
+    });
+    const plan = recoveryPlan({
+      rule,
+      sourceId,
+      periodId: input.periodId,
+      sourceTotalRaw: input.sourceTotalRaw,
+    });
+
+    const result = await service.persistAllocationSet({ ...input, recoveryPlan: plan });
+    expect(result).toMatchObject({
+      status: "allocated",
+      replayed: false,
+      emissionBudgetEvent: {
+        status: "reserved",
+        reason: "RESERVED",
+        operatorRecovery: {
+          recoveryCaseId: "recovery-case-418",
+          approvalId: "approval-418",
+          planHash: plan.planHash,
+          originalReason: "DAY_CLOSED",
+        },
+      },
+    });
+    expect(validateRewardEmissionBudgetEvent(repository.state.emissionBudgetEvents[0])).toBe(true);
+    expect(repository.state.emissionBudgetDays[0].reservedRaw).toBe("10");
+    expect(repository.state.emissionBudgetStates[0].reservedLifetimeRaw).toBe("10");
+
+    const replay = await service.persistAllocationSet({
+      ...input,
+      now: new Date("2026-07-12T00:00:00.000Z"),
+      recoveryPlan: plan,
+    });
+    expect(replay).toMatchObject({ status: "allocated", replayed: true });
+    expect(repository.state.emissionBudgetEvents).toHaveLength(1);
+    expect(repository.state.emissionBudgetDays[0].reservedRaw).toBe("10");
+  });
+
+  it("rechaza recuperaciones sin cierre DAY_CLOSED o con plan manipulado", async () => {
+    const rule = ruleWithBudget({ dailyCapRaw: "100", lifetimeCapRaw: "1000" });
+    const { repository, service } = subject(rule);
+    const sourceId = "game-a:early-recovery";
+    const input = allocationInput({
+      rule,
+      sourceId,
+      amountRaw: "10",
+      ruleEffectiveAt: new Date("2026-07-10T12:00:00.000Z"),
+      now: new Date("2026-07-10T12:30:00.000Z"),
+    });
+    const plan = recoveryPlan({
+      rule,
+      sourceId,
+      periodId: input.periodId,
+      sourceTotalRaw: input.sourceTotalRaw,
+    });
+    await expect(service.persistAllocationSet({ ...input, recoveryPlan: plan }))
+      .rejects.toThrow(/no requiere una recuperacion DAY_CLOSED/);
+    expect(repository.state.emissionBudgetEvents).toHaveLength(0);
+
+    const lateInput = allocationInput({
+      rule,
+      sourceId: "game-a:tampered-recovery",
+      amountRaw: "10",
+      ruleEffectiveAt: new Date("2026-07-10T12:00:00.000Z"),
+      now: new Date("2026-07-11T00:00:00.000Z"),
+    });
+    const validPlan = recoveryPlan({
+      rule,
+      sourceId: lateInput.sourceId,
+      periodId: lateInput.periodId,
+      sourceTotalRaw: lateInput.sourceTotalRaw,
+    });
+    await expect(service.persistAllocationSet({
+      ...lateInput,
+      recoveryPlan: { ...validPlan, dailyCapRaw: "99" },
+    })).rejects.toThrow(/planHash no coincide/);
+    expect(repository.state.emissionBudgetEvents).toHaveLength(0);
   });
 
   it("bloquea fuentes anteriores al inicio versionado del programa", async () => {

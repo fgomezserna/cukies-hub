@@ -7,10 +7,13 @@ import type { RewardRepository } from "./repository";
 import { stableRewardHash, validRewardDate, validRewardText } from "./rules";
 import {
   REWARD_EMISSION_BUDGET_SCOPE,
+  REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_VERSION,
   type RewardEmissionBudgetDay,
   type RewardEmissionBudgetEvent,
+  type RewardEmissionBudgetOperatorRecovery,
   type RewardEmissionBudgetReason,
   type RewardEmissionBudgetState,
+  type RewardLateSettlementRecoveryPlan,
   type RewardRule,
 } from "./types";
 
@@ -27,7 +30,312 @@ type EmissionBudgetSource = {
   calculationOutputHash: string;
   ruleEffectiveAt: Date;
   now: Date;
+  recoveryPlan?: RewardLateSettlementRecoveryPlan;
 };
+
+export const REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_ENV =
+  "REWARD_LATE_SETTLEMENT_RECOVERY_PLAN" as const;
+const RECOVERY_DATABASE_NAME = "cukieshub-new-staging" as const;
+const RECOVERY_CHAIN_ID = 97 as const;
+const RECOVERY_CYCLE_SECONDS = 1_800 as const;
+
+function exactRecordKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  label: string,
+) {
+  const expected = new Set(allowed);
+  const unexpected = Object.keys(value).filter((key) => !expected.has(key));
+  if (unexpected.length > 0) {
+    throw new DomainValidationError(
+      `${label} contiene campos no permitidos: ${unexpected.join(",")}.`,
+    );
+  }
+}
+
+function recoveryRaw(value: unknown, label: string) {
+  if (typeof value !== "string") {
+    throw new DomainValidationError(`${label} debe ser un raw decimal.`);
+  }
+  try {
+    return formatRawAmount(parseRawAmount(value));
+  } catch {
+    throw new DomainValidationError(`${label} debe ser un raw decimal canonico.`);
+  }
+}
+
+function recoveryMap(
+  value: unknown,
+  label: string,
+  sourceIds: readonly string[],
+  required: boolean,
+) {
+  if (value === undefined && !required) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new DomainValidationError(`${label} debe ser un objeto.`);
+  }
+  const map = value as Record<string, unknown>;
+  const allowed = new Set(sourceIds);
+  const keys = Object.keys(map);
+  if (required && keys.length !== sourceIds.length) {
+    throw new DomainValidationError(`${label} debe fijar todos los sourceIds del plan.`);
+  }
+  if (keys.some((key) => !allowed.has(key))) {
+    throw new DomainValidationError(`${label} contiene un sourceId fuera del plan.`);
+  }
+  const normalized: Record<string, string> = {};
+  for (const sourceId of keys) {
+    const amount = map[sourceId];
+    normalized[sourceId] = recoveryRaw(amount, `${label}.${sourceId}`);
+  }
+  return normalized;
+}
+
+function recoveryHashMap(
+  value: unknown,
+  label: string,
+  sourceIds: readonly string[],
+) {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new DomainValidationError(`${label} debe ser un objeto.`);
+  }
+  const map = value as Record<string, unknown>;
+  const allowed = new Set(sourceIds);
+  const keys = Object.keys(map);
+  if (keys.some((key) => !allowed.has(key))) {
+    throw new DomainValidationError(`${label} contiene un sourceId fuera del plan.`);
+  }
+  const normalized: Record<string, string> = {};
+  for (const sourceId of keys) {
+    const hash = map[sourceId];
+    if (typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash)) {
+      throw new DomainValidationError(`${label}.${sourceId} no es un hash canonico.`);
+    }
+    normalized[sourceId] = hash;
+  }
+  return normalized;
+}
+
+function planUnsigned(plan: RewardLateSettlementRecoveryPlan) {
+  const { planHash: _planHash, ...unsigned } = plan;
+  return unsigned;
+}
+
+export function rewardLateSettlementRecoveryPlanHash(
+  plan: Omit<RewardLateSettlementRecoveryPlan, "planHash">,
+) {
+  return stableRewardHash({
+    kind: "reward-late-settlement-recovery-plan",
+    ...plan,
+  });
+}
+
+/**
+ * Validates the complete, immutable recovery material. This is deliberately
+ * separate from command parsing: an approval id or hash by itself is never an
+ * authorization.
+ */
+export function assertRewardLateSettlementRecoveryPlan(
+  value: unknown,
+): RewardLateSettlementRecoveryPlan {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new DomainValidationError("El plan de recuperacion debe ser un objeto.");
+  }
+  const item = value as Record<string, unknown>;
+  exactRecordKeys(item, [
+    "planVersion",
+    "recoveryCaseId",
+    "approvalId",
+    "planHash",
+    "approvedAt",
+    "approvedBy",
+    "databaseName",
+    "chainId",
+    "cycleSeconds",
+    "sourceIds",
+    "periodIds",
+    "sourceTotalRawById",
+    "expectedRuleVersion",
+    "expectedRuleConfigHash",
+    "dailyCapRaw",
+    "lifetimeCapRaw",
+    "sourceSetHashById",
+    "calculationInputHashById",
+    "calculationOutputHashById",
+  ], "recoveryPlan");
+  if (item.planVersion !== REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_VERSION) {
+    throw new DomainValidationError("La version del plan de recuperacion no es compatible.");
+  }
+  const recoveryCaseId = validRewardText(item.recoveryCaseId, "recoveryPlan.recoveryCaseId");
+  const approvalId = validRewardText(item.approvalId, "recoveryPlan.approvalId");
+  const planHash = validRewardText(item.planHash, "recoveryPlan.planHash");
+  if (!/^[0-9a-f]{64}$/.test(planHash)) {
+    throw new DomainValidationError("recoveryPlan.planHash no es un hash canonico.");
+  }
+  const approvedAt = validRewardDate(item.approvedAt, "recoveryPlan.approvedAt");
+  const approvedBy = validRewardText(item.approvedBy, "recoveryPlan.approvedBy");
+  const databaseName = validRewardText(item.databaseName, "recoveryPlan.databaseName");
+  if (databaseName !== RECOVERY_DATABASE_NAME) {
+    throw new DomainConflictError("El plan de recuperacion no pertenece a la base de staging autorizada.");
+  }
+  if (!Number.isSafeInteger(item.chainId) || item.chainId !== RECOVERY_CHAIN_ID) {
+    throw new DomainConflictError("El plan de recuperacion no pertenece a BSC Testnet.");
+  }
+  if (!Number.isSafeInteger(item.cycleSeconds) || item.cycleSeconds !== RECOVERY_CYCLE_SECONDS) {
+    throw new DomainConflictError("El plan de recuperacion no pertenece al ciclo C1800.");
+  }
+  if (!Array.isArray(item.sourceIds) || item.sourceIds.length === 0 || item.sourceIds.length > 100) {
+    throw new DomainValidationError("recoveryPlan.sourceIds debe contener entre 1 y 100 sources.");
+  }
+  const sourceIds = item.sourceIds.map((sourceId, index) =>
+    validRewardText(sourceId, `recoveryPlan.sourceIds[${index}]`));
+  if (new Set(sourceIds).size !== sourceIds.length) {
+    throw new DomainValidationError("recoveryPlan.sourceIds no puede repetir sources.");
+  }
+  if (!Array.isArray(item.periodIds) || item.periodIds.length === 0 || item.periodIds.length > 100) {
+    throw new DomainValidationError("recoveryPlan.periodIds debe contener entre 1 y 100 periodos.");
+  }
+  const periodIds = item.periodIds.map((periodId, index) =>
+    validRewardText(periodId, `recoveryPlan.periodIds[${index}]`));
+  if (new Set(periodIds).size !== periodIds.length) {
+    throw new DomainValidationError("recoveryPlan.periodIds no puede repetir periodos.");
+  }
+  const sourceTotalRawById = recoveryMap(
+    item.sourceTotalRawById,
+    "recoveryPlan.sourceTotalRawById",
+    sourceIds,
+    true,
+  )!;
+  const expectedRuleVersion = validRewardText(
+    item.expectedRuleVersion,
+    "recoveryPlan.expectedRuleVersion",
+  );
+  const expectedRuleConfigHash = validRewardText(
+    item.expectedRuleConfigHash,
+    "recoveryPlan.expectedRuleConfigHash",
+  );
+  if (!/^[0-9a-f]{64}$/.test(expectedRuleConfigHash)) {
+    throw new DomainValidationError("recoveryPlan.expectedRuleConfigHash no es un hash canonico.");
+  }
+  const dailyCapRaw = recoveryRaw(item.dailyCapRaw, "recoveryPlan.dailyCapRaw");
+  const lifetimeCapRaw = recoveryRaw(item.lifetimeCapRaw, "recoveryPlan.lifetimeCapRaw");
+  if (parseRawAmount(dailyCapRaw) <= BigInt(0) || parseRawAmount(lifetimeCapRaw) < parseRawAmount(dailyCapRaw)) {
+    throw new DomainValidationError("recoveryPlan debe conservar techos de emision positivos y ordenados.");
+  }
+  const sourceSetHashById = recoveryHashMap(
+    item.sourceSetHashById,
+    "recoveryPlan.sourceSetHashById",
+    sourceIds,
+  );
+  const calculationInputHashById = recoveryHashMap(
+    item.calculationInputHashById,
+    "recoveryPlan.calculationInputHashById",
+    sourceIds,
+  );
+  const calculationOutputHashById = recoveryHashMap(
+    item.calculationOutputHashById,
+    "recoveryPlan.calculationOutputHashById",
+    sourceIds,
+  );
+  const plan: RewardLateSettlementRecoveryPlan = {
+    planVersion: REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_VERSION,
+    recoveryCaseId,
+    approvalId,
+    planHash,
+    approvedAt,
+    approvedBy,
+    databaseName,
+    chainId: item.chainId as number,
+    cycleSeconds: item.cycleSeconds as number,
+    sourceIds,
+    periodIds,
+    sourceTotalRawById,
+    expectedRuleVersion,
+    expectedRuleConfigHash,
+    dailyCapRaw,
+    lifetimeCapRaw,
+    ...(sourceSetHashById ? { sourceSetHashById } : {}),
+    ...(calculationInputHashById ? { calculationInputHashById } : {}),
+    ...(calculationOutputHashById ? { calculationOutputHashById } : {}),
+  };
+  if (rewardLateSettlementRecoveryPlanHash(planUnsigned(plan)) !== plan.planHash) {
+    throw new DomainConflictError("recoveryPlan.planHash no coincide con el plan inmutable.");
+  }
+  return plan;
+}
+
+export function assertRewardLateSettlementRecoveryForSource(
+  planInput: unknown,
+  source: Pick<EmissionBudgetSource, "periodId" | "sourceId" | "sourceTotalRaw" | "sourceSetHash" | "calculationInputHash" | "calculationOutputHash" | "now">,
+  rule: RewardRule,
+): RewardEmissionBudgetOperatorRecovery {
+  const plan = assertRewardLateSettlementRecoveryPlan(planInput);
+  if (!plan.sourceIds.includes(source.sourceId)) {
+    throw new DomainConflictError(`El source ${source.sourceId} no esta incluido en el plan de recuperacion.`);
+  }
+  if (!plan.periodIds.includes(source.periodId)) {
+    throw new DomainConflictError(`El periodo ${source.periodId} no esta incluido en el plan de recuperacion.`);
+  }
+  if (plan.sourceTotalRawById[source.sourceId] !== source.sourceTotalRaw) {
+    throw new DomainConflictError(`El sourceTotalRaw del source ${source.sourceId} no coincide con el plan aprobado.`);
+  }
+  if (
+    plan.expectedRuleVersion !== rule.version
+    || plan.expectedRuleConfigHash !== rule.configHash
+    || plan.dailyCapRaw !== rule.emissionBudget.dailyCapRaw
+    || plan.lifetimeCapRaw !== rule.emissionBudget.lifetimeCapRaw
+  ) {
+    throw new DomainConflictError(`La regla o los techos de emision no coinciden con el plan aprobado.`);
+  }
+  const calendar = rule.emissionBudget.calendar;
+  if (calendar && (calendar.chainId !== plan.chainId || calendar.cycleSeconds !== plan.cycleSeconds)) {
+    throw new DomainConflictError(`El calendario economico no coincide con el plan aprobado.`);
+  }
+  if (plan.approvedAt.getTime() > source.now.getTime()) {
+    throw new DomainConflictError("El plan de recuperacion no estaba aprobado al ejecutar el comando.");
+  }
+  if (
+    (plan.sourceSetHashById?.[source.sourceId] && plan.sourceSetHashById[source.sourceId] !== source.sourceSetHash)
+    || (plan.calculationInputHashById?.[source.sourceId] && plan.calculationInputHashById[source.sourceId] !== source.calculationInputHash)
+    || (plan.calculationOutputHashById?.[source.sourceId] && plan.calculationOutputHashById[source.sourceId] !== source.calculationOutputHash)
+  ) {
+    throw new DomainConflictError(`La evidencia de calculo del source ${source.sourceId} no coincide con el plan aprobado.`);
+  }
+  return {
+    recoveryCaseId: plan.recoveryCaseId,
+    approvalId: plan.approvalId,
+    planHash: plan.planHash,
+    originalReason: "DAY_CLOSED",
+    approvedAt: plan.approvedAt,
+    approvedBy: plan.approvedBy,
+  };
+}
+
+/** Resolves the approved plan from a runtime secret, never from command data. */
+export function loadRewardLateSettlementRecoveryPlan() {
+  const raw = process.env[REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_ENV]?.trim();
+  if (!raw) return null;
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    throw new DomainValidationError("REWARD_LATE_SETTLEMENT_RECOVERY_PLAN no es JSON valido.");
+  }
+  if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
+    throw new DomainValidationError("REWARD_LATE_SETTLEMENT_RECOVERY_PLAN debe ser un objeto.");
+  }
+  const item = decoded as Record<string, unknown>;
+  const approvedAt = item.approvedAt;
+  if (typeof approvedAt !== "string") {
+    throw new DomainValidationError("recoveryPlan.approvedAt debe ser ISO-8601 UTC.");
+  }
+  const date = new Date(approvedAt);
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== approvedAt) {
+    throw new DomainValidationError("recoveryPlan.approvedAt debe ser ISO-8601 UTC canonico.");
+  }
+  return assertRewardLateSettlementRecoveryPlan({ ...item, approvedAt: date });
+}
 
 export function rewardEmissionBudgetDayWindow(
   ruleEffectiveAtInput: Date,
@@ -163,6 +471,7 @@ function buildEvent(input: {
   resultingDailyRaw: bigint;
   previousLifetimeRaw: bigint;
   resultingLifetimeRaw: bigint;
+  operatorRecovery?: RewardEmissionBudgetOperatorRecovery;
 }): RewardEmissionBudgetEvent {
   const eventId = stableRewardHash({
     kind: "reward-emission-budget-source",
@@ -199,6 +508,7 @@ function buildEvent(input: {
     calculationKind: input.source.calculationKind,
     calculationInputHash: input.source.calculationInputHash,
     calculationOutputHash: input.source.calculationOutputHash,
+    ...(input.operatorRecovery ? { operatorRecovery: input.operatorRecovery } : {}),
     createdAt: input.source.now,
   };
   return {
@@ -208,9 +518,58 @@ function buildEvent(input: {
   };
 }
 
+function assertOperatorRecovery(value: unknown): RewardEmissionBudgetOperatorRecovery {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new DomainValidationError("budgetEvent.operatorRecovery debe ser un objeto.");
+  }
+  const item = value as Record<string, unknown>;
+  exactRecordKeys(item, [
+    "recoveryCaseId",
+    "approvalId",
+    "planHash",
+    "originalReason",
+    "approvedAt",
+    "approvedBy",
+  ], "budgetEvent.operatorRecovery");
+  const recoveryCaseId = validRewardText(
+    item.recoveryCaseId,
+    "budgetEvent.operatorRecovery.recoveryCaseId",
+  );
+  const approvalId = validRewardText(
+    item.approvalId,
+    "budgetEvent.operatorRecovery.approvalId",
+  );
+  const planHash = validRewardText(item.planHash, "budgetEvent.operatorRecovery.planHash");
+  if (!/^[0-9a-f]{64}$/.test(planHash)) {
+    throw new DomainValidationError("budgetEvent.operatorRecovery.planHash no es canonico.");
+  }
+  if (item.originalReason !== "DAY_CLOSED") {
+    throw new DomainValidationError("budgetEvent.operatorRecovery.originalReason debe ser DAY_CLOSED.");
+  }
+  const approvedAt = validRewardDate(
+    item.approvedAt,
+    "budgetEvent.operatorRecovery.approvedAt",
+  );
+  const approvedBy = validRewardText(
+    item.approvedBy,
+    "budgetEvent.operatorRecovery.approvedBy",
+  );
+  return {
+    recoveryCaseId,
+    approvalId,
+    planHash,
+    originalReason: "DAY_CLOSED",
+    approvedAt,
+    approvedBy,
+  };
+}
+
 export function validateRewardEmissionBudgetEvent(event: RewardEmissionBudgetEvent) {
   try {
     const { _id, payloadHash, ...immutable } = event;
+    const operatorRecovery = event.operatorRecovery
+      ? assertOperatorRecovery(event.operatorRecovery)
+      : undefined;
     const sourceTotal = parseRawAmount(event.sourceTotalRaw);
     const previousDaily = parseRawAmount(event.previousDailyRaw);
     const resultingDaily = parseRawAmount(event.resultingDailyRaw);
@@ -269,6 +628,7 @@ export function validateRewardEmissionBudgetEvent(event: RewardEmissionBudgetEve
       && validRewardDate(event.programStartsAt, "budgetEvent.programStartsAt") instanceof Date
       && validRewardDate(event.ruleEffectiveAt, "budgetEvent.ruleEffectiveAt") instanceof Date
       && validRewardDate(event.createdAt, "budgetEvent.createdAt") instanceof Date
+      && (!operatorRecovery || operatorRecovery.approvedAt.getTime() <= event.createdAt.getTime())
       && event.sourceTotalRaw === formatRawAmount(parseRawAmount(event.sourceTotalRaw))
       && event.previousDailyRaw === formatRawAmount(parseRawAmount(event.previousDailyRaw))
       && event.resultingDailyRaw === formatRawAmount(parseRawAmount(event.resultingDailyRaw))
@@ -288,12 +648,16 @@ export function validateRewardEmissionBudgetEvent(event: RewardEmissionBudgetEve
         (
           event.status === "reserved"
           && event.reason === "RESERVED"
-          && expectedReason === "RESERVED"
+          && (
+            (!operatorRecovery && expectedReason === "RESERVED")
+            || (operatorRecovery?.originalReason === "DAY_CLOSED" && expectedReason === "DAY_CLOSED")
+          )
           && resultingDaily === previousDaily + sourceTotal
           && resultingLifetime === previousLifetime + sourceTotal
         )
         || (
           event.status === "blocked"
+          && !operatorRecovery
           && event.reason !== "RESERVED"
           && event.reason === expectedReason
           && resultingDaily === previousDaily
@@ -317,11 +681,12 @@ export function assertRewardEmissionBudgetReplay(
       `La decision de presupuesto del source ${source.sourceId} fue manipulada.`,
     );
   }
-  // Las fuentes ya reservadas dejan que el reconciliador de rewards compare
-  // el replay completo y bloquee allocations existentes ante cualquier drift.
-  // Una fuente ya rechazada no tiene manifest que reconciliar y debe coincidir
-  // exactamente con su decision inmutable.
-  if (event.status === "reserved") return event;
+  // El camino normal conserva la reconciliacion de allocations para detectar
+  // drift de un replay reservado. Una decision recuperada, en cambio, exige
+  // volver a presentar el mismo plan y la misma evidencia antes de continuar.
+  if (event.status === "reserved" && !event.operatorRecovery && !source.recoveryPlan) {
+    return event;
+  }
   const window = rewardEmissionBudgetDayWindow(
     source.ruleEffectiveAt,
     rule.emissionBudget.dayBoundarySecondUtc,
@@ -346,6 +711,14 @@ export function assertRewardEmissionBudgetReplay(
       `La decision de presupuesto del source ${source.sourceId} no coincide con el replay.`,
     );
   }
+  const expectedOperatorRecovery = source.recoveryPlan
+    ? assertRewardLateSettlementRecoveryForSource(source.recoveryPlan, source, rule)
+    : undefined;
+  if (stableRewardHash(event.operatorRecovery ?? null) !== stableRewardHash(expectedOperatorRecovery ?? null)) {
+    throw new DomainConflictError(
+      `La decision de presupuesto del source ${source.sourceId} no coincide con el plan de recuperacion.`,
+    );
+  }
   return event;
 }
 
@@ -368,6 +741,7 @@ export async function reserveRewardEmissionBudget(
     calculationOutputHash: sourceInput.calculationOutputHash,
     ruleEffectiveAt: validRewardDate(sourceInput.ruleEffectiveAt, "ruleEffectiveAt"),
     now: validRewardDate(sourceInput.now, "now"),
+    ...(sourceInput.recoveryPlan ? { recoveryPlan: sourceInput.recoveryPlan } : {}),
   };
   if (
     !/^[0-9a-f]{64}$/.test(source.sourceSetHash)
@@ -426,13 +800,30 @@ export async function reserveRewardEmissionBudget(
     lifetimeCap,
   });
 
-  if (reason !== "RESERVED") {
+  let operatorRecovery: RewardEmissionBudgetOperatorRecovery | undefined;
+  let effectiveReason = reason;
+  if (source.recoveryPlan) {
+    operatorRecovery = assertRewardLateSettlementRecoveryForSource(source.recoveryPlan, source, rule);
+    if (reason !== "DAY_CLOSED") {
+      throw new DomainConflictError(
+        `El source ${source.sourceId} no requiere una recuperacion DAY_CLOSED autorizada.`,
+      );
+    }
+    if (proposedDaily > dailyCap || proposedLifetime > lifetimeCap) {
+      throw new DomainConflictError(
+        `El source ${source.sourceId} excederia los techos de emision durante la recuperacion.`,
+      );
+    }
+    effectiveReason = "RESERVED";
+  }
+
+  if (effectiveReason !== "RESERVED") {
     const event = buildEvent({
       source,
       rule,
       window,
       status: "blocked",
-      reason,
+      reason: effectiveReason,
       previousDailyRaw: previousDaily,
       resultingDailyRaw: previousDaily,
       previousLifetimeRaw: previousLifetime,
@@ -487,11 +878,12 @@ export async function reserveRewardEmissionBudget(
     rule,
     window,
     status: "reserved",
-    reason,
+    reason: effectiveReason,
     previousDailyRaw: previousDaily,
     resultingDailyRaw: proposedDaily,
     previousLifetimeRaw: previousLifetime,
     resultingLifetimeRaw: proposedLifetime,
+    operatorRecovery,
   });
   await repository.persistEmissionBudgetState(state?.revision ?? null, nextState);
   await repository.persistEmissionBudgetDay(day?.revision ?? null, nextDay);
