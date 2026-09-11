@@ -2,6 +2,8 @@ import "server-only";
 
 import type { ClientSession, Db } from "mongodb";
 
+import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
+
 import {
   DomainConflictError,
   DomainNotFoundError,
@@ -24,6 +26,8 @@ import {
 } from './materialization';
 import {
   buildCreditSourceHealthEvidenceHash,
+  classifyCreditSourceHealth,
+  creditSourceBlockingEventFilter,
   creditSourceCursorIsHealthy,
 } from "./source-health";
 import {
@@ -1004,6 +1008,15 @@ export function createMongoCompetitionCreditRepository(
       const aliases = route === "uki"
         ? ["UKI_STAKING", "VESTING_VAULT"]
         : ["TOKEN_V2", "CUKIE_MASTER_NFT_VAULT"];
+      // Only TOKEN_V2 Transfer ownership is ancillary for the custodial NFT
+      // route. Metadata and unknown TOKEN_V2 events can change entitlement
+      // inputs and therefore remain in the blocking predicate.
+      const nftMode = route === "nft" ? ukiNftVaults.mode.cukieMaster : undefined;
+      const blockingEventFilter = creditSourceBlockingEventFilter({
+        route,
+        nftMode,
+        aliases,
+      });
       const expectedCursorIds = route === "uki"
         ? [
             "UKI_STAKING:Staked",
@@ -1026,6 +1039,8 @@ export function createMongoCompetitionCreditRepository(
         cursors,
         deadLetters,
         pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
         incidents,
         rounds,
         stakingPositions,
@@ -1072,6 +1087,17 @@ export function createMongoCompetitionCreditRepository(
         db.collection("chain_events").countDocuments(
           {
             contractAlias: { $in: aliases },
+            status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
+          },
+          options
+        ),
+        db.collection("chain_dead_letters").countDocuments(
+          blockingEventFilter,
+          options
+        ),
+        db.collection("chain_events").countDocuments(
+          {
+            ...blockingEventFilter,
             status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
           },
           options
@@ -1364,6 +1390,15 @@ export function createMongoCompetitionCreditRepository(
           }
         : null;
       const sortedWarnings = [...warnings].sort(compareCreditText);
+      const healthClassification = classifyCreditSourceHealth({
+        route,
+        nftMode,
+        warnings: sortedWarnings,
+        deadLetters,
+        pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
+      });
       const cukieProjectionHash = stableCreditHash({
         positions: cukiePositions.map((position) => ({
           _id: position._id,
@@ -1407,6 +1442,9 @@ export function createMongoCompetitionCreditRepository(
         })),
         deadLetters,
         pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
+        nftMode,
         incidents,
         sourceRuleVersions,
         rounds: rounds.map((round) => ({
@@ -1435,7 +1473,9 @@ export function createMongoCompetitionCreditRepository(
         warnings: sortedWarnings,
       });
       return {
-        healthy: sortedWarnings.length === 0,
+        // `warnings` intentionally retains ancillary TOKEN_V2 alarms. Only
+        // warnings outside that explicitly non-blocking set gate new cuts.
+        healthy: healthClassification.healthy,
         warnings: sortedWarnings,
         observedThrough,
         sourceRuleVersions,
