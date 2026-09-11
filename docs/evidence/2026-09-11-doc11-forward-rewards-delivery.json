@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-11T18:45:27.020458+00:00",
+  "observedAt": "2026-09-11T19:45:44.402504+00:00",
   "pr": "https://github.com/fgomezserna/cukies-hub/pull/434",
   "scope": "Staging forward session settlement, canonical daily/weekly accounting and publication queues, ranking boundary and Compose propagation",
   "codeSha": "2e13c72c",
@@ -23,22 +23,241 @@
     "publisherTests": 31,
     "schedulerTests": 22,
     "composeTests": 4,
-    "generatedCompose": "PASS"
+    "generatedCompose": "PASS",
+    "prCi": {
+      "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34635143169",
+      "result": "PASS"
+    }
   },
   "delivery": {
-    "state": "prepared",
-    "baselineArtifact": "/tmp/doc11-pr434-baseline.json"
+    "state": "deployed_verified",
+    "stagingSha": "75d8cc8f2bb43fe750638599ffcfa0e618ebeff8",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34635473631",
+    "baselineArtifact": "/tmp/doc11-pr434-baseline.json",
+    "verifiedAt": "2026-09-11T19:30:47.544095+00:00",
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "publicGitSha": "75d8cc8f2bb43fe750638599ffcfa0e618ebeff8",
+    "changedComponents": [
+      "dapp",
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer",
+      "treasure-hunt",
+      "world-api",
+      "world-matchmaking"
+    ],
+    "workers": {
+      "count": 10,
+      "running": true,
+      "restarts": 0
+    },
+    "protected": {
+      "total": 81,
+      "preserved": 81,
+      "changed": []
+    },
+    "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "publisherKeyIsolated": true,
+    "postflightArtifact": "/tmp/cukies-pool-custody-postflight-20260911-pr434.json"
   },
   "activation": {
-    "state": "not_activated",
-    "forwardActivationAt": null,
-    "financialGates": false,
+    "state": "enabled_ranking_wait_fix_pending",
+    "forwardActivationAt": "2026-09-11T20:30:00.000Z",
+    "financialGates": true,
     "cycleSeconds": 1800,
-    "historicalRecovery": false
+    "historicalRecovery": false,
+    "candidateAt": null,
+    "firstDailyCloseEligibleAt": "2026-09-11T21:02:30.000Z",
+    "firstWeeklyRankingEligibleAt": "2026-09-12T00:02:30.000Z",
+    "firstWeeklyPayoutEligibleAt": "2026-09-12T00:03:45.000Z",
+    "fundingMechanism": "Publisher funds only the canonical deficit from the verified owner; existing 7.5 UKI reserves are excluded from freeBalance.",
+    "financialGatesConfigured": true,
+    "publicSettingsChanged": 19,
+    "configArtifact": "/tmp/doc11-forward-runtime-config-applied.json",
+    "baselineArtifact": "/tmp/doc11-runtime-activation-baseline.json",
+    "webDeployment": {
+      "id": 1546,
+      "uuid": "hkggwco0gokwog8k0ck4s48k",
+      "status": "finished",
+      "verifiedAt": "2026-09-11T19:35:32.402832+00:00",
+      "readyHttpStatus": 200
+    },
+    "workersDeployment": {
+      "id": 1547,
+      "uuid": "p8wsk0oos8swc8o0cc80wwgw",
+      "status": "finished"
+    },
+    "configurationVerified": true,
+    "runtimePostflight": {
+      "ok": false,
+      "observedAt": "2026-09-11T19:45:44.402504+00:00",
+      "heartbeatFailures": [
+        "HEARTBEAT_STATUS_ranking"
+      ],
+      "heartbeats": {
+        "game": {
+          "_id": "scheduler-heartbeat:coolify-staging-primary",
+          "schedulerId": "coolify-staging-primary",
+          "status": "success",
+          "lastAttemptAt": "2026-09-11T19:45:27.576Z",
+          "lastSuccessAt": "2026-09-11T19:45:27.576Z",
+          "updatedAt": "2026-09-11T19:45:27.576Z",
+          "createdAt": "2026-09-11T19:40:25.070Z",
+          "consecutiveFailures": 0
+        },
+        "pool": {
+          "_id": "scheduler-heartbeat:coolify-staging-primary",
+          "schedulerId": "coolify-staging-primary",
+          "status": "success",
+          "lastAttemptAt": "2026-09-11T19:45:27.753Z",
+          "lastSuccessAt": "2026-09-11T19:45:28.034Z",
+          "updatedAt": "2026-09-11T19:45:28.034Z",
+          "createdAt": "2026-09-11T19:40:25.301Z",
+          "consecutiveFailures": 0
+        },
+        "ranking": {
+          "_id": "scheduler-heartbeat:coolify-staging-primary",
+          "schedulerId": "coolify-staging-primary",
+          "status": "error",
+          "lastAttemptAt": "2026-09-11T19:45:25.698Z",
+          "lastFailureAt": "2026-09-11T19:45:25.698Z",
+          "updatedAt": "2026-09-11T19:45:25.698Z",
+          "createdAt": "2026-09-11T19:40:24.482Z",
+          "consecutiveFailures": 6,
+          "lastErrorCode": "WEEKLY_RANKING_TICK_HTTP_409"
+        },
+        "accounting": {
+          "_id": "scheduler-heartbeat:coolify-staging-primary",
+          "schedulerId": "coolify-staging-primary",
+          "status": "success",
+          "lastAttemptAt": "2026-09-11T19:45:25.600Z",
+          "lastSuccessAt": "2026-09-11T19:45:25.600Z",
+          "updatedAt": "2026-09-11T19:45:25.600Z",
+          "createdAt": "2026-09-11T19:40:24.438Z",
+          "consecutiveFailures": 0
+        },
+        "publisher": {
+          "_id": "scheduler-heartbeat:coolify-staging-primary",
+          "schedulerId": "coolify-staging-primary",
+          "schedulerKind": "reward_batch_publisher",
+          "status": "success",
+          "lastAttemptAt": "2026-09-11T19:45:32.347Z",
+          "lastSuccessAt": "2026-09-11T19:45:32.352Z",
+          "lastFailureAt": "2026-09-01T09:57:27.769Z",
+          "updatedAt": "2026-09-11T19:45:32.352Z",
+          "createdAt": "2026-08-20T20:46:33.107Z",
+          "consecutiveFailures": 0,
+          "result": {
+            "status": "idle",
+            "completedAt": "2026-09-11T19:45:32.347Z"
+          }
+        }
+      },
+      "protected": {
+        "baselineCount": 82,
+        "changed": []
+      },
+      "readyHttpStatus": 200,
+      "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+      "artifact": "/tmp/doc11-activation-postflight-partial.json"
+    },
+    "selectedFinancialRecordsUnchangedBeforeBoundary": true,
+    "financialComparisonObservedAt": "2026-09-11T19:41:44.987Z",
+    "rankingFollowup": {
+      "branch": "codex/doc11-ranking-forward-waiting",
+      "issueComment": "https://github.com/fgomezserna/cukies-hub/issues/418#issuecomment-5639796568",
+      "symptom": "WEEKLY_RANKING_TICK_HTTP_409 before the first complete forward period",
+      "state": "implementation_in_progress"
+    }
   },
   "limits": [
-    "Deployment and activation not yet verified",
+    "All runtime gates configured and four processes verified; ranking waiting-state correction pending",
     "No personal wallet signatures, reward funding or historical recovery",
     "Functional new game, lender allocation, publication and claim still pending"
-  ]
+  ],
+  "fundingReadOnly": {
+    "observedAt": "2026-09-11T18:55:52.629Z",
+    "readOnly": true,
+    "chainId": 97,
+    "blockNumber": "130458669",
+    "blockTimestamp": "2026-09-11T18:55:45.000Z",
+    "distributor": "0xc2252D797Da294D16b84282d213604b4Bcf6EE09",
+    "ukiToken": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+    "owner": "0xba84bFFad693EDbd4B3F7899fB6E3cCb0c1D7820",
+    "paused": false,
+    "freeBalanceRaw": "0",
+    "totalReservedRaw": "7500000000000000000",
+    "ownerUkiRaw": "493244946300000000000000000",
+    "ownerNativeRaw": "24154984000000000"
+  },
+  "selectedAccountingBaseline": {
+    "observedAt": "2026-09-11T19:03:17.855Z",
+    "purpose": "Verify selected accounting records remain unchanged before the new activation boundary",
+    "state": [
+      {
+        "collection": "reward_daily_accounting",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "collection": "reward_weekly_prize_accounting",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "collection": "reward_accounting_allocations",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "collection": "reward_publication_plans",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "collection": "reward_claim_batches",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "collection": "reward_emission_budget_events",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "collection": "reward_allocations",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "collection": "reward_pool_accruals",
+        "count": 0,
+        "identityStatusTimestampHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "runtime": {
+      "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+      "COMPETITION_CREDITS_RULE_VERSION": "credits-staging-cycle-v1",
+      "ECONOMY_CYCLE_SECONDS": "1800",
+      "ECONOMY_CYCLE_ANCHOR_AT": "2026-09-07T11:30:00.000Z"
+    },
+    "readOnly": true
+  },
+  "publisherReadOnlyPreflight": {
+    "readOnly": true,
+    "observedAt": "2026-09-11T19:09:54.619Z",
+    "chainId": 97,
+    "ownerMatchesConfiguredSigner": true,
+    "tokenMatches": true,
+    "paused": false,
+    "schema": {
+      "dbName": "cukieshub-new-staging",
+      "schemaVersion": 3
+    },
+    "configValid": true,
+    "enabledOnlyInThisReadOnlyProcess": true,
+    "noTransactionSigned": true
+  }
 }
