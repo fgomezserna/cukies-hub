@@ -38,6 +38,7 @@ describe('ambassador invitation API', () => {
     mockGetInvitation.mockResolvedValue({
       invitationCode: 'cw-123456789abc',
       ambassadorWalletMasked: '0x2222…2222',
+      ambassadorPublicName: 'TreasurePlayer',
       isCukiesWorld: false,
     });
 
@@ -50,6 +51,7 @@ describe('ambassador invitation API', () => {
       invitation: {
         invitationCode: 'cw-123456789abc',
         ambassadorWalletMasked: '0x2222…2222',
+        ambassadorPublicName: 'TreasurePlayer',
         isCukiesWorld: false,
       },
     });
@@ -86,6 +88,7 @@ describe('ambassador invitation API', () => {
     const response = await request('cw-123456789abc');
 
     expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('private, no-store, max-age=0');
     expect(await response.json()).toEqual({
       status: 'error',
       code: AMBASSADOR_ELIGIBILITY_UNAVAILABLE,

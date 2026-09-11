@@ -33,6 +33,25 @@ type AmbassadorGraphState = {
   updatedAt: Date;
 };
 
+type HubUserPublicIdentity = {
+  _id?: unknown;
+  walletAddress?: unknown;
+  username?: unknown;
+};
+
+type HubUserWalletIdentity = {
+  userId?: unknown;
+  normalizedAddress?: unknown;
+};
+
+const PUBLIC_NAME_LOOKUP_TIMEOUT_MS = 1_500;
+
+function publicUsername(row: HubUserPublicIdentity | null, walletNormalized: string) {
+  const username = typeof row?.username === "string" ? row.username.trim() : "";
+  if (!username || username.toLowerCase() === walletNormalized.toLowerCase()) return null;
+  return username;
+}
+
 function duplicateKey(error: unknown) {
   return Boolean(
     error &&
@@ -404,6 +423,64 @@ export async function findMongoAmbassadorByInvitationCode(
     walletNormalized,
     invitationCode: assertAmbassadorInvitationCode(row.invitationCode),
   };
+}
+
+/**
+ * Lee solo la identidad pública asociada a la wallet exacta del patrocinador.
+ * El perfil de competición y User.username son fuentes distintas: no se
+ * resuelve un alias de otra campaña ni se elige una wallet arbitraria.
+ *
+ * El nombre es opcional para el flujo de embajadores. Si la base de usuarios
+ * no está disponible o no existe una identidad pública, el llamador conserva
+ * la wallet abreviada como fallback honesto.
+ */
+export async function findMongoAmbassadorPublicName(wallet: string) {
+  const walletNormalized = validAmbassadorWallet(wallet);
+  if (!process.env.DATABASE_URL?.trim()) return null;
+
+  const read = async () => {
+    const { getHubDb } = await import("@/lib/mongodb-hub");
+    const db = await getHubDb();
+    const users = db.collection<HubUserPublicIdentity>("User");
+    const projection = { projection: { _id: 1, walletAddress: 1, username: 1 } };
+    const primary = await users.findOne({ walletAddress: walletNormalized }, projection);
+    const primaryName = publicUsername(primary, walletNormalized);
+    if (primary) return primaryName;
+
+    // Una cuenta puede conservar la wallet como UserWallet tras importar otra
+    // wallet. El vínculo por userId sigue siendo exacto y no expone el resto
+    // del perfil.
+    const linkedWallet = await db
+      .collection<HubUserWalletIdentity>("UserWallet")
+      .findOne(
+        { normalizedAddress: walletNormalized },
+        { projection: { _id: 0, userId: 1, normalizedAddress: 1 } },
+      );
+    if (linkedWallet?.userId === undefined || linkedWallet.userId === null) return null;
+
+    return publicUsername(
+      await users.findOne(
+        { _id: linkedWallet.userId },
+        projection,
+      ),
+      walletNormalized,
+    );
+  };
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      read(),
+      new Promise<null>((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), PUBLIC_NAME_LOOKUP_TIMEOUT_MS);
+      }),
+    ]);
+  } catch {
+    // La identidad es una mejora de presentación; nunca debe convertir una
+    // invitación válida o una relación confirmada en un error de servicio.
+    return null;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 export async function getMongoAmbassadorEnrollment(
