@@ -1,0 +1,92 @@
+{
+  "kind": "cukies-ambassadors-a1-diagnostic",
+  "observedAt": "2026-09-11T14:02:39.417Z",
+  "deployment": {
+    "environment": "production",
+    "resource": "app12",
+    "gitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "database": "cukieshub-new"
+  },
+  "historicalReproduction": {
+    "otherInvitationCode": {
+      "code": "cw-4ad84cd7208a",
+      "origin": {
+        "status": 503,
+        "errorCode": "AMBASSADOR_ELIGIBILITY_UNAVAILABLE",
+        "milliseconds": 1727
+      },
+      "public": {
+        "status": 404,
+        "errorCode": "INVITATION_NOT_FOUND",
+        "milliseconds": 666
+      }
+    },
+    "existingInvitationProfile": {
+      "code": "cw-56918691f339",
+      "origin": {
+        "status": 503,
+        "errorCode": "AMBASSADOR_ELIGIBILITY_UNAVAILABLE",
+        "milliseconds": 1896
+      },
+      "public": {
+        "status": 503,
+        "errorCode": "AMBASSADOR_ELIGIBILITY_UNAVAILABLE",
+        "milliseconds": 2155
+      }
+    }
+  },
+  "currentReadOnlyReplay": {
+    "sameContainerAndSha": true,
+    "status": 404,
+    "errorCode": "INVITATION_NOT_FOUND",
+    "eligibility": {
+      "isCukieMaster": false,
+      "reason": "CUKIE_MASTER_REQUIREMENT_NOT_MET"
+    },
+    "sponsorPurchaseRaw": "888000000000000000000",
+    "requiredUkiRaw": "20000000000000000000000",
+    "sameExistingInvitationCode": "cw-56918691f339",
+    "observedWindowUtc": "2026-09-11T14:30:00Z/2026-09-11T14:36:23Z",
+    "eligibilityNote": "El perfil existe; eso no acredita un patrocinador elegible. La lectura actual es no elegible."
+  },
+  "materialization": {
+    "stakingState": "consistent",
+    "checkpoint": "healthy",
+    "vestingProjectionForSponsor": "absent",
+    "vestingIdentityAndCursors": "absent",
+    "pendingEvents": 0,
+    "deadLetters": 0,
+    "openIncidents": 0,
+    "economySchema": "valid"
+  },
+  "rpc": {
+    "currentRead": {
+      "chainId": 56,
+      "scheduleTotalRaw": "888000000000000000000",
+      "scheduleReleasedRaw": "0",
+      "stakedRaw": "0",
+      "result": "reachable"
+    },
+    "historicalWindow": {
+      "result": "not_observable_from_current_logs",
+      "note": "No se conserva el motivo del catch del fallback on-chain."
+    }
+  },
+  "discardedHypotheses": [
+    "Mongo economy schema ausente o incompatible",
+    "fallo actual de RPC, chainId o contrato",
+    "staking materialization inconsistente",
+    "dead letter, incidente abierto o evento pendiente",
+    "error del branch legacy/custodial en el artefacto servido"
+  ],
+  "compatibleButUnprovenHypothesis": "Durante la ventana histórica, la proyección UKI incompleta coincidió con un fallback on-chain que devolvió null (posible indisponibilidad o timeout transitorio del proveedor RPC).",
+  "limitation": "La ruta captura silenciosamente ese fallo y no deja nombre, código ni stack; no puede probarse retrospectivamente desde Mongo/logs actuales.",
+  "scope": {
+    "configurationChanged": false,
+    "databaseChanged": false,
+    "stagingTouched": false,
+    "codeChanged": false,
+    "issue": "#424 remains open",
+    "sourceIssueComment": "https://github.com/fgomezserna/cukies-hub/issues/424#issuecomment-5636043943"
+  }
+}

@@ -24,6 +24,10 @@ import {
 import { DomainConflictError, DomainNotFoundError } from "../errors";
 import { calculateSettlementRewardAllocations } from "./calculation";
 import { resolveAppliedArenaRanking } from "./arena-ranking";
+import {
+  assertRewardLateSettlementRecoveryPlan,
+  loadRewardLateSettlementRecoveryPlan,
+} from "./emission-budget";
 import type { RewardAllocationService } from "./service";
 import { rewardAllocationService } from "./service";
 import {
@@ -33,7 +37,11 @@ import {
   validRewardText,
   validRewardWallet,
 } from "./rules";
-import type { RewardRule } from "./types";
+import type {
+  RewardLateSettlementRecoveryPlan,
+  RewardLateSettlementRecoveryRequest,
+  RewardRule,
+} from "./types";
 
 export type SettleGameRewardsInput = {
   sessionId: string;
@@ -41,6 +49,13 @@ export type SettleGameRewardsInput = {
   expectedRuleVersion: string;
   now: Date;
 };
+
+export type RecoverLateSettlementInput = SettleGameRewardsInput
+  & Omit<RewardLateSettlementRecoveryRequest, "sessionId" | "periodId" | "expectedRuleVersion">;
+
+export type RewardLateSettlementRecoveryPlanResolver = (
+  input: RecoverLateSettlementInput,
+) => Promise<RewardLateSettlementRecoveryPlan | null> | RewardLateSettlementRecoveryPlan | null;
 
 export function assertSettlementRewardPeriod(periodId: string, settledAt: Date) {
   const canonicalPeriodId = getIsoWeekPeriodId(settledAt);
@@ -299,9 +314,14 @@ export class RewardCalculationCoordinator {
   constructor(
     private readonly allocations: RewardAllocationService,
     private readonly loadSnapshot: typeof loadSettlementRewardSnapshot = loadSettlementRewardSnapshot,
+    private readonly resolveRecoveryPlan: RewardLateSettlementRecoveryPlanResolver =
+      async () => loadRewardLateSettlementRecoveryPlan(),
   ) {}
 
-  async settleGame(input: SettleGameRewardsInput) {
+  private async persistSettlement(
+    input: SettleGameRewardsInput,
+    recoveryPlan?: RewardLateSettlementRecoveryPlan,
+  ) {
     const snapshot = await this.loadSnapshot(input);
     const calculatorInput = {
       periodId: snapshot.periodId,
@@ -353,6 +373,7 @@ export class RewardCalculationCoordinator {
         inputHash: calculationInputHash,
         outputHash: calculationOutputHash,
       },
+      ...(recoveryPlan ? { recoveryPlan } : {}),
       now: input.now,
     });
     return {
@@ -363,6 +384,45 @@ export class RewardCalculationCoordinator {
       calculationOutputHash,
       result,
     };
+  }
+
+  async settleGame(input: SettleGameRewardsInput) {
+    return this.persistSettlement(input);
+  }
+
+  /**
+   * Operator-only recovery. The command identifiers are matched against a
+   * complete plan resolved out of band; the plan is then checked again by the
+   * budget ledger against the exact calculated source and rule evidence.
+   */
+  async recoverLateSettlement(input: RecoverLateSettlementInput) {
+    const request: RecoverLateSettlementInput = {
+      sessionId: validRewardText(input.sessionId, "sessionId"),
+      periodId: validRewardText(input.periodId, "periodId"),
+      expectedRuleVersion: validRewardText(input.expectedRuleVersion, "expectedRuleVersion"),
+      recoveryCaseId: validRewardText(input.recoveryCaseId, "recoveryCaseId"),
+      approvalId: validRewardText(input.approvalId, "approvalId"),
+      planHash: validRewardText(input.planHash, "planHash"),
+      now: input.now,
+    };
+    const resolved = await this.resolveRecoveryPlan(request);
+    if (!resolved) {
+      throw new DomainConflictError(
+        "No existe un plan inmutable aprobado para recover_late_settlement.",
+      );
+    }
+    const plan = assertRewardLateSettlementRecoveryPlan(resolved);
+    if (
+      plan.recoveryCaseId !== request.recoveryCaseId
+      || plan.approvalId !== request.approvalId
+      || plan.planHash !== request.planHash
+      || plan.expectedRuleVersion !== request.expectedRuleVersion
+    ) {
+      throw new DomainConflictError(
+        "Los identificadores del comando no coinciden con el plan aprobado.",
+      );
+    }
+    return this.persistSettlement(request, plan);
   }
 }
 

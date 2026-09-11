@@ -155,14 +155,15 @@ el usuario ha retirado NFTs después y se comprobará de nuevo por identidad.
 El alias de competición y el nombre público general son fuentes distintas;
 no se supone una relación entre ambos sin verificarla.
 
-Estado comprobado el **11 de septiembre de 2026, 14:18 UTC**: el hotfix
+Estado comprobado el **11 de septiembre de 2026, 14:38 UTC**: el hotfix
 PR426 está servido en producción y su propagación PR428 está servida en
-staging. L1 está revisada y combinada con staging, lista para integrar PR425.
-La corrección de PR427 está aceptada para integración posterior. L3 y el
-diagnóstico A1 de L6 están activos; L2, L5 y L7 permanecen en cola.
+staging. PR425 está servida en staging; su censo actual se ha contrastado
+on-chain/Mongo. PR427 está aceptada y validada con esa integración. L2 está
+activa; L3 corrige un hallazgo de PR429. L6 terminó la pasada de diagnóstico
+sin parche nuevo; A1 permanece abierto. L5 y L7 siguen en cola.
 Modelo de las siete: **Luna Max**, con revisión e integración
 de **Astra Max** en la tarea raíz `01a07aec-6bc1-7203-8f43-357ed4b8931c`.
-Base Git y web servidas: staging `ecbf7b9dd83e283f81aafbfdb9f0ab608ce912e5` (PR428);
+Base Git y web servidas: staging `f4134d714f1662e7d8251c51ad60462f050cd99f` (PR425);
 main `d1a71495f83d16f6b22425f52e05ec5a2e8ea191` (PR426).
 Producción: deploy1534 terminado a las14:01:08UTC. Staging: CI34607972412
 correcto y postflight14:16UTC con readiness200, journal limpio, diez workers
@@ -181,25 +182,30 @@ acepta el código, sin ejecutar recuperación ni acreditar rewards.
 El sondeo productivo de las14:02UTC sí reprodujo A1:
 `cw-56918691f339` devuelve503 `AMBASSADOR_ELIGIBILITY_UNAVAILABLE` tanto en
 origen como en público. Los errores ya son privados/no-store. La UX conserva
-la invitación y permite reintentar; falta diagnosticar la fuente de
-elegibilidad. L6 continúa desde main en `codex/doc11-ambassadors-eligibility`.
+la invitación y permite reintentar. La lectura posterior del mismo artefacto
+devuelve404 y acredita que ese patrocinador no alcanza el requisito actual.
+La hipótesis de un error legacy/custodial quedó descartada al contrastar el
+bundle; tampoco se pudo probar la causa del503 histórico por falta de log del
+catch. RPC transitorio es solo una hipótesis. La rama
+`codex/doc11-ambassadors-eligibility` queda limpia, sin PR. A1 necesita un
+enlace actualmente elegible e instrumentación focal si vuelve a fallar.
+[Diagnóstico y límites](evidence/2026-09-11-ambassadors-a1-diagnostic.json).
 
 | Lote | Cobertura y resultado exigido | Issue y tarea responsable | Estado, rama y destino |
 | --- | --- | --- | --- |
-| L1 | M1, M2, P1, O2: custodia entre Master/Pool/Mis Cukies, elegibilidad de Originales y convergencia tras recibo. | [#419](https://github.com/fgomezserna/cukies-hub/issues/419) · **11-Sep · Custodia y actualización de Cukies**, tarea `01a09068-1787-7a20-a4bf-c2c2b28f5586` | [PR425](https://github.com/fgomezserna/cukies-hub/pull/425), producto `b224c1e` combinado con staging `ecbf7b9` en `2a4707c`: 271 suites/2282 tests, lint y tipos correctos. Locks, identidad y frescura revisados por raíz. Pendiente merge y QA servida. `codex/doc11-custody-refresh` → `staging`. |
-| L2 | R1, R2, C1, C2: intentos obsoletos, avisos de Resumen, cuatro indicadores de créditos y corte sin finalizar. | [#421](https://github.com/fgomezserna/cukies-hub/issues/421) · **11-Sep · Créditos y datos de Resumen**, tarea `01a09068-7652-7c61-86e8-cccc3647b589` | En cola; acuse recibido. Coordinar la interfaz de salud/refresco con L1. Rama prevista `codex/doc11-credits-summary` → `staging`. |
-| L3 | J2: guardar y volver a leer el alias del perfil con sesión válida. | [#422](https://github.com/fgomezserna/cukies-hub/issues/422) · **Implement weekly Treasure Hunt alias scope**, tarea `01a09068-a8af-79e0-877d-228e413065a1` | Activada a las13:55UTC sobre staging `b374505`; sin entrega todavía. Escritura de alias separada de lectura pública de L6. `codex/doc11-profile-alias` → `staging`. |
-| L4 | J1, W1, W2: reserva del bote, UKI directo y reparto a los prestadores de los recursos usados. | [#418](https://github.com/fgomezserna/cukies-hub/issues/418) · **11-Sep · Recompensas y bote semanal**, tarea `01a09068-e5f9-7a01-838b-82f98da5a5a2` | [PR427](https://github.com/fgomezserna/cukies-hub/pull/427), corrección `1a5d687`, 270 suites/2255 tests, lint y tipos correctos. Revisión raíz aceptada: entorno real, hashes completos, replay y caps. Solo prepara recuperación tardía; censo actualizado, apply y asignación real pendientes. `codex/doc11-reward-accrual` → `staging`, después de PR425. |
+| L1 | M1, M2, P1, O2: custodia entre Master/Pool/Mis Cukies, elegibilidad de Originales y convergencia tras recibo. | [#419](https://github.com/fgomezserna/cukies-hub/issues/419) · **11-Sep · Custodia y actualización de Cukies**, tarea `01a09068-1787-7a20-a4bf-c2c2b28f5586` | [PR425](https://github.com/fgomezserna/cukies-hub/pull/425) publicada en staging `f4134d7`, CI34609723488SUCCESS; postflight14:33UTC, readiness200, journal limpio,10workers y82protegidos intactos.271suites/2282tests/lint/tipos/build correctos. A las14:36UTC, bloque130424039:11NFT en wallet,98000007 en Pool,0Master; Mongo concuerda sin solapamiento. QA autenticada pendiente por timeouts de CUA; no se reprodujo una firma/pending local del usuario. [Evidencia](evidence/2026-09-11-doc11-custody-delivery.json). Rama `codex/doc11-custody-refresh` integrada. |
+| L2 | R1, R2, C1, C2: intentos obsoletos, avisos de Resumen, cuatro indicadores de créditos y corte sin finalizar. | [#421](https://github.com/fgomezserna/cukies-hub/issues/421) · **11-Sep · Créditos y datos de Resumen**, tarea `01a09068-7652-7c61-86e8-cccc3647b589` | Activada14:25UTC desde staging `f4134d7`, rama `codex/doc11-credits-summary` → `staging`. Consume custodia/refresco de L1; la contabilidad de créditos se mantiene separada de UKI/L4. |
+| L3 | J2: guardar y volver a leer el alias del perfil con sesión válida. | [#422](https://github.com/fgomezserna/cukies-hub/issues/422) · **Implement weekly Treasure Hunt alias scope**, tarea `01a09068-a8af-79e0-877d-228e413065a1` | [PR429](https://github.com/fgomezserna/cukies-hub/pull/429), `638a3d4`,5suites/66tests focales y lint/tipos correctos. Revisión raíz pide conservar el alias personalizado al leer el nuevo scope semanal: GET no debe renombrar el ranking. Corrección activada tras terminar L6; QA live pendiente. `codex/doc11-profile-alias` → `staging`. |
+| L4 | J1, W1, W2: reserva del bote, UKI directo y reparto a los prestadores de los recursos usados. | [#418](https://github.com/fgomezserna/cukies-hub/issues/418) · **11-Sep · Recompensas y bote semanal**, tarea `01a09068-e5f9-7a01-838b-82f98da5a5a2` | [PR427](https://github.com/fgomezserna/cukies-hub/pull/427), corrección `1a5d687` combinada con staging `f4134d7` en `5714006`:271suites/2291tests/lint/tipos correctos. Revisión raíz aceptada: entorno real, hashes completos, replay y caps. Solo prepara recuperación tardía; censo actualizado, apply y asignación real pendientes. `codex/doc11-reward-accrual` → `staging`, lista para publicar. |
 | L5 | J3, W3: cierre del periodo, publicación, estado del premio y disponibilidad para cobrar. | [#423](https://github.com/fgomezserna/cukies-hub/issues/423) · **11-Sep · Cierre y cobro de premios**, tarea `01a09069-25af-7e12-9a37-7054fdc8dcac` | En cola; acuse recibido. Depende de allocations/fuentes canónicas de L4. Rama prevista `codex/doc11-rewards-publication` → `staging`. |
-| L6 | A1, A2, A3: invitación válida, relación ya confirmada y nombre público del patrocinador. | [#424](https://github.com/fgomezserna/cukies-hub/issues/424) · **11-Sep · Hotfix de embajadores**, tarea `01a09068-3c90-7ff3-b7a5-16dac47d66c1` | [PR426](https://github.com/fgomezserna/cukies-hub/pull/426) publicada en main `d1a7149` y [PR428](https://github.com/fgomezserna/cukies-hub/pull/428) en staging `ecbf7b9`. Gates main173suites/1501tests/build y staging271/2259/lint/tipos correctos. A1 reproducido503 en producción; diagnóstico activo desde main en `codex/doc11-ambassadors-eligibility`. A2/A3 cubiertos por regresiones; relación y nombre de sponsor elegible no acreditados por los sondeos live. |
+| L6 | A1, A2, A3: invitación válida, relación ya confirmada y nombre público del patrocinador. | [#424](https://github.com/fgomezserna/cukies-hub/issues/424) · **11-Sep · Hotfix de embajadores**, tarea `01a09068-3c90-7ff3-b7a5-16dac47d66c1` | [PR426](https://github.com/fgomezserna/cukies-hub/pull/426) publicada en main `d1a7149` y [PR428](https://github.com/fgomezserna/cukies-hub/pull/428) en staging `ecbf7b9`. Gates main173suites/1501tests/build y staging271/2259/lint/tipos correctos. A1:503 histórico y lectura posterior404/no elegible; diagnóstico termina sin RCA probada ni parche nuevo. Rama `codex/doc11-ambassadors-eligibility` limpia. A2/A3 cubiertos por regresiones; relación y nombre de sponsor elegible no acreditados por los sondeos live. |
 | L7 | O1: partidas diarias restantes con Cukies propios elegibles, sin reinicio por transferir. | [#412](https://github.com/fgomezserna/cukies-hub/issues/412) · **11-Sep · Partidas con Cukies propios**, tarea `01a09069-7cdf-71d1-b03d-5d246eacc44e` | En cola; acuse recibido. Matriz diaria y anti-reset pendientes de respuesta; depende de L1/L4. Rama prevista `codex/doc11-own-cukie-quota` → `staging`. |
 
 ### Dependencias, integración y comprobación
 
-- Máximo dos implementaciones simultáneas. L1 y L6 arrancan primero; el
-  siguiente puesto libre se asigna a L4. L2 continúa después de fijar la
-  frontera de refresco de L1; L3 puede ocupar un puesto libre sin editar
-  Embajadores. L5 consume los resultados canónicos de L4. L7 requiere respuesta
+- Máximo dos implementaciones simultáneas: ahora L2 y la corrección de L3.
+  L1 queda en comprobación servida y L4 en integración por raíz. L5 consume
+  los resultados canónicos de L4. L7 requiere respuesta
   de producto y coordinar sus archivos de game-economy con L4. Una dependencia
   no detiene otro lote independiente.
 - Una tarea en cola no es trabajo terminado: la raíz debe activarla con la base

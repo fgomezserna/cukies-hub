@@ -53,6 +53,8 @@ export async function POST(request: Request) {
       ? await rewardRuleService.persistRule({ ...command.payload, now })
       : command.command === "settle_game"
         ? await rewardCalculationCoordinator.settleGame({ ...command.payload, now })
+        : command.command === "recover_late_settlement"
+          ? await rewardCalculationCoordinator.recoverLateSettlement({ ...command.payload, now })
         : command.command === "seal_period"
           ? await rewardPeriodSealService.sealPeriod({ ...command.payload, now })
           : await rewardClaimBatchService.createDraft({ ...command.payload, now });
