@@ -1,0 +1,117 @@
+{
+  "observedAt": "2026-09-11T16:32:31.461390+00:00",
+  "alias": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/429",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34618773937",
+    "sha": "0ca4c8ed1f92f224e7c0f5f8d3fbaaddfb94d912",
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "changedComponents": [
+      "dapp"
+    ],
+    "changedWorkers": [],
+    "protected": {
+      "total": 82,
+      "preserved": 82,
+      "changed": []
+    },
+    "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "authenticatedSaveReadback": "not_verified_browser_selection_timeout"
+  },
+  "creditsBefore430": {
+    "observedAt": "2026-09-11T16:02:11.301Z",
+    "readOnly": true,
+    "runtime": {
+      "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+      "COMPETITION_CREDITS_RULE_VERSION": "credits-staging-cycle-v1",
+      "ECONOMY_CYCLE_SECONDS": "1800",
+      "ECONOMY_CYCLE_ANCHOR_AT": "2026-09-07T11:30:00.000Z"
+    },
+    "latestByRoute": [
+      {
+        "route": "uki",
+        "cutoff": "2026-09-11T16:00:00.000Z",
+        "status": "open"
+      },
+      {
+        "route": "nft",
+        "cutoff": "2026-09-11T09:00:00.000Z",
+        "status": "open"
+      }
+    ],
+    "blockedNftReasonCodes": [
+      "SOURCE_UNHEALTHY",
+      "CHAIN_DEAD_LETTERS_OPEN",
+      "CHAIN_EVENTS_NOT_PROJECTED"
+    ],
+    "interpretation": "NFT source blockage remains separate from advancing a stale test cycle; no historic recovery was run."
+  },
+  "creditsDelivery": {
+    "observedAt": "2026-09-11T16:16:41.821608+00:00",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/430",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34619798496",
+    "sha": "6e63ca53deaab664e9aa49c16cf9eda0c31be5f3",
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "changedComponents": [
+      "dapp"
+    ],
+    "changedWorkers": [],
+    "protected": {
+      "total": 82,
+      "preserved": 82,
+      "changed": []
+    },
+    "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "authenticatedUi": "not_verified",
+    "latestByRoute": [
+      {
+        "route": "uki",
+        "cutoff": "2026-09-11T16:00:00.000Z",
+        "status": "open"
+      },
+      {
+        "route": "nft",
+        "cutoff": "2026-09-11T09:00:00.000Z",
+        "status": "open"
+      }
+    ],
+    "nftSourceIssue": "remains_open"
+  },
+  "forwardSettlementDelivery": {
+    "observedAt": "2026-09-11T16:32:31.461390+00:00",
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "changedComponents": [
+      "dapp"
+    ],
+    "changedWorkers": [],
+    "protected": {
+      "total": 82,
+      "preserved": 82,
+      "changed": []
+    },
+    "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/431",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34621416333",
+    "sha": "419371fbc9eec32e38a2766a3e624d5b65409cc9",
+    "financialGates": "off",
+    "economyCycleSeconds": 1800,
+    "historicalRecoveryApplied": false,
+    "newSessionToClaim": "not_verified"
+  },
+  "rewardsFundingReadOnly": {
+    "observedAt": "2026-09-11T16:23:42.622Z",
+    "readOnly": true,
+    "chainId": 97,
+    "blockNumber": "130438381",
+    "blockTimestamp": "2026-09-11T16:23:35.000Z",
+    "distributor": "0xc2252D797Da294D16b84282d213604b4Bcf6EE09",
+    "ukiToken": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+    "owner": "0xba84bFFad693EDbd4B3F7899fB6E3cCb0c1D7820",
+    "paused": false,
+    "freeBalanceRaw": "0",
+    "totalReservedRaw": "7500000000000000000",
+    "operationalAction": "none; calculate canonical first new batch requirement before funding; preserve existing reservations"
+  }
+}
