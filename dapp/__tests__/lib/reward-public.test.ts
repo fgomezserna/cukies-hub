@@ -8,12 +8,15 @@ import {
 } from '@/lib/uki-economy/rewards/public';
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
 import { calculateSettlementRewardAllocations } from '@/lib/uki-economy/rewards/calculation';
+import { sealDailyRewardAccounting } from '@/lib/uki-economy/rewards/accounting';
+import type { RewardAccountingAllocationDocument } from '@/lib/uki-economy/rewards/accounting-types';
 import { RewardAllocationService } from '@/lib/uki-economy/rewards/service';
 import {
   createMemoryRewardTransactionRunner,
   MemoryRewardRepository,
   testRewardRule,
 } from '@/lib/uki-economy/rewards/testing';
+import { stableRewardHash } from '@/lib/uki-economy/rewards/rules';
 
 const WALLET = `0x${'a'.repeat(40)}` as `0x${string}`;
 const DISTRIBUTOR = `0x${'9'.repeat(40)}` as `0x${string}`;
@@ -90,11 +93,216 @@ function fixture() {
   return { batch, proof: draft.proofs[0], publicationEvent };
 }
 
+function accountingFixture() {
+  const allocationCore = {
+    allocationId: 'c'.repeat(64),
+    walletNormalized: WALLET,
+    category: 'credit_pool' as const,
+    amountRaw: '750000000000000000',
+    fundingMode: 'daily_emission' as const,
+    sourceIds: ['game-session:stage-public-reward'],
+  };
+  const accounting = sealDailyRewardAccounting({
+    dayId: '2026-09-07',
+    ruleVersion: 'rewards-staging-test-v4',
+    ruleConfigHash: 'b'.repeat(64),
+    emissionRaw: allocationCore.amountRaw,
+    buckets: {
+      playersRaw: '0',
+      creditPoolRaw: allocationCore.amountRaw,
+      cukiePoolRaw: '0',
+      ambassadorOrdinaryRaw: '0',
+      weeklyPrizeRaw: '0',
+      ambassadorWeeklyRaw: '0',
+    },
+    sourceIds: allocationCore.sourceIds,
+    allocations: [allocationCore],
+    destinations: {
+      treasury: `0x${'6'.repeat(40)}`,
+      marketingDevelopment: `0x${'7'.repeat(40)}`,
+      supplyReduction: `0x${'8'.repeat(40)}`,
+    },
+    sealedAt: new Date('2026-09-08T16:00:00.000Z'),
+  });
+  const immutable = {
+    accountingId: accounting._id,
+    accountingKind: 'daily' as const,
+    periodId: accounting.dayId,
+    ...allocationCore,
+    availableAt: accounting.sealedAt,
+    status: 'allocated_offchain' as const,
+    createdAt: accounting.sealedAt,
+  };
+  return {
+    accounting,
+    allocation: {
+      _id: immutable.allocationId,
+      ...immutable,
+      payloadHash: stableRewardHash({
+        kind: 'reward-accounting-allocation-document',
+        ...immutable,
+      }),
+    },
+  };
+}
+
+function cursor(documents: unknown[]) {
+  const value = {
+    sort: () => value,
+    limit: () => value,
+    toArray: async () => documents,
+  };
+  return value;
+}
+
 describe('public reward claimable', () => {
+  it('expone el cierre contable final como calculado y pendiente de publicación', async () => {
+    const { accounting, allocation } = accountingFixture();
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => ({
+        find: () =>
+          cursor(
+            name === 'reward_accounting_allocations'
+              ? [allocation]
+              : name === 'reward_daily_accounting'
+              ? [accounting]
+              : [],
+          ),
+        countDocuments: async () => 0,
+      }),
+    });
+
+    const result = await listWalletRewardStatus({ walletAddress: WALLET });
+
+    expect(result).toMatchObject({
+      sourceStatus: 'canonical',
+      calculatedRaw: allocation.amountRaw,
+      pendingPublicationRaw: allocation.amountRaw,
+      pendingRaw: allocation.amountRaw,
+      claimableRaw: '0',
+      unknownRaw: '0',
+      publicationStates: [
+        {
+          allocationId: allocation.allocationId,
+          periodId: allocation.periodId,
+          status: 'calculated',
+          nextAction: 'prepare_publication',
+          planStatus: null,
+        },
+      ],
+    });
+  });
+
+  it('distingue un plan preparado de una publicación y no habilita el cobro', async () => {
+    const { accounting, allocation } = accountingFixture();
+    const plan = {
+      accountingId: allocation.accountingId,
+      status: 'prepared',
+      batchId: null,
+    };
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => ({
+        find: () =>
+          cursor(
+            name === 'reward_accounting_allocations'
+              ? [allocation]
+              : name === 'reward_daily_accounting'
+              ? [accounting]
+              : name === 'reward_publication_plans'
+              ? [plan]
+              : [],
+          ),
+        countDocuments: async () => 0,
+      }),
+    });
+
+    const result = await listWalletRewardStatus({ walletAddress: WALLET });
+
+    expect(result).toMatchObject({
+      claimPublished: false,
+      claimableRaw: '0',
+      pendingPublicationRaw: allocation.amountRaw,
+      publicationStates: [
+        {
+          allocationId: allocation.allocationId,
+          status: 'pending_publication',
+          nextAction: 'publish',
+          planStatus: 'prepared',
+        },
+      ],
+    });
+  });
+
+  it('mantiene un origen bloqueado como desconocido, nunca como cero', async () => {
+    const { accounting, allocation } = accountingFixture();
+    const plan = {
+      accountingId: allocation.accountingId,
+      status: 'blocked',
+      batchId: null,
+    };
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => ({
+        find: () =>
+          cursor(
+            name === 'reward_accounting_allocations'
+              ? [allocation]
+              : name === 'reward_daily_accounting'
+              ? [accounting]
+              : name === 'reward_publication_plans'
+              ? [plan]
+              : [],
+          ),
+        countDocuments: async () => 0,
+      }),
+    });
+
+    const result = await listWalletRewardStatus({ walletAddress: WALLET });
+
+    expect(result).toMatchObject({
+      unknownRaw: allocation.amountRaw,
+      pendingRaw: '0',
+      healthy: false,
+      publicationStates: [
+        {
+          allocationId: allocation.allocationId,
+          status: 'unknown',
+          nextAction: 'source_review',
+        },
+      ],
+    });
+  });
+
+  it('falla cerrado si una allocation contable cambia de estado fuera del ledger', async () => {
+    const { accounting, allocation } = accountingFixture();
+    const corrupted = {
+      ...allocation,
+      status: 'blocked',
+    } as unknown as RewardAccountingAllocationDocument;
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => ({
+        find: () =>
+          cursor(
+            name === 'reward_accounting_allocations'
+              ? [corrupted]
+              : name === 'reward_daily_accounting'
+              ? [accounting]
+              : [],
+          ),
+        countDocuments: async () => 0,
+      }),
+    });
+
+    await expect(
+      listWalletRewardStatus({ walletAddress: WALLET }),
+    ).rejects.toThrow(/allocation contable/);
+  });
+
   it('falla cerrado si una allocation publica carece de manifest global exacto', async () => {
     const rule = testRewardRule();
     const repository = new MemoryRewardRepository(rule);
-    const service = new RewardAllocationService(createMemoryRewardTransactionRunner(repository));
+    const service = new RewardAllocationService(
+      createMemoryRewardTransactionRunner(repository),
+    );
     const calculated = calculateSettlementRewardAllocations(rule, {
       periodId: '2026-W28',
       sourceId: 'game-session:public-manifest',
@@ -123,23 +331,28 @@ describe('public reward claimable', () => {
       },
       now: new Date('2026-07-10T12:00:00.000Z'),
     });
-    expect(() => assertRewardAllocationManifestBindings(
-      persisted.allocations,
-      repository.state.sourceManifests,
-    )).not.toThrow();
-    expect(() => assertRewardAllocationManifestBindings(persisted.allocations, [])).toThrow(
-      /sin manifest global exacto/,
-    );
+    expect(() =>
+      assertRewardAllocationManifestBindings(
+        persisted.allocations,
+        repository.state.sourceManifests,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertRewardAllocationManifestBindings(persisted.allocations, []),
+    ).toThrow(/sin manifest global exacto/);
     repository.state.sourceManifests[0].sourceSetHash = '0'.repeat(64);
-    expect(() => assertRewardAllocationManifestBindings(
-      persisted.allocations,
-      repository.state.sourceManifests,
-    )).toThrow(/sin manifest global exacto/);
+    expect(() =>
+      assertRewardAllocationManifestBindings(
+        persisted.allocations,
+        repository.state.sourceManifests,
+      ),
+    ).toThrow(/sin manifest global exacto/);
   });
 
   it('materializa claimableRaw y devuelve el batch/proof publicado desde Mongo', async () => {
     const subject = fixture();
     const ambassadorAllocation = {
+      _id: 'legacy-ambassador-1',
       allocationId: 'ambassador:daily:1',
       periodId: '2026-07-10',
       category: 'ambassador_ordinary',
@@ -158,34 +371,40 @@ describe('public reward claimable', () => {
     };
     (getEconomyDb as jest.Mock).mockResolvedValue({
       collection: (name: string) => ({
-        find: () => cursor(
-          name === 'reward_claim_proofs'
-            ? [subject.proof]
-            : name === 'reward_claim_batches'
+        find: () =>
+          cursor(
+            name === 'reward_claim_proofs'
+              ? [subject.proof]
+              : name === 'reward_claim_batches'
               ? [subject.batch]
               : name === 'chain_events'
-                ? [subject.publicationEvent]
-                : name === 'reward_accounting_allocations'
-                  ? [ambassadorAllocation]
-                : [],
-        ),
-        aggregate: () => cursor(
-          name === 'reward_allocations'
-            ? [{
-              allocatedCount: 2,
-              blockedCount: 1,
-              allocatedRaw: '10000',
-              blockedRaw: '500',
-              invalidCount: 0,
-            }]
-            : name === 'reward_claims'
+              ? [subject.publicationEvent]
+              : name === 'reward_accounting_allocations'
+              ? [ambassadorAllocation]
+              : [],
+          ),
+        aggregate: () =>
+          cursor(
+            name === 'reward_allocations'
+              ? [
+                  {
+                    allocatedCount: 2,
+                    blockedCount: 1,
+                    allocatedRaw: '10000',
+                    blockedRaw: '500',
+                    invalidCount: 0,
+                  },
+                ]
+              : name === 'reward_claims'
               ? [{ claimCount: 1, claimedRaw: '2500', invalidCount: 0 }]
               : [],
-        ),
+          ),
         countDocuments: async () => 0,
       }),
     });
-    jest.useFakeTimers().setSystemTime(new Date(Number(STARTS_AT_RAW) * 1_000 + 1));
+    jest
+      .useFakeTimers()
+      .setSystemTime(new Date(Number(STARTS_AT_RAW) * 1_000 + 1));
     try {
       const result = await listWalletRewardStatus({ walletAddress: WALLET });
       expect(result).toMatchObject({
@@ -197,16 +416,20 @@ describe('public reward claimable', () => {
         blockedAllocations: 1,
         claimableRaw: '7500',
         claimPublished: true,
-        claimables: [{
-          batch: { batchId: subject.batch.batchId, amountRaw: '7500' },
-          proof: { proofId: subject.proof.proofId },
-          onChainStatus: 'claimable',
-        }],
-        ambassadorAllocations: [{
-          allocationId: ambassadorAllocation.allocationId,
-          category: 'ambassador_ordinary',
-          amountRaw: '375',
-        }],
+        claimables: [
+          {
+            batch: { batchId: subject.batch.batchId, amountRaw: '7500' },
+            proof: { proofId: subject.proof.proofId },
+            onChainStatus: 'claimable',
+          },
+        ],
+        ambassadorAllocations: [
+          {
+            allocationId: ambassadorAllocation.allocationId,
+            category: 'ambassador_ordinary',
+            amountRaw: '375',
+          },
+        ],
       });
     } finally {
       jest.useRealTimers();
@@ -240,32 +463,40 @@ describe('public reward claimable', () => {
   it('falla cerrado si el evento o el proof no coincide exactamente', () => {
     const wrongEvent = fixture();
     wrongEvent.publicationEvent.normalized.merkleRoot = `0x${'f'.repeat(64)}`;
-    expect(() => validatePublishedRewardClaimable({
-      ...wrongEvent,
-      expectedWallet: WALLET,
-      now: new Date(Number(STARTS_AT_RAW) * 1_000 + 1),
-    })).toThrow(/no coincide con el batch/);
+    expect(() =>
+      validatePublishedRewardClaimable({
+        ...wrongEvent,
+        expectedWallet: WALLET,
+        now: new Date(Number(STARTS_AT_RAW) * 1_000 + 1),
+      }),
+    ).toThrow(/no coincide con el batch/);
 
     const wrongProof = fixture();
     wrongProof.proof.amountRaw = '1';
-    expect(() => validatePublishedRewardClaimable({
-      ...wrongProof,
-      expectedWallet: WALLET,
-      now: new Date(Number(STARTS_AT_RAW) * 1_000 + 1),
-    })).toThrow(/Proof/);
+    expect(() =>
+      validatePublishedRewardClaimable({
+        ...wrongProof,
+        expectedWallet: WALLET,
+        now: new Date(Number(STARTS_AT_RAW) * 1_000 + 1),
+      }),
+    ).toThrow(/Proof/);
   });
 
   it('expone el estado temporal on-chain sin llamar claimable a un batch futuro o expirado', () => {
     const subject = fixture();
-    expect(validatePublishedRewardClaimable({
-      ...subject,
-      expectedWallet: WALLET,
-      now: new Date(Number(STARTS_AT_RAW) * 1_000 - 1),
-    }).onChainStatus).toBe('scheduled');
-    expect(validatePublishedRewardClaimable({
-      ...subject,
-      expectedWallet: WALLET,
-      now: EXPIRES_AT,
-    }).onChainStatus).toBe('expired');
+    expect(
+      validatePublishedRewardClaimable({
+        ...subject,
+        expectedWallet: WALLET,
+        now: new Date(Number(STARTS_AT_RAW) * 1_000 - 1),
+      }).onChainStatus,
+    ).toBe('scheduled');
+    expect(
+      validatePublishedRewardClaimable({
+        ...subject,
+        expectedWallet: WALLET,
+        now: EXPIRES_AT,
+      }).onChainStatus,
+    ).toBe('expired');
   });
 });

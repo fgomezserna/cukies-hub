@@ -1,5 +1,11 @@
 import userEvent from '@testing-library/user-event';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import {
   useAccount,
   usePublicClient,
@@ -64,6 +70,35 @@ const fetchMock = jest.fn();
 const switchChain = jest.fn();
 const writeContractAsync = jest.fn();
 const waitForTransactionReceipt = jest.fn();
+
+type PublicationStateFixture = {
+  allocationId: string;
+  accountingId: string;
+  accountingKind: 'daily' | 'weekly';
+  periodId: string;
+  category: string;
+  amountRaw: string;
+  status:
+    | 'calculated'
+    | 'pending_publication'
+    | 'scheduled'
+    | 'claimable'
+    | 'claimed'
+    | 'expired'
+    | 'unknown';
+  nextAction:
+    | 'prepare_publication'
+    | 'publish'
+    | 'wait_until_available'
+    | 'wait_until_claim_window'
+    | 'claim'
+    | 'none'
+    | 'source_review';
+  sourceIds: string[];
+  availableAt: string;
+  planStatus: string | null;
+  batchId: `0x${string}` | null;
+};
 
 function authValue(user: User | null = { walletAddress: wallet } as User) {
   return {
@@ -138,6 +173,11 @@ function rewardStatus() {
         onChainStatus: 'claimable',
       },
     ],
+    calculatedRaw: '2000000000000000000',
+    pendingPublicationRaw: '1000000000000000000',
+    unknownRaw: '0',
+    sourceStatus: 'legacy' as 'legacy' | 'canonical',
+    publicationStates: [] as PublicationStateFixture[],
     blockedAllocations: 0,
     healthy: true,
     nextCursor: null as string | null,
@@ -217,6 +257,44 @@ describe('PremiosContent', () => {
       '2 UKI',
     );
     expect(screen.queryByText('999 UKI')).not.toBeInTheDocument();
+  });
+
+  it('muestra el estado canónico del cierre y la siguiente acción de publicación', async () => {
+    const data = rewardStatus();
+    data.sourceStatus = 'canonical';
+    data.calculatedRaw = data.totalAllocatedRaw;
+    data.pendingPublicationRaw = data.totalAllocatedRaw;
+    data.publicationStates = [
+      {
+        allocationId: 'allocation-1',
+        accountingId: 'reward-daily:2026-08-31',
+        accountingKind: 'daily',
+        periodId: '2026-08-31',
+        category: 'player',
+        amountRaw: data.totalAllocatedRaw,
+        status: 'pending_publication',
+        nextAction: 'publish',
+        sourceIds: ['game-session:new'],
+        availableAt: '2026-08-31T12:00:00.000Z',
+        planStatus: 'prepared',
+        batchId: null,
+      },
+    ];
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', data }),
+    });
+    render(<PremiosContent />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Seguimiento del cierre' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText('Pendiente de publicación').length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText('La publicación sigue en curso.'),
+    ).toBeInTheDocument();
   });
 
   it('bloquea el cobro si la wallet activa no coincide con la sesión', async () => {
@@ -336,13 +414,25 @@ describe('PremiosContent', () => {
       .mockResolvedValueOnce({ status: 'success' });
     render(<PremiosContent />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Cobrar 1 UKI' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Cobrar 1 UKI' }),
+    );
     expect(await screen.findByText(/Cobro enviado/)).toBeInTheDocument();
-    const recheck = screen.getByRole('button', { name: /Comprobar cobro enviado/ });
+    const recheck = screen.getByRole('button', {
+      name: /Comprobar cobro enviado/,
+    });
     fireEvent.click(recheck);
-    await waitFor(() => expect(screen.getByText('Cobro confirmado. Los UKI ya están en tu wallet.')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Comprobar cobro enviado' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Cobrar 1 UKI' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText('Cobro confirmado. Los UKI ya están en tu wallet.'),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Comprobar cobro enviado' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Cobrar 1 UKI' }),
+    ).not.toBeInTheDocument();
     expect(writeContractAsync).toHaveBeenCalledTimes(1);
   });
 
@@ -452,17 +542,37 @@ describe('PremiosContent', () => {
 
   it('revela y enfoca el ancla del historial cuando llega la lectura pendiente', async () => {
     let finish!: (response: unknown) => void;
-    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    window.history.replaceState(window.history.state, '', '/premios#reward-history-title');
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    window.history.replaceState(
+      window.history.state,
+      '',
+      '/premios#reward-history-title',
+    );
     render(<PremiosContent />);
-    expect(screen.queryByRole('heading', { name: 'Historial de premios' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Historial de premios' }),
+    ).not.toBeInTheDocument();
 
     await act(async () => {
-      finish({ ok: true, json: async () => ({ status: 'ok', data: rewardStatus() }) });
+      finish({
+        ok: true,
+        json: async () => ({ status: 'ok', data: rewardStatus() }),
+      });
     });
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Historial de premios' })).toHaveFocus());
-    expect(screen.getByRole('tabpanel')).toHaveTextContent('Historial de premios');
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Historial de premios' }),
+      ).toHaveFocus(),
+    );
+    expect(screen.getByRole('tabpanel')).toHaveTextContent(
+      'Historial de premios',
+    );
   });
 
   it('sincroniza atrás y adelante sin reemplazar el estado de Next', async () => {
