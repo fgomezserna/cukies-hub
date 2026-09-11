@@ -241,6 +241,20 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const pendingInvitationRef = useRef(pendingInvitationCode);
   pendingInvitationRef.current = pendingInvitationCode;
   const currentDashboard = dashboard?.walletNormalized.toLowerCase() === walletKey ? dashboard : null;
+  const hasConfirmedSponsor = Boolean(
+    currentDashboard && (
+      Boolean(currentDashboard.ownAttribution) || currentDashboard.enrollment.hasConfirmedSponsor === true
+    ),
+  );
+  const invitationLookupGate = !walletKey
+    ? 'visitor'
+    : requestState === 'error'
+      ? 'summary-error'
+      : requestState !== 'ready' || !currentDashboard
+        ? 'waiting-summary'
+        : hasConfirmedSponsor
+          ? 'confirmed'
+          : 'ready';
 
   useEffect(() => {
     mounted.current = true;
@@ -336,6 +350,10 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       setInvitationState('idle');
       return;
     }
+    if (invitationLookupGate !== 'visitor' && invitationLookupGate !== 'ready') {
+      setInvitationState('idle');
+      return;
+    }
     setInvitationFallback(false);
     const controller = new AbortController();
     const requestWalletKey = walletKey;
@@ -401,7 +419,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       if (timeoutId) clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [forgetPendingInvitation, invitationRequest, pendingInvitationCode, walletKey]);
+  }, [forgetPendingInvitation, invitationLookupGate, invitationRequest, pendingInvitationCode, walletKey]);
 
   const invitationUrl = useMemo(() => {
     if (
@@ -445,11 +463,6 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const proposedAmbassador = invitation ?? defaultAmbassador;
   const isOwnInvitation = Boolean(
     invitation && currentDashboard?.profile?.invitationCode === invitation.invitationCode,
-  );
-  const hasConfirmedSponsor = Boolean(
-    currentDashboard && (
-      Boolean(currentDashboard.ownAttribution) || currentDashboard.enrollment.hasConfirmedSponsor === true
-    ),
   );
   // Una relación confirmada, incluida la bloqueada en preventa, oculta el
   // bloque de invitación aunque el perfil se consulte en paralelo.
@@ -561,7 +574,11 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
         </div>
       </header>
 
-      {!shouldHideInvitationProgram && (pendingInvitationCode || (currentDashboard?.enrollment.canChooseSponsor && requestState === 'ready')) ? (
+      {!shouldHideInvitationProgram && (
+        pendingInvitationCode
+          ? invitationLookupGate === 'visitor' || invitationLookupGate === 'ready'
+          : currentDashboard?.enrollment.canChooseSponsor && requestState === 'ready'
+      ) ? (
         <section aria-labelledby="invitation-title" className="pt-7">
           <Panel innerClassName="p-5 sm:p-7">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)] lg:items-center">
