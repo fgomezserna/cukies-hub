@@ -46,7 +46,12 @@ type RewardAllocation = {
   periodId: string;
   category: string;
   amountRaw: string;
-  status: 'allocated' | 'blocked';
+  status: 'allocated' | 'allocated_offchain' | 'blocked';
+  accountingId?: string;
+  accountingKind?: 'daily' | 'weekly';
+  fundingMode?: 'daily_emission' | 'reserved_no_mint';
+  sourceIds?: string[];
+  availableAt?: string;
   createdAt: string;
 };
 
@@ -56,6 +61,35 @@ type RewardClaim = {
   amountRaw: string;
   transactionHash: Hex;
   indexedAt: string;
+};
+
+type RewardPublicationState = {
+  allocationId: string;
+  accountingId: string;
+  accountingKind: 'daily' | 'weekly';
+  periodId: string;
+  category: string;
+  amountRaw: string;
+  status:
+    | 'calculated'
+    | 'pending_publication'
+    | 'scheduled'
+    | 'claimable'
+    | 'claimed'
+    | 'expired'
+    | 'unknown';
+  nextAction:
+    | 'prepare_publication'
+    | 'publish'
+    | 'wait_until_available'
+    | 'wait_until_claim_window'
+    | 'claim'
+    | 'none'
+    | 'source_review';
+  sourceIds: string[];
+  availableAt: string;
+  planStatus: string | null;
+  batchId: Hex | null;
 };
 
 type PublishedReward = {
@@ -77,6 +111,8 @@ type RewardStatus = {
   allocations: RewardAllocation[];
   ambassadorAllocations?: Array<{
     allocationId: string;
+    accountingId?: string;
+    accountingKind?: 'daily' | 'weekly';
     periodId: string;
     category: 'ambassador_ordinary' | 'ambassador_weekly';
     amountRaw: string;
@@ -97,6 +133,11 @@ type RewardStatus = {
   claimPublished: boolean;
   claimables: PublishedReward[];
   publishedRewards: PublishedReward[];
+  calculatedRaw?: string;
+  pendingPublicationRaw?: string;
+  unknownRaw?: string;
+  sourceStatus?: 'canonical' | 'legacy';
+  publicationStates?: RewardPublicationState[];
   blockedAllocations: number;
   healthy: boolean;
   nextCursor: string | null;
@@ -168,6 +209,12 @@ function formatDate(value: string) {
 }
 
 function periodLabel(periodId: string) {
+  const accountingDay =
+    /^reward-accounting:reward-daily:(\d{4}-\d{2}-\d{2})$/i.exec(periodId);
+  if (accountingDay) return periodLabel(accountingDay[1]);
+  const accountingWeek =
+    /^reward-accounting:reward-weekly:(\d{4}-W\d{1,2})$/i.exec(periodId);
+  if (accountingWeek) return periodLabel(accountingWeek[1]);
   const week = /^(\d{4})-W(\d{1,2})$/i.exec(periodId);
   if (week) return `Semana ${Number(week[2])} de ${week[1]}`;
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(periodId);
@@ -187,10 +234,13 @@ function rewardLabel(category: string) {
     case 'player':
       return 'Premio de partida';
     case 'credit_pool_daily':
+    case 'credit_pool':
       return 'Pool de créditos';
     case 'cukie_pool_original_distribution':
+    case 'cukie_pool_original':
       return 'Pool de Cukies Originales';
     case 'cukie_pool_second_plus_distribution':
+    case 'cukie_pool_second_plus':
       return 'Pool de Cukies';
     case 'ambassador_ordinary':
       return 'Comisión de embajador';
@@ -208,6 +258,49 @@ function rewardLabel(category: string) {
       return 'Reducción de suministro';
     default:
       return 'Premio Cukies';
+  }
+}
+
+function publicationStateLabel(status: RewardPublicationState['status']) {
+  switch (status) {
+    case 'calculated':
+      return 'Calculado';
+    case 'pending_publication':
+      return 'Pendiente de publicación';
+    case 'scheduled':
+      return 'Programado';
+    case 'claimable':
+      return 'Disponible';
+    case 'claimed':
+      return 'Cobrado';
+    case 'expired':
+      return 'Caducado';
+    case 'unknown':
+      return 'Origen no disponible';
+    default:
+      return 'Estado no disponible';
+  }
+}
+
+function publicationNextActionLabel(
+  action: RewardPublicationState['nextAction'],
+) {
+  switch (action) {
+    case 'prepare_publication':
+      return 'La publicación del cierre está pendiente.';
+    case 'publish':
+      return 'La publicación sigue en curso.';
+    case 'wait_until_available':
+      return 'Se habilitará cuando llegue la fecha del cierre.';
+    case 'wait_until_claim_window':
+      return 'Espera a que comience la ventana de cobro.';
+    case 'claim':
+      return 'Puedes cobrarlo desde Por cobrar.';
+    case 'source_review':
+      return 'Revisión necesaria antes de mostrarlo como cobrable.';
+    case 'none':
+    default:
+      return null;
   }
 }
 
@@ -246,10 +339,12 @@ export function PremiosContent() {
     null,
   );
   const mountedRef = useRef(true);
-  const contextRef = useRef<{ address: string | null; chainId: number | null }>({
-    address: address ?? null,
-    chainId: chainId ?? null,
-  });
+  const contextRef = useRef<{ address: string | null; chainId: number | null }>(
+    {
+      address: address ?? null,
+      chainId: chainId ?? null,
+    },
+  );
   const pendingClaimRef = useRef<PendingClaim | null>(null);
   const [pendingClaim, setPendingClaim] = useState<PendingClaim | null>(null);
   const refreshAbortRef = useRef<AbortController | null>(null);
@@ -273,10 +368,10 @@ export function PremiosContent() {
   useEffect(() => {
     const pending = pendingClaimRef.current;
     const matches = Boolean(
-      pending
-      && address
-      && sameAddress(pending.wallet, address)
-      && pending.chainId === chainId,
+      pending &&
+        address &&
+        sameAddress(pending.wallet, address) &&
+        pending.chainId === chainId,
     );
     if (matches && pending) {
       setPendingClaim(pending);
@@ -285,15 +380,18 @@ export function PremiosContent() {
     refreshAbortRef.current?.abort();
     setPendingClaim(null);
     setClaimingBatch(null);
-    setClaimFeedback((current) => current?.transactionHash ? null : current);
+    setClaimFeedback((current) => (current?.transactionHash ? null : current));
   }, [address, chainId]);
 
-  function assertLiveClaimContext(expectedAddress: string, expectedChainId: 56 | 97) {
+  function assertLiveClaimContext(
+    expectedAddress: string,
+    expectedChainId: 56 | 97,
+  ) {
     if (
-      !mountedRef.current
-      || !contextRef.current.address
-      || !sameAddress(contextRef.current.address, expectedAddress)
-      || contextRef.current.chainId !== expectedChainId
+      !mountedRef.current ||
+      !contextRef.current.address ||
+      !sameAddress(contextRef.current.address, expectedAddress) ||
+      contextRef.current.chainId !== expectedChainId
     ) {
       throw new Error('WALLET_CONTEXT_CHANGED');
     }
@@ -302,10 +400,10 @@ export function PremiosContent() {
   function pendingBelongsToCurrent() {
     const pending = pendingClaimRef.current;
     return Boolean(
-      pending
-      && address
-      && sameAddress(pending.wallet, address)
-      && pending.chainId === chainId,
+      pending &&
+        address &&
+        sameAddress(pending.wallet, address) &&
+        pending.chainId === chainId,
     );
   }
 
@@ -318,8 +416,8 @@ export function PremiosContent() {
         hash === 'cobrar-premios'
           ? 'claimable-rewards-title'
           : hash === 'historial-premios' || hash === 'reward-history-title'
-            ? 'reward-history-title'
-            : null,
+          ? 'reward-history-title'
+          : null,
       );
     };
     syncNavigation();
@@ -375,7 +473,9 @@ export function PremiosContent() {
       if (options?.scroll && typeof document !== 'undefined') {
         window.setTimeout(() => {
           const targetId =
-            nextTab === 'history' ? 'reward-history-title' : 'claimable-rewards-title';
+            nextTab === 'history'
+              ? 'reward-history-title'
+              : 'claimable-rewards-title';
           const target = document.getElementById(targetId);
           if (target && typeof target.scrollIntoView === 'function') {
             target.focus({ preventScroll: true });
@@ -424,25 +524,39 @@ export function PremiosContent() {
           status?: string;
           data?: RewardStatus;
         };
-        if (options?.signal?.aborted) throw new Error('TRANSACTION_REFRESH_ABORTED');
-        if (requestId !== loadRequestIdRef.current || !mountedRef.current) return null;
+        if (options?.signal?.aborted)
+          throw new Error('TRANSACTION_REFRESH_ABORTED');
+        if (requestId !== loadRequestIdRef.current || !mountedRef.current)
+          return null;
         if (options?.expectedAddress && options.expectedChainId !== undefined) {
-          assertLiveClaimContext(options.expectedAddress, options.expectedChainId);
+          assertLiveClaimContext(
+            options.expectedAddress,
+            options.expectedChainId,
+          );
         }
         if (!response.ok || body.status !== 'ok' || !body.data)
           throw new Error('REWARDS_UNAVAILABLE');
         setStatus((current) => {
           if (!mountedRef.current) return current;
           if (!append || !current) return body.data!;
-          const known = new Set(
+          const knownAllocations = new Set(
             current.allocations.map((item) => item.allocationId),
+          );
+          const knownPublicationStates = new Set(
+            (current.publicationStates ?? []).map((item) => item.allocationId),
           );
           return {
             ...body.data!,
             allocations: [
               ...current.allocations,
               ...body.data!.allocations.filter(
-                (item) => !known.has(item.allocationId),
+                (item) => !knownAllocations.has(item.allocationId),
+              ),
+            ],
+            publicationStates: [
+              ...(current.publicationStates ?? []),
+              ...(body.data!.publicationStates ?? []).filter(
+                (item) => !knownPublicationStates.has(item.allocationId),
               ),
             ],
           };
@@ -496,10 +610,14 @@ export function PremiosContent() {
     status &&
       (status.allocationCount > 0 ||
         status.claimCount > 0 ||
-        status.publishedRewards.length > 0),
+        status.publishedRewards.length > 0 ||
+        (status.publicationStates?.length ?? 0) > 0),
   );
   const activity = useMemo(() => {
     if (!status) return [];
+    const publicationByAllocation = new Map(
+      (status.publicationStates ?? []).map((item) => [item.allocationId, item]),
+    );
     return [
       ...status.allocations.map((allocation) => ({
         id: `allocation:${allocation.allocationId}`,
@@ -507,10 +625,16 @@ export function PremiosContent() {
         title: rewardLabel(allocation.category),
         helper: periodLabel(allocation.periodId),
         amountRaw: allocation.amountRaw,
-        state:
-          allocation.status === 'blocked' ? 'En revisión' : 'Premio registrado',
+        state: publicationByAllocation.get(allocation.allocationId)
+          ? publicationStateLabel(
+              publicationByAllocation.get(allocation.allocationId)!.status,
+            )
+          : allocation.status === 'blocked'
+          ? 'En revisión'
+          : 'Premio registrado',
         kind:
-          allocation.status === 'blocked'
+          publicationByAllocation.get(allocation.allocationId)?.status ===
+            'unknown' || allocation.status === 'blocked'
             ? ('warning' as const)
             : ('earned' as const),
         category: 'reward' as const,
@@ -523,8 +647,16 @@ export function PremiosContent() {
         title: rewardLabel(allocation.category),
         helper: periodLabel(allocation.periodId),
         amountRaw: allocation.amountRaw,
-        state: 'Comisión registrada' as const,
-        kind: 'earned' as const,
+        state: publicationByAllocation.get(allocation.allocationId)
+          ? publicationStateLabel(
+              publicationByAllocation.get(allocation.allocationId)!.status,
+            )
+          : ('Comisión registrada' as const),
+        kind:
+          publicationByAllocation.get(allocation.allocationId)?.status ===
+          'unknown'
+            ? ('warning' as const)
+            : ('earned' as const),
         category: 'ambassador' as const,
         transactionHash: null,
         transactionChainId: null,
@@ -592,10 +724,15 @@ export function PremiosContent() {
               expectedChainId: pending.chainId,
             });
             assertLiveClaimContext(pending.wallet, pending.chainId);
-            return Boolean(next?.claims.some((claim) => (
-              claim.batchId.toLowerCase() === pending.batchId.toLowerCase()
-                || claim.transactionHash.toLowerCase() === pending.hash.toLowerCase()
-            )));
+            return Boolean(
+              next?.claims.some(
+                (claim) =>
+                  claim.batchId.toLowerCase() ===
+                    pending.batchId.toLowerCase() ||
+                  claim.transactionHash.toLowerCase() ===
+                    pending.hash.toLowerCase(),
+              ),
+            );
           } catch (reason) {
             if (isTransactionRefreshAborted(reason)) throw reason;
             return false;
@@ -606,15 +743,26 @@ export function PremiosContent() {
       if (converged && mountedRef.current) {
         pendingClaimRef.current = null;
         setPendingClaim(null);
-        setClaimFeedback((current) => current?.kind === 'success'
-          ? { ...current, message: 'Cobro confirmado. Los UKI ya están en tu wallet y el historial está actualizado.' }
-          : current);
+        setClaimFeedback((current) =>
+          current?.kind === 'success'
+            ? {
+                ...current,
+                message:
+                  'Cobro confirmado. Los UKI ya están en tu wallet y el historial está actualizado.',
+              }
+            : current,
+        );
       }
     } catch (reason) {
-      if (isTransactionRefreshAborted(reason) || (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED')) return;
+      if (
+        isTransactionRefreshAborted(reason) ||
+        (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED')
+      )
+        return;
       // Receipt success is authoritative; a slow rewards API remains a delayed projection.
     } finally {
-      if (refreshAbortRef.current === controller) refreshAbortRef.current = null;
+      if (refreshAbortRef.current === controller)
+        refreshAbortRef.current = null;
     }
   }
 
@@ -624,7 +772,8 @@ export function PremiosContent() {
     if (!publicClient) {
       setClaimFeedback({
         kind: 'error',
-        message: 'No podemos consultar la confirmación todavía. Conservamos el hash para volver a comprobarlo.',
+        message:
+          'No podemos consultar la confirmación todavía. Conservamos el hash para volver a comprobarlo.',
         transactionHash: pending.hash,
         chainId: pending.chainId,
       });
@@ -635,7 +784,8 @@ export function PremiosContent() {
     } catch {
       setClaimFeedback({
         kind: 'error',
-        message: 'La wallet o la red cambió. Vuelve a conectar la cuenta original para comprobar este cobro.',
+        message:
+          'La wallet o la red cambió. Vuelve a conectar la cuenta original para comprobar este cobro.',
         transactionHash: pending.hash,
         chainId: pending.chainId,
       });
@@ -643,7 +793,10 @@ export function PremiosContent() {
     }
     setClaimingBatch(pending.batchId);
     try {
-      const confirmed = await waitForConfirmedEvmTransaction(publicClient, pending.hash);
+      const confirmed = await waitForConfirmedEvmTransaction(
+        publicClient,
+        pending.hash,
+      );
       const receipt = confirmed.receipt;
       if (receipt.status !== 'success') throw new Error('CLAIM_REVERTED');
       assertLiveClaimContext(pending.wallet, pending.chainId);
@@ -661,7 +814,11 @@ export function PremiosContent() {
         transactionHash: confirmedHash,
         chainId: pending.chainId,
       });
-      window.dispatchEvent(new CustomEvent('cukies:rewards:refresh', { detail: { hash: confirmedHash, batchId: pending.batchId } }));
+      window.dispatchEvent(
+        new CustomEvent('cukies:rewards:refresh', {
+          detail: { hash: confirmedHash, batchId: pending.batchId },
+        }),
+      );
       void refreshClaimProjection(confirmedPending);
     } catch (error: unknown) {
       if (!mountedRef.current) return;
@@ -670,7 +827,8 @@ export function PremiosContent() {
         setPendingClaim(null);
         setClaimFeedback({
           kind: 'error',
-          message: 'El cobro no se ha completado: la transacción fue revertida. No se ha descontado ningún premio y puedes volver a intentarlo.',
+          message:
+            'El cobro no se ha completado: la transacción fue revertida. No se ha descontado ningún premio y puedes volver a intentarlo.',
         });
       } else if (error instanceof TransactionReplacementPendingError) {
         const updated = { ...pending, hash: error.hash } satisfies PendingClaim;
@@ -678,7 +836,8 @@ export function PremiosContent() {
         setPendingClaim(updated);
         setClaimFeedback({
           kind: 'error',
-          message: 'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.',
+          message:
+            'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.',
           transactionHash: error.hash,
           chainId: pending.chainId,
         });
@@ -687,14 +846,16 @@ export function PremiosContent() {
         setPendingClaim(null);
         setClaimFeedback({
           kind: 'error',
-          message: error.reason === 'cancelled'
-            ? 'La transacción fue cancelada en la wallet. No se ha descontado ningún premio.'
-            : 'La transacción fue reemplazada por otra operación. No se ha descontado ningún premio.',
+          message:
+            error.reason === 'cancelled'
+              ? 'La transacción fue cancelada en la wallet. No se ha descontado ningún premio.'
+              : 'La transacción fue reemplazada por otra operación. No se ha descontado ningún premio.',
         });
       } else {
         setClaimFeedback({
           kind: 'error',
-          message: 'El cobro sigue pendiente. Puedes volver a comprobarlo sin firmar otra vez.',
+          message:
+            'El cobro sigue pendiente. Puedes volver a comprobarlo sin firmar otra vez.',
           transactionHash: pending.hash,
           chainId: pending.chainId,
         });
@@ -736,11 +897,18 @@ export function PremiosContent() {
       let receipt;
       let confirmedHash = hash;
       try {
-        const confirmed = await waitForConfirmedEvmTransaction(publicClient, hash);
+        const confirmed = await waitForConfirmedEvmTransaction(
+          publicClient,
+          hash,
+        );
         receipt = confirmed.receipt;
         confirmedHash = confirmed.hash;
       } catch (reason) {
-        if (reason instanceof TransactionReplacementError || reason instanceof TransactionReplacementPendingError) throw reason;
+        if (
+          reason instanceof TransactionReplacementError ||
+          reason instanceof TransactionReplacementPendingError
+        )
+          throw reason;
         const pending = {
           batchId: reward.batch.batchId,
           hash,
@@ -751,7 +919,8 @@ export function PremiosContent() {
         if (mountedRef.current) setPendingClaim(pending);
         setClaimFeedback({
           kind: 'error',
-          message: 'Cobro enviado. La confirmación aún no llega; compruébalo sin firmar otra vez.',
+          message:
+            'Cobro enviado. La confirmación aún no llega; compruébalo sin firmar otra vez.',
           transactionHash: hash,
           chainId: expectedChainId,
         });
@@ -774,11 +943,18 @@ export function PremiosContent() {
         transactionHash: confirmedHash,
         chainId: reward.batch.chainId,
       });
-      window.dispatchEvent(new CustomEvent('cukies:rewards:refresh', { detail: { hash: confirmedHash, batchId: reward.batch.batchId } }));
+      window.dispatchEvent(
+        new CustomEvent('cukies:rewards:refresh', {
+          detail: { hash: confirmedHash, batchId: reward.batch.batchId },
+        }),
+      );
       void refreshClaimProjection(confirmedPending);
     } catch (error: unknown) {
       if (!mountedRef.current) return;
-      if (error instanceof Error && error.message === 'WALLET_CONTEXT_CHANGED') {
+      if (
+        error instanceof Error &&
+        error.message === 'WALLET_CONTEXT_CHANGED'
+      ) {
         if (submittedHash) {
           const pending = {
             batchId: reward.batch.batchId,
@@ -792,7 +968,8 @@ export function PremiosContent() {
         }
         setClaimFeedback({
           kind: 'success',
-          message: 'Cobro confirmado en la cadena. La wallet o la red cambió antes de actualizar esta vista.',
+          message:
+            'Cobro confirmado en la cadena. La wallet o la red cambió antes de actualizar esta vista.',
           transactionHash: submittedHash ?? undefined,
           chainId: expectedChainId,
         });
@@ -801,7 +978,8 @@ export function PremiosContent() {
       if (error instanceof Error && error.message === 'CLAIM_REVERTED') {
         setClaimFeedback({
           kind: 'error',
-          message: 'El cobro no se ha completado: la transacción fue revertida. No se ha descontado ningún premio y puedes volver a intentarlo.',
+          message:
+            'El cobro no se ha completado: la transacción fue revertida. No se ha descontado ningún premio y puedes volver a intentarlo.',
         });
         return;
       }
@@ -816,7 +994,8 @@ export function PremiosContent() {
         setPendingClaim(pending);
         setClaimFeedback({
           kind: 'error',
-          message: 'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.',
+          message:
+            'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.',
           transactionHash: error.hash,
           chainId: expectedChainId,
         });
@@ -825,9 +1004,10 @@ export function PremiosContent() {
       if (error instanceof TransactionReplacementError) {
         setClaimFeedback({
           kind: 'error',
-          message: error.reason === 'cancelled'
-            ? 'La transacción fue cancelada en la wallet. No se ha descontado ningún premio.'
-            : 'La transacción fue reemplazada por otra operación. No se ha descontado ningún premio.',
+          message:
+            error.reason === 'cancelled'
+              ? 'La transacción fue cancelada en la wallet. No se ha descontado ningún premio.'
+              : 'La transacción fue reemplazada por otra operación. No se ha descontado ningún premio.',
         });
         return;
       }
@@ -968,14 +1148,18 @@ export function PremiosContent() {
             aria-labelledby="reward-balance-title"
             className="mt-5 overflow-hidden rounded-[16px] border border-[var(--uki-lilac-border)] bg-[rgba(228,92,255,0.06)]"
           >
-            <h2 id="reward-balance-title" className="sr-only">Tu saldo en UKI</h2>
+            <h2 id="reward-balance-title" className="sr-only">
+              Tu saldo en UKI
+            </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4">
               {[
                 ['Listo para cobrar', status.claimableRaw, 'Disponible ahora'],
                 [
                   'En preparación',
-                  status.pendingRaw,
-                  'Registrado y todavía no habilitado',
+                  status.pendingPublicationRaw ?? status.pendingRaw,
+                  status.pendingPublicationRaw !== undefined
+                    ? 'Calculado y pendiente de publicación'
+                    : 'Registrado y todavía no habilitado',
                 ],
                 [
                   'Ya cobrado',
@@ -991,8 +1175,8 @@ export function PremiosContent() {
                   status.totalAllocatedRaw,
                   `${status.allocationCount} ${
                     status.allocationCount === 1
-                      ? 'premio registrado'
-                      : 'premios registrados'
+                      ? 'premio calculado'
+                      : 'premios calculados'
                   }`,
                 ],
               ].map(([label, value, helper], index) => (
@@ -1049,7 +1233,84 @@ export function PremiosContent() {
                 </div>
               </div>
             ) : null}
+            {hasPositiveRaw(status.unknownRaw) ? (
+              <div className="mt-4 flex items-start gap-3 rounded-[12px] border border-amber-300/25 bg-amber-300/[0.07] p-4">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
+                <div>
+                  <p className="font-black text-[var(--uki-cream)]">
+                    Hay un origen de premio que no está disponible
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+                    {formatRaw(status.unknownRaw!)} UKI no se han convertido en
+                    cero: conservamos el importe hasta poder reconciliar su
+                    fuente.
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </section>
+
+          {(status.publicationStates?.length ?? 0) > 0 ? (
+            <section
+              aria-labelledby="reward-publication-status-title"
+              className="mt-5 rounded-[16px] border border-white/10 bg-black/20 p-5 sm:p-6"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2
+                    id="reward-publication-status-title"
+                    className="font-headline text-xl font-black text-[var(--uki-cream)] sm:text-2xl"
+                  >
+                    Seguimiento del cierre
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
+                    El importe se calcula en el cierre diario o semanal y solo
+                    pasa a Por cobrar después de publicar su batch canónico.
+                  </p>
+                </div>
+                {status.sourceStatus === 'canonical' ? (
+                  <span className="text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)]">
+                    Fuente contable canónica
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-4 divide-y divide-white/10">
+                {status.publicationStates?.map((item) => (
+                  <div
+                    key={item.allocationId}
+                    className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-black text-[var(--uki-cream)]">
+                          {rewardLabel(item.category)} ·{' '}
+                          {periodLabel(item.periodId)}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.08em] ${
+                            item.status === 'unknown' ||
+                            item.status === 'expired'
+                              ? 'bg-amber-300/10 text-amber-100'
+                              : 'bg-[rgba(228,92,255,0.10)] text-[var(--uki-lilac)]'
+                          }`}
+                        >
+                          {publicationStateLabel(item.status)}
+                        </span>
+                      </div>
+                      {publicationNextActionLabel(item.nextAction) ? (
+                        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                          {publicationNextActionLabel(item.nextAction)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <p className="shrink-0 font-headline text-lg font-black text-[var(--uki-cream)]">
+                      {formatRaw(item.amountRaw)} UKI
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <Tabs
             value={activeTab}
@@ -1195,9 +1456,13 @@ export function PremiosContent() {
                   {status.claimables.map((reward) => {
                     const wrongChain = chainId !== reward.batch.chainId;
                     const isClaiming = claimingBatch === reward.batch.batchId;
-                    const isPending = pendingClaim?.batchId === reward.batch.batchId;
+                    const isPending =
+                      pendingClaim?.batchId === reward.batch.batchId;
                     const claimDisabled =
-                      Boolean(claimingBatch) || Boolean(pendingClaim) || !walletMatches || !isConnected;
+                      Boolean(claimingBatch) ||
+                      Boolean(pendingClaim) ||
+                      !walletMatches ||
+                      !isConnected;
                     return (
                       <article
                         key={reward.batch.batchId}
@@ -1237,8 +1502,14 @@ export function PremiosContent() {
                             disabled={Boolean(claimingBatch)}
                             className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[9px] border border-amber-200/35 bg-amber-200/[0.08] px-5 font-headline text-sm font-black uppercase tracking-[0.07em] text-amber-100 disabled:opacity-50"
                           >
-                            {isClaiming ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                            {isClaiming ? 'Comprobando cobro…' : 'Comprobar cobro enviado'}
+                            {isClaiming ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                            {isClaiming
+                              ? 'Comprobando cobro…'
+                              : 'Comprobar cobro enviado'}
                           </button>
                         ) : wrongChain && walletMatches ? (
                           <button
@@ -1283,20 +1554,32 @@ export function PremiosContent() {
                 </div>
               ) : (
                 <div className="mt-5 rounded-[16px] border border-white/10 bg-black/25 p-7 sm:p-8">
-                  {hasPositiveRaw(status.pendingRaw) ? (
+                  {hasPositiveRaw(status.unknownRaw) ? (
+                    <AlertCircle className="h-7 w-7 text-amber-200" />
+                  ) : hasPositiveRaw(
+                      status.pendingPublicationRaw ?? status.pendingRaw,
+                    ) ? (
                     <Clock3 className="h-7 w-7 text-[var(--uki-lilac)]" />
                   ) : (
                     <Sparkles className="h-7 w-7 text-[var(--uki-lilac)]" />
                   )}
                   <h3 className="mt-4 font-headline text-xl font-black text-[var(--uki-cream)]">
-                    {hasPositiveRaw(status.pendingRaw)
+                    {hasPositiveRaw(status.unknownRaw)
+                      ? 'Hay un premio pendiente de reconciliar'
+                      : hasPositiveRaw(
+                          status.pendingPublicationRaw ?? status.pendingRaw,
+                        )
                       ? `${formatRaw(
-                          status.pendingRaw,
+                          status.pendingPublicationRaw ?? status.pendingRaw,
                         )} UKI se están preparando`
                       : 'Ahora mismo no tienes premios para cobrar'}
                   </h3>
                   <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-                    {hasPositiveRaw(status.pendingRaw)
+                    {hasPositiveRaw(status.unknownRaw)
+                      ? 'La fuente de este importe no está disponible todavía. No se muestra como cero ni requiere que repitas ninguna acción.'
+                      : hasPositiveRaw(
+                          status.pendingPublicationRaw ?? status.pendingRaw,
+                        )
                       ? 'No tienes que hacer nada. Cuando el cobro esté habilitado aparecerá aquí con su fecha límite.'
                       : 'Cuando ganes UKI en partidas o pools, podrás seguir su estado y cobrarlos desde esta pantalla.'}
                   </p>
