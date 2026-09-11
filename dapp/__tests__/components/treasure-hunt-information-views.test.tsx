@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import TreasureHuntPlaySidebar from '@/components/games/treasure-hunt-play-sidebar';
 import TreasureHuntRankingsView from '@/components/games/treasure-hunt-rankings-view';
@@ -459,5 +459,74 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.queryByText(/^Torneo$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Estado$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Partidas computables$/)).not.toBeInTheDocument();
+  });
+
+  it('guarda el alias semanal y confirma el readback antes de mostrar éxito', async () => {
+    const participant = {
+      alias: 'WeeklyAlias',
+      canonicalAlias: 'weeklyalias',
+      aliasChangedAt: '2026-09-11T12:00:00.000Z',
+      createdAt: '2026-08-26T12:00:00.000Z',
+    };
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, participant }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, participant }), { status: 200 }));
+    const previousFetch = global.fetch;
+    global.fetch = fetchMock as typeof fetch;
+
+    try {
+      render(<TreasureHuntProfile />);
+      fireEvent.change(screen.getByLabelText('Alias público'), { target: { value: participant.alias } });
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar alias' }));
+
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Alias actualizado.'));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0]?.[0]).toBe(
+        '/api/games/treasure-hunt/competition/participant?scope=weekly',
+      );
+      expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+        method: 'PATCH',
+        credentials: 'same-origin',
+      });
+      expect(fetchMock.mock.calls[1]?.[0]).toBe(
+        '/api/games/treasure-hunt/competition/participant?scope=weekly',
+      );
+      expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+    } finally {
+      global.fetch = previousFetch;
+    }
+  });
+
+  it('no muestra éxito si el readback no confirma el alias solicitado', async () => {
+    const savedParticipant = {
+      alias: 'WeeklyAlias',
+      canonicalAlias: 'weeklyalias',
+      aliasChangedAt: '2026-09-11T12:00:00.000Z',
+      createdAt: '2026-08-26T12:00:00.000Z',
+    };
+    const staleParticipant = {
+      ...savedParticipant,
+      alias: 'CukiePlayer',
+      canonicalAlias: 'cukieplayer',
+    };
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, participant: savedParticipant }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, participant: staleParticipant }), { status: 200 }));
+    const previousFetch = global.fetch;
+    global.fetch = fetchMock as typeof fetch;
+
+    try {
+      render(<TreasureHuntProfile />);
+      fireEvent.change(screen.getByLabelText('Alias público'), { target: { value: savedParticipant.alias } });
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar alias' }));
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar el alias.'));
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      global.fetch = previousFetch;
+    }
   });
 });

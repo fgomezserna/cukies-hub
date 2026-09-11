@@ -3,6 +3,15 @@ import { createHash, createHmac } from 'node:crypto';
 const ALIAS_PATTERN = /^[A-Za-z0-9_-]{3,20}$/;
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const LEGACY_GENERATED_ALIAS_PATTERN = /^Hunter-[A-Z0-9]{6,13}$/i;
+
+/**
+ * Stable participant scope for the continuous credits-based leaderboard.
+ *
+ * Special campaigns keep their own immutable participant rows after close;
+ * the weekly game needs a separate row so editing the current public alias
+ * cannot rewrite a historical tournament.
+ */
+export const TREASURE_HUNT_WEEKLY_ALIAS_SCOPE = 'treasure-hunt-weekly' as const;
 const ALIAS_ADJECTIVES = [
   'Aero', 'Amber', 'Aqua', 'Astro', 'Bold', 'Brave', 'Coral', 'Cuki',
   'Dusk', 'Ember', 'Epic', 'Frost', 'Gold', 'Lunar', 'Mint', 'Neon',
