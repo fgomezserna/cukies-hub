@@ -31,6 +31,10 @@ import {
 
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
+import {
+  useUkiMarketplaceCancelController,
+} from '@/components/uki-marketplace/cancel-order';
+import { UkiMarketplaceCancelSheet } from '@/components/uki-marketplace/cancel-sheet';
 import type {
   MyCukieCollectionData,
   MyCukieCollectionItem,
@@ -38,11 +42,16 @@ import type {
   MyCukieAction,
 } from '@/lib/cukies-data/my-collection-types';
 import { getLegacyMarketplaceDetailHref } from '@/lib/legacy-marketplace/identity';
+import type {
+  UkiMarketplaceOrderView,
+  UkiMarketplaceOrdersResponse,
+} from '@/lib/uki-marketplace/types';
 import {
   isTransactionRefreshAborted,
   retryTransactionRefresh,
 } from '@/lib/transaction-refresh';
 import { useAuth } from '@/providers/auth-provider';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
 
@@ -55,12 +64,68 @@ type CollectionRefreshTarget = {
 
 type CollectionRefreshDetail = CollectionRefreshTarget & {
   hash?: string;
+  orderId?: string;
 };
 
 const CukieSaleDialog = dynamic(
   () => import('@/components/cukies/cukie-sale-dialog').then((module) => module.CukieSaleDialog),
   { ssr: false },
 );
+
+const ORDER_ID_PATTERN = /^0x[0-9a-f]{64}$/i;
+
+function sameMarketplaceOrderAsset(
+  order: UkiMarketplaceOrderView,
+  cukie: MyCukieCollectionItem,
+) {
+  return order.chainId === cukie.chainId
+    && order.tokenId === cukie.tokenId
+    && order.collectionAddress.toLowerCase() === cukie.collectionAddress.toLowerCase();
+}
+
+function orderMatchesCukie(
+  order: UkiMarketplaceOrderView,
+  cukie: MyCukieCollectionItem,
+  walletAddress: string,
+) {
+  return order.status === 'active'
+    && typeof cukie.saleOrderId === 'string'
+    && ORDER_ID_PATTERN.test(cukie.saleOrderId)
+    && order.orderId.toLowerCase() === cukie.saleOrderId.toLowerCase()
+    && order.seller.toLowerCase() === walletAddress.toLowerCase()
+    && sameMarketplaceOrderAsset(order, cukie);
+}
+
+function MyCukieCancelSheet({
+  order,
+  open,
+  onOpenChange,
+  onConfirmed,
+}: {
+  order: UkiMarketplaceOrderView | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirmed: (result: { hash: `0x${string}` }, order: UkiMarketplaceOrderView) => void | Promise<void>;
+}) {
+  const controller = useUkiMarketplaceCancelController({
+    order,
+    enabled: open,
+    onConfirmed,
+  });
+  return (
+    <UkiMarketplaceCancelSheet
+      order={order}
+      open={open}
+      onOpenChange={onOpenChange}
+      onConfirm={controller.cancelOrder}
+      busy={controller.busy}
+      pendingHash={controller.pending?.hash ?? null}
+      onRecheckPending={controller.recheckPending}
+      notice={controller.notice}
+      error={controller.error}
+    />
+  );
+}
 
 function generationLabel(cukie: MyCukieCollectionItem) {
   if (cukie.generation === 'original') return 'Original';
@@ -307,9 +372,10 @@ const navigationLinkClass = 'group inline-flex min-h-11 min-w-0 items-center jus
 
 function actionHref(cukie: MyCukieCollectionItem, action: MyCukieAction) {
   if (action === 'cancel_sale') {
-    return cukie.saleKind === 'uki'
-      ? ukiMarketplaceHref(cukie)
-      : legacyMarketplaceHref(cukie);
+    // UKI cancellation is opened in the exact-order sheet. Keeping an href
+    // here would let the card fall back to the seller catalogue when the
+    // order lookup has not resolved yet.
+    return cukie.saleKind === 'uki' ? null : legacyMarketplaceHref(cukie);
   }
   if (action === 'request_pool_exit' || action === 'withdraw_pool') {
     return custodyHref(cukie, '/cukie-hodler', `pool-cukie-${cukie.tokenId}`);
@@ -350,12 +416,22 @@ function ukiMarketplaceHref(cukie: MyCukieCollectionItem) {
     collection: cukie.collectionAddress,
     chainId: String(cukie.chainId),
   });
+  if (cukie.saleOrderId && /^0x[0-9a-f]{64}$/i.test(cukie.saleOrderId)) {
+    query.set('orderId', cukie.saleOrderId.toLowerCase());
+  }
   return `/marketplace?${query.toString()}#mis-anuncios`;
 }
 
-function filterMatches(cukie: MyCukieCollectionItem, filter: CollectionFilter) {
+function filterMatches(
+  cukie: MyCukieCollectionItem,
+  filter: CollectionFilter,
+  pendingListedAssets: ReadonlySet<string> = new Set(),
+) {
   if (filter === 'all') return true;
-  if (filter === 'listed') return cukie.state === 'listed';
+  if (filter === 'listed') {
+    return cukie.state === 'listed'
+      || (pendingListedAssets.has(cukie.assetId) && cukie.custody === 'wallet');
+  }
   if (filter === 'pool') return cukie.custody === 'cukie_pool' || cukie.custody === 'cukie_pool_recovery';
   if (filter === 'master') return cukie.custody === 'cukie_master';
   return cukie.custody === 'wallet' && cukie.state === 'available';
@@ -398,6 +474,7 @@ function collectionTargetMatches(
 export function MyCukiesPanel() {
   const { user, isLoading: authLoading } = useAuth();
   const walletAddress = user?.walletAddress ?? null;
+  const { evm, requestWallet, openWalletSelector } = useWalletCoordinator();
   const [state, setState] = useState<LoadState>('idle');
   const [collection, setCollection] = useState<MyCukieCollectionData | null>(null);
   const [filter, setFilter] = useState<CollectionFilter>('all');
@@ -405,11 +482,18 @@ export function MyCukiesPanel() {
     cuki: MyCukieCollectionItem;
     preferredSurface?: 'uki';
   } | null>(null);
+  const [cancelSheetOrder, setCancelSheetOrder] = useState<UkiMarketplaceOrderView | null>(null);
+  const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
+  const [cancelSheetTarget, setCancelSheetTarget] = useState<MyCukieCollectionItem | null>(null);
+  const [cancelLookupAsset, setCancelLookupAsset] = useState<string | null>(null);
+  const [cancelLookupError, setCancelLookupError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const refreshAbortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(false);
   const collectionRef = useRef<MyCukieCollectionData | null>(null);
   const saleSelectionRef = useRef(saleSelection);
+  const cancelLookupRequestRef = useRef(0);
+  const cancelWalletContextRef = useRef<string | null>(null);
   const pendingRefreshTargetsRef = useRef<Map<string, CollectionRefreshTarget>>(new Map());
   const pendingRefreshTargetAssetsRef = useRef<Map<string, string>>(new Map());
   const [pendingRefreshAssets, setPendingRefreshAssets] = useState<Set<string>>(
@@ -417,10 +501,41 @@ export function MyCukiesPanel() {
   );
   collectionRef.current = collection;
   saleSelectionRef.current = saleSelection;
+  const pendingListedAssets = useMemo(() => {
+    const assetIds = new Set<string>();
+    for (const [targetKey, target] of pendingRefreshTargetsRef.current) {
+      if (target.expectedState !== 'listed') continue;
+      const assetId = target.assetId
+        ?? pendingRefreshTargetAssetsRef.current.get(targetKey);
+      if (assetId) assetIds.add(assetId);
+    }
+    return assetIds;
+  }, [pendingRefreshAssets]);
   const items = useMemo(() => collection?.items ?? [], [collection]);
   const visibleItems = useMemo(() => items
-    .filter((item) => filterMatches(item, filter))
-    .sort((left, right) => collectionOrder(left) - collectionOrder(right) || (BigInt(left.tokenId) < BigInt(right.tokenId) ? -1 : 1)), [filter, items]);
+    .filter((item) => filterMatches(item, filter, pendingListedAssets))
+    .sort((left, right) => collectionOrder(left) - collectionOrder(right) || (BigInt(left.tokenId) < BigInt(right.tokenId) ? -1 : 1)), [filter, items, pendingListedAssets]);
+
+  const ensureCancelWallet = useCallback(async (expectedChainId: 56 | 97) => {
+    if (!walletAddress) throw new Error('CANCEL_WALLET_REQUIRED');
+    if (evm.address && evm.address.toLowerCase() !== walletAddress.toLowerCase()) {
+      openWalletSelector('evm', 'Conecta la misma wallet con la que has iniciado sesión para cancelar este anuncio.');
+      throw new Error('CANCEL_WALLET_REQUIRED');
+    }
+    try {
+      const ready = await requestWallet({
+        kind: 'evm',
+        targetChainId: expectedChainId,
+        reason: 'Conecta la wallet propietaria y sitúala en la red del anuncio para cancelar.',
+      });
+      if (
+        ready.address.toLowerCase() !== walletAddress.toLowerCase()
+        || ready.chainId !== expectedChainId
+      ) throw new Error('CANCEL_WALLET_REQUIRED');
+    } catch {
+      throw new Error('CANCEL_WALLET_REQUIRED');
+    }
+  }, [evm.address, openWalletSelector, requestWallet, walletAddress]);
 
   const load = useCallback(async (
     signal?: AbortSignal,
@@ -452,6 +567,44 @@ export function MyCukiesPanel() {
     setState('ready');
     return body.data;
   }, [walletAddress]);
+
+  const openCancel = useCallback(async (cukie: MyCukieCollectionItem) => {
+    const orderId = cukie.saleOrderId;
+    if (cukie.saleKind !== 'uki' || !orderId || !ORDER_ID_PATTERN.test(orderId)) {
+      setCancelLookupError('Este anuncio no tiene una identificación verificable para cancelar. Actualiza tu colección.');
+      return;
+    }
+    if (!walletAddress) return;
+    const lookupId = cancelLookupRequestRef.current + 1;
+    cancelLookupRequestRef.current = lookupId;
+    setCancelLookupAsset(cukie.assetId);
+    setCancelLookupError(null);
+    setCancelSheetOpen(false);
+    setCancelSheetOrder(null);
+    setCancelSheetTarget(cukie);
+    try {
+      await ensureCancelWallet(cukie.chainId);
+      const response = await fetch(
+        `/api/marketplace/v1/orders?scope=seller&walletAddress=${encodeURIComponent(walletAddress)}&limit=50`,
+        { cache: 'no-store', credentials: 'same-origin' },
+      );
+      const body = await response.json() as UkiMarketplaceOrdersResponse;
+      if (!response.ok || body.status !== 'ok') throw new Error('ORDER_LOOKUP_UNAVAILABLE');
+      const order = body.data.orders.find((candidate) => orderMatchesCukie(candidate, cukie, walletAddress));
+      if (!order) throw new Error('ORDER_LOOKUP_MISMATCH');
+      if (!mountedRef.current || cancelLookupRequestRef.current !== lookupId) return;
+      setCancelSheetOrder(order);
+      setCancelSheetOpen(true);
+    } catch (reason) {
+      if (!mountedRef.current || cancelLookupRequestRef.current !== lookupId) return;
+      setCancelSheetTarget(null);
+      setCancelLookupError(reason instanceof Error && reason.message === 'CANCEL_WALLET_REQUIRED'
+        ? 'Conecta la misma wallet con la que has iniciado sesión y sitúala en la red configurada para cancelar.'
+        : 'No se encontró un anuncio UKI activo para este Cukie. Actualiza tu colección antes de intentarlo de nuevo.');
+    } finally {
+      if (cancelLookupRequestRef.current === lookupId) setCancelLookupAsset(null);
+    }
+  }, [ensureCancelWallet, walletAddress]);
 
   const runRefresh = useCallback((target?: CollectionRefreshTarget) => {
     if (!walletAddress) return;
@@ -531,6 +684,30 @@ export function MyCukiesPanel() {
     } : undefined);
   }, [runRefresh]);
 
+  const closeCancelSheet = useCallback((nextOpen: boolean) => {
+    if (nextOpen) return;
+    cancelLookupRequestRef.current += 1;
+    setCancelSheetOpen(false);
+    setCancelSheetTarget(null);
+    setCancelLookupAsset(null);
+  }, []);
+
+  const handleCancelConfirmed = useCallback((
+    _result: { hash: `0x${string}` },
+    order: UkiMarketplaceOrderView,
+  ) => {
+    // The shared controller dispatches the orderId-tagged refresh event before
+    // invoking this callback. The event listener owns polling and maps the
+    // exact collection/token to the available state after cancellation.
+    if (
+      cancelSheetTarget
+      && cancelSheetTarget.saleOrderId?.toLowerCase() === order.orderId.toLowerCase()
+      && sameMarketplaceOrderAsset(order, cancelSheetTarget)
+    ) {
+      setCancelLookupError(null);
+    }
+  }, [cancelSheetTarget]);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -547,6 +724,16 @@ export function MyCukiesPanel() {
     const requestedWallet = walletAddress?.toLowerCase() ?? null;
     const loadedWallet = collectionRef.current?.walletNormalized?.toLowerCase() ?? null;
     const walletChanged = Boolean(requestedWallet && loadedWallet && requestedWallet !== loadedWallet);
+    const cancelWalletChanged = cancelWalletContextRef.current !== requestedWallet;
+    cancelWalletContextRef.current = requestedWallet;
+    if (cancelWalletChanged) {
+      cancelLookupRequestRef.current += 1;
+      setCancelSheetOpen(false);
+      setCancelSheetOrder(null);
+      setCancelSheetTarget(null);
+      setCancelLookupAsset(null);
+      setCancelLookupError(null);
+    }
     if (!walletAddress || walletChanged) {
       collectionRef.current = null;
       pendingRefreshTargetsRef.current.clear();
@@ -583,6 +770,12 @@ export function MyCukiesPanel() {
         ? event.detail as CollectionRefreshDetail
         : {};
       const selected = saleSelectionRef.current?.cuki;
+      const detailOrderId = typeof detail.orderId === 'string' && ORDER_ID_PATTERN.test(detail.orderId)
+        ? detail.orderId.toLowerCase()
+        : null;
+      const orderItem = detailOrderId
+        ? collectionRef.current?.items.find((item) => item.saleOrderId?.toLowerCase() === detailOrderId)
+        : undefined;
       const target: CollectionRefreshTarget | undefined = detail.assetId || detail.tokenId
         ? {
             assetId: typeof detail.assetId === 'string' ? detail.assetId : selected?.assetId,
@@ -590,8 +783,15 @@ export function MyCukiesPanel() {
             collectionAddress: typeof detail.collectionAddress === 'string'
               ? detail.collectionAddress
               : selected?.collectionAddress,
-            expectedState: detail.expectedState ?? 'listed',
+            expectedState: detail.expectedState ?? (orderItem ? 'available' : 'listed'),
           }
+        : orderItem
+          ? {
+              assetId: orderItem.assetId,
+              tokenId: orderItem.tokenId,
+              collectionAddress: orderItem.collectionAddress,
+              expectedState: detail.expectedState ?? 'available',
+            }
         : selected
           ? {
               assetId: selected.assetId,
@@ -685,8 +885,14 @@ export function MyCukiesPanel() {
       </section>
 
       {pendingRefreshAssets.size > 0 ? (
-        <div role="status" className="mt-6 rounded-[12px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 text-sm font-semibold text-[var(--uki-text)]">
+      <div role="status" className="mt-6 rounded-[12px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 text-sm font-semibold text-[var(--uki-text)]">
           La transacción está confirmada. Estamos actualizando el estado del Cukie; no repitas la operación.
+        </div>
+      ) : null}
+
+      {cancelLookupError ? (
+        <div role="alert" className="mt-4 rounded-[12px] border border-rose-200/25 bg-rose-200/[0.07] p-4 text-sm font-semibold text-rose-100">
+          {cancelLookupError}
         </div>
       ) : null}
 
@@ -707,7 +913,7 @@ export function MyCukiesPanel() {
               <span className="sr-only">Filtrar colección</span>
               <select aria-label="Filtrar colección" value={filter} onChange={(event) => setFilter(event.target.value as CollectionFilter)} className="min-h-10 rounded-[8px] border border-white/10 bg-black/30 px-3 text-xs font-black uppercase tracking-[0.06em] text-[var(--uki-text)] outline-none transition focus:border-[var(--uki-lilac-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)] motion-reduce:transition-none">
                 <option value="all">Todos ({items.length})</option>
-                <option value="listed">En venta ({items.filter((item) => item.state === 'listed').length})</option>
+                <option value="listed">En venta ({items.filter((item) => item.state === 'listed' || pendingListedAssets.has(item.assetId)).length})</option>
                 <option value="pool">Pool ({items.filter((item) => item.custody === 'cukie_pool' || item.custody === 'cukie_pool_recovery').length})</option>
                 <option value="master">Staking Master ({items.filter((item) => item.custody === 'cukie_master').length})</option>
                 <option value="available">Disponibles ({items.filter((item) => item.custody === 'wallet' && item.state === 'available').length})</option>
@@ -726,20 +932,19 @@ export function MyCukiesPanel() {
               const hasAlternateUkiSale = cukie.state === 'available'
                 && cukie.marketplaceSurface === 'legacy'
                 && cukie.sellSurfaces?.includes('uki');
+              const hasMarketplaceDetail = cukie.marketplaceSurface !== 'uki';
               const actionCount = (explicitActions.length > 0 ? explicitActions.length : 1)
                 + (hasAlternateUkiSale ? 1 : 0)
-                + 1;
+                + (hasMarketplaceDetail ? 1 : 0);
               const network = networkPresentation(cukie.network);
               const NetworkIcon = network.Icon;
               const status = statusPresentation(cukie);
               const StatusIcon = status.Icon;
               const actionGridClass = actionCount > 1 ? 'grid-cols-2' : 'grid-cols-1';
               const marketplaceHref = cukie.marketplaceSurface === 'legacy'
-                ? legacyMarketplaceHref(cukie) ?? '/marketplace'
-                : cukie.marketplaceSurface === 'uki'
-                  ? ukiMarketplaceHref(cukie) ?? '/marketplace'
-                  : null;
-              const marketplaceLabel = cukie.marketplaceSurface === 'legacy' ? 'Ver ficha' : 'Ver marketplace';
+                ? legacyMarketplaceHref(cukie)
+                : null;
+              const marketplaceLabel = 'Ver ficha';
               const marketplaceGridClass = actionCount % 2 === 1 ? 'col-span-2' : '';
 
               return (
@@ -797,16 +1002,36 @@ export function MyCukiesPanel() {
                         {explicitActions.length > 0 ? explicitActions.map((action) => {
                           const href = actionHref(cukie, action);
                           const ActionIcon = actionIcon(action);
-                          if (!href) {
-                            return (
-                              <span key={action} className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.02] px-3 py-2 text-center text-[11px] font-black leading-tight text-[var(--uki-muted)]">
-                                <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                Acción no disponible
-                              </span>
-                            );
-                          }
                           const className = actionClassName(action);
                           const content = <><ActionIcon className={`h-4 w-4 shrink-0 ${action === 'sell' ? 'text-[#120817]' : 'text-[var(--uki-lilac)]'}`} aria-hidden="true" /><span className="min-w-0 break-words">{actionLabel(action)}</span></>;
+                          if (action === 'cancel_sale' && cukie.saleKind === 'uki') {
+                            if (isRefreshPending) {
+                              return (
+                                <span key={action} role="status" className={`${className} cursor-wait opacity-70`}>
+                                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+                                  <span className="min-w-0 break-words">Actualizando estado…</span>
+                                </span>
+                              );
+                            }
+                            const lookupPending = cancelLookupAsset === cukie.assetId;
+                            return (
+                              <button
+                                key={action}
+                                type="button"
+                                onClick={() => void openCancel(cukie)}
+                                disabled={lookupPending}
+                                className={className}
+                                aria-haspopup="dialog"
+                              >
+                                {lookupPending ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+                                    <span className="min-w-0 break-words">Comprobando anuncio…</span>
+                                  </>
+                                ) : content}
+                              </button>
+                            );
+                          }
                           if (isRefreshPending) {
                             return (
                               <span
@@ -816,6 +1041,14 @@ export function MyCukiesPanel() {
                               >
                                 <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
                                 <span className="min-w-0 break-words">Actualizando estado…</span>
+                              </span>
+                            );
+                          }
+                          if (!href) {
+                            return (
+                              <span key={action} className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.02] px-3 py-2 text-center text-[11px] font-black leading-tight text-[var(--uki-muted)]">
+                                <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                Acción no disponible
                               </span>
                             );
                           }
@@ -885,12 +1118,12 @@ export function MyCukiesPanel() {
                             <span className="min-w-0 break-words">{marketplaceLabel}</span>
                             <ChevronRight className="h-4 w-4 shrink-0 text-[var(--uki-muted)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                           </Link>
-                        ) : (
+                        ) : hasMarketplaceDetail ? (
                           <span className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-white/10 bg-white/[0.02] px-3 py-2 text-center text-[11px] font-black leading-tight text-[var(--uki-muted)] ${marketplaceGridClass}`}>
                             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             Ficha no disponible
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -934,6 +1167,12 @@ export function MyCukiesPanel() {
           onCompleted={refreshAfterSale}
         />
       ) : null}
+      <MyCukieCancelSheet
+        order={cancelSheetOrder}
+        open={cancelSheetOpen}
+        onOpenChange={closeCancelSheet}
+        onConfirmed={handleCancelConfirmed}
+      />
     </div>
   );
 }

@@ -21,6 +21,8 @@ export {
 } from './errors';
 import type {
   IndexedUkiMarketplaceOrder,
+  UkiMarketplaceAssetIdentity,
+  UkiMarketplaceAssetMetadata,
   UkiMarketplaceDisplayStatus,
   UkiMarketplaceLiveInspection,
   UkiMarketplaceOrderView,
@@ -104,6 +106,48 @@ function normalizeSeller(walletAddress: string) {
   return normalized as `0x${string}`;
 }
 
+const DECIMAL_TOKEN_ID = /^(0|[1-9][0-9]*)$/;
+const MAX_UINT256 = (BigInt(1) << BigInt(256)) - BigInt(1);
+
+function orderAssetIdentity(
+  order: IndexedUkiMarketplaceOrder,
+): UkiMarketplaceAssetIdentity | null {
+  return assetIdentity({
+    chainId: order.chainId,
+    collectionAddress: order.collectionAddressNormalized,
+    tokenId: order.tokenId,
+  });
+}
+
+function assetIdentity(input: {
+  chainId: unknown;
+  collectionAddress: unknown;
+  tokenId: unknown;
+}): UkiMarketplaceAssetIdentity | null {
+  if (input.chainId !== 56 && input.chainId !== 97) return null;
+  if (typeof input.collectionAddress !== 'string') return null;
+  const collectionAddress = input.collectionAddress.trim().toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(collectionAddress) || /^0x0{40}$/.test(collectionAddress)) {
+    return null;
+  }
+  const tokenId = String(input.tokenId);
+  if (!DECIMAL_TOKEN_ID.test(tokenId)) return null;
+  try {
+    if (BigInt(tokenId) > MAX_UINT256) return null;
+  } catch {
+    return null;
+  }
+  return {
+    chainId: input.chainId,
+    collectionAddress: collectionAddress as `0x${string}`,
+    tokenId,
+  };
+}
+
+function assetIdentityKey(input: UkiMarketplaceAssetIdentity) {
+  return `${input.chainId}:${input.collectionAddress.toLowerCase()}:${input.tokenId}`;
+}
+
 function resolveActiveStatus(
   order: IndexedUkiMarketplaceOrder,
   inspection: UkiMarketplaceLiveInspection | undefined,
@@ -152,6 +196,7 @@ function toOrderView(
   status: UkiMarketplaceDisplayStatus,
   attentionReason: UkiMarketplaceOrderView['attentionReason'],
   catalogCursor?: string,
+  metadata?: UkiMarketplaceAssetMetadata,
 ): UkiMarketplaceOrderView {
   return {
     orderId: order.orderId,
@@ -175,8 +220,74 @@ function toOrderView(
     cancelledAt: order.cancelledAt?.toISOString() ?? null,
     expiredAt: order.expiredAt?.toISOString() ?? null,
     invalidatedAt: order.invalidatedAt?.toISOString() ?? null,
+    imageUrl: metadata?.imageUrl ?? null,
+    rarity: metadata?.rarity ?? null,
+    generation: metadata?.generation ?? null,
     catalogCursor,
   };
+}
+
+type ResolvedPublicOrder = {
+  order: IndexedUkiMarketplaceOrder;
+  status: UkiMarketplaceDisplayStatus;
+  attentionReason: UkiMarketplaceOrderView['attentionReason'];
+  catalogCursor?: string;
+};
+
+async function metadataByOrder(
+  entries: ResolvedPublicOrder[],
+  repository: UkiMarketplaceRepository,
+) {
+  const listAssetMetadata = repository.listAssetMetadata;
+  if (!listAssetMetadata || entries.length === 0) return new Map<string, UkiMarketplaceAssetMetadata>();
+
+  const identities = [...new Map(
+    entries.flatMap((entry) => {
+      const identity = orderAssetIdentity(entry.order);
+      return identity
+        ? [[assetIdentityKey(identity), identity] as const]
+        : [];
+    }),
+  ).values()];
+  if (identities.length === 0) return new Map<string, UkiMarketplaceAssetMetadata>();
+
+  // La imagen es enriquecimiento opcional: una caída de metadata no puede
+  // ocultar el anuncio que ya fue reconciliado con el contrato.
+  try {
+    const metadata = await listAssetMetadata.call(repository, { identities });
+    const requested = new Set(identities.map(assetIdentityKey));
+    return new Map(
+      metadata.flatMap((item) => {
+        const identity = assetIdentity({
+          chainId: item.chainId,
+          collectionAddress: item.collectionAddress,
+          tokenId: item.tokenId,
+        });
+        if (!identity) return [];
+        const key = assetIdentityKey(identity);
+        return requested.has(key) ? [[key, item] as const] : [];
+      }),
+    );
+  } catch {
+    return new Map<string, UkiMarketplaceAssetMetadata>();
+  }
+}
+
+async function orderViews(
+  entries: ResolvedPublicOrder[],
+  repository: UkiMarketplaceRepository,
+) {
+  const metadata = await metadataByOrder(entries, repository);
+  return entries.map((entry) => {
+    const identity = orderAssetIdentity(entry.order);
+    return toOrderView(
+      entry.order,
+      entry.status,
+      entry.attentionReason,
+      entry.catalogCursor,
+      identity ? metadata.get(assetIdentityKey(identity)) : undefined,
+    );
+  });
 }
 
 export type UkiMarketplacePublicPage = {
@@ -197,9 +308,15 @@ export async function listPublicUkiMarketplacePage(
   const limit = validatedLimit(input.limit);
   const now = dependencies.now();
   let cursor = decodeCursor(input.cursor);
-  const orders: UkiMarketplaceOrderView[] = [];
+  const entries: ResolvedPublicOrder[] = [];
   let scans = 0;
   let budgetExhausted = false;
+
+  const page = async (nextCursor: UkiMarketplaceCursor | undefined, hasMore: boolean) => ({
+    orders: await orderViews(entries, dependencies.repository),
+    nextCursor: nextCursor ? encodeCursor(nextCursor) : null,
+    hasMore,
+  });
 
   const hasValidCandidateAfter = async (after: UkiMarketplaceCursor) => {
     let probe = after;
@@ -244,7 +361,7 @@ export async function listPublicUkiMarketplacePage(
     return { hasMore: true, cursor: probe };
   };
 
-  while (orders.length < limit && scans < 8) {
+  while (entries.length < limit && scans < 8) {
     const candidates = await dependencies.repository.listPublicCandidates({
       chainId,
       marketplaceAddress,
@@ -279,39 +396,29 @@ export async function listPublicUkiMarketplacePage(
         return { order, ...status };
       })
       .filter(({ status }) => status === 'active');
-    const availableSlots = limit - orders.length;
+    const availableSlots = limit - entries.length;
     for (const entry of resolved.slice(0, availableSlots)) {
       const entryCursor = encodeCursor({
         listedAt: entry.order.listedAt,
         id: entry.order._id,
       });
-      orders.push(
-        toOrderView(
-          entry.order,
-          entry.status,
-          entry.attentionReason,
-          entryCursor,
-        ),
-      );
+      entries.push({
+        order: entry.order,
+        status: entry.status,
+        attentionReason: entry.attentionReason,
+        catalogCursor: entryCursor,
+      });
       cursor = { listedAt: entry.order.listedAt, id: entry.order._id };
     }
-    if (orders.length === limit) {
+    if (entries.length === limit) {
       if (resolved.length > availableSlots) {
-        return {
-          orders,
-          nextCursor: cursor ? encodeCursor(cursor) : null,
-          hasMore: true,
-        };
+        return page(cursor, true);
       }
       const more =
         candidates.length === limit && cursor
           ? await hasValidCandidateAfter(cursor)
           : { hasMore: false, cursor };
-      return {
-        orders,
-        nextCursor: more.cursor ? encodeCursor(more.cursor) : null,
-        hasMore: more.hasMore,
-      };
+      return page(more.cursor, more.hasMore);
     }
     const lastCandidate = candidates[candidates.length - 1];
     cursor = { listedAt: lastCandidate.listedAt, id: lastCandidate._id };
@@ -322,11 +429,7 @@ export async function listPublicUkiMarketplacePage(
     }
   }
 
-  return {
-    orders,
-    nextCursor: cursor ? encodeCursor(cursor) : null,
-    hasMore: budgetExhausted && Boolean(cursor),
-  };
+  return page(cursor, budgetExhausted && Boolean(cursor));
 }
 
 export async function listPublicUkiMarketplaceOrders(
@@ -360,12 +463,17 @@ export async function listSellerUkiMarketplaceOrders(
   const active = orders.filter((order) => order.status === 'active');
   const inspections = await dependencies.liveReader.inspectOrders(active);
 
-  return orders.map((order) => {
+  const entries = orders.map((order) => {
     const resolved = resolveActiveStatus(
       order,
       inspections.get(order.orderId),
       now,
     );
-    return toOrderView(order, resolved.status, resolved.attentionReason);
+    return {
+      order,
+      status: resolved.status,
+      attentionReason: resolved.attentionReason,
+    } satisfies ResolvedPublicOrder;
   });
+  return orderViews(entries, dependencies.repository);
 }

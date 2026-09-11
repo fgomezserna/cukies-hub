@@ -1,24 +1,30 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   ChevronDown,
   Filter,
   RefreshCw,
   Search,
-  ShieldCheck,
 } from 'lucide-react';
+import { useAccount } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
 import type { UkiMarketplaceOrderView } from '@/lib/uki-marketplace/types';
-import { UkiMarketplaceBuyerCheckout } from '@/components/uki-marketplace/buyer-checkout';
+import { UkiMarketplacePurchaseSheet } from '@/components/uki-marketplace/purchase-sheet';
+import {
+  ukiGenerationLabel,
+  ukiRarityLabel,
+} from '@/components/uki-marketplace/metadata-labels';
 import {
   retryTransactionRefresh,
 } from '@/lib/transaction-refresh';
 
 import { CukiCard } from './cuki-card';
+import { CukiImage } from './cuki-image';
 
 const PAGE_SIZE = 24;
 type MarketplaceScope = 'all' | 'legacy' | 'uki';
@@ -106,21 +112,39 @@ function formatUkiAmount(raw: string) {
   } UKI`;
 }
 
+function ukiSellerManagementHref(order: UkiMarketplaceOrderView) {
+  const query = new URLSearchParams({
+    tokenId: order.tokenId,
+    collection: order.collectionAddress,
+    chainId: String(order.chainId),
+    orderId: order.orderId,
+  });
+  return `/marketplace?${query.toString()}#mis-anuncios`;
+}
+
 function UkiMarketplaceCard({
   order,
-  expanded,
-  onToggle,
+  open,
+  onOpenChange,
   onPurchased,
 }: {
   order: UkiMarketplaceOrderView;
-  expanded: boolean;
-  onToggle: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onPurchased: () => void;
 }) {
+  const { address } = useAccount();
+  const ownOrder = Boolean(address && address.toLowerCase() === order.seller.toLowerCase());
   return (
-    <article className="group flex min-w-0 flex-col overflow-hidden rounded-[8px] border border-lilac-200/20 bg-[#0d121d] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-lilac-300/45">
-      <div className="relative grid aspect-[4/5] min-h-[22rem] place-items-center bg-[radial-gradient(circle_at_center,rgba(228,92,255,0.2),transparent_65%)]">
-        <ShieldCheck aria-hidden className="h-14 w-14 text-lilac-100/70" />
+    <>
+      <article className="group flex min-w-0 flex-col overflow-hidden rounded-[8px] border border-lilac-200/20 bg-[#0d121d] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-lilac-300/45">
+      <div className="relative aspect-[4/5] min-h-[22rem] overflow-hidden bg-[radial-gradient(circle_at_center,rgba(228,92,255,0.2),transparent_65%)]">
+        <CukiImage
+          src={order.imageUrl ?? null}
+          alt={`Cukie #${order.tokenId}`}
+          sizes="(min-width: 1536px) 280px, (min-width: 1024px) 30vw, 50vw"
+          className="object-contain p-4 transition duration-500 group-hover:scale-[1.02]"
+        />
         <div className="absolute left-3 top-3 rounded-full border border-lilac-200/30 bg-lilac-200/15 px-2.5 py-1 text-xs font-bold text-lilac-100 backdrop-blur">
           V2 · UKI
         </div>
@@ -133,13 +157,15 @@ function UkiMarketplaceCard({
           <h3 className="font-headline text-lg font-bold text-white">
             Cukie #{order.tokenId}
           </h3>
-          <p className="mt-1 text-xs text-slate-400">
-            Red BSC · Colección {order.collectionAddress.slice(0, 8)}…
-            {order.collectionAddress.slice(-6)}
-          </p>
-          <p className="mt-1 truncate font-mono text-[11px] text-slate-500">
-            Orden {order.orderId.slice(0, 8)}…
-          </p>
+            <p className="mt-1 text-xs text-slate-400">Red {order.chainId === 97 ? 'BSC Testnet' : 'BSC'} · anuncio UKI</p>
+            {(order.rarity || order.generation) && (
+              <p className="mt-2 text-xs font-semibold text-slate-400">
+                {[
+                  order.rarity ? ukiRarityLabel(order.rarity) : null,
+                  order.generation ? ukiGenerationLabel(order.generation) : null,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            )}
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
@@ -156,27 +182,35 @@ function UkiMarketplaceCard({
           </div>
         </div>
         <p className="text-xs text-slate-400">Precio fijado en UKI</p>
-        <Button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          className="bg-lilac-200 text-[#0d0914] hover:bg-lilac-100"
-        >
-          {expanded ? 'Cerrar compra' : 'Comprar'}
-          <ChevronDown
-            className={`ml-2 h-4 w-4 transition-transform ${
-              expanded ? 'rotate-180' : ''
-            }`}
-          />
-        </Button>
-        {expanded && (
-          <UkiMarketplaceBuyerCheckout
-            order={order}
-            onPurchased={onPurchased}
-          />
+        {ownOrder ? (
+          <Link
+            href={ukiSellerManagementHref(order)}
+            className="inline-flex min-h-9 items-center justify-center rounded-md bg-lilac-200 px-3 text-sm font-bold text-[#0d0914] hover:bg-lilac-100"
+          >
+            Gestionar anuncio
+          </Link>
+        ) : (
+          <Button
+            type="button"
+            onClick={() => onOpenChange(true)}
+            aria-haspopup="dialog"
+            className="bg-lilac-200 text-[#0d0914] hover:bg-lilac-100"
+          >
+            Comprar
+            <ChevronDown className="ml-2 h-4 w-4 -rotate-90" />
+          </Button>
         )}
       </div>
-    </article>
+      </article>
+      {!ownOrder ? (
+        <UkiMarketplacePurchaseSheet
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+          onPurchased={onPurchased}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -617,12 +651,8 @@ export function MarketplaceClient({
               <UkiMarketplaceCard
                 key={`uki-${entry.item.chainId}-${entry.item.collectionAddress}-${entry.item.tokenId}-${entry.item.orderId}`}
                 order={entry.item}
-                expanded={selectedUkiOrderId === entry.item.orderId}
-                onToggle={() =>
-                  setSelectedUkiOrderId((current) =>
-                    current === entry.item.orderId ? null : entry.item.orderId,
-                  )
-                }
+                open={selectedUkiOrderId === entry.item.orderId}
+                onOpenChange={(open) => setSelectedUkiOrderId(open ? entry.item.orderId : null)}
                 onPurchased={() => {
                   setSelectedUkiOrderId(null);
                   setReloadKey((value) => value + 1);

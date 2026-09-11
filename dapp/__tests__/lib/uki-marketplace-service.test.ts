@@ -17,6 +17,7 @@ import {
 import { resolveUkiMarketplaceRuntime } from '@/lib/uki-marketplace/runtime';
 import type {
   IndexedUkiMarketplaceOrder,
+  UkiMarketplaceAssetMetadata,
   UkiMarketplaceLiveInspection,
 } from '@/lib/uki-marketplace/types';
 
@@ -68,11 +69,15 @@ function dependencies(input: {
   publicOrders?: IndexedUkiMarketplaceOrder[];
   sellerOrders?: IndexedUkiMarketplaceOrder[];
   inspections?: Map<string, UkiMarketplaceLiveInspection>;
+  metadata?: UkiMarketplaceAssetMetadata[];
   ready?: boolean;
 } = {}) {
   const repository = {
     listPublicCandidates: jest.fn().mockResolvedValue(input.publicOrders ?? []),
     listSellerOrders: jest.fn().mockResolvedValue(input.sellerOrders ?? []),
+    ...(input.metadata
+      ? { listAssetMetadata: jest.fn().mockResolvedValue(input.metadata) }
+      : {}),
   };
   const liveReader = {
     inspectOrders: jest.fn().mockResolvedValue(input.inspections ?? new Map()),
@@ -99,6 +104,79 @@ function dependencies(input: {
 }
 
 describe('UKI marketplace Stage service', () => {
+  it('enriquece el anuncio por identidad exacta sin mezclar colección o cadena', async () => {
+    const listed = order('1', { tokenId: '42' });
+    const otherCollection = '0x0000000000000000000000000000000000001003' as `0x${string}`;
+    const context = dependencies({
+      publicOrders: [listed],
+      inspections: new Map([[listed.orderId, inspection()]]),
+      metadata: [
+        {
+          chainId: 97,
+          collectionAddress: collection,
+          tokenId: '42',
+          imageUrl: 'https://minio.example/cukie-42.png',
+          rarity: 'rare',
+          generation: 'original',
+        },
+        {
+          chainId: 56,
+          collectionAddress: collection,
+          tokenId: '42',
+          imageUrl: 'https://wrong.example/other-chain.png',
+          rarity: 'legendary',
+          generation: 'second_generation',
+        },
+        {
+          chainId: 97,
+          collectionAddress: otherCollection,
+          tokenId: '42',
+          imageUrl: 'https://wrong.example/other-collection.png',
+          rarity: 'common',
+          generation: 'original',
+        },
+      ],
+    });
+
+    const result = await listPublicUkiMarketplaceOrders(
+      { limit: 1 },
+      context.dependencies,
+    );
+
+    expect(result[0]).toMatchObject({
+      orderId: listed.orderId,
+      imageUrl: 'https://minio.example/cukie-42.png',
+      rarity: 'rare',
+      generation: 'original',
+    });
+    expect(context.repository.listAssetMetadata).toHaveBeenCalledTimes(1);
+    expect(context.repository.listAssetMetadata).toHaveBeenCalledWith({
+      identities: [{ chainId: 97, collectionAddress: collection, tokenId: '42' }],
+    });
+  });
+
+  it('mantiene el anuncio aunque falle el enriquecimiento de metadata', async () => {
+    const listed = order('2', { tokenId: '43' });
+    const context = dependencies({
+      publicOrders: [listed],
+      inspections: new Map([[listed.orderId, inspection()]]),
+      metadata: [],
+    });
+    const metadataReader = context.repository.listAssetMetadata as jest.Mock;
+    metadataReader.mockRejectedValueOnce(new Error('metadata unavailable'));
+
+    await expect(
+      listPublicUkiMarketplaceOrders({ limit: 1 }, context.dependencies),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        orderId: listed.orderId,
+        imageUrl: null,
+        rarity: null,
+        generation: null,
+      }),
+    ]);
+  });
+
   it('publishes only orders proven active, owned and approved in the live contract state', async () => {
     const valid = order('1');
     const revoked = order('2');

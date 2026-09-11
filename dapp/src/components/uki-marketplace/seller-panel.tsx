@@ -22,6 +22,13 @@ import {
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
 import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-dynamic';
 import { Button } from '@/components/ui/button';
+import { UkiMarketplaceCancelSheet } from './cancel-sheet';
+import {
+  cancelUkiMarketplaceOrder,
+  UkiMarketplaceCancelPendingError,
+  type UkiMarketplaceCancelPublicClient,
+  type UkiMarketplaceCancelWriteContract,
+} from './cancel-order';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import {
   ukiMarketplaceNftReadAbi,
@@ -76,6 +83,7 @@ type MarketplaceTarget = {
   tokenId: string;
   collection: string;
   chainId: 56 | 97;
+  orderId?: `0x${string}`;
 } | {
   invalid: true;
 };
@@ -123,13 +131,13 @@ function transactionError(reason: unknown) {
   if (reason instanceof Error) {
     const message = reason.message.toLowerCase();
     if (message.includes('user rejected') || message.includes('user denied') || message.includes('rejected')) {
-      return 'La wallet canceló la firma. No se ha cambiado ninguna orden.';
+      return 'La wallet canceló la firma. No se ha cambiado ningún anuncio.';
     }
     if (message.includes('transaction_pending')) {
       return 'La transacción ya fue enviada. Conservamos el hash; comprueba la confirmación sin firmar otra vez.';
     }
     if (message.includes('transaction_cancelled')) {
-      return 'La wallet canceló la transacción antes de crear o cambiar la orden.';
+      return 'La wallet canceló la transacción antes de crear o cambiar el anuncio.';
     }
     if (message.includes('transaction_replaced')) {
       return 'La transacción fue reemplazada por otra operación. No se ha confirmado este anuncio.';
@@ -193,6 +201,7 @@ export function UkiMarketplaceSellerPanel() {
   const publicClient = usePublicClient({ chainId: expectedChainId ?? undefined });
   const [dataState, setDataState] = useState<SellerDataState>({ kind: 'idle' });
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [cancelSheetOrderId, setCancelSheetOrderId] = useState<string | null>(null);
   const [ukiPrice, setUkiPrice] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [phase, setPhase] = useState<TransactionPhase>('idle');
@@ -242,13 +251,24 @@ export function UkiMarketplaceSellerPanel() {
     const tokenId = params.get('tokenId')?.trim() ?? '';
     const collection = params.get('collection')?.trim() ?? '';
     const rawChainId = params.get('chainId')?.trim() ?? '';
-    if (!tokenId && !collection && !rawChainId) return;
+    const rawOrderId = params.get('orderId')?.trim() ?? '';
+    if (!tokenId && !collection && !rawChainId && !rawOrderId) return;
     const chainId = Number(rawChainId);
-    if (!/^\d+$/.test(tokenId) || !/^0x[0-9a-f]{40}$/i.test(collection) || (chainId !== 56 && chainId !== 97)) {
+    if (
+      !/^\d+$/.test(tokenId)
+      || !/^0x[0-9a-f]{40}$/i.test(collection)
+      || (chainId !== 56 && chainId !== 97)
+      || (rawOrderId && !/^0x[0-9a-f]{64}$/i.test(rawOrderId))
+    ) {
       setMarketplaceTarget({ invalid: true });
       return;
     }
-    setMarketplaceTarget({ tokenId, collection, chainId });
+    setMarketplaceTarget({
+      tokenId,
+      collection,
+      chainId,
+      ...(rawOrderId ? { orderId: rawOrderId as `0x${string}` } : {}),
+    });
   }, []);
 
   const configReady = ukiMarketplacePublicConfig.ready
@@ -389,6 +409,19 @@ export function UkiMarketplaceSellerPanel() {
     }
   }, [dataState, expectedChainId, marketplaceTarget]);
 
+  useEffect(() => {
+    if (!marketplaceTarget || 'invalid' in marketplaceTarget || !marketplaceTarget.orderId || dataState.kind !== 'ready') return;
+    const targetOrder = dataState.orders.find((order) => (
+      order.orderId.toLowerCase() === marketplaceTarget.orderId?.toLowerCase()
+      && order.status === 'active'
+      && marketplaceTarget.chainId === expectedChainId
+      && sameAddress(order.collectionAddress, marketplaceTarget.collection)
+      && order.tokenId === marketplaceTarget.tokenId
+    ));
+    if (targetOrder) setCancelSheetOrderId(targetOrder.orderId);
+    else setError('El anuncio solicitado no está activo o ya no pertenece a esta wallet.');
+  }, [dataState, expectedChainId, marketplaceTarget]);
+
   const selectedAsset = useMemo(() => (
     dataState.kind === 'ready'
       ? dataState.inventory.find((item) => item.assetId === selectedAssetId) ?? null
@@ -403,6 +436,11 @@ export function UkiMarketplaceSellerPanel() {
         )) ?? null
       : null
   ), [dataState, selectedAsset]);
+  const cancelSheetOrder = useMemo(() => (
+    dataState.kind === 'ready' && cancelSheetOrderId
+      ? dataState.orders.find((order) => order.orderId === cancelSheetOrderId) ?? null
+      : null
+  ), [cancelSheetOrderId, dataState]);
   const validation = useMemo(() => validateUkiMarketplaceListing({
     ukiPrice,
     expiresAt,
@@ -562,7 +600,7 @@ export function UkiMarketplaceSellerPanel() {
           args: [activeOrderId],
         });
         if (currentState === 1) {
-          throw new Error('MARKETPLACE_UI:Este Cukie ya tiene una orden UKI activa.');
+          throw new Error('MARKETPLACE_UI:Este Cukie ya tiene un anuncio UKI activo.');
         }
       }
 
@@ -619,7 +657,7 @@ export function UkiMarketplaceSellerPanel() {
         .then((indexed) => {
           if (!mountedRef.current) return;
           setNotice(indexed
-            ? `Orden ${shortIdentity(orderId)} confirmada y visible en tu historial.`
+            ? `Anuncio ${shortIdentity(orderId)} confirmado y visible en tu historial.`
             : `Anuncio ${shortIdentity(orderId)} confirmado. Puede tardar unos instantes en aparecer.`);
         })
         .catch((reason) => {
@@ -724,15 +762,15 @@ export function UkiMarketplaceSellerPanel() {
             if (!mountedRef.current) return;
             if (pending.kind === 'cancel') {
               setNotice(indexed
-                ? 'Orden cancelada y reflejada en tu historial.'
+                ? 'Anuncio cancelado y reflejado en tu historial.'
                 : 'Anuncio cancelado. Puede tardar unos instantes en reflejarse.');
             } else if (pending.kind === 'renew') {
               setNotice(indexed
-                ? 'Aprobación restaurada; la orden vuelve a estar activa.'
+                ? 'Aprobación restaurada; el anuncio vuelve a estar activo.'
                 : 'Permiso restaurado. El anuncio puede tardar unos instantes en actualizarse.');
             } else {
               setNotice(indexed
-                ? `Orden ${shortIdentity(orderId)} confirmada y visible en tu historial.`
+                ? `Anuncio ${shortIdentity(orderId)} confirmado y visible en tu historial.`
                 : `Anuncio ${shortIdentity(orderId)} confirmado. Puede tardar unos instantes en aparecer.`);
             }
           })
@@ -754,7 +792,7 @@ export function UkiMarketplaceSellerPanel() {
       if (reason instanceof Error && reason.message === 'TRANSACTION_REVERTED') {
         clearPendingOperation();
         setLatestTxHash(null);
-        setError('La transacción fue revertida. No se ha creado ni cambiado ninguna orden.');
+        setError('La transacción fue revertida. No se ha creado ni cambiado ningún anuncio.');
       } else if (reason instanceof TransactionReplacementPendingError) {
         const updated = { ...pending, hash: reason.hash };
         pendingOperationRef.current = updated;
@@ -789,7 +827,7 @@ export function UkiMarketplaceSellerPanel() {
     }
   }
 
-  async function cancelOrder(order: UkiMarketplaceOrderView) {
+  async function cancelOrder(order: UkiMarketplaceOrderView): Promise<boolean> {
     const marketplaceAddress = ukiMarketplacePublicConfig.marketplaceAddress;
     if (
       busy
@@ -801,7 +839,7 @@ export function UkiMarketplaceSellerPanel() {
       || expectedChainId === null
       || !correctChain
       || !publicClient
-    ) return;
+    ) return false;
     setActiveOperationId(order.orderId);
     setError(null);
     setNotice(null);
@@ -810,27 +848,22 @@ export function UkiMarketplaceSellerPanel() {
     const refreshController = new AbortController();
     eventAbortRef.current = refreshController;
     let receiptConfirmed = false;
+    let operationConfirmed = false;
     let backgroundRefresh = false;
     try {
       setPhase('verifying');
-      const currentState = await publicClient.readContract({
-        address: marketplaceAddress,
-        abi: ukiMarketplaceReadAbi,
-        functionName: 'orderState',
-        args: [order.orderId],
-      });
-      if (currentState !== 1) {
-        throw new Error('MARKETPLACE_UI:El anuncio ya no está activo. Actualiza tu historial.');
-      }
       setPhase('cancelling');
-      const cancelHash = await writeAndConfirm({
-        chainId: expectedChainId,
-        address: marketplaceAddress,
-        abi: ukiMarketplaceWriteAbi,
-        functionName: 'cancelOrder',
-        args: [order.orderId],
-      }, { address, chainId: expectedChainId });
+      const { hash: cancelHash } = await cancelUkiMarketplaceOrder({
+        order,
+        walletAddress: address,
+        expectedChainId,
+        marketplaceAddress,
+        publicClient: publicClient as unknown as UkiMarketplaceCancelPublicClient,
+        writeContractAsync: writeContractAsync as unknown as UkiMarketplaceCancelWriteContract,
+        assertLiveContext: () => assertLiveContext(address, expectedChainId),
+      });
       receiptConfirmed = true;
+      operationConfirmed = true;
       assertLiveContext(address, expectedChainId);
       setPhase('syncing');
       setNotice(`Cancelación de ${shortIdentity(order.orderId)} confirmada. Actualizando el índice…`);
@@ -842,7 +875,7 @@ export function UkiMarketplaceSellerPanel() {
         .then((indexed) => {
           if (!mountedRef.current) return;
           setNotice(indexed
-            ? 'Orden cancelada y reflejada en tu historial.'
+            ? 'Anuncio cancelado y reflejado en tu historial.'
             : 'Anuncio cancelado. Puede tardar unos instantes en reflejarse.');
         })
         .catch((reason) => {
@@ -852,8 +885,8 @@ export function UkiMarketplaceSellerPanel() {
           if (eventAbortRef.current === refreshController) eventAbortRef.current = null;
         });
     } catch (reason) {
-      if (!mountedRef.current || isTransactionRefreshAborted(reason)) return;
-      if (reason instanceof BroadcastPendingError) {
+      if (!mountedRef.current || isTransactionRefreshAborted(reason)) return false;
+      if (reason instanceof BroadcastPendingError || reason instanceof UkiMarketplaceCancelPendingError) {
         rememberPendingOperation({
           kind: 'cancel',
           hash: reason.hash,
@@ -880,6 +913,7 @@ export function UkiMarketplaceSellerPanel() {
         setActiveOperationId(null);
       }
     }
+    return operationConfirmed;
   }
 
   async function renewOrderApproval(order: UkiMarketplaceOrderView) {
@@ -930,7 +964,7 @@ export function UkiMarketplaceSellerPanel() {
         }),
       ]);
       if (!sameAddress(owner, address) || collectionAllowed !== true || activeOrderId !== order.orderId) {
-        throw new Error('MARKETPLACE_UI:La orden ya no puede recuperar su aprobación de forma segura.');
+        throw new Error('MARKETPLACE_UI:El anuncio ya no puede recuperar su aprobación de forma segura.');
       }
       setPhase('approving');
       const renewHash = await writeAndConfirm({
@@ -949,7 +983,7 @@ export function UkiMarketplaceSellerPanel() {
         args: [order.orderId],
       });
       if (currentState !== 1) {
-        throw new Error('MARKETPLACE_UI:La aprobación se confirmó, pero la orden continúa inválida.');
+        throw new Error('MARKETPLACE_UI:La aprobación se confirmó, pero el anuncio continúa inválido.');
       }
       setPhase('syncing');
       setNotice(`Aprobación de ${shortIdentity(order.orderId)} restaurada. Actualizando el estado en vivo…`);
@@ -961,7 +995,7 @@ export function UkiMarketplaceSellerPanel() {
         .then((indexed) => {
           if (!mountedRef.current) return;
           setNotice(indexed
-            ? 'Aprobación restaurada; la orden vuelve a estar activa.'
+            ? 'Aprobación restaurada; el anuncio vuelve a estar activo.'
             : 'Permiso restaurado. El anuncio puede tardar unos instantes en actualizarse.');
         })
         .catch((reason) => {
@@ -1240,10 +1274,10 @@ export function UkiMarketplaceSellerPanel() {
                   {!validation.valid && validation.priceError && ukiPrice ? <span className="text-xs font-normal text-amber-200">{validation.priceError}</span> : null}
                 </label>
                 <label className="grid gap-2 text-sm font-semibold text-slate-200">
-                  Caducidad de la orden
+                  Caducidad del anuncio
                   <input
                     type="datetime-local"
-                    aria-label="Caducidad de la orden"
+                    aria-label="Caducidad del anuncio"
                     value={expiresAt}
                     onChange={(event) => setExpiresAt(event.target.value)}
                     disabled={busy}
@@ -1257,7 +1291,7 @@ export function UkiMarketplaceSellerPanel() {
               <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-xl text-xs leading-5 text-slate-400">
                   <p>El comprador paga la comisión en la moneda elegida. {currentFeeBps === null ? 'La comisión actual se mostrará antes de confirmar.' : `Comisión actual: ${(currentFeeBps / 100).toLocaleString('es-ES')}%.`}</p>
-                  <p className="mt-1">Si falta permiso, la wallet pedirá primero aprobar este NFT y después publicar la orden.</p>
+                  <p className="mt-1">Si falta permiso, la wallet pedirá primero aprobar este NFT y después publicar el anuncio.</p>
                 </div>
                 <Button
                   type="button"
@@ -1276,7 +1310,7 @@ export function UkiMarketplaceSellerPanel() {
                         idle: 'Verificar y publicar',
                       } as const)[phase]
                     : activeAssetOrder
-                      ? 'Ya tiene una orden activa'
+                      ? 'Ya tiene un anuncio activo'
                       : 'Verificar y publicar'}
                 </Button>
               </div>
@@ -1320,7 +1354,7 @@ export function UkiMarketplaceSellerPanel() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => void cancelOrder(order)}
+                            onClick={() => setCancelSheetOrderId(order.orderId)}
                             disabled={busy}
                             className="border-rose-300/20 bg-rose-300/[0.06] text-rose-100 hover:bg-rose-300/10 active:scale-[0.98]"
                           >
@@ -1348,7 +1382,7 @@ export function UkiMarketplaceSellerPanel() {
                     </div>
                     {order.status === 'requires_attention' ? (
                       <p className="mt-3 flex gap-2 text-xs leading-5 text-amber-200">
-                        <WarningCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> La aprobación del marketplace ya no está vigente. Esta orden no se muestra públicamente.
+                        <WarningCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> La aprobación del marketplace ya no está vigente. Este anuncio no se muestra públicamente.
                       </p>
                     ) : null}
                   </article>
@@ -1358,6 +1392,28 @@ export function UkiMarketplaceSellerPanel() {
           )}
         </aside>
       </div>
+      <UkiMarketplaceCancelSheet
+        order={cancelSheetOrder}
+        open={Boolean(cancelSheetOrder)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setCancelSheetOrderId(null);
+        }}
+        onConfirm={() => (cancelSheetOrder ? cancelOrder(cancelSheetOrder) : false)}
+        busy={busy || Boolean(
+          pendingOperation
+          && pendingOperation.kind !== 'cancel'
+        )}
+        pendingHash={pendingOperation?.kind === 'cancel'
+          && pendingOperation.orderId === cancelSheetOrder?.orderId
+          ? pendingOperation.hash
+          : null}
+        onRecheckPending={pendingOperation?.kind === 'cancel'
+          && pendingOperation.orderId === cancelSheetOrder?.orderId
+          ? () => { void recheckPendingOperation(); }
+          : undefined}
+        notice={notice}
+        error={error}
+      />
     </section>
   );
 }

@@ -789,6 +789,20 @@ primera liquidacion. Ninguna de estas cantidades entra en un claim de usuario.
   `setFeeConfig`, hasta el 10%; el porcentaje se guarda por anuncio al publicarlo,
   por lo que el cambio solo afecta a anuncios nuevos. No fija la comision de
   produccion ni modifica el 5% independiente de embajadores.
+- El vendedor fija y recibe el precio exacto en UKI. El comprador elige UKI,
+  ASM, BNB, USDT o USDC entre las monedas habilitadas; la conversión usa salida
+  exacta a UKI y devuelve el sobrante. La comisión se conserva en la moneda
+  del comprador. En BNB queda acreditada en `claimableNativeFees` hasta que la
+  tesorería la retire; una acreditación no es un cobro de esa tesorería.
+- Comprar abre un sheet lateral en escritorio e inferior en móvil, con imagen,
+  moneda, precio, comisión y máximo autorizado. La conexión/red precede a la
+  aprobación y compra; abrir el sheet no firma. Los hashes pendientes siguen
+  ligados al anuncio y wallet originales y se comprueban sin repetir la firma.
+- Publicar V2 no transfiere el NFT: sigue en Mis Cukies, marcado En venta,
+  con Cancelar venta para el anuncio exacto. Los filtros conservan la operación
+  confirmada mientras se actualiza el índice; una lectura atrasada no habilita
+  una segunda operación. La imagen se resuelve por red, colección y token ID,
+  independientemente del vendedor. Los enlaces de cada tarjeta son contextuales.
 - Los anuncios legacy no se convierten automaticamente en ordenes UKI: el
   vendedor cancela y republica. El contrato UKI actual publica mediante
   transaccion `createOrder` tras approval, no mediante orden off-chain EIP-712.

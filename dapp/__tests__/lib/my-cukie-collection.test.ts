@@ -221,6 +221,7 @@ describe('my canonical Cukie collection', () => {
     const poolPosition = position('2', 'active');
     const masterPosition = position('3', 'custodied');
     const ukiOrder = {
+      orderId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       chainId: 97,
       collectionAddressNormalized: collection,
       tokenId: '1',
@@ -244,6 +245,7 @@ describe('my canonical Cukie collection', () => {
     expect(result.items.find((item) => item.tokenId === '1')).toMatchObject({
       state: 'listed',
       saleKind: 'uki',
+      saleOrderId: ukiOrder.orderId,
       availableActions: ['cancel_sale'],
     });
     expect(result.items.find((item) => item.tokenId === '2')).toMatchObject({

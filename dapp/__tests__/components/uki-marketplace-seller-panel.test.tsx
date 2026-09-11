@@ -1,5 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+jest.mock('lucide-react', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const Icon = (props: React.SVGProps<SVGSVGElement>) => React.createElement('svg', props);
+  return { X: Icon };
+});
+
 const wallet = '0x00000000000000000000000000000000000000aa';
 const marketplace = '0x1111111111111111111111111111111111111111';
 const collection = '0x2222222222222222222222222222222222222222';
@@ -37,6 +43,17 @@ const readContract = jest.fn(async (input: { functionName: string }) => {
       return false;
     case 'activeOrderIds':
       return published || existingActiveOrder ? orderId : `0x${'0'.repeat(64)}`;
+    case 'orders':
+      return [
+        wallet,
+        collection,
+        BigInt(73),
+        BigInt('1250000000000000000000'),
+        BigInt(1_800_000_000),
+        BigInt(1),
+        1_000,
+        1,
+      ];
     case 'orderState':
       return 1;
     default:
@@ -203,7 +220,7 @@ describe('zona vendedor marketplace UKI', () => {
     });
     expect(waitForTransactionReceipt).toHaveBeenCalledTimes(2);
     await waitFor(() => {
-      expect(screen.getByText(/confirmada y visible en tu historial/)).toBeInTheDocument();
+      expect(screen.getByText(/confirmado y visible en tu historial/)).toBeInTheDocument();
     });
   });
 
@@ -214,6 +231,7 @@ describe('zona vendedor marketplace UKI', () => {
     const cancelButton = await screen.findByRole('button', { name: 'Cancelar anuncio' });
     expect(screen.getByText('Para cambiar el precio, cancela y vuelve a publicar.')).toBeInTheDocument();
     fireEvent.click(cancelButton);
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar cancelación' }));
 
     await waitFor(() => {
       expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -228,7 +246,7 @@ describe('zona vendedor marketplace UKI', () => {
       onReplaced: expect.any(Function),
     });
     await waitFor(() => {
-      expect(screen.getByText('Orden cancelada y reflejada en tu historial.')).toBeInTheDocument();
+      expect(screen.getByText('Anuncio cancelado y reflejado en tu historial.')).toBeInTheDocument();
     });
   });
 
@@ -252,7 +270,7 @@ describe('zona vendedor marketplace UKI', () => {
       functionName: 'createOrder',
     }));
     await waitFor(() => {
-      expect(screen.getByText('Aprobación restaurada; la orden vuelve a estar activa.')).toBeInTheDocument();
+      expect(screen.getByText('Aprobación restaurada; el anuncio vuelve a estar activo.')).toBeInTheDocument();
     });
   });
 

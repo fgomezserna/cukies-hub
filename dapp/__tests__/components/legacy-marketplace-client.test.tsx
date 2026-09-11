@@ -1,11 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+let mockWalletAddress: string | null = null;
+
+jest.mock('wagmi', () => ({
+  useAccount: () => ({ address: mockWalletAddress }),
+}));
+
 import { MarketplaceClient } from '@/components/legacy-marketplace/marketplace-client';
 
 jest.mock('lucide-react', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const Icon = (props: React.SVGProps<SVGSVGElement>) => React.createElement('svg', props);
-  return { ChevronDown: Icon, Filter: Icon, RefreshCw: Icon, Search: Icon, ShieldCheck: Icon };
+  return { ChevronDown: Icon, Filter: Icon, RefreshCw: Icon, Search: Icon, ShieldCheck: Icon, X: Icon };
 });
 jest.mock('@/components/uki-marketplace/buyer-checkout', () => ({
   UkiMarketplaceBuyerCheckout: () => <div data-testid="uki-checkout">Checkout UKI disponible</div>,
@@ -56,6 +62,7 @@ describe('marketplace publico', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockWalletAddress = null;
   });
 
   it('consulta el catálogo conjunto y no expone filtros de estado legacy', async () => {
@@ -112,12 +119,34 @@ describe('marketplace publico', () => {
     render(<MarketplaceClient />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Comprar' })).toBeInTheDocument());
     expect(screen.getByText('V2 · UKI')).toBeInTheDocument();
-    expect(screen.getByText('Red BSC · Colección 0x000000…001002')).toBeInTheDocument();
+    expect(screen.getByText('Red BSC Testnet · anuncio UKI')).toBeInTheDocument();
     expect(screen.getByText('Precio fijado en UKI')).toBeInTheDocument();
-    expect(screen.queryByText(/BSC Testnet/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Pago: UKI, BNB o USDT/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Comprar' }));
     expect(await screen.findByTestId('uki-checkout')).toHaveTextContent('Checkout UKI disponible');
+  });
+
+  it('muestra gestión del anuncio en la tarjeta propia en vez de ofrecer compra propia', async () => {
+    mockWalletAddress = baseUkiOrder.seller;
+    fetchMock.mockResolvedValueOnce({
+      json: async () => ({
+        status: 'ok',
+        data: {
+          items: [{ source: 'uki', item: baseUkiOrder }],
+          cursors: { legacyOffset: 0, ukiCursor: null },
+          hasMore: false,
+          legacyFacets: { states: [], networks: [], types: [], generations: [] },
+          sources: { legacy: 'ready', uki: 'ready' },
+        },
+      }),
+    });
+
+    render(<MarketplaceClient />);
+    expect(await screen.findByRole('link', { name: 'Gestionar anuncio' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`orderId=${baseUkiOrder.orderId}`),
+    );
+    expect(screen.queryByRole('button', { name: 'Comprar' })).not.toBeInTheDocument();
   });
 
   it('cambia a Solo Legacy antes de aplicar tipo y generación sin metadatos V2', async () => {

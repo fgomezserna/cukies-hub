@@ -433,15 +433,17 @@ topologia o migracion de BBDD requiere una operacion separada con su propio plan
 | `NEXT_PUBLIC_UKI_PRESALE_ADDRESS` | Presale testnet | Presale mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
 | `NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Distributor mainnet pendiente | Sin fondos/lotes de producto hasta aprobar reglas. |
-| `NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS` | Vacío hasta desplegar y verificar el contrato nuevo en chain `97` | Marketplace UKI mainnet pendiente | Debe coincidir con `CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS`; vacío mantiene la API cerrada. |
-| `NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS` | `0xD99D1c33F9fC3444f8101754aBC46c52416550D1` solo tras desplegar Marketplace | Router mainnet pendiente | Pancake V2 Testnet fijado por el deploy; no habilita por sí solo BNB/USDT. |
-| `NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS` | `0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd` solo tras desplegar Marketplace | WBNB mainnet pendiente | Debe coincidir con `router.WETH()` en chain `97`. |
-| `NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS` | Vacío | USDT mainnet pendiente | No existe token/ruta Testnet aprobada; vacío mantiene solo USDT cerrado y no bloquea UKI directo. |
-| `NEXT_PUBLIC_UKI_MARKETPLACE_{BNB,USDT}_PATH` | Vacío | Rutas mainnet pendientes | Solo se rellenan después de que el verificador pruebe la ruta completa en la chain objetivo. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS` | `0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D` | Marketplace UKI mainnet pendiente | Verificado en chain 97; coincide con el indexador. No se redepliega para habilitar monedas. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS` | `0xD99D1c33F9fC3444f8101754aBC46c52416550D1` | Router mainnet pendiente | Pancake V2 Testnet; compra exact-output con rutas verificadas. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS` | `0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd` | WBNB mainnet pendiente | Coincide con `router.WETH()` en chain 97. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS` | `0x5A4C2904E80d2d27F6996C0df989A53AeBAf968D` | USDT mainnet pendiente | tUSDT de pruebas, 18 decimales; no es USDT real. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDC_ADDRESS` | `0x3593f86E45Fe02536B30A2cb445628e5301289EC` | USDC mainnet pendiente | tUSDC de pruebas, 18 decimales; no es USDC real. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ASM_ADDRESS` | `0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C` | ASM mainnet pendiente | tASM de pruebas; conserva el token existente de Stage. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_{BNB,ASM,USDT,USDC}_PATH` | Dos direcciones separadas por coma: WBNB/tASM/tUSDT/tUSDC → UKI, usando las direcciones de esta tabla | Rutas mainnet pendientes | Allowlist y liquidez verificadas con compras firmadas en chain 97 el 11Sep2026; evidencia enlazada debajo. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS` | `0x8fa397B4E1DED911161f13C128DF369cE9a95B3A` | Pair mainnet oficial | Pair ASM/UKI de Pancake V2 verificado en chain 97; el guard rechaza cualquier otro. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS` | Vacío hasta verificar un locker testnet | Locker mainnet oficial | Si está vacío, la home no anuncia ni enlaza liquidez bloqueada. |
 | `NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL` | Vacío sin locker testnet | Fecha UTC aprobada | Es solo texto; exige un locker configurado para mostrarse. |
-| `NEXT_PUBLIC_UKI_SWAP_URL` | `https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c` | Opcional; mainnet se construye con ASM/UKI | Stage habilita solo la ruta directa ASM/UKI y exige el pair verificado. BNB y USDT siguen deshabilitados hasta que el verificador demuestre una ruta. |
+| `NEXT_PUBLIC_UKI_SWAP_URL` | `https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c` | Opcional; mainnet se construye con ASM/UKI | El enlace de swap usa ASM/UKI y exige ese pair verificado. Marketplace tiene sus propias rutas de pago verificadas y no depende de este enlace. |
 | `NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | Colección mainnet pendiente | Colección ERC-721 V2 custodiable de staging. |
 | `NEXT_PUBLIC_CUKIES_BRIDGE_MODE` | `disabled` hasta completar E2E; despues `testnet` | `disabled`; `live` no esta soportado | Nunca habilitar parcialmente. |
 | `NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID` | `97` | Sin configurar | Esta entrega rechaza expresamente chain `56`. |
@@ -463,6 +465,8 @@ topologia o migracion de BBDD requiere una operacion separada con su propio plan
 | `TELEGRAM_BOT_TOKEN` | Bot staging | Bot production | Evitar publicar en chats reales durante QA. |
 | `TELEGRAM_CHAT_ID` | Chat staging | Chat production | Separado. |
 | `TELEGRAM_CLEANUP_SECRET` | Secret staging | Secret production | Separado. |
+
+Marketplace V2 Testnet: [direcciones, liquidez y cinco compras verificadas](evidence/2026-09-11-marketplace-v2-complete.json). Las nuevas variables públicas deben estar en `CUKIES_BUILD_ENV_JSON` de `cukies-staging` y en los ARG/ENV de `Dockerfile.ci`; no se copian a producción.
 
 ### Contracts deploy
 

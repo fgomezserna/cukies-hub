@@ -40,6 +40,25 @@ export type IndexedUkiMarketplaceOrder = {
   invalidReason?: `0x${string}`;
 };
 
+/**
+ * Identidad canónica de un NFT que puede aparecer en un anuncio UKI.
+ *
+ * El tokenId se conserva como decimal sin ceros a la izquierda y la
+ * colección siempre está normalizada en minúsculas.  La clave incluye la
+ * cadena porque un mismo tokenId puede existir en varias redes/colecciones.
+ */
+export type UkiMarketplaceAssetIdentity = {
+  chainId: 56 | 97;
+  collectionAddress: `0x${string}`;
+  tokenId: string;
+};
+
+export type UkiMarketplaceAssetMetadata = UkiMarketplaceAssetIdentity & {
+  imageUrl: string | null;
+  rarity: string | null;
+  generation: string | null;
+};
+
 export type UkiMarketplaceLiveInspection = {
   contractState: 0 | 1 | 2 | 3 | 4 | 5 | null;
   ownerNormalized: `0x${string}` | null;
@@ -68,6 +87,10 @@ export type UkiMarketplaceOrderView = {
   cancelledAt: string | null;
   expiredAt: string | null;
   invalidatedAt: string | null;
+  /** Metadata derivada del inventario; nunca se guarda en la orden indexada. */
+  imageUrl?: string | null;
+  rarity?: string | null;
+  generation?: string | null;
   catalogCursor?: string;
 };
 
