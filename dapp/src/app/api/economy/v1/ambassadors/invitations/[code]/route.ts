@@ -13,7 +13,12 @@ function json(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
     status,
     headers: {
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+      // Solo una invitación resuelta puede cachearse públicamente. Un 404 o
+      // un 503 transitorio no debe quedarse servido como si fuera un estado
+      // canónico del enlace.
+      "Cache-Control": status >= 400
+        ? "private, no-store, max-age=0"
+        : "public, max-age=60, stale-while-revalidate=300",
     },
   });
 }
