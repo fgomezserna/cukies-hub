@@ -11,6 +11,7 @@ import { createMongoGameEconomyPorts } from "./resource-ports";
 import { validGameDate, validGameText } from "./rules";
 import { createMongoGameEconomyService } from "./service";
 import { reconcileTreasureHuntEconomyRuns } from "./treasure-hunt";
+import { assertTreasureHuntStagingRuntime } from "./treasure-hunt-policy";
 
 const STATE_COLLECTION = "game_economy_runtime_state";
 const RUNS_COLLECTION = "game_economy_runtime_runs";
@@ -22,11 +23,7 @@ export type GameEconomyRuntimeConfig = {
   recoveryLimit: number;
   expiryLimit: number;
   leaseMs: number;
-  /**
-   * Lower bound for reward settlement candidates.  This is deliberately
-   * separate from the economic calendar anchor: the anchor may predate a
-   * runtime activation and therefore cannot protect an existing backlog.
-   */
+  /** Lower bound used only by the staging/testnet forward-only runtime. */
   rewardForwardActivationAt?: Date;
 };
 
@@ -152,6 +149,8 @@ export function loadGameEconomyRuntimeConfig(
   env: Record<string, string | undefined> = process.env,
 ): GameEconomyRuntimeConfig {
   const enabled = strictBoolean(env.GAME_ECONOMY_RUNTIME_ENABLED, "GAME_ECONOMY_RUNTIME_ENABLED");
+  const stagingForwardOnly = enabled && env.APP_ENV === "staging";
+  if (stagingForwardOnly) assertTreasureHuntStagingRuntime(env);
   const tickTimeoutMs = boundedInteger(
     env.GAME_ECONOMY_TICK_TIMEOUT_MS,
     240_000,
@@ -182,7 +181,7 @@ export function loadGameEconomyRuntimeConfig(
       60 * 60_000,
       "GAME_ECONOMY_TICK_LEASE_MS",
     ),
-    ...(enabled
+    ...(stagingForwardOnly
       ? {
           rewardForwardActivationAt: requiredCanonicalUtcDate(
             env.REWARD_FORWARD_ACTIVATION_AT,
@@ -299,13 +298,11 @@ export async function runGameEconomyRuntimeTick(input: {
   if (!config.enabled) {
     throw new GameEconomyRuntimeConfigurationError("El runtime GameEconomy esta desactivado.");
   }
-  if (
-    !config.rewardForwardActivationAt
-    || !(config.rewardForwardActivationAt instanceof Date)
-    || Number.isNaN(config.rewardForwardActivationAt.getTime())
-  ) {
+  if (config.rewardForwardActivationAt !== undefined
+    && (!(config.rewardForwardActivationAt instanceof Date)
+      || Number.isNaN(config.rewardForwardActivationAt.getTime()))) {
     throw new GameEconomyRuntimeConfigurationError(
-      "REWARD_FORWARD_ACTIVATION_AT es obligatorio con el runtime GameEconomy activo.",
+      "REWARD_FORWARD_ACTIVATION_AT debe ser una fecha valida.",
     );
   }
   const workerId = validGameText(input.workerId, "workerId");

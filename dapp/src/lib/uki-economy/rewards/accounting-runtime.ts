@@ -135,9 +135,12 @@ export function buildPendingTreasureHuntRewardPipeline(
         status: "settled",
         gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
         "rule.version": TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
-        settledAt: {
+        createdAt: {
           $type: "date",
           ...(forwardActivationAt ? { $gte: new Date(forwardActivationAt.getTime()) } : {}),
+        },
+        settledAt: {
+          $type: "date",
         },
       },
     },
@@ -164,7 +167,7 @@ export function buildPendingTreasureHuntRewardPipeline(
 export async function settlePendingTreasureHuntRewards(input: {
   now?: Date;
   limit?: number;
-  forwardActivationAt: Date;
+  forwardActivationAt?: Date;
 }) {
   const now = input.now ?? new Date();
   const limit = input.limit ?? 100;

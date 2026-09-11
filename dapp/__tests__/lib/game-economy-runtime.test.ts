@@ -27,18 +27,42 @@ describe("GameEconomy productive runtime and commands", () => {
     })).toThrow(/360000/);
   });
 
-  it("requires a canonical forward activation boundary for productive rewards", () => {
+  it("requires a canonical forward activation boundary only for staging", () => {
     expect(() => loadGameEconomyRuntimeConfig({
       GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
     })).toThrow(/REWARD_FORWARD_ACTIVATION_AT/);
     expect(() => loadGameEconomyRuntimeConfig({
       GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
       REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00Z",
     })).toThrow(/ISO UTC canonica/);
     expect(loadGameEconomyRuntimeConfig({
       GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
       REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00.000Z",
     }).rewardForwardActivationAt).toEqual(new Date("2026-07-10T12:00:00.000Z"));
+    expect(loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "production",
+    }).rewardForwardActivationAt).toBeUndefined();
+    expect(() => loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "56",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "56",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00.000Z",
+    })).toThrow(/TREASURE_HUNT_STAGING_RUNTIME_REQUIRED/);
   });
 
   it("recovers stale sagas before expiring sessions under one lease", async () => {
