@@ -9,11 +9,20 @@ import {
 
 const wallet = "0x1111111111111111111111111111111111111111";
 
-function mockPublicDb(weeklyRows: unknown[]) {
+function mockPublicDb(weeklyRows: unknown[], participantRows: unknown[] = []) {
   const calls: Array<{ operation: string; filter?: Record<string, unknown> }> = [];
   const db = {
     collection: jest.fn((name: string) => {
       const rowsFor = (filter: Record<string, unknown>) => {
+        if (name === "presale_game_participants") {
+          const wallets = (filter.walletAddress as { $in?: unknown[] } | undefined)?.$in;
+          if (!Array.isArray(wallets)) return [];
+          return participantRows.filter((row) => {
+            if (!row || typeof row !== "object") return false;
+            const walletAddress = (row as { walletAddress?: unknown }).walletAddress;
+            return typeof walletAddress === "string" && wallets.includes(walletAddress);
+          });
+        }
         if (name !== "treasure_hunt_weekly_bests") return [];
         return weeklyRows.filter((row) => {
           if (!row || typeof row !== "object") return false;
@@ -84,6 +93,71 @@ describe("Treasure Hunt weekly public overview", () => {
     for (const call of rankingCalls) {
       expect(call.filter?.creditSource).toEqual({ $in: ["own", "pool"] });
     }
+  });
+
+  it("mantiene el alias historico hasta que exista un alias semanal explicito", async () => {
+    const base = {
+      walletNormalized: wallet,
+      weeklyPeriodId: "th-week:2026-08-17T14:00:00.000Z",
+      gameId: "treasure-hunt",
+      scoreRaw: "900",
+      scoreDigits: 3,
+      creditSource: "own" as const,
+      cukieSource: "own" as const,
+      achievedAt: new Date("2026-08-20T10:00:00.000Z"),
+      winningGameId: "session-own",
+      authorityGameSessionId: "authority-own",
+      creditReservationId: "credit-own",
+      cukieAssignmentId: "cukie-own",
+      cukieAssetId: "asset-own",
+      revision: 0,
+      createdAt: new Date("2026-08-20T10:00:00.000Z"),
+      updatedAt: new Date("2026-08-20T10:00:00.000Z"),
+    };
+    const legacyParticipant = {
+      campaignId: "uki-staking-testnet-2026-08",
+      walletAddress: wallet,
+      alias: "LegacyRunner",
+      updatedAt: "2026-08-20T12:00:00.000Z",
+    };
+
+    mockPublicDb([base], [legacyParticipant]);
+    const fallbackOverview = await getTreasureHuntWeeklyOverview({
+      now: new Date("2026-08-20T12:00:00.000Z"),
+      pageSize: 20,
+    });
+    expect(fallbackOverview.entries[0]?.alias).toBe("LegacyRunner");
+
+    mockPublicDb([base], [
+      legacyParticipant,
+      {
+        campaignId: "treasure-hunt-weekly",
+        walletAddress: wallet,
+        alias: "GeneratedWeekly",
+        updatedAt: "2026-08-20T13:00:00.000Z",
+      },
+    ]);
+    const generatedWeeklyOverview = await getTreasureHuntWeeklyOverview({
+      now: new Date("2026-08-20T12:00:00.000Z"),
+      pageSize: 20,
+    });
+    expect(generatedWeeklyOverview.entries[0]?.alias).toBe("LegacyRunner");
+
+    mockPublicDb([base], [
+      legacyParticipant,
+      {
+        campaignId: "treasure-hunt-weekly",
+        walletAddress: wallet,
+        alias: "WeeklyRunner",
+        aliasChangedAt: "2026-08-20T12:00:00.000Z",
+        updatedAt: "2026-08-20T11:00:00.000Z",
+      },
+    ]);
+    const explicitWeeklyOverview = await getTreasureHuntWeeklyOverview({
+      now: new Date("2026-08-20T12:00:00.000Z"),
+      pageSize: 20,
+    });
+    expect(explicitWeeklyOverview.entries[0]?.alias).toBe("WeeklyRunner");
   });
 
   it("considera cubierta una partida reciente inferior a la mejor marca", () => {

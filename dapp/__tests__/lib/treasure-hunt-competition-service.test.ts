@@ -63,6 +63,13 @@ class MemoryCompetitionRepository implements CompetitionRepository {
     return this.participants.get(`${campaignId}:${walletAddress}`) ?? null;
   }
 
+  async findLatestParticipantByWallet(walletAddress: string, excludeCampaignId?: string) {
+    return [...this.participants.values()]
+      .filter((participant) =>
+        participant.walletAddress === walletAddress && participant.campaignId !== excludeCampaignId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0] ?? null;
+  }
+
   async updateParticipantAlias(input: {
     campaignId: string;
     walletAddress: string;
@@ -1357,6 +1364,23 @@ describe('Treasure Hunt competition service', () => {
 
     await expect(harness.service.updateAlias(wallet, 'TooLate'))
       .rejects.toMatchObject({ code: 'ALIAS_LOCKED', status: 409 });
+  });
+
+  it('reads the current alias without creating a weekly row until an explicit PATCH', async () => {
+    const harness = createHarness();
+    await harness.service.getParticipant(wallet);
+    await harness.service.updateAlias(wallet, 'LegacyRunner');
+
+    await expect(harness.service.getWeeklyParticipant(wallet))
+      .resolves.toMatchObject({ alias: 'LegacyRunner', canonicalAlias: 'legacyrunner' });
+    expect(harness.repository.participants.has(`treasure-hunt-weekly:${wallet}`)).toBe(false);
+
+    await expect(harness.service.updateWeeklyAlias(wallet, 'WeeklyRunner'))
+      .resolves.toMatchObject({ alias: 'WeeklyRunner', canonicalAlias: 'weeklyrunner' });
+    expect(harness.repository.participants.get(`treasure-hunt-weekly:${wallet}`)).toMatchObject({
+      alias: 'WeeklyRunner',
+      aliasChangedAt: expect.any(String),
+    });
   });
 
   it('keeps the closed campaign immutable while allowing the weekly alias scope', async () => {

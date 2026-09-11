@@ -35,6 +35,7 @@ type ParticipantAlias = {
   campaignId?: string;
   walletAddress: string;
   alias: string;
+  aliasChangedAt?: string | null;
   updatedAt: string;
 };
 
@@ -148,24 +149,36 @@ function publicAlias(wallet: string, alias?: string) {
   return displayCompetitionAlias(alias ?? generateCompetitionAlias(wallet));
 }
 
+function aliasPriority(participant: ParticipantAlias) {
+  if (participant.campaignId !== TREASURE_HUNT_WEEKLY_ALIAS_SCOPE) return 1;
+  return participant.aliasChangedAt != null ? 2 : 0;
+}
+
 async function aliasesFor(wallets: string[]) {
   if (wallets.length === 0) return new Map<string, string>();
   const db = await getEconomyDb();
   const participants = await db.collection<ParticipantAlias>("presale_game_participants")
     .find({ walletAddress: { $in: wallets } })
     .sort({ updatedAt: -1 })
-    .project<ParticipantAlias>({ _id: 0, campaignId: 1, walletAddress: 1, alias: 1, updatedAt: 1 })
+    .project<ParticipantAlias>({
+      _id: 0,
+      campaignId: 1,
+      walletAddress: 1,
+      alias: 1,
+      aliasChangedAt: 1,
+      updatedAt: 1,
+    })
     .toArray();
   const aliases = new Map<string, ParticipantAlias>();
   for (const participant of participants) {
     const wallet = participant.walletAddress.toLowerCase();
     const current = aliases.get(wallet);
-    const isWeekly = participant.campaignId === TREASURE_HUNT_WEEKLY_ALIAS_SCOPE;
-    const currentIsWeekly = current?.campaignId === TREASURE_HUNT_WEEKLY_ALIAS_SCOPE;
+    const priority = aliasPriority(participant);
+    const currentPriority = current ? aliasPriority(current) : -1;
     if (
       !current ||
-      (isWeekly && !currentIsWeekly) ||
-      (isWeekly === currentIsWeekly && participant.updatedAt > current.updatedAt)
+      priority > currentPriority ||
+      (priority === currentPriority && participant.updatedAt > current.updatedAt)
     ) {
       aliases.set(wallet, participant);
     }
