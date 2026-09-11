@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { MyCukiesPanel } from '@/components/cukies/my-cukies-panel';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
@@ -41,6 +41,7 @@ jest.mock('lucide-react', () => {
 });
 
 const wallet = '0x2222222222222222222222222222222222222222';
+const otherWallet = '0x5555555555555555555555555555555555555555';
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const fetchMock = jest.fn();
 
@@ -71,7 +72,7 @@ function item(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function response(items: ReturnType<typeof item>[]) {
+function response(items: ReturnType<typeof item>[], walletNormalized = wallet) {
   const inWallet = items.filter((cukie) => cukie.custody === 'wallet').length;
   const inPool = items.filter((cukie) => cukie.custody === 'cukie_pool').length;
   const inCukieMaster = items.filter((cukie) => cukie.custody === 'cukie_master').length;
@@ -80,7 +81,7 @@ function response(items: ReturnType<typeof item>[]) {
     json: async () => ({
       status: 'ok',
       data: {
-        walletNormalized: wallet,
+        walletNormalized,
         items,
         summary: {
           total: items.length,
@@ -98,6 +99,7 @@ function response(items: ReturnType<typeof item>[]) {
 
 describe('MyCukiesPanel', () => {
   beforeEach(() => {
+    fetchMock.mockReset();
     jest.clearAllMocks();
     global.fetch = fetchMock;
     mockUseAuth.mockReturnValue(authValue());
@@ -325,5 +327,199 @@ describe('MyCukiesPanel', () => {
     expect((await screen.findAllByText('Retirada disponible')).length).toBeGreaterThan(0);
     expect(screen.getByText(/Puedes retirarlo desde/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Retirar del Cukie Pool' })).toBeInTheDocument();
+  });
+
+  it('conserva la tarjeta mientras reconcilia una venta confirmada y desbloquea al converger sin recargar', async () => {
+    const available = item({
+      assetId: `56:${legacyMarketplaceContracts.bsc.contracts.token.toLowerCase()}:98000005`,
+      chainId: 56,
+      network: 'BSC',
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplaceSurface: 'legacy',
+      saleKind: null,
+      sellSurfaces: ['legacy', 'uki'],
+      availableActions: ['sell'],
+      generation: 'original',
+      rarity: 'legendary',
+    });
+    const listed = item({
+      assetId: available.assetId,
+      chainId: 56,
+      network: 'BSC',
+      collectionAddress: legacyMarketplaceContracts.bsc.contracts.token,
+      marketplaceSurface: 'legacy',
+      saleKind: 'legacy',
+      state: 'listed',
+      sellSurfaces: ['legacy', 'uki'],
+      availableActions: ['cancel_sale'],
+      generation: 'second_generation',
+      rarity: 'rare',
+    });
+    fetchMock
+      .mockResolvedValueOnce(response([available]))
+      .mockResolvedValueOnce(response([available]))
+      .mockResolvedValueOnce(response([listed]));
+
+    render(<MyCukiesPanel />);
+    await screen.findByRole('heading', { name: 'Cukie #98000005' });
+
+    jest.useFakeTimers();
+    try {
+      act(() => {
+        window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+          detail: {
+            assetId: available.assetId,
+            tokenId: available.tokenId,
+            collectionAddress: available.collectionAddress,
+            expectedState: 'listed',
+          },
+        }));
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(screen.getByRole('heading', { name: 'Cukie #98000005' })).toBeInTheDocument();
+      expect(screen.getByText('Original')).toBeInTheDocument();
+      expect(screen.getByText('Legendario')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Vender' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Vender en UKI' })).not.toBeInTheDocument();
+      expect(screen.getAllByText('Actualizando estado…')).toHaveLength(2);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(500);
+      });
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Cancelar venta' })).toBeInTheDocument());
+      expect(screen.getByText('Segunda generación')).toBeInTheDocument();
+      expect(screen.getByText('Raro')).toBeInTheDocument();
+      expect(screen.queryByText('Actualizando estado…')).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('libera saleA cuando llega el snapshot de saleA aunque saleB haya iniciado otra reconciliación', async () => {
+    const saleA = item({
+      tokenId: '98000005',
+      assetId: '97:0x3333333333333333333333333333333333333333:98000005',
+      network: 'BSC',
+      saleKind: null,
+      availableActions: ['sell'],
+    });
+    const saleB = item({
+      tokenId: '98000006',
+      assetId: '97:0x3333333333333333333333333333333333333333:98000006',
+      network: 'BSC',
+      saleKind: null,
+      availableActions: ['sell'],
+    });
+    const listedA = { ...saleA, state: 'listed', saleKind: 'uki', availableActions: ['cancel_sale'] };
+    const listedB = { ...saleB, state: 'listed', saleKind: 'uki', availableActions: ['cancel_sale'] };
+    fetchMock
+      .mockResolvedValueOnce(response([saleA, saleB]))
+      .mockResolvedValueOnce(response([saleA, saleB]))
+      .mockResolvedValueOnce(response([listedA, saleB]))
+      .mockResolvedValueOnce(response([listedA, listedB]));
+
+    render(<MyCukiesPanel />);
+    await screen.findByRole('heading', { name: 'Cukie #98000005' });
+    jest.useFakeTimers();
+    try {
+      act(() => {
+        window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+          detail: { assetId: saleA.assetId, tokenId: saleA.tokenId, collectionAddress: saleA.collectionAddress, expectedState: 'listed' },
+        }));
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(screen.getAllByText('Actualizando estado…')).toHaveLength(1);
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+          detail: { assetId: saleB.assetId, tokenId: saleB.tokenId, collectionAddress: saleB.collectionAddress, expectedState: 'listed' },
+        }));
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+      await waitFor(() => expect(screen.getByRole('link', { name: 'Cancelar venta' })).toBeInTheDocument());
+      expect(screen.getAllByText('Actualizando estado…')).toHaveLength(1);
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(500);
+      });
+      await waitFor(() => expect(screen.getAllByRole('link', { name: 'Cancelar venta' })).toHaveLength(2));
+      expect(screen.queryByText('Actualizando estado…')).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('no desbloquea por un anuncio ajeno con el mismo tokenId y exige el assetId exacto', async () => {
+    const target = item({
+      network: 'BSC',
+      saleKind: null,
+      availableActions: ['sell'],
+    });
+    const foreign = item({
+      assetId: '97:0x9999999999999999999999999999999999999999:98000005',
+      network: 'BSC',
+      collectionAddress: '0x9999999999999999999999999999999999999999',
+      saleKind: 'uki',
+      state: 'listed',
+      availableActions: ['cancel_sale'],
+    });
+    const listedTarget = { ...target, state: 'listed', saleKind: 'uki', availableActions: ['cancel_sale'] };
+    fetchMock
+      .mockResolvedValueOnce(response([target]))
+      .mockResolvedValueOnce(response([target, foreign]))
+      .mockResolvedValueOnce(response([listedTarget, foreign]));
+
+    render(<MyCukiesPanel />);
+    await screen.findByRole('heading', { name: 'Cukie #98000005' });
+    jest.useFakeTimers();
+    try {
+      act(() => {
+        window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+          detail: { assetId: target.assetId, tokenId: target.tokenId, collectionAddress: target.collectionAddress, expectedState: 'listed' },
+        }));
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(screen.getAllByText('Actualizando estado…')).toHaveLength(1);
+      const foreignCancel = screen.getAllByRole('link', { name: 'Cancelar venta' });
+      expect(foreignCancel).toHaveLength(1);
+      expect(foreignCancel[0]).toHaveAttribute('href', expect.stringContaining('0x9999999999999999999999999999999999999999'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(500);
+      });
+      await waitFor(() => {
+        const cancelLinks = screen.getAllByRole('link', { name: 'Cancelar venta' });
+        expect(cancelLinks).toHaveLength(2);
+        expect(cancelLinks.some((link) => link.getAttribute('href')?.includes(target.collectionAddress))).toBe(true);
+      });
+      expect(screen.queryByText('Actualizando estado…')).not.toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('limpia colección y bloqueos al cambiar de wallet aunque la API de la nueva wallet falle', async () => {
+    const initial = item({ network: 'BSC', saleKind: null, availableActions: ['sell'] });
+    fetchMock
+      .mockResolvedValueOnce(response([initial]))
+      .mockImplementationOnce(() => new Promise(() => undefined))
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ status: 'error' }) });
+
+    const { rerender } = render(<MyCukiesPanel />);
+    await screen.findByRole('heading', { name: 'Cukie #98000005' });
+    act(() => {
+      window.dispatchEvent(new CustomEvent('cukies:uki-marketplace:refresh', {
+        detail: { assetId: initial.assetId, tokenId: initial.tokenId, collectionAddress: initial.collectionAddress, expectedState: 'listed' },
+      }));
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.getAllByText('Actualizando estado…')).toHaveLength(1);
+
+    mockUseAuth.mockReturnValue(authValue({ walletAddress: otherWallet } as User));
+    rerender(<MyCukiesPanel />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No podemos cargar tu colección ahora');
+    expect(screen.queryByRole('heading', { name: 'Cukie #98000005' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Actualizando estado…')).not.toBeInTheDocument();
   });
 });

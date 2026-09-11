@@ -38,9 +38,24 @@ import type {
   MyCukieAction,
 } from '@/lib/cukies-data/my-collection-types';
 import { getLegacyMarketplaceDetailHref } from '@/lib/legacy-marketplace/identity';
+import {
+  isTransactionRefreshAborted,
+  retryTransactionRefresh,
+} from '@/lib/transaction-refresh';
 import { useAuth } from '@/providers/auth-provider';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'unavailable';
+
+type CollectionRefreshTarget = {
+  assetId?: string;
+  tokenId?: string;
+  collectionAddress?: string | null;
+  expectedState?: MyCukieCollectionItem['state'];
+};
+
+type CollectionRefreshDetail = CollectionRefreshTarget & {
+  hash?: string;
+};
 
 const CukieSaleDialog = dynamic(
   () => import('@/components/cukies/cukie-sale-dialog').then((module) => module.CukieSaleDialog),
@@ -354,6 +369,32 @@ function collectionOrder(cukie: MyCukieCollectionItem) {
   return 4;
 }
 
+function sameCollectionIdentity(
+  item: MyCukieCollectionItem,
+  target: CollectionRefreshTarget,
+) {
+  // An asset id is the canonical identity. If it is supplied, a token id
+  // match from another collection must never satisfy this target.
+  if (target.assetId) return item.assetId === target.assetId;
+  if (!target.tokenId || item.tokenId !== target.tokenId) return false;
+  if (!target.collectionAddress) return true;
+  return item.collectionAddress.toLowerCase() === target.collectionAddress.toLowerCase();
+}
+
+function collectionTargetKey(target: CollectionRefreshTarget) {
+  if (target.assetId) return `asset:${target.assetId}`;
+  return `token:${target.tokenId ?? ''}:${target.collectionAddress?.toLowerCase() ?? ''}`;
+}
+
+function collectionTargetMatches(
+  data: MyCukieCollectionData,
+  target?: CollectionRefreshTarget,
+) {
+  if (!target) return false;
+  const item = data.items.find((candidate) => sameCollectionIdentity(candidate, target));
+  return Boolean(item && (!target.expectedState || item.state === target.expectedState));
+}
+
 export function MyCukiesPanel() {
   const { user, isLoading: authLoading } = useAuth();
   const walletAddress = user?.walletAddress ?? null;
@@ -365,6 +406,17 @@ export function MyCukiesPanel() {
     preferredSurface?: 'uki';
   } | null>(null);
   const requestIdRef = useRef(0);
+  const refreshAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(false);
+  const collectionRef = useRef<MyCukieCollectionData | null>(null);
+  const saleSelectionRef = useRef(saleSelection);
+  const pendingRefreshTargetsRef = useRef<Map<string, CollectionRefreshTarget>>(new Map());
+  const pendingRefreshTargetAssetsRef = useRef<Map<string, string>>(new Map());
+  const [pendingRefreshAssets, setPendingRefreshAssets] = useState<Set<string>>(
+    () => new Set(),
+  );
+  collectionRef.current = collection;
+  saleSelectionRef.current = saleSelection;
   const items = useMemo(() => collection?.items ?? [], [collection]);
   const visibleItems = useMemo(() => items
     .filter((item) => filterMatches(item, filter))
@@ -373,15 +425,16 @@ export function MyCukiesPanel() {
   const load = useCallback(async (
     signal?: AbortSignal,
     expectedRequestId = requestIdRef.current,
-  ) => {
-    if (!walletAddress) return;
+    options: { preserve?: boolean } = {},
+  ): Promise<MyCukieCollectionData | null> => {
+    if (!walletAddress) return null;
     const requestedWallet = walletAddress;
     const isCurrentRequest = () => (
       requestIdRef.current === expectedRequestId
       && walletAddress === requestedWallet
       && !signal?.aborted
     );
-    setState('loading');
+    if (!options.preserve && isCurrentRequest()) setState('loading');
     const params = new URLSearchParams({ walletAddress });
     const response = await fetch('/api/cukies/mine?' + params.toString(), {
       cache: 'no-store',
@@ -390,39 +443,173 @@ export function MyCukiesPanel() {
     });
     const body = await response.json() as MyCukieCollectionResponse;
     if (!response.ok || body.status !== 'ok') throw new Error('CUKIES_UNAVAILABLE');
-    if (!isCurrentRequest()) return;
+    if (!isCurrentRequest()) return null;
+    if (body.data.walletNormalized.toLowerCase() !== requestedWallet.toLowerCase()) {
+      throw new Error('COLLECTION_CONTEXT_CHANGED');
+    }
+    collectionRef.current = body.data;
     setCollection(body.data);
     setState('ready');
+    return body.data;
   }, [walletAddress]);
 
-  const refreshAfterSale = useCallback(() => {
-    const requestId = requestIdRef.current;
-    void load(undefined, requestId).catch(() => {
-      if (requestIdRef.current === requestId) setState('unavailable');
+  const runRefresh = useCallback((target?: CollectionRefreshTarget) => {
+    if (!walletAddress) return;
+    if (target && (target.assetId || target.tokenId)) {
+      const targetKey = collectionTargetKey(target);
+      pendingRefreshTargetsRef.current.set(targetKey, target);
+      const knownAssetId = target.assetId
+        ?? collectionRef.current?.items.find((item) => sameCollectionIdentity(item, target))?.assetId;
+      if (knownAssetId) pendingRefreshTargetAssetsRef.current.set(targetKey, knownAssetId);
+      setPendingRefreshAssets((current) => {
+        if (!knownAssetId || current.has(knownAssetId)) return current;
+        const next = new Set(current);
+        next.add(knownAssetId);
+        return next;
+      });
+    }
+    refreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    refreshAbortRef.current = controller;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    if (target?.assetId) {
+      setPendingRefreshAssets((current) => {
+        const next = new Set(current);
+        next.add(target.assetId as string);
+        return next;
+      });
+    }
+    void retryTransactionRefresh(
+      async () => {
+        try {
+          const data = await load(controller.signal, requestId, { preserve: true });
+          if (!data) return false;
+          const resolvedAssets = new Set<string>();
+          for (const [targetKey, pendingTarget] of pendingRefreshTargetsRef.current) {
+            if (!collectionTargetMatches(data, pendingTarget)) continue;
+            const resolvedAssetId = pendingRefreshTargetAssetsRef.current.get(targetKey)
+              ?? data.items.find((item) => sameCollectionIdentity(item, pendingTarget))?.assetId;
+            if (resolvedAssetId) resolvedAssets.add(resolvedAssetId);
+            pendingRefreshTargetsRef.current.delete(targetKey);
+            pendingRefreshTargetAssetsRef.current.delete(targetKey);
+          }
+          if (resolvedAssets.size > 0) {
+            const stillPendingAssets = new Set(pendingRefreshTargetAssetsRef.current.values());
+            setPendingRefreshAssets((current) => {
+              const next = new Set(current);
+              for (const assetId of resolvedAssets) {
+                if (!stillPendingAssets.has(assetId)) next.delete(assetId);
+              }
+              return next;
+            });
+          }
+          // A manual refresh ends after the first valid payload. A
+          // post-transaction refresh keeps polling until every remembered
+          // target converges, including targets from an earlier loop.
+          return pendingRefreshTargetsRef.current.size === 0;
+        } catch (reason) {
+          if (isTransactionRefreshAborted(reason)) throw reason;
+          return false;
+        }
+      },
+      { signal: controller.signal },
+    ).catch(() => {
+      // A newer read, wallet change or unmount owns the next state.
+    }).finally(() => {
+      if (refreshAbortRef.current === controller) refreshAbortRef.current = null;
     });
-  }, [load]);
+  }, [load, walletAddress]);
+
+  const refreshAfterSale = useCallback(() => {
+    const selected = saleSelectionRef.current?.cuki;
+    runRefresh(selected ? {
+      assetId: selected.assetId,
+      tokenId: selected.tokenId,
+      collectionAddress: selected.collectionAddress,
+      expectedState: 'listed',
+    } : undefined);
+  }, [runRefresh]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshAbortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    if (!walletAddress) {
+    refreshAbortRef.current?.abort();
+    const requestedWallet = walletAddress?.toLowerCase() ?? null;
+    const loadedWallet = collectionRef.current?.walletNormalized?.toLowerCase() ?? null;
+    const walletChanged = Boolean(requestedWallet && loadedWallet && requestedWallet !== loadedWallet);
+    if (!walletAddress || walletChanged) {
+      collectionRef.current = null;
+      pendingRefreshTargetsRef.current.clear();
+      pendingRefreshTargetAssetsRef.current.clear();
+      setPendingRefreshAssets(new Set());
       setCollection(null);
+    }
+    if (!walletAddress) {
       setState('idle');
       return;
     }
     const controller = new AbortController();
+    refreshAbortRef.current = controller;
     load(controller.signal, requestId).catch((error: unknown) => {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       if (requestIdRef.current !== requestId) return;
-      setCollection(null);
-      setState('unavailable');
+      if (!collectionRef.current) {
+        setCollection(null);
+        setState('unavailable');
+      } else {
+        setState('ready');
+      }
     });
     return () => {
       controller.abort();
+      if (refreshAbortRef.current === controller) refreshAbortRef.current = null;
       if (requestIdRef.current === requestId) requestIdRef.current += 1;
     };
   }, [authLoading, load, walletAddress]);
+
+  useEffect(() => {
+    const refreshFromTransaction = (event: Event) => {
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as CollectionRefreshDetail
+        : {};
+      const selected = saleSelectionRef.current?.cuki;
+      const target: CollectionRefreshTarget | undefined = detail.assetId || detail.tokenId
+        ? {
+            assetId: typeof detail.assetId === 'string' ? detail.assetId : selected?.assetId,
+            tokenId: typeof detail.tokenId === 'string' ? detail.tokenId : selected?.tokenId,
+            collectionAddress: typeof detail.collectionAddress === 'string'
+              ? detail.collectionAddress
+              : selected?.collectionAddress,
+            expectedState: detail.expectedState ?? 'listed',
+          }
+        : selected
+          ? {
+              assetId: selected.assetId,
+              tokenId: selected.tokenId,
+              collectionAddress: selected.collectionAddress,
+              expectedState: 'listed',
+            }
+          : undefined;
+      runRefresh(target);
+    };
+    window.addEventListener('cukies:legacy-marketplace:refresh', refreshFromTransaction);
+    window.addEventListener('cukies:uki-marketplace:refresh', refreshFromTransaction);
+    return () => {
+      refreshAbortRef.current?.abort();
+      window.removeEventListener('cukies:legacy-marketplace:refresh', refreshFromTransaction);
+      window.removeEventListener('cukies:uki-marketplace:refresh', refreshFromTransaction);
+    };
+  }, [runRefresh]);
 
   if (authLoading) {
     return (
@@ -458,12 +645,7 @@ export function MyCukiesPanel() {
             <h1 className="mt-2 text-balance font-headline text-4xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-5xl">Mis Cukies</h1>
             <p className="mt-4 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">Aquí aparecen los Cukies asociados a tu wallet. Abre una ficha para ver sus datos o elige una acción para utilizarlos.</p>
           </div>
-          <button type="button" onClick={() => {
-            const requestId = requestIdRef.current;
-            void load(undefined, requestId).catch(() => {
-              if (requestIdRef.current === requestId) setState('unavailable');
-            });
-          }} disabled={state === 'loading'} className="inline-flex items-center gap-2 rounded-[8px] px-2 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:bg-[var(--uki-lilac-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#09060f] disabled:opacity-50 motion-reduce:transition-none">
+          <button type="button" onClick={() => runRefresh()} disabled={state === 'loading'} className="inline-flex items-center gap-2 rounded-[8px] px-2 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:bg-[var(--uki-lilac-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#09060f] disabled:opacity-50 motion-reduce:transition-none">
             <RefreshCw className={state === 'loading' ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} aria-hidden="true" />
             Actualizar colección
           </button>
@@ -502,6 +684,12 @@ export function MyCukiesPanel() {
         </Link>
       </section>
 
+      {pendingRefreshAssets.size > 0 ? (
+        <div role="status" className="mt-6 rounded-[12px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 text-sm font-semibold text-[var(--uki-text)]">
+          La transacción está confirmada. Estamos actualizando el estado del Cukie; no repitas la operación.
+        </div>
+      ) : null}
+
       {state === 'unavailable' ? (
         <div role="alert" className="mt-6 rounded-[12px] border border-white/10 bg-black/25 p-5">
           <p className="font-black text-[var(--uki-cream)]">No podemos cargar tu colección ahora</p>
@@ -534,6 +722,7 @@ export function MyCukiesPanel() {
           <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {visibleItems.map((cukie) => {
               const explicitActions = actionsFor(cukie);
+              const isRefreshPending = pendingRefreshAssets.has(cukie.assetId);
               const hasAlternateUkiSale = cukie.state === 'available'
                 && cukie.marketplaceSurface === 'legacy'
                 && cukie.sellSurfaces?.includes('uki');
@@ -618,6 +807,18 @@ export function MyCukiesPanel() {
                           }
                           const className = actionClassName(action);
                           const content = <><ActionIcon className={`h-4 w-4 shrink-0 ${action === 'sell' ? 'text-[#120817]' : 'text-[var(--uki-lilac)]'}`} aria-hidden="true" /><span className="min-w-0 break-words">{actionLabel(action)}</span></>;
+                          if (isRefreshPending) {
+                            return (
+                              <span
+                                key={action}
+                                role="status"
+                                className={`${className} cursor-wait opacity-70`}
+                              >
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+                                <span className="min-w-0 break-words">Actualizando estado…</span>
+                              </span>
+                            );
+                          }
                           if (action === 'sell') {
                             return (
                               <a
@@ -639,6 +840,9 @@ export function MyCukiesPanel() {
                           (() => {
                             const fallback = itemAction(cukie);
                             const FallbackIcon = fallbackActionIcon(cukie);
+                            if (isRefreshPending) {
+                              return <span role="status" className={`${actionClassName('request_pool_exit')} cursor-wait opacity-70`}><Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" /><span className="min-w-0 break-words">Actualizando estado…</span></span>;
+                            }
                             return <Link href={fallback.href} className={`${actionClassName('request_pool_exit')}`}><FallbackIcon className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" /><span className="min-w-0 break-words">{fallback.label}</span></Link>;
                           })()
                         ) : hasActionsField(cukie) ? (
@@ -650,10 +854,18 @@ export function MyCukiesPanel() {
                           (() => {
                             const fallback = itemAction(cukie);
                             const FallbackIcon = fallbackActionIcon(cukie);
+                            if (isRefreshPending) {
+                              return <span role="status" className={`${actionClassName('deposit_pool')} cursor-wait opacity-70`}><Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" /><span className="min-w-0 break-words">Actualizando estado…</span></span>;
+                            }
                             return <Link href={fallback.href} className={`${actionClassName('deposit_pool')}`}><FallbackIcon className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" /><span className="min-w-0 break-words">{fallback.label}</span></Link>;
                           })()
                         )}
-                        {hasAlternateUkiSale ? (
+                        {hasAlternateUkiSale ? isRefreshPending ? (
+                          <span role="status" className={`${actionClassName('deposit_pool')} cursor-wait opacity-70`}>
+                            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+                            <span className="min-w-0 break-words">Actualizando estado…</span>
+                          </span>
+                        ) : (
                           <a
                             href={ukiMarketplaceHref(cukie) ?? '/marketplace'}
                             aria-haspopup="dialog"

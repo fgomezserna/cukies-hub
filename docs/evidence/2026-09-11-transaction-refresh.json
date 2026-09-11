@@ -1,5 +1,5 @@
 {
-  "status": "second-delivery-published-collection-legacy-followup-in-progress",
+  "status": "second-delivery-published-collection-vesting-candidate-under-validation",
   "recordedAt": "2026-09-11T00:03:05.483834+00:00",
   "scope": "Automatic UI convergence after confirmed transactions; staging only",
   "baseCommit": "151c33bf02533963973358a2eb486cc9dc5b6087",
@@ -146,10 +146,10 @@
   ],
   "areas": {
     "masterAndRuntime": "PR404 published and read-only browser verified; deferred reconciliation covered by component tests",
-    "marketplaceAndClaims": "Marketplace and rewards PR405 published/verified. Vesting final correction implemented, awaiting combined validation with collection/legacy.",
+    "marketplaceAndClaims": "Marketplace and rewards PR405 published/verified. Vesting reviewed with released-amount proof and operation-generation CAS; isolated validation next.",
     "poolRecovery": "PR405 published/verified; receipt and epoch reconciliation, automatic retry, per-NFT pending locks",
-    "bridgeBreeding": "active legacy write paths identified; receipt and refresh follow-up pending",
-    "myCukies": "Confirmed gap: sale completion performs one immediate inventory request without retry; bounded follow-up queued with Bridge/Breeding"
+    "bridgeBreeding": "Receipt and refresh correction in progress; existing runtime write gates remain unchanged",
+    "myCukies": "Implemented and root-reviewed: retained inventory, per-asset targets across concurrent sales, all conflicting actions locked, wallet-scoped refresh; isolated validation next."
   },
   "validation": {
     "focal": {
@@ -187,7 +187,7 @@
         "typecheck": "passed",
         "includesUnpublishedVestingHappyPath": true
       },
-      "full": "pending isolated candidate validation"
+      "full": "Completed on isolated source 215d34b; see secondFull"
     },
     "secondFull": {
       "sha": "215d34b0120585fa63a993aea6dce2aace679e89",
@@ -201,10 +201,17 @@
     },
     "vestingFocal": {
       "suites": 1,
-      "tests": 2,
+      "tests": 3,
       "result": "passed",
       "lint": "passed without warnings",
-      "typecheck": "not isolated; working Breeding file errors prevented shared tsc; final isolated check pending"
+      "typecheck": "final isolated candidate check pending; shared in-progress Bridge file prevented global tsc",
+      "sha": "10acf4f",
+      "review": "Confirmed released amount, independent account reads, and operation-generation CAS across wallet changes"
+    },
+    "collectionFocal": {
+      "suites": 1,
+      "tests": 15,
+      "result": "passed including alternate-sale and per-asset pending regressions"
     }
   },
   "transactionsSignedByAgent": false,
@@ -253,8 +260,8 @@
     "branch": "codex/tx-confirmation-collection-20260911",
     "poolRecovery": "receipt, custody/epoch and automatic retry",
     "marketplaceClaims": "receipt replacement, delayed projections, per-operation locks and shared account refresh",
-    "collectionLegacy": "My Cukies sale reconciliation; Bridge source receipt and transit, Breeding receipt and refresh",
-    "vesting": "Receipt-confirmed claim remains locked until released amount proves refreshed state; correction in progress"
+    "collectionLegacy": "Third delivery: My Cukies and Vesting. Separate final delivery: Bridge source/transit, Breeding receipt/projection and strict TRON confirmation.",
+    "vesting": "Implemented and root-reviewed: receipt-confirmed claim remains locked until released amount changes; late wallet A cannot overwrite newer B operation"
   },
   "secondDelivery": {
     "pr": "https://github.com/fgomezserna/cukies-hub/pull/405",
@@ -303,12 +310,14 @@
     "browser": {
       "routes": [
         "/cukie-hodler#mi-cukie-pool",
-        "/marketplace"
+        "/marketplace",
+        "/premios"
       ],
       "pool": "2 current positions, 6 available wallet NFTs, no pending refresh spinner",
       "marketplace": "V2 UKI and Legacy BSC/TRON listings with prices loaded",
       "method": "authenticated read-only navigation after deploy",
-      "limit": "No real wallet transaction signed; delayed reads and pending receipt behavior covered by regression tests"
+      "limit": "No real wallet transaction signed; delayed reads and pending receipt behavior covered by regression tests",
+      "rewards": "Por cobrar / Historial tabs hydrate; existing account has zero claimable rewards, with an explicit empty state and no stuck loading"
     }
   }
 }
