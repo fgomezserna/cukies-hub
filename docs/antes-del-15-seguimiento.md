@@ -164,7 +164,7 @@ el usuario ha retirado NFTs después y se comprobará de nuevo por identidad.
 El alias de competición y el nombre público general son fuentes distintas;
 no se supone una relación entre ambos sin verificarla.
 
-Estado del programa revisado el **11 de septiembre de 2026, 18:09 UTC**. PR426 está
+Estado del programa revisado el **11 de septiembre de 2026, 18:25 UTC**. PR426 está
 servida en producción; PR428, PR425 y PR427 están integradas y servidas en
 staging. PR427 no ha ejecutado recuperación ni acreditado UKI. L2 entregó
 PR430, revisada para R1/C1/C2 y aún parcial en R2; PR429 se integró
@@ -187,6 +187,12 @@ L4 entregó [PR434](https://github.com/fgomezserna/cukies-hub/pull/434),
 `d0c60f83`; la revisión independiente confirmó un P1: un periodo histórico
 con artefactos creados después de la frontera puede prepararse/publicarse.
 Se ha pedido corregir la selección por periodo canónico antes de integrarla.
+La auditoría adicional confirmó que weekly-ranking también inicia catch-up
+desde la regla más antigua: un segundo implementador Luna Max corrige ese
+límite en paralelo, solo en ranking, para integrar ambos cambios en PR434.
+La raíz añadió la propagación de la misma frontera a web y workers;
+las cuatro pruebas de Compose generado pasan. Pool necesita conservar su
+limpieza normal de leases/locks expirados; no recupera premios históricos.
 L6 terminó el diagnóstico sin parche nuevo; A1 permanece abierto. L7 sigue en cola.
 Modelo de las siete: **Luna Max**, con revisión e integración
 de **Astra Max** en la tarea raíz `01a07aec-6bc1-7203-8f43-357ed4b8931c`.
@@ -276,6 +282,10 @@ en c82498be; CI34630108075SUCCESS y postflight18:09UTC correctos.
   se creó después de la frontera. El primer diario/semanal futuro pasó la prueba
   independiente sin weekly histórico; se preservan reservas canónicas válidas.
   La activación espera la corrección y el cierre de dependencias operativas.
+  La dependencia weekly-ranking está confirmada y en implementación separada
+  en `codex/doc11-ranking-forward-boundary`, para el mismo PR434. Se limita
+  el primer cierre/reconciliación al periodo completo de la frontera; no cambia
+  el catch-up de producción. No se requiere reescribir el historial del Pool.
   La revisión Astra independiente de433 terminó sin hallazgos pendientes.
   L1 tiene pendiente validar operaciones nuevas en el
   producto servido. L5 consume los resultados canónicos nuevos de L4. L7 requiere respuesta
