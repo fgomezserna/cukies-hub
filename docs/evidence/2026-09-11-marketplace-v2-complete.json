@@ -3,9 +3,9 @@
   "issue": "https://github.com/fgomezserna/cukies-hub/issues/409",
   "environment": "staging",
   "chainId": 97,
-  "status": "onchain_and_local_qa_verified_deployment_pending",
+  "status": "deployed_staging_and_live_product_verified",
   "baseSha": "0b34d7d9acf5e45faf22b9a502604e789410af5b",
-  "observedAt": "2026-09-11T01:51:35.450Z",
+  "observedAt": "2026-09-11T02:58:14.055853+00:00",
   "addresses": {
     "marketplace": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
     "uki": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
@@ -357,7 +357,84 @@
         "docs/evidence/2026-09-11-marketplace-v2-qa/v2-purchase-usdc-mobile.png"
       ]
     },
-    "liveProduct": "pending merge and deployed SHA verification",
+    "liveProduct": {
+      "servedSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+      "url": "https://cukieshub.eurekand.com/marketplace",
+      "catalogAndImages": {
+        "observedAt": "2026-09-11T02:52:48.929418+00:00",
+        "catalog": "https://cukieshub.eurekand.com/api/marketplace/v1/catalog?limit=24&scope=all&legacyOffset=0&sort=newest",
+        "sources": {
+          "legacy": "ready",
+          "uki": "ready"
+        },
+        "orders": [
+          {
+            "tokenId": "98000005",
+            "orderId": "0x34b4f173ebf378dd2c074f69b7bd47d33ae9ee01d445cb7c69d9534d68ba736f",
+            "status": "active",
+            "imageUrl": "https://assets-staging.cukies.world/OTgwMDAwMDU/e2b3c0e9917ed69c7f96817b26e49ee0cc100d2fa5af6558145fe375391762d5.png",
+            "imageStatus": 200,
+            "imageContentType": "image/png",
+            "rarity": "legendary",
+            "generation": "original"
+          },
+          {
+            "tokenId": "98000007",
+            "orderId": "0x80679d26658b415044ce433a59172251777f0c959e4892a99b1336b0259676dd",
+            "status": "active",
+            "imageUrl": "https://assets-staging.cukies.world/OTgwMDAwMDc/7fef6a1efd2930b92193ecaeff7f74592709d3266ffee7ebcf777b9c446dd1e3.png",
+            "imageStatus": 200,
+            "imageContentType": "image/png",
+            "rarity": "common",
+            "generation": "second_generation"
+          }
+        ],
+        "status": "public_images_verified"
+      },
+      "publicPurchaseSheet": {
+        "scope": "Public staging page with all local API fixtures removed before navigation; read-only quotes, no signature.",
+        "viewports": [
+          "1440x1000",
+          "390x844",
+          "320x740"
+        ],
+        "paymentOptions": [
+          "UKI",
+          "ASM",
+          "BNB",
+          "USDT",
+          "USDC"
+        ],
+        "quotes": "Five currencies selectable; price, 5 percent fee and authorized maximum visible.",
+        "mobileCta": "Within 320px viewport and at least 44px high.",
+        "screenshots": [
+          "docs/evidence/2026-09-11-marketplace-v2-qa/v2-live-purchase-desktop.png",
+          "docs/evidence/2026-09-11-marketplace-v2-qa/v2-live-purchase-mobile.png"
+        ]
+      },
+      "authenticatedCollection": {
+        "scope": "Existing user Edge session, staging /cukies after reload.",
+        "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "total": 12,
+        "walletCount": 6,
+        "available": 4,
+        "listed": 2,
+        "pool": 5,
+        "cukieMaster": 1,
+        "listedTokenIds": [
+          "98000005",
+          "98000007"
+        ],
+        "imagesVisible": true,
+        "cancelSaleButtonOnEachListedCard": true,
+        "cancelSheetOpenedFor": "98000005",
+        "priceUki": "1250",
+        "generation": "Original",
+        "rarity": "Legendario",
+        "cancelSheetClosedWithoutSigning": true,
+        "genericMarketplaceButtonRemovedFromIndividualV2Cards": true
+      }
+    },
     "deliveryInvariants": {
       "passed": 131,
       "failed": 0,
@@ -370,5 +447,52 @@
     "Testnet stablecoins are tUSDT/tUSDC fixtures with 18 decimals, not real stablecoins.",
     "Residual test BNB in ephemeral wallets was not swept.",
     "30 to 15 minute cycle change remains cancelled."
-  ]
+  ],
+  "pullRequest": "https://github.com/fgomezserna/cukies-hub/pull/410",
+  "deployment": {
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34554177044",
+    "health": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "staging",
+      "gitSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+      "gitRef": "staging",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "fqdn": null
+      }
+    },
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "workerCount": 10,
+    "workersRunningNoRestarts": true,
+    "protected": {
+      "total": 80,
+      "preserved": 80,
+      "changed": []
+    },
+    "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+    "observedAt": "2026-09-11T02:53:09.095157+00:00",
+    "release": {
+      "commit": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+      "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+      "updatedAt": "2026-09-11T02:52:40.545Z",
+      "webResourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+      "workersResourceUuid": "u4s804o4wwcckowgk0woo4wg",
+      "gameResourceUuid": "lc04cw8gs4koo4swwws0c4ss"
+    },
+    "imageDigests": {
+      "dapp": "sha256:3516c291367cd594102e26d59bddbeae238e2cc6e0b3b1ebc65819f718ba038b",
+      "chain-indexer": "sha256:851524e0d3630a241840e50f0d7250937b6830e5c8c529b6122372d4fa05954c",
+      "cuki-card-worker": "sha256:db9d527cc334c14cec4bf3d69dd0179593673acb8f58fa0388469b8dc2f8cdf2",
+      "schedulers": "sha256:f84252e8a21285d15359f5f17a7ecb014908b2bd4741e3cd6d1c74fb023750fb",
+      "cukies-bridge-relayer": "sha256:635853cee6e090b4b84b8f5cc6d059d7a4c01a15ff1da3435441b9f79df1179b",
+      "treasure-hunt": "sha256:3fe6c04cb463920a45a7b5471434ac8a2b5a6c66f67c7883d97cf472bfa0bf92",
+      "world-api": "sha256:41d91369c0fc7e9d7b6bac504f0862876560ce145e3013951a52a8776efe132e",
+      "world-matchmaking": "sha256:d8506aa6baf76dd61a3a746db9aee9bbf00245bf3d8643f253fd5171f66af769"
+    },
+    "worldRuntimeActivated": false,
+    "productionChanged": false
+  }
 }
