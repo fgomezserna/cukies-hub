@@ -27,6 +27,7 @@ import {
 import {
   buildCreditSourceHealthEvidenceHash,
   classifyCreditSourceHealth,
+  creditSourceBlockingEventFilter,
   creditSourceCursorIsHealthy,
 } from "./source-health";
 import {
@@ -1007,14 +1008,15 @@ export function createMongoCompetitionCreditRepository(
       const aliases = route === "uki"
         ? ["UKI_STAKING", "VESTING_VAULT"]
         : ["TOKEN_V2", "CUKIE_MASTER_NFT_VAULT"];
-      // TOKEN_V2 ownership is an ancillary inventory projection for the
-      // custodial NFT route. Credit slots are materialized from the Master
-      // vault events; keep TOKEN_V2 alarms visible without making an old
-      // ownership dead letter force a credit backfill.
+      // Only TOKEN_V2 Transfer ownership is ancillary for the custodial NFT
+      // route. Metadata and unknown TOKEN_V2 events can change entitlement
+      // inputs and therefore remain in the blocking predicate.
       const nftMode = route === "nft" ? ukiNftVaults.mode.cukieMaster : undefined;
-      const blockingEventAliases = route === "nft" && nftMode === 'custodial'
-        ? ["CUKIE_MASTER_NFT_VAULT"]
-        : aliases;
+      const blockingEventFilter = creditSourceBlockingEventFilter({
+        route,
+        nftMode,
+        aliases,
+      });
       const expectedCursorIds = route === "uki"
         ? [
             "UKI_STAKING:Staked",
@@ -1090,14 +1092,12 @@ export function createMongoCompetitionCreditRepository(
           options
         ),
         db.collection("chain_dead_letters").countDocuments(
-          {
-            contractAlias: { $in: blockingEventAliases },
-          },
+          blockingEventFilter,
           options
         ),
         db.collection("chain_events").countDocuments(
           {
-            contractAlias: { $in: blockingEventAliases },
+            ...blockingEventFilter,
             status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
           },
           options

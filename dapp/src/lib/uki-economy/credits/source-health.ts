@@ -40,6 +40,38 @@ export function creditSourceCursorIsHealthy(input: {
 
 export type CreditNftSourceMode = 'legacy' | 'custodial' | 'invalid';
 
+export function isAncillaryNftCreditEvent(input: {
+  nftMode?: CreditNftSourceMode;
+  contractAlias?: unknown;
+  eventName?: unknown;
+}) {
+  return input.nftMode === 'custodial'
+    && input.contractAlias === 'TOKEN_V2'
+    && input.eventName === 'Transfer';
+}
+
+/**
+ * Returns the event predicate that can mutate the NFT credit source. The
+ * custodial exception is deliberately limited to TOKEN_V2 Transfer events;
+ * metadata events remain blocking because entitlement reads rarity/generation
+ * from the `cukies` projection they materialize.
+ */
+export function creditSourceBlockingEventFilter(input: {
+  route: 'uki' | 'nft';
+  nftMode?: CreditNftSourceMode;
+  aliases: readonly string[];
+}) {
+  if (input.route === 'nft' && input.nftMode === 'custodial') {
+    return {
+      $or: [
+        { contractAlias: 'CUKIE_MASTER_NFT_VAULT' },
+        { contractAlias: 'TOKEN_V2', eventName: { $ne: 'Transfer' } },
+      ],
+    };
+  }
+  return { contractAlias: { $in: [...input.aliases] } };
+}
+
 export type CreditSourceHealthClassification = {
   healthy: boolean;
   blockingWarnings: string[];
@@ -48,9 +80,10 @@ export type CreditSourceHealthClassification = {
 
 /**
  * Classifies source warnings without discarding any evidence. In custodial
- * mode the TOKEN_V2 ownership projection is ancillary to the vault-backed
- * credit slots; its dead-letter/pending alarms remain visible but do not block
- * a new cut unless the vault itself also has a pending or dead-letter event.
+ * mode only TOKEN_V2 Transfer ownership alarms are ancillary to the
+ * vault-backed credit slots; metadata and unknown TOKEN_V2 events remain
+ * blocking because they can change entitlement inputs. Transfer alarms remain
+ * visible but do not block a new cut unless a blocking event is also present.
  * Legacy and invalid modes keep every NFT warning blocking.
  */
 export function classifyCreditSourceHealth(input: {

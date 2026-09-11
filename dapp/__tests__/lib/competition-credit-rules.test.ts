@@ -10,7 +10,9 @@ import {
 import {
   buildCreditSourceHealthEvidenceHash,
   classifyCreditSourceHealth,
+  creditSourceBlockingEventFilter,
   creditSourceCursorIsHealthy,
+  isAncillaryNftCreditEvent,
 } from "@/lib/uki-economy/credits/source-health";
 import { testCompetitionCreditRule } from "@/lib/uki-economy/credits/testing";
 
@@ -225,6 +227,42 @@ describe("competition credit rules", () => {
       ancillaryWarnings: [],
     },
     {
+      name: 'TOKEN_V2 metadata pending',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 1,
+      pendingEvents: 1,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 1,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'TOKEN_V2 metadata dead letter',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      deadLetters: 1,
+      pendingEvents: 0,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'TOKEN_V2 event without a known name',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 1,
+      pendingEvents: 1,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 1,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+    {
       name: 'incident or invalid cursor',
       nftMode: 'custodial' as const,
       warnings: ['CHAIN_INTEGRITY_INCIDENT_OPEN', 'CURSOR_UNHEALTHY:TOKEN_V2:Transfer'],
@@ -287,6 +325,31 @@ describe("competition credit rules", () => {
     expect(result.healthy).toBe(healthy);
     expect(result.blockingWarnings).toEqual(blockingWarnings);
     expect(result.ancillaryWarnings).toEqual(ancillaryWarnings);
+  });
+
+  it.each([
+    ['custodial TOKEN_V2 Transfer', 'custodial', 'TOKEN_V2', 'Transfer', true],
+    ['custodial TOKEN_V2 metadata', 'custodial', 'TOKEN_V2', 'CukieMetadataConfigured', false],
+    ['custodial TOKEN_V2 unknown event', 'custodial', 'TOKEN_V2', undefined, false],
+    ['custodial vault event', 'custodial', 'CUKIE_MASTER_NFT_VAULT', 'CukieMasterDeposited', false],
+    ['legacy TOKEN_V2 Transfer', 'legacy', 'TOKEN_V2', 'Transfer', false],
+    ['invalid TOKEN_V2 Transfer', 'invalid', 'TOKEN_V2', 'Transfer', false],
+  ])('recognizes only %s as ancillary', (_name, nftMode, contractAlias, eventName, expected) => {
+    expect(isAncillaryNftCreditEvent({ nftMode: nftMode as 'custodial' | 'legacy' | 'invalid', contractAlias, eventName }))
+      .toBe(expected);
+  });
+
+  it('keeps metadata and unknown TOKEN_V2 events in the blocking Mongo predicate', () => {
+    expect(creditSourceBlockingEventFilter({
+      route: 'nft',
+      nftMode: 'custodial',
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+    })).toEqual({
+      $or: [
+        { contractAlias: 'CUKIE_MASTER_NFT_VAULT' },
+        { contractAlias: 'TOKEN_V2', eventName: { $ne: 'Transfer' } },
+      ],
+    });
   });
 
   it("accepts a cursor at or ahead of the completed UKI watermark, never behind it", () => {

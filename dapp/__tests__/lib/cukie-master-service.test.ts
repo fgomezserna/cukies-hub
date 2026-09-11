@@ -381,6 +381,18 @@ describe('Cukie Master canonical sources', () => {
       status: { $in: ['ingested', 'projecting', 'failed'] },
       $or: expect.arrayContaining([
         expect.objectContaining({
+          contractAlias: 'TOKEN_V2',
+          eventName: 'Transfer',
+          $or: expect.arrayContaining([
+            { 'normalized.fromNormalized': '0xabc' },
+            { 'normalized.toNormalized': '0xabc' },
+          ]),
+        }),
+        expect.objectContaining({
+          contractAlias: 'TOKEN_V2',
+          eventName: { $ne: 'Transfer' },
+        }),
+        expect.objectContaining({
           contractAlias: 'CUKIE_MASTER_NFT_VAULT',
           $or: expect.arrayContaining([
             { 'normalized.beneficiaryNormalized': '0xabc' },
