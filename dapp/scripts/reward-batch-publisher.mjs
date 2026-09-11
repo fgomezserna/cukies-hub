@@ -185,6 +185,7 @@ async function runTick(context) {
       chainId: context.runtime.chainId,
       tokenAddress: context.runtime.tokenAddress,
       distributorAddress: context.runtime.distributorAddress,
+      forwardActivationAt: new Date(context.runtime.forwardActivationAt),
       now,
     });
     if (!prepared) return { status: 'idle', completedAt: now.toISOString() };
@@ -231,9 +232,13 @@ async function runTick(context) {
 }
 
 async function acquirePlan(db, runtime, now) {
+  const activationAt = runtime.forwardActivationAt
+    ? new Date(runtime.forwardActivationAt)
+    : undefined;
   const result = await db.collection('reward_publication_plans').findOneAndUpdate(
     {
       status: { $nin: ['completed', 'blocked'] },
+      ...(activationAt ? { createdAt: { $gte: activationAt } } : {}),
       $or: [
         { leaseExpiresAt: null },
         { leaseExpiresAt: { $exists: false } },

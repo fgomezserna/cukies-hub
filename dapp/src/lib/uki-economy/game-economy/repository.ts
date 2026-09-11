@@ -35,11 +35,13 @@ export interface GameEconomyRepository {
   ): Promise<GameEconomySession | null>;
   listExpiredSessions(
     now: Date,
-    limit: number
+    limit: number,
+    forwardActivationAt?: Date,
   ): Promise<GameEconomySession[]>;
   listRecoverableSessions(
     now: Date,
-    limit: number
+    limit: number,
+    forwardActivationAt?: Date,
   ): Promise<GameEconomySession[]>;
   advanceRewardPeriodGuard(periodId: string, now: Date): Promise<void>;
 }
@@ -172,7 +174,7 @@ export function createMongoGameEconomyRepository(
       if (replaced) await events.insertOne(buildGameEconomySessionEvent(previous, replaced), options);
       return replaced;
     },
-    listExpiredSessions(now, limit) {
+    listExpiredSessions(now, limit, forwardActivationAt) {
       const nonTerminal: GameEconomySessionStatus[] = [
         "created",
         "resources_reserved",
@@ -182,17 +184,26 @@ export function createMongoGameEconomyRepository(
       ];
       return sessions
         .find(
-          { status: { $in: nonTerminal }, expiresAt: { $lte: now } },
+          {
+            status: { $in: nonTerminal },
+            expiresAt: { $lte: now },
+            ...(forwardActivationAt
+              ? { createdAt: { $gte: new Date(forwardActivationAt.getTime()) } }
+              : {}),
+          },
           options
         )
         .sort({ expiresAt: 1, _id: 1 })
         .limit(limit)
         .toArray();
     },
-    listRecoverableSessions(now, limit) {
+    listRecoverableSessions(now, limit, forwardActivationAt) {
       return sessions
         .find(
           {
+            ...(forwardActivationAt
+              ? { createdAt: { $gte: new Date(forwardActivationAt.getTime()) } }
+              : {}),
             $or: [
               { status: "created" },
               { settlementIntent: { $exists: true }, settlementCommand: { $exists: false } },

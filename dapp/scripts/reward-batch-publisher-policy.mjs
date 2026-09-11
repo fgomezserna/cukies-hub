@@ -14,6 +14,18 @@ function required(value, label) {
   return normalized;
 }
 
+function canonicalForwardActivationAt(environment) {
+  const normalized = required(
+    environment.REWARD_FORWARD_ACTIVATION_AT,
+    'REWARD_FORWARD_ACTIVATION_AT',
+  );
+  const activationAt = new Date(normalized);
+  if (Number.isNaN(activationAt.getTime()) || activationAt.toISOString() !== normalized) {
+    throw new Error('REWARD_FORWARD_ACTIVATION_AT debe ser una fecha ISO UTC canonica.');
+  }
+  return activationAt.toISOString();
+}
+
 function positiveInteger(value, fallback, label, minimum, maximum) {
   const parsed = Number(value ?? fallback);
   if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
@@ -85,6 +97,7 @@ function loadStagingPublicationTarget(environment) {
     chainId: 97,
     tokenAddress,
     distributorAddress,
+    forwardActivationAt: canonicalForwardActivationAt(environment),
   };
 }
 
@@ -113,6 +126,7 @@ export function publicRewardBatchPreparerConfig(config) {
     databaseName: config.databaseName,
     tokenAddress: config.tokenAddress,
     distributorAddress: config.distributorAddress,
+    forwardActivationAt: config.forwardActivationAt,
     maxCandidates: config.maxCandidates,
   };
 }
@@ -204,6 +218,7 @@ export function publicRewardBatchPublisherConfig(config) {
       databaseName: config.databaseName,
       tokenAddress: config.tokenAddress,
       distributorAddress: config.distributorAddress,
+      forwardActivationAt: config.forwardActivationAt,
       signerAddress: config.signerAddress,
       confirmations: config.confirmations,
       claimWindowSeconds: config.claimWindowSeconds,

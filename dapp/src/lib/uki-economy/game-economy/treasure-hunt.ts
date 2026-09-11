@@ -22,6 +22,7 @@ import {
   finishTreasureHuntPoolQuota,
   getTreasureHuntDailyPeriod,
   getTreasureHuntWeeklyPeriod,
+  resolveTreasureHuntForwardActivationAt,
   reserveTreasureHuntPoolQuota,
   shouldReplaceTreasureHuntWeeklyBest,
   treasureHuntScoreOrderKey,
@@ -41,6 +42,7 @@ import type { GameEconomySession } from "./types";
 import {
   stableGameEconomyHash,
   validGameText,
+  validGameDate,
   validGameWallet,
 } from "./rules";
 import { completeGameSession, rejectGameSession } from "./coordinator";
@@ -1215,8 +1217,13 @@ export async function reconcileTreasureHuntEconomyRuns(input: {
   now?: Date;
   limit?: number;
   staleUnstartedMs?: number;
+  /** Optional explicit fence; staging workers default to the guarded env value. */
+  forwardActivationAt?: Date;
 }) {
-  const now = input.now ?? new Date();
+  const now = validGameDate(input.now ?? new Date(), "now");
+  const forwardActivationAt = input.forwardActivationAt === undefined
+    ? resolveTreasureHuntForwardActivationAt()
+    : validGameDate(input.forwardActivationAt, "forwardActivationAt");
   const limit = input.limit ?? 100;
   const staleUnstartedMs = input.staleUnstartedMs ?? 120_000;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
@@ -1227,7 +1234,12 @@ export async function reconcileTreasureHuntEconomyRuns(input: {
   }
   const db = await getEconomyDb();
   const candidates = await db.collection<TreasureHuntEconomyRun>("treasure_hunt_economy_runs")
-    .find({ status: { $in: ["active", "finishing"] } })
+    .find({
+      status: { $in: ["active", "finishing"] },
+      ...(forwardActivationAt
+        ? { reservedAt: { $gte: new Date(forwardActivationAt.getTime()) } }
+        : {}),
+    })
     .sort({ updatedAt: 1, _id: 1 })
     .limit(limit)
     .toArray();

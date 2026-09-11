@@ -6,6 +6,16 @@ function required(environment, name) {
   return value;
 }
 
+function canonicalForwardActivationAt(environment) {
+  if (environment.APP_ENV !== 'staging') return undefined;
+  const normalized = required(environment, 'REWARD_FORWARD_ACTIVATION_AT');
+  const activationAt = new Date(normalized);
+  if (Number.isNaN(activationAt.getTime()) || activationAt.toISOString() !== normalized) {
+    throw new Error('REWARD_FORWARD_ACTIVATION_AT debe ser una fecha ISO UTC canonica.');
+  }
+  return activationAt.toISOString();
+}
+
 function bounded(environment, name, fallback, minimum, maximum) {
   const raw = environment[name]?.trim();
   if (!raw) return fallback;
@@ -63,6 +73,7 @@ export function loadRewardAccountingSchedulerConfig(environment = process.env, h
     ),
   };
   if (!enabled) return { ...shared, keyId: null, secret: null, mongoUrl: null, dbName: null };
+  const forwardActivationAt = canonicalForwardActivationAt(environment);
   for (const gate of [
     'REWARD_DAILY_ACCOUNTING_ENABLED',
     'REWARD_WEEKLY_PAYOUT_ENABLED',
@@ -85,6 +96,7 @@ export function loadRewardAccountingSchedulerConfig(environment = process.env, h
   }
   return {
     ...shared,
+    forwardActivationAt,
     keyId,
     secret,
     mongoUrl: required(environment, 'CHAIN_INDEXER_MONGO_URL'),

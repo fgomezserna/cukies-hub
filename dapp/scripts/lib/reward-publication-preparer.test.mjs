@@ -59,9 +59,12 @@ class MemoryCollection {
       throw new Error(`Aggregate inesperado sobre ${this.name}.`);
     }
     const cutoff = pipeline[0].$match.availableAt.$lte;
+    const activation = pipeline[0].$match.createdAt?.$gte;
     const limit = pipeline.at(-1).$limit;
     const eligible = this.rows
-      .filter((row) => row.status === 'allocated_offchain' && row.availableAt <= cutoff)
+      .filter((row) => row.status === 'allocated_offchain'
+        && row.availableAt <= cutoff
+        && (activation === undefined || row.createdAt >= activation))
       .sort((left, right) => (
         left.availableAt.getTime() - right.availableAt.getTime()
         || left.accountingId.localeCompare(right.accountingId)
@@ -161,6 +164,17 @@ test('ordena los cierres despues de agrupar para publicar primero el mas antiguo
   ]);
 });
 
+test('el pipeline de publicacion excluye allocations anteriores a la frontera', () => {
+  const activation = new Date('2026-08-20T16:00:00.000Z');
+  assert.deepEqual(buildRewardPublicationCandidatePipeline(NOW, 50, activation)[0], {
+    $match: {
+      status: 'allocated_offchain',
+      availableAt: { $lte: NOW },
+      createdAt: { $gte: activation },
+    },
+  });
+});
+
 test('persiste un draft preview-only y un plan sin autorizar ni firmar', async () => {
   const context = setup();
   const result = await prepare(context);
@@ -192,6 +206,21 @@ test('el replay no duplica plan, batch ni proofs', async () => {
   assert.equal(context.db.rows.get('reward_publication_plans').length, 1);
   assert.equal(context.db.rows.get('reward_claim_batches').length, 1);
   assert.equal(context.db.rows.get('reward_claim_proofs').length, 1);
+});
+
+test('el preparador no crea artefactos para una allocation historica', async () => {
+  const context = setup();
+  context.db.rows.get('reward_accounting_allocations')[0].createdAt = new Date(
+    '2026-08-20T15:59:59.999Z',
+  );
+  const result = await prepare({
+    ...context,
+    forwardActivationAt: new Date('2026-08-20T16:00:00.000Z'),
+  });
+  assert.equal(result, null);
+  assert.equal(context.db.rows.get('reward_publication_plans').length, 0);
+  assert.equal(context.db.rows.get('reward_claim_batches').length, 0);
+  assert.equal(context.db.rows.get('reward_claim_proofs').length, 0);
 });
 
 test('ignora allocations intermedias mientras no exista un cierre contable final', async () => {

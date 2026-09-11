@@ -83,6 +83,7 @@ import {
 } from '@/lib/uki-economy/game-economy/treasure-hunt-recovery';
 import {
   openTreasureHuntEconomyRun,
+  reconcileTreasureHuntEconomyRuns,
   treasureHuntEconomyOpenCreateIdempotencyKey,
 } from '@/lib/uki-economy/game-economy/treasure-hunt';
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
@@ -149,6 +150,16 @@ function matches(document: Doc, filter: Doc): boolean {
         if (Boolean(operator.$exists) !== (actual !== undefined)) return false;
         continue;
       }
+      if ('$gte' in operator) {
+        const bound = operator.$gte as Date;
+        if (!(actual instanceof Date) || !(bound instanceof Date) || actual.getTime() < bound.getTime()) return false;
+        continue;
+      }
+      if ('$lte' in operator) {
+        const bound = operator.$lte as Date;
+        if (!(actual instanceof Date) || !(bound instanceof Date) || actual.getTime() > bound.getTime()) return false;
+        continue;
+      }
     }
     if (Array.isArray(actual)) {
       if (!actual.some((item) => equalValue(item, expected))) return false;
@@ -168,6 +179,24 @@ function fakeCollection<T extends Doc>(rows: T[]) {
     find: jest.fn((filter: Doc) => {
       let selected = rows.filter((candidate) => matches(candidate, filter));
       const cursor = {
+        sort(specification: Record<string, 1 | -1>) {
+          const fields = Object.entries(specification);
+          selected.sort((left, right) => {
+            for (const [field, direction] of fields) {
+              const leftValue = valueAt(left, field);
+              const rightValue = valueAt(right, field);
+              if (leftValue instanceof Date && rightValue instanceof Date) {
+                if (leftValue.getTime() !== rightValue.getTime()) {
+                  return (leftValue.getTime() - rightValue.getTime()) * direction;
+                }
+              } else if (leftValue !== rightValue) {
+                return (String(leftValue) < String(rightValue) ? -1 : 1) * direction;
+              }
+            }
+            return 0;
+          });
+          return cursor;
+        },
         limit(limit: number) {
           selected = selected.slice(0, limit);
           return cursor;
@@ -1432,5 +1461,40 @@ describe('Treasure Hunt economy recovery inspector', () => {
     const session = await createRejectedSession();
     const decision = await inspectTreasureHuntEconomyRecovery(inspectInput(session, fakeDb({})));
     expect(decision).toEqual({ kind: 'not_applicable', reason: 'economy_session_not_found' });
+  });
+
+  it('no reconcilia runs reservados antes de la frontera forward', async () => {
+    const activationAt = new Date('2026-08-20T16:00:00.000Z');
+    const db = fakeDb({
+      treasure_hunt_economy_runs: [
+        {
+          _id: 'run-before',
+          runId: 'run-before',
+          status: 'active',
+          reservedAt: new Date('2026-08-20T15:59:59.999Z'),
+          updatedAt: new Date('2026-08-20T15:59:59.999Z'),
+          gameEconomySessionId: 'session-before',
+        },
+        {
+          _id: 'run-after',
+          runId: 'run-after',
+          status: 'active',
+          reservedAt: new Date('2026-08-20T16:00:00.000Z'),
+          updatedAt: new Date('2026-08-20T16:00:00.000Z'),
+          gameEconomySessionId: 'session-after',
+        },
+      ],
+      game_economy_sessions: [],
+    });
+    (getEconomyDb as jest.Mock).mockResolvedValue(db);
+    await expect(reconcileTreasureHuntEconomyRuns({
+      now: new Date('2026-08-20T16:05:00.000Z'),
+      forwardActivationAt: activationAt,
+      limit: 10,
+    })).resolves.toMatchObject({
+      scanned: 1,
+      pending: 0,
+      failures: [{ runId: 'run-after' }],
+    });
   });
 });

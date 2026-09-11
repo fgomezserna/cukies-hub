@@ -3,6 +3,8 @@ import {
   assertTreasureHuntStagingRuntime,
   getTreasureHuntDailyPeriod,
   getTreasureHuntWeeklyPeriod,
+  resolveTreasureHuntForwardActivationAt,
+  firstTreasureHuntFullPeriodStartAtOrAfter,
   finishTreasureHuntPoolQuota,
   isTreasureHuntLowScore,
   reserveTreasureHuntPoolQuota,
@@ -26,6 +28,33 @@ describe("Treasure Hunt economy policy", () => {
       NEXT_PUBLIC_UKI_CHAIN_ID: "56",
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "56",
     })).toThrow("TREASURE_HUNT_STAGING_RUNTIME_REQUIRED");
+  });
+
+  it("exige una frontera UTC canonica en staging y conserva catch-up en produccion", () => {
+    const staging = {
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-08-20T16:00:00.000Z",
+    };
+    expect(resolveTreasureHuntForwardActivationAt(staging)).toEqual(
+      new Date("2026-08-20T16:00:00.000Z"),
+    );
+    expect(() => resolveTreasureHuntForwardActivationAt({ ...staging, REWARD_FORWARD_ACTIVATION_AT: "2026-08-20T16:00:00Z" })).toThrow(/ISO UTC canonica/);
+    expect(() => resolveTreasureHuntForwardActivationAt({ ...staging, REWARD_FORWARD_ACTIVATION_AT: undefined })).toThrow(/obligatorio/);
+    expect(resolveTreasureHuntForwardActivationAt({ APP_ENV: "production" })).toBeUndefined();
+  });
+
+  it("salta a un periodo completo cuando la activacion cae dentro del corte", () => {
+    const activation = new Date("2026-08-20T15:00:00.000Z");
+    expect(firstTreasureHuntFullPeriodStartAtOrAfter(activation, "daily")).toEqual(
+      new Date("2026-08-21T14:00:00.000Z"),
+    );
+    expect(firstTreasureHuntFullPeriodStartAtOrAfter(
+      new Date("2026-08-24T14:00:00.000Z"),
+      "weekly",
+    )).toEqual(new Date("2026-08-24T14:00:00.000Z"));
   });
 
   it("pins a run reserved at 13:59 to the previous period after it crosses 14:00", () => {

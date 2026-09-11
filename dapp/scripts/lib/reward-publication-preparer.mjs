@@ -19,6 +19,14 @@ function validNow(value) {
   return value;
 }
 
+function validForwardActivationAt(value) {
+  if (value === undefined) return undefined;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    throw new Error('forwardActivationAt debe ser una fecha valida.');
+  }
+  return value;
+}
+
 function validMaxCandidates(value) {
   if (!Number.isSafeInteger(value) || value < 1 || value > 1_000) {
     throw new Error('maxCandidates debe estar entre 1 y 1000.');
@@ -34,9 +42,18 @@ async function existingPlan(db, accountingId, session) {
   return plan ? assertRewardPublicationPlanIntegrity(plan) : null;
 }
 
-export function buildRewardPublicationCandidatePipeline(now, maxCandidates) {
+export function buildRewardPublicationCandidatePipeline(
+  now,
+  maxCandidates,
+  forwardActivationAt,
+) {
+  const activationAt = validForwardActivationAt(forwardActivationAt);
   return [
-    { $match: { status: 'allocated_offchain', availableAt: { $lte: now } } },
+    { $match: {
+      status: 'allocated_offchain',
+      availableAt: { $lte: now },
+      ...(activationAt ? { createdAt: { $gte: activationAt } } : {}),
+    } },
     { $sort: { availableAt: 1, accountingId: 1, _id: 1 } },
     {
       $group: {
@@ -53,8 +70,9 @@ export function buildRewardPublicationCandidatePipeline(now, maxCandidates) {
 export async function prepareNextRewardPublicationPlan(input) {
   const now = validNow(input.now ?? new Date());
   const maxCandidates = validMaxCandidates(input.maxCandidates ?? 50);
+  const forwardActivationAt = validForwardActivationAt(input.forwardActivationAt);
   const candidates = await input.db.collection('reward_accounting_allocations').aggregate(
-    buildRewardPublicationCandidatePipeline(now, maxCandidates),
+    buildRewardPublicationCandidatePipeline(now, maxCandidates, forwardActivationAt),
   ).toArray();
 
   for (const candidate of candidates) {
