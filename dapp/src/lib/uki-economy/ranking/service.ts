@@ -6,7 +6,11 @@ import type { CreditReservation } from "../credits/types";
 import { DomainConflictError, DomainValidationError, StaleFenceError } from "../errors";
 import { stableGameEconomyHash, assertGameSessionIntegrity, parseCanonicalRaw } from "../game-economy/rules";
 import type { GameEconomySession } from "../game-economy/types";
-import { TREASURE_HUNT_ECONOMY_POLICY } from "../game-economy/treasure-hunt-policy";
+import {
+  TREASURE_HUNT_ECONOMY_POLICY,
+  firstTreasureHuntFullPeriodStartAtOrAfter,
+  resolveTreasureHuntForwardActivationAt,
+} from "../game-economy/treasure-hunt-policy";
 import { getIsoWeekPeriod, getIsoWeekPeriodId, getIsoWeekPeriodFromId, type UtcPeriod } from "../periods";
 import {
   compareRewardText,
@@ -520,16 +524,43 @@ export class WeeklyRankingService {
     }
   }
 
-  async closeCompletedPeriod(input: { now: Date; pageSize?: number }) {
+  async closeCompletedPeriod(input: { now: Date; pageSize?: number; forwardActivationAt?: Date }) {
     const now = validRewardDate(input.now, "now");
+    const forwardActivationAt = input.forwardActivationAt === undefined
+      ? resolveTreasureHuntForwardActivationAt()
+      : validRewardDate(input.forwardActivationAt, "forwardActivationAt");
     const period = await this.runTransaction(async (repository) => {
       const firstRule = await repository.findFirstRuleBefore(now);
       if (!firstRule) {
         throw new DomainConflictError("No hay una regla de ranking activa antes del cierre actual.");
       }
       assertWeeklyRankingRule(firstRule);
-      const current = getIsoWeekPeriod(now, firstRule.calendar);
-      let cursor = getIsoWeekPeriod(firstRule.activeFrom, firstRule.calendar);
+      // A retired rule may remain active in the immutable rule collection. If
+      // it ended before the forward fence, use the calendar sealed on the rule
+      // that is effective at the fence so a calendar transition cannot strand
+      // the cursor in the retired (usually 24h) timeline.
+      let calendar = firstRule.calendar;
+      if (forwardActivationAt && firstRule.activeUntil
+        && firstRule.activeUntil.getTime() <= forwardActivationAt.getTime()) {
+        const successor = await repository.findRuleCovering(
+          forwardActivationAt,
+          new Date(forwardActivationAt.getTime() + 1),
+        ) ?? await repository.findRuleCovering(
+          now,
+          new Date(now.getTime() + 1),
+        );
+        if (successor) {
+          assertWeeklyRankingRule(successor);
+          calendar = successor.calendar;
+        }
+      }
+      const current = getIsoWeekPeriod(now, calendar);
+      const firstEligibleStart = forwardActivationAt
+        ? firstTreasureHuntFullPeriodStartAtOrAfter(forwardActivationAt, "weekly", calendar)
+        : null;
+      let cursor = firstEligibleStart
+        ? getIsoWeekPeriod(firstEligibleStart, calendar)
+        : getIsoWeekPeriod(firstRule.activeFrom, calendar);
       let latestCovered: UtcPeriod | null = null;
       while (cursor.endExclusive.getTime() <= current.start.getTime()) {
         const coveringRule = await repository.findRuleCovering(cursor.start, cursor.endExclusive);
@@ -538,7 +569,7 @@ export class WeeklyRankingService {
           const state = await repository.findPeriodState(cursor.id);
           if (!state) return cursor;
         }
-        cursor = getIsoWeekPeriod(new Date(cursor.endExclusive.getTime() + 1), firstRule.calendar);
+        cursor = getIsoWeekPeriod(new Date(cursor.endExclusive.getTime() + 1), calendar);
       }
       if (!latestCovered) {
         throw new DomainConflictError("No hay semanas completas cubiertas por una regla de ranking.");

@@ -32,6 +32,7 @@ import type {
   WeeklyRankingAuditEvent,
   WeeklyRankingManifest,
   WeeklyRankingPeriodState,
+  WeeklyRankingRule,
   WeeklyRankingRun,
   WeeklyRankingSnapshot,
   WeeklyRankingSource,
@@ -181,6 +182,34 @@ class MemoryRankingRepository {
   async insertAuditEvent(row: WeeklyRankingAuditEvent) { this.events.push(row); }
 }
 
+class TransitionRankingRepository extends MemoryRankingRepository {
+  readonly rules: WeeklyRankingRule[];
+  readonly periodStateLookups: string[] = [];
+
+  constructor(rules: WeeklyRankingRule[]) {
+    super();
+    this.rules = rules;
+  }
+
+  override async findFirstRuleBefore(end: Date) {
+    return this.rules
+      .filter((rule) => rule.activeFrom < end)
+      .sort((left, right) => left.activeFrom.getTime() - right.activeFrom.getTime())[0] ?? null;
+  }
+
+  override async findRuleCovering(start: Date, end: Date) {
+    return this.rules
+      .filter((rule) => rule.activeFrom <= start
+        && (!rule.activeUntil || rule.activeUntil >= end))
+      .sort((left, right) => right.activeFrom.getTime() - left.activeFrom.getTime())[0] ?? null;
+  }
+
+  override async findPeriodState(periodId: string) {
+    this.periodStateLookups.push(periodId);
+    return super.findPeriodState(periodId);
+  }
+}
+
 function service(repository: MemoryRankingRepository) {
   const runner: WeeklyRankingTransactionRunner = async (work) =>
     work(repository as unknown as WeeklyRankingRepository);
@@ -188,6 +217,120 @@ function service(repository: MemoryRankingRepository) {
 }
 
 describe("weekly ranking sealed producer", () => {
+  it("salta el backlog de una regla jubilada y abre el primer periodo acelerado completo", async () => {
+    const calendar: EconomyCycleCalendar = {
+      version: "cycle-v1",
+      chainId: 97,
+      cycleSeconds: 1800,
+      anchorAt: "2026-09-07T11:30:00.000Z",
+    };
+    const oldRule = buildCurrentWeeklyRankingRule({
+      version: "ranking-old",
+      activeFrom: new Date("2026-08-24T00:00:00.000Z"),
+      activeUntil: new Date("2026-09-07T00:00:00.000Z"),
+      now: new Date("2026-08-24T00:00:00.000Z"),
+    });
+    const newRule = buildCurrentWeeklyRankingRule({
+      version: "ranking-fast-forward",
+      activeFrom: new Date(calendar.anchorAt),
+      calendar,
+      now: new Date(calendar.anchorAt),
+    });
+    const repository = new TransitionRankingRepository([oldRule, newRule]);
+    const activationAt = new Date("2026-09-07T12:00:00.000Z");
+    const firstEligibleStart = new Date("2026-09-07T15:00:00.000Z");
+    const period = getIsoWeekPeriod(firstEligibleStart, calendar);
+    const row = fixture(900, "pool", new Date(period.endExclusive.getTime() + 1_000));
+    row.game.createdAt = new Date(period.start.getTime() + 1_000);
+    row.game.rule.calendar = calendar;
+    repository.sessions = [row.game];
+    repository.credits = [row.credit];
+
+    const result = await service(repository).closeCompletedPeriod({
+      now: new Date(period.endExclusive.getTime() + 151_000),
+      pageSize: 5,
+      forwardActivationAt: activationAt,
+    });
+
+    expect(result).toMatchObject({ periodId: period.id, replayed: false, sourceCount: 1 });
+    expect(repository.sources[0]?.periodId).toBe(period.id);
+    expect(repository.periodStateLookups).toEqual([period.id]);
+    expect(repository.periodStateLookups.some((periodId) => periodId < period.id)).toBe(false);
+
+    const nextPeriod = getIsoWeekPeriod(period.endExclusive, calendar);
+    const nextRow = fixture(902, "pool", new Date(nextPeriod.endExclusive.getTime() + 1_000));
+    nextRow.game.createdAt = new Date(nextPeriod.start.getTime() + 1_000);
+    nextRow.game.rule.calendar = calendar;
+    repository.sessions.push(nextRow.game);
+    repository.credits.push(nextRow.credit);
+    await expect(service(repository).closeCompletedPeriod({
+      now: new Date(nextPeriod.endExclusive.getTime() + 151_000),
+      pageSize: 5,
+      forwardActivationAt: activationAt,
+    })).resolves.toMatchObject({ periodId: nextPeriod.id, replayed: false });
+    expect(repository.periodStateLookups).toEqual([period.id, period.id, nextPeriod.id]);
+  });
+
+  it("mantiene el periodo en una frontera exacta de activacion", async () => {
+    const calendar: EconomyCycleCalendar = {
+      version: "cycle-v1",
+      chainId: 97,
+      cycleSeconds: 1800,
+      anchorAt: "2026-09-07T11:30:00.000Z",
+    };
+    const period = getIsoWeekPeriod(new Date(calendar.anchorAt), calendar);
+    const rule = buildCurrentWeeklyRankingRule({
+      version: "ranking-fast-boundary",
+      activeFrom: period.start,
+      calendar,
+      now: period.start,
+    });
+    const repository = new TransitionRankingRepository([rule]);
+    const row = fixture(901, "pool", new Date(period.endExclusive.getTime() + 1_000));
+    row.game.createdAt = new Date(period.start.getTime() + 1_000);
+    row.game.rule.calendar = calendar;
+    repository.sessions = [row.game];
+    repository.credits = [row.credit];
+
+    await expect(service(repository).closeCompletedPeriod({
+      now: new Date(period.endExclusive.getTime() + 151_000),
+      pageSize: 5,
+      forwardActivationAt: period.start,
+    })).resolves.toMatchObject({ periodId: period.id, replayed: false });
+  });
+
+  it("falla antes de leer el repositorio cuando staging no tiene frontera", async () => {
+    const envKeys = [
+      "APP_ENV",
+      "STAGING_ONLY_GUARD",
+      "NEXT_PUBLIC_UKI_CHAIN_ID",
+      "CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID",
+      "REWARD_FORWARD_ACTIVATION_AT",
+    ];
+    const previous = new Map(envKeys.map((key) => [key, process.env[key]]));
+    Object.assign(process.env, {
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
+    });
+    delete process.env.REWARD_FORWARD_ACTIVATION_AT;
+    const repository = new MemoryRankingRepository();
+    try {
+      await expect(service(repository).closeCompletedPeriod({
+        now: new Date("2026-09-07T18:32:31.000Z"),
+        pageSize: 5,
+      })).rejects.toThrow(/REWARD_FORWARD_ACTIVATION_AT.*obligatorio/);
+      expect(repository.sessionPageCalls).toBe(0);
+    } finally {
+      for (const key of envKeys) {
+        const value = previous.get(key);
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
   it('cierra y reproduce una semana de siete ciclos sin perder una sesion liquidada tras el corte', async () => {
     const calendar: EconomyCycleCalendar = { version: 'cycle-v1', chainId: 97, cycleSeconds: 1800, anchorAt: '2026-09-04T12:00:00.000Z' };
     const fastStart = new Date(calendar.anchorAt);

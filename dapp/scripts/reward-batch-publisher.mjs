@@ -19,6 +19,7 @@ import {
   assertRewardPublicationPlanIntegrity,
   authorizeRewardClaimBatch,
 } from './lib/reward-batch-publication.mjs';
+import { acquireRewardPublicationPlan } from './lib/reward-publication-plan-acquirer.mjs';
 import { prepareNextRewardPublicationPlan } from './lib/reward-publication-preparer.mjs';
 import {
   loadRewardBatchPublisherConfig,
@@ -177,7 +178,7 @@ async function writeHeartbeat(db, schedulerId, status, startedAt, detail) {
 
 async function runTick(context) {
   const now = new Date();
-  let plan = await acquirePlan(context.db, context.runtime, now);
+  let plan = await acquireRewardPublicationPlan(context.db, context.runtime, now);
   if (!plan) {
     const prepared = await prepareNextRewardPublicationPlan({
       db: context.db,
@@ -185,10 +186,11 @@ async function runTick(context) {
       chainId: context.runtime.chainId,
       tokenAddress: context.runtime.tokenAddress,
       distributorAddress: context.runtime.distributorAddress,
+      forwardActivationAt: new Date(context.runtime.forwardActivationAt),
       now,
     });
     if (!prepared) return { status: 'idle', completedAt: now.toISOString() };
-    plan = await acquirePlan(context.db, context.runtime, new Date());
+    plan = await acquireRewardPublicationPlan(context.db, context.runtime, new Date());
   }
   if (!plan) return { status: 'contended', completedAt: now.toISOString() };
   try {
@@ -228,30 +230,6 @@ async function runTick(context) {
     await releaseLease(context.db, plan).catch(() => undefined);
     throw error;
   }
-}
-
-async function acquirePlan(db, runtime, now) {
-  const result = await db.collection('reward_publication_plans').findOneAndUpdate(
-    {
-      status: { $nin: ['completed', 'blocked'] },
-      $or: [
-        { leaseExpiresAt: null },
-        { leaseExpiresAt: { $exists: false } },
-        { leaseExpiresAt: { $lte: now } },
-        { leaseOwner: runtime.schedulerId },
-      ],
-    },
-    {
-      $set: {
-        leaseOwner: runtime.schedulerId,
-        leaseExpiresAt: new Date(now.getTime() + runtime.leaseMs),
-        updatedAt: now,
-      },
-      $inc: { revision: 1 },
-    },
-    { sort: { createdAt: 1, _id: 1 }, returnDocument: 'after' },
-  );
-  return result ?? null;
 }
 
 async function ensureAuthorizedBatch(db, runtime, plan) {

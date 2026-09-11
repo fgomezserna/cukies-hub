@@ -55,6 +55,7 @@ import type {
 import {
   TREASURE_HUNT_ECONOMY_POLICY,
   assertTreasureHuntStagingRuntime,
+  resolveTreasureHuntForwardActivationAt,
 } from "./treasure-hunt-policy";
 
 const TERMINAL_STATUSES = new Set<GameEconomySessionStatus>([
@@ -119,6 +120,8 @@ export type ExpireGameSessionInput = {
 export type ExpireGameSessionsBatchInput = {
   now: Date;
   limit?: number;
+  /** Optional explicit fence; staging workers default to the guarded env value. */
+  forwardActivationAt?: Date;
 };
 
 export type RecoverGameSessionsBatchInput = ExpireGameSessionsBatchInput;
@@ -1607,12 +1610,15 @@ export function createGameEconomyService(
 
   async function expireBatch(input: ExpireGameSessionsBatchInput) {
     const now = validGameDate(input.now, "now");
+    const forwardActivationAt = input.forwardActivationAt === undefined
+      ? resolveTreasureHuntForwardActivationAt()
+      : validGameDate(input.forwardActivationAt, "forwardActivationAt");
     const limit = input.limit ?? 50;
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       throw new DomainValidationError("limit debe estar entre 1 y 100.");
     }
     const candidates = await runner((repository) =>
-      repository.listExpiredSessions(now, limit)
+      repository.listExpiredSessions(now, limit, forwardActivationAt)
     );
     const sessions: GameEconomySession[] = [];
     const failures: Array<{ sessionId: string; code: string }> = [];
@@ -1674,12 +1680,15 @@ export function createGameEconomyService(
 
   async function recoverBatch(input: RecoverGameSessionsBatchInput) {
     const now = validGameDate(input.now, "now");
+    const forwardActivationAt = input.forwardActivationAt === undefined
+      ? resolveTreasureHuntForwardActivationAt()
+      : validGameDate(input.forwardActivationAt, "forwardActivationAt");
     const limit = input.limit ?? 50;
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       throw new DomainValidationError("limit debe estar entre 1 y 100.");
     }
     const candidates = await runner((repository) =>
-      repository.listRecoverableSessions(now, limit)
+      repository.listRecoverableSessions(now, limit, forwardActivationAt)
     );
     const sessions: GameEconomySession[] = [];
     const failures: Array<{ sessionId: string; code: string }> = [];

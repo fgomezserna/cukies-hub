@@ -35,6 +35,37 @@ test('reward accounting activo exige HMAC privado y Mongo no legacy', () => {
   assert.equal(config.secret, 'reward-accounting-secret-with-entropy-A9!');
 });
 
+test('el scheduler staging exige una frontera forward UTC canonica', () => {
+  const base = {
+    REWARD_ACCOUNTING_SCHEDULER_ENABLED: 'true',
+    REWARD_ACCOUNTING_RUNTIME_ENABLED: 'true',
+    APP_ENV: 'staging',
+    REWARD_DAILY_ACCOUNTING_ENABLED: 'true',
+    REWARD_WEEKLY_PAYOUT_ENABLED: 'true',
+    REWARD_POOL_TRANCHES_ENABLED: 'true',
+    ECONOMY_INTERNAL_HMAC_KEY_ID: 'staging-reward-accounting',
+    ECONOMY_INTERNAL_HMAC_SECRET: 'reward-accounting-secret-with-entropy-A9!',
+    CHAIN_INDEXER_MONGO_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
+    CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
+  };
+  assert.throws(
+    () => loadRewardAccountingSchedulerConfig(base, 'host-a'),
+    /REWARD_FORWARD_ACTIVATION_AT es obligatorio/,
+  );
+  const config = loadRewardAccountingSchedulerConfig({
+    ...base,
+    REWARD_FORWARD_ACTIVATION_AT: '2026-08-20T16:00:00.000Z',
+  }, 'host-a');
+  assert.equal(config.forwardActivationAt, '2026-08-20T16:00:00.000Z');
+  assert.throws(
+    () => loadRewardAccountingSchedulerConfig({
+      ...base,
+      REWARD_FORWARD_ACTIVATION_AT: '2026-08-20T16:00:00Z',
+    }, 'host-a'),
+    /ISO UTC canonica/,
+  );
+});
+
 test('el scheduler no puede activarse con el runtime apagado', () => {
   assert.throws(() => loadRewardAccountingSchedulerConfig({
     REWARD_ACCOUNTING_SCHEDULER_ENABLED: 'true',

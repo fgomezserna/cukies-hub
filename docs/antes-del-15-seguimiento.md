@@ -164,7 +164,7 @@ el usuario ha retirado NFTs después y se comprobará de nuevo por identidad.
 El alias de competición y el nombre público general son fuentes distintas;
 no se supone una relación entre ambos sin verificarla.
 
-Estado del programa revisado el **11 de septiembre de 2026, 17:49 UTC**. PR426 está
+Estado del programa revisado el **11 de septiembre de 2026, 18:45 UTC**. PR426 está
 servida en producción; PR428, PR425 y PR427 están integradas y servidas en
 staging. PR427 no ha ejecutado recuperación ni acreditado UKI. L2 entregó
 PR430, revisada para R1/C1/C2 y aún parcial en R2; PR429 se integró
@@ -179,15 +179,26 @@ reemplazaron solo DApp y conservaron los diez workers y82contenedores
 protegidos. No quedan PR429/430/431 esperando integración. PR432 está integrada y servida en `50521eb3`; CI34628683317 y
 postflight17:49UTC correctos. El corte NFT, detenido en09:00, avanzó
 a17:30 con el primer tick del nuevo despliegue a17:48:40; permanecen
-los tres dead letters de Transfer. PR433 está revisada y validada contra
-esa base, lista para la siguiente entrega. L5 entregó d843c74e en PR433, bajo revisión
-independiente de sus dos hallazgos. L4 vuelve a estar activo para completar
-el límite futuro de contabilidad/publicación sin recuperar historia.
+los tres dead letters de Transfer. Ambas rutas abrieron también el corte18:00.
+PR433 está integrada y servida en `c82498be`, tras revisión y272suites/2342tests;
+CI34630108075SUCCESS y postflight18:09UTC verifican readiness200, journal limpio,
+solo DApp reemplazada, diez workers y82contenedores protegidos conservados.
+L4 entregó [PR434](https://github.com/fgomezserna/cukies-hub/pull/434):
+la revisión rechazó la selección histórica por createdAt y luego la inanición
+de colas por planes terminados y límites previos. La corrección `c56eea10`
+superó la reproducción independiente de esos casos: históricos intactos,
+periodos nuevos alcanzables y reanudación del plan pendiente sin alterar hashes.
+El ranking incorpora `3f419b35`, con frontera y calendario de la regla sucesora.
+La raíz integró ambos en `2e13c72c` y la misma variable en Compose web/workers.
+Gate conjunto correcto:272suites/2352tests,lint/tipos,31tests de publisher,
+22de schedulers y4de Compose; generación de Compose coherente.
+PR434 está preparada para entrega, todavía sin afirmar despliegue ni activación. Pool necesita conservar su
+limpieza normal de leases/locks expirados; no recupera premios históricos.
 L6 terminó el diagnóstico sin parche nuevo; A1 permanece abierto. L7 sigue en cola.
 Modelo de las siete: **Luna Max**, con revisión e integración
 de **Astra Max** en la tarea raíz `01a07aec-6bc1-7203-8f43-357ed4b8931c`.
-Último cambio de producto integrado en staging: `50521eb33b21e75470321bf30cf95bda1133e83f` (PR432);
-web staging verificada17:49UTC: `50521eb33b21e75470321bf30cf95bda1133e83f` (PR432);
+Último cambio de producto integrado en staging: `c82498bed20a8d29f645ada011e332a779aeb51d` (PR433);
+web staging verificada18:09UTC: `c82498bed20a8d29f645ada011e332a779aeb51d` (PR433);
 main `d1a71495f83d16f6b22425f52e05ec5a2e8ea191` (PR426).
 Producción: deploy1534 terminado a las14:01:08UTC. Staging: CI34607972412
 correcto y postflight14:16UTC con readiness200, journal limpio, diez workers
@@ -224,8 +235,8 @@ enlace actualmente elegible e instrumentación focal si vuelve a fallar.
 | L1 | M1, M2, P1, O2: custodia entre Master/Pool/Mis Cukies, elegibilidad de Originales y convergencia tras recibo. | [#419](https://github.com/fgomezserna/cukies-hub/issues/419) · **11-Sep · Custodia y actualización de Cukies**, tarea `01a09068-1787-7a20-a4bf-c2c2b28f5586` | [PR425](https://github.com/fgomezserna/cukies-hub/pull/425) publicada en staging `f4134d7`, CI34609723488SUCCESS; postflight14:33UTC, readiness200, journal limpio,10workers y82protegidos intactos.271suites/2282tests/lint/tipos/build correctos. A las14:36UTC, bloque130424039:11NFT en wallet,98000007 en Pool,0Master; Mongo concuerda sin solapamiento. M1/M2/P1: parches desplegados; falta comprobar una operación NUEVA y la convergencia autenticada. O2 es parcial: se ocultan cupos/umbrales obsoletos, pero no está acreditada la actualización conjunta de saldo, cupos y aviso. No cambiar el umbral de20000UKI por el ejemplo25000→5000. No se exige recuperar pending histórico. [Evidencia](evidence/2026-09-11-doc11-custody-delivery.json). Rama `codex/doc11-custody-refresh` integrada. |
 | L2 | R1, R2, C1, C2: intentos obsoletos, avisos de Resumen, cuatro indicadores de créditos y finalización de nuevos cortes. | [#421](https://github.com/fgomezserna/cukies-hub/issues/421) · **11-Sep · Créditos y datos de Resumen**, tarea `01a09068-7652-7c61-86e8-cccc3647b589` | [PR430](https://github.com/fgomezserna/cukies-hub/pull/430), `b7e7d54`, en integración con staging0ca4c8e: R1/C1 implementados, navegación conservada y C2 avanza al corte actual de testnet sin alterar el catch-up diario de producción. Revisión raíz añade2c602df para conservar grantedCredits cuando la proyección está obsoleta;114tests focales correctos. Combinado d61a85a validado con272suites/2309tests/lint/tipos; merge6e63ca5 servido, CI34619798496SUCCESS y postflight16:16UTC:readiness200/journal limpio/soloDApp/10workers y82protegidos conservados. R1/C1 desplegados con QA autenticada pendiente. [Evidencia](evidence/2026-09-11-doc11-alias-credits-delivery.json). R2/C2: sonda16:02UTC acredita UKI abierto16:00, NFT detenido09:00 por SOURCE_UNHEALTHY/CHAIN_DEAD_LETTERS_OPEN/CHAIN_EVENTS_NOT_PROJECTED. PR432 en `codex/doc11-credit-source-health` corrige la fuente actual; P1 del predicado y aislamiento de metadata corregidos en0cea45df; revisión raíz aceptada y gate final correcto:272suites/2334tests/lint/tipos. Integrada y servida50521eb3; CI34628683317SUCCESS y postflight17:49UTC correctos. Corte NFT nuevo17:30 abierto a17:48:40, tres dead letters conservados. Falta verificar acreditación con cupos elegibles y UX autenticada. [Evidencia](evidence/2026-09-11-doc11-credits-source-delivery.json). No reparar ni compensar cortes antiguos. PR430 usa Refs421 y no cierra el lote por esos cambios parciales. `codex/doc11-credits-summary` → `staging`. Consume L1; créditos separados de UKI/L4. |
 | L3 | J2: guardar y volver a leer el alias del perfil con sesión válida. | [#422](https://github.com/fgomezserna/cukies-hub/issues/422) · **Implement weekly Treasure Hunt alias scope**, tarea `01a09068-a8af-79e0-877d-228e413065a1` | [PR429](https://github.com/fgomezserna/cukies-hub/pull/429), corrección `b351a44` revisada y aceptada: GET sin renombrar el ranking, fallback personalizado y PATCH semanal. Integrada el11-Sept15:53UTC en staging0ca4c8e,272suites/2301tests/lint/tipos correctos. CI34618773937SUCCESS y postflight16:02UTC: SHA/readiness200, journal limpio,10workers y82protegidos conservados. QA autenticada pendiente por timeout al seleccionar la pestaña. [Evidencia](evidence/2026-09-11-doc11-alias-credits-delivery.json). `codex/doc11-profile-alias` → `staging`. La raíz incorpora esta decisión de alcance en el mismo carril documental. |
-| L4 | J1, W1, W2: reserva del bote, UKI directo y reparto a los prestadores reales en partidas NUEVAS. | [#418](https://github.com/fgomezserna/cukies-hub/issues/418) · **11-Sep · Recompensas y bote semanal**, tarea `01a09068-e5f9-7a01-838b-82f98da5a5a2` | [PR427](https://github.com/fgomezserna/cukies-hub/pull/427) integrada y servida en staging `bf34f17`, CI34611669131SUCCESS, postflight15:08UTC correcto;271suites/2291tests/lint/tipos previos. Recuperación histórica CANCELADA, nunca aplicada. [PR431](https://github.com/fgomezserna/cukies-hub/pull/431),5350b08, revisión raíz aceptada: límite por inicio canónico de sesión exclusivamente staging97; producción conserva su comportamiento.272suites/2312tests/lint/tipos correctos; merge419371f servido, CI34621416333SUCCESS y postflight16:32UTC:readiness200/journal limpio/soloDApp/10workers y82protegidos conservados. GatesOFF; activación, partida nueva, atribución al prestador y reparto siguen pendientes. Lectura on-chain16:23UTC confirma0UKIlibres y7.5UKIreservados en distributor97; preparar financiación exacta del primer lote NUEVO sin consumir reservas anteriores. [Evidencia](evidence/2026-09-11-doc11-alias-credits-delivery.json). No exigir censo histórico, apply ni asignaciones retroactivas. L4 reactivado para la frontera futura de accounting/publication en `codex/doc11-forward-accounting`, sin tocar public.ts de L5 ni runtime/CI de la raíz. |
-| L5 | J3, W3: cierre de un periodo NUEVO, publicación, estado del premio y disponibilidad para cobrar. | [#423](https://github.com/fgomezserna/cukies-hub/issues/423) · **11-Sep · Cierre y cobro de premios**, tarea `01a09069-25af-7e12-9a37-7054fdc8dcac` | [PR433](https://github.com/fgomezserna/cukies-hub/pull/433),d843c74e: P1 multiwallet y P2 del total limitado a100claims corregidos; revisión independiente PASS,12tests focales y reproducciones multiwallet/101claims. Gate conjunto c12ed45f correcto:272suites/2342tests/lint/tipos. Pendiente integración/despliegue tras432. Consume allocations canónicas de partidas nuevas de L4; no depende de recuperar partidas o premios antiguos ni de aplicar PR427. Preparar orden de activación/publicación/claim y cálculo canónico del importe necesario para el primer lote NUEVO, pues el distributor tiene0UKIlibres en bloque130438381. Rama `codex/doc11-rewards-publication` → `staging`. |
+| L4 | J1, W1, W2: reserva del bote, UKI directo y reparto a los prestadores reales en partidas NUEVAS. | [#418](https://github.com/fgomezserna/cukies-hub/issues/418) · **11-Sep · Recompensas y bote semanal**, tarea `01a09068-e5f9-7a01-838b-82f98da5a5a2` | [PR427](https://github.com/fgomezserna/cukies-hub/pull/427) integrada y servida en staging `bf34f17`, CI34611669131SUCCESS, postflight15:08UTC correcto;271suites/2291tests/lint/tipos previos. Recuperación histórica CANCELADA, nunca aplicada. [PR431](https://github.com/fgomezserna/cukies-hub/pull/431),5350b08, revisión raíz aceptada: límite por inicio canónico de sesión exclusivamente staging97; producción conserva su comportamiento.272suites/2312tests/lint/tipos correctos; merge419371f servido, CI34621416333SUCCESS y postflight16:32UTC:readiness200/journal limpio/soloDApp/10workers y82protegidos conservados. GatesOFF; activación, partida nueva, atribución al prestador y reparto siguen pendientes. Lectura on-chain16:23UTC confirma0UKIlibres y7.5UKIreservados en distributor97; preparar financiación exacta del primer lote NUEVO sin consumir reservas anteriores. [Evidencia](evidence/2026-09-11-doc11-alias-credits-delivery.json). No exigir censo histórico, apply ni asignaciones retroactivas. L4 entregó [PR434](https://github.com/fgomezserna/cukies-hub/pull/434),correcciónc56eea10; revisión independiente PASS para periodo canónico, cola sin inanición y reanudación inmutable. Ranking3f419b35 y propagación de la frontera integrados en2e13c72c. Gate conjunto:272suites/2352tests,lint/tipos,31publisher,22schedulers y4Compose PASS. Preparada para entrega a staging; T y gates siguen sin activar. [Revisión y validación](evidence/2026-09-11-doc11-forward-rewards-delivery.json). La activación se alinea con un periodo diario y semanal completo, sin recuperar el historial. |
+| L5 | J3, W3: cierre de un periodo NUEVO, publicación, estado del premio y disponibilidad para cobrar. | [#423](https://github.com/fgomezserna/cukies-hub/issues/423) · **11-Sep · Cierre y cobro de premios**, tarea `01a09069-25af-7e12-9a37-7054fdc8dcac` | [PR433](https://github.com/fgomezserna/cukies-hub/pull/433),d843c74e: P1 multiwallet y P2 del total limitado a100claims corregidos; revisión independiente PASS,12tests focales y reproducciones multiwallet/101claims. Gate conjunto c12ed45f correcto:272suites/2342tests/lint/tipos. Integrada y servida c82498be; CI34630108075SUCCESS y postflight18:09UTC: readiness200, journal limpio, diez workers y82protegidos conservados. [Entrega](evidence/2026-09-11-doc11-rewards-state-delivery.json). Alcance: estados e importes canónicos, no activación del recorrido financiero. Consume allocations canónicas de partidas nuevas de L4; no depende de recuperar partidas o premios antiguos ni de aplicar PR427. Preparar orden de activación/publicación/claim y cálculo canónico del importe necesario para el primer lote NUEVO, pues el distributor tiene0UKIlibres en bloque130438381. Rama `codex/doc11-rewards-publication` → `staging`. |
 | L6 | A1, A2, A3: invitación válida, relación ya confirmada y nombre público del patrocinador. | [#424](https://github.com/fgomezserna/cukies-hub/issues/424) · **11-Sep · Hotfix de embajadores**, tarea `01a09068-3c90-7ff3-b7a5-16dac47d66c1` | [PR426](https://github.com/fgomezserna/cukies-hub/pull/426) publicada en main `d1a7149` y [PR428](https://github.com/fgomezserna/cukies-hub/pull/428) en staging `ecbf7b9`. Gates main173suites/1501tests/build y staging271/2259/lint/tipos correctos. A1:503 histórico y lectura posterior404/no elegible; diagnóstico termina sin RCA probada ni parche nuevo. Rama `codex/doc11-ambassadors-eligibility` limpia. A2/A3 cubiertos por regresiones; relación y nombre de sponsor elegible no acreditados por los sondeos live. |
 | L7 | O1: partidas diarias restantes con Cukies propios elegibles, sin reinicio por transferir. | [#412](https://github.com/fgomezserna/cukies-hub/issues/412) · **11-Sep · Partidas con Cukies propios**, tarea `01a09069-7cdf-71d1-b03d-5d246eacc44e` | En cola; acuse recibido. Matriz diaria y anti-reset pendientes de respuesta; depende de L1/L4. Rama prevista `codex/doc11-own-cukie-quota` → `staging`. |
 
@@ -240,7 +251,9 @@ CI34628683317SUCCESS y postflight17:49UTC acreditan SHA servido,
 readiness200, journal limpio, diez workers sin cambios y82contenedores
 protegidos conservados. El tick normal de17:48:40 abrió el corte NFT17:30,
 sin recrear los cortes intermedios desde09:00 ni tocar los tres dead letters.
-C2 tiene avance nuevo observado; falta comprobar la acreditación con cupos
+Sonda18:01:57UTC: ambas rutas abrieron además el corte18:00; se conservan
+los tres dead letters y no hay pendientes de aplicación. C2 tiene continuidad
+del proceso observada; falta comprobar la acreditación con cupos
 elegibles y la UX autenticada de R2. [Evidencia](evidence/2026-09-11-doc11-credits-source-delivery.json).
 
 Revisión independiente de L5 a las17:33UTC: [PR433](https://github.com/fgomezserna/cukies-hub/pull/433),
@@ -249,19 +262,31 @@ del total de claims truncado a100;12tests focales y reproducciones independiente
 con dos beneficiarios y101claims. Conserva detección de datos corruptos fuera
 de la página visible. El combinado c12ed45f con staging50521eb3 pasó272suites/2342tests, lint y tipos. La entrega previa91456a9b fue rechazada con ambos casos
 reproducidos. El alcance real es estado/presentación canónica de premios;
-no acredita cierre, financiación, publicación ni cobro live.
+no acredita cierre, financiación, publicación ni cobro live. Integrada y servida
+en c82498be; CI34630108075SUCCESS y postflight18:09UTC correctos.
+[Entrega](evidence/2026-09-11-doc11-rewards-state-delivery.json).
 
-- L2 y L5 han terminado sus correcciones;432ya está servida y la raíz
-  entrega433. L1 completó su pasada LIVE de solo lectura y acota el
+- L2 y L5 han terminado sus correcciones;432y433ya están servidas.
+  L1 completó su pasada LIVE de solo lectura y acotó el
   consumidor del catálogo público; no firmó ni mutó la cuenta.
   A17:45UTC, bloque130449097, Master no tiene posiciones98000001..12;
   Pool tiene98000007 y los demás están en wallet. Ese depósito es de10:02UTC,
   anterior al parche425: no acredita una operación nueva tras el arreglo.
   Las APIs autenticadas devolvieron401 en la sesión disponible; M1/M2/P1/O2
   conservan la QA autenticada pendiente.
-  L4 está activo en `codex/doc11-forward-accounting` para aislar el primer
-  periodo futuro completo en contabilidad/publicación y evitar procesar historia.
-  Una revisión Astra independiente comprueba433 en paralelo.
+  Su catálogo público legacy no es fuente operativa de esas cuatro pantallas.
+  Bridge sí lo consume sin revalidar ownerOf antes de preparar la acción;
+  es un hallazgo de código, sin afirmar el modo live. Seguimiento registrado
+  en [issue419](https://github.com/fgomezserna/cukies-hub/issues/419#issuecomment-5638555984).
+  PR434 ya superó la revisión focal en c56eea10: rechaza periodos anteriores,
+  salta planes completed/blocked y alcanza periodos nuevos detrás de50cierres
+  o1000planes históricos. La reanudación conserva hashes, operaciones y destinos.
+  El ranking3f419b35 usa el primer periodo completo y el calendario de su regla
+  sucesora; producción conserva el catch-up. Ambos están integrados y validados
+  en2e13c72c. La raíz entrega el código y prepara en paralelo la activación
+  con frontera futura alineada; gatesOFF hasta concretarla. No se requiere
+  reescribir el historial del Pool ni financiar reservas anteriores.
+  La revisión Astra independiente de433 terminó sin hallazgos pendientes.
   L1 tiene pendiente validar operaciones nuevas en el
   producto servido. L5 consume los resultados canónicos nuevos de L4. L7 requiere respuesta
   de producto y coordinar sus archivos de game-economy con L4. Una dependencia

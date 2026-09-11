@@ -105,3 +105,14 @@ test('usa URL web configurable y valida la identidad sana del dapp remoto', () =
   }
 });
 
+test('conserva la misma frontera futura entre web y workers de recompensas', () => {
+  const imageServices = serviceBlocks(images);
+  const workerServices = serviceBlocks(workers);
+  const variable = '      REWARD_FORWARD_ACTIVATION_AT: ${REWARD_FORWARD_ACTIVATION_AT:-}';
+
+  assert.ok(section(imageServices.get('dapp'), 'environment').includes(variable));
+  for (const name of ['game-economy-scheduler', 'reward-accounting-scheduler', 'reward-batch-publisher']) {
+    assert.ok(section(workerServices.get(name), 'environment').includes(variable), name);
+  }
+  assert.doesNotMatch(section(imageServices.get('dapp'), 'environment').join('\n'), /REWARD_BATCH_PUBLISHER_PRIVATE_KEY/);
+});

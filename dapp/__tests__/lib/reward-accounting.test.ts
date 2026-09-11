@@ -1249,6 +1249,27 @@ describe("accounting persistence and runtime gates", () => {
     })).resolves.toBeNull();
   });
 
+  it("salta la semana parcial anterior a la frontera forward", async () => {
+    const repository = new MemoryAccountingRepository();
+    const service = new RewardAccountingService(async (work) => work(repository));
+    await expect(service.nextWeeklyPeriod({
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: new Date("2026-08-31T17:01:00.000Z"),
+      forwardActivationAt: new Date("2026-08-20T15:00:00.000Z"),
+    })).resolves.toEqual({
+      periodId: "2026-W35",
+      startsAt: new Date("2026-08-24T14:00:00.000Z"),
+      payoutAt: new Date("2026-08-31T17:00:00.000Z"),
+    });
+    await expect(service.closeWeeklyPeriod({
+      periodId: "2026-W34",
+      startsAt: new Date("2026-08-17T14:00:00.000Z"),
+      ruleVersion: CURRENT_REWARD_RULE.version,
+      now: new Date("2026-08-31T17:01:00.000Z"),
+      forwardActivationAt: new Date("2026-08-20T15:00:00.000Z"),
+    })).rejects.toThrow(/anterior a la frontera forward/);
+  });
+
   it("no reparte snapshots v2 elegibles sin evidencia y conserva legacy", () => {
     const walletNormalized = wallet(403);
     expect(resolveAmbassadorSnapshotWallet({
@@ -1773,5 +1794,16 @@ describe("accounting persistence and runtime gates", () => {
       ambassadorWeeklyRaw: "100000000000000000",
     });
     expect(result.conservationRaw).toBe(DAILY_REWARD_EMISSION_RAW);
+  });
+
+  it("rechaza cerrar desde sources un dia anterior a la frontera", async () => {
+    const repository = new MemoryAccountingRepository();
+    const service = new RewardAccountingService(async (work) => work(repository));
+    await expect(service.closeDailyFromReservedSources({
+      dayId: "2026-08-20",
+      ruleVersion: "reward-v3",
+      sealedAt: new Date("2026-08-24T00:00:00Z"),
+      forwardActivationAt: new Date("2026-08-21T15:00:00.000Z"),
+    })).rejects.toThrow(/anterior a la frontera forward/);
   });
 });

@@ -1,0 +1,44 @@
+{
+  "observedAt": "2026-09-11T18:45:27.020458+00:00",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/434",
+  "scope": "Staging forward session settlement, canonical daily/weekly accounting and publication queues, ranking boundary and Compose propagation",
+  "codeSha": "2e13c72c",
+  "implementationShas": [
+    "c56eea10d1b401f9d0179631f29fce4d72355a76",
+    "3f419b35105a02255d05dd9484bca2f53fc353e2"
+  ],
+  "independentReview": {
+    "result": "PASS",
+    "scope": "Canonical period fence, completed/blocked queue continuation, 50 historic closures and 1000 historic plans before a new candidate, immutable awaiting_projection resume",
+    "historicData": "Unchanged in real-function in-memory reproductions"
+  },
+  "checks": {
+    "dappJest": {
+      "suites": 272,
+      "tests": 2352,
+      "result": "PASS"
+    },
+    "lint": "PASS; existing pendingRefreshAssets warning in my-cukies-panel.tsx:513",
+    "typecheck": "PASS",
+    "publisherTests": 31,
+    "schedulerTests": 22,
+    "composeTests": 4,
+    "generatedCompose": "PASS"
+  },
+  "delivery": {
+    "state": "prepared",
+    "baselineArtifact": "/tmp/doc11-pr434-baseline.json"
+  },
+  "activation": {
+    "state": "not_activated",
+    "forwardActivationAt": null,
+    "financialGates": false,
+    "cycleSeconds": 1800,
+    "historicalRecovery": false
+  },
+  "limits": [
+    "Deployment and activation not yet verified",
+    "No personal wallet signatures, reward funding or historical recovery",
+    "Functional new game, lender allocation, publication and claim still pending"
+  ]
+}

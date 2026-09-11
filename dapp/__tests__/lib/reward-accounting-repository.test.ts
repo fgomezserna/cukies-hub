@@ -90,6 +90,21 @@ describe("Mongo reward accounting repository", () => {
     });
   });
 
+  it("salta los dias sellables anteriores a la frontera forward", async () => {
+    const repository = createRepository([
+      { dayId: "2026-08-20", ruleVersion: "staging-test-v4", status: "sealed" },
+    ]);
+
+    await expect(repository.findNextClosableRewardDay(
+      "staging-test-v4",
+      new Date("2026-08-24T17:00:00.000Z"),
+      new Date("2026-08-21T15:00:00.000Z"),
+    )).resolves.toEqual({
+      dayId: "2026-08-22",
+      startsAt: new Date("2026-08-22T14:00:00.000Z"),
+    });
+  });
+
   it("falla de forma visible ante un dayId con forma ISO pero fecha imposible", async () => {
     const repository = createRepository([
       { dayId: "2026-99-99", ruleVersion: "staging-test-v4", status: "sealed" },

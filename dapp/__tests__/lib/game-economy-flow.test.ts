@@ -136,6 +136,35 @@ async function createSubmitted(
 }
 
 describe("multi-game economy session saga", () => {
+  it("aplica la frontera forward a las colas de expiry y recovery", async () => {
+    const context = setup();
+    const before = await createReady(context, "forward-before");
+    const activationAt = new Date(NOW.getTime() + 5_000);
+    const after = await context.service.createSession({
+      walletAddress: WALLET,
+      gameId: "arena",
+      cukieAssetIds: ["cukie-forward"],
+      expectedRuleVersion: "v1",
+      idempotencyKey: "forward-after",
+      now: new Date(activationAt.getTime() + 1_000),
+    });
+    const expired = await context.repository.listExpiredSessions(
+      new Date(after.expiresAt.getTime()),
+      10,
+      activationAt,
+    );
+    expect(expired.map((session) => session.sessionId)).toEqual([after.sessionId]);
+
+    for (const session of context.repository.state.sessions) session.status = "created";
+    const recoverable = await context.repository.listRecoverableSessions(
+      new Date(after.expiresAt.getTime()),
+      10,
+      activationAt,
+    );
+    expect(recoverable.map((session) => session.sessionId)).toEqual([after.sessionId]);
+    expect(before.createdAt.getTime()).toBeLessThan(activationAt.getTime());
+  });
+
   it("consumes both Treasure Hunt resources on a completed settlement", async () => {
     const context = setupTreasureHunt();
     const started = await createStartedTreasureHunt(context);

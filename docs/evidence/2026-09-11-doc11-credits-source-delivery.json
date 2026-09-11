@@ -238,5 +238,78 @@
     "transferDeadLettersPreserved": 3,
     "newCreditGrantToEligibleWalletVerified": false,
     "authenticatedUxVerified": false
+  },
+  "followUpCreditCuts": {
+    "observedAt": "2026-09-11T18:01:57.296Z",
+    "runs": [
+      {
+        "route": "uki",
+        "cutoff": "2026-09-11T18:00:00.000Z",
+        "status": "open"
+      },
+      {
+        "route": "uki",
+        "cutoff": "2026-09-11T17:30:00.000Z",
+        "status": "open"
+      },
+      {
+        "route": "nft",
+        "cutoff": "2026-09-11T18:00:00.000Z",
+        "status": "open"
+      },
+      {
+        "route": "nft",
+        "cutoff": "2026-09-11T17:30:00.000Z",
+        "status": "open"
+      }
+    ],
+    "deadLetters": [
+      {
+        "_id": {
+          "contractAlias": "TOKEN_V2",
+          "eventName": "Transfer"
+        },
+        "count": 3
+      }
+    ],
+    "pendingEvents": [
+      {
+        "_id": {
+          "contractAlias": "TOKEN_V2",
+          "eventName": "Transfer",
+          "status": "failed"
+        },
+        "count": 3
+      }
+    ],
+    "latestTick": {
+      "runId": "c0e6cc68-c085-42ab-81c0-6b263b45b98f",
+      "status": "success",
+      "startedAt": "2026-09-11T18:01:50.207Z",
+      "endedAt": "2026-09-11T18:01:50.395Z",
+      "result": {
+        "status": "waiting",
+        "routeResults": [
+          {
+            "route": "uki",
+            "status": "waiting",
+            "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T18:00:00.000Z",
+            "creditRunId": "",
+            "batchesProcessed": 0,
+            "itemsApplied": 0,
+            "pendingItems": 0
+          },
+          {
+            "route": "nft",
+            "status": "waiting",
+            "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T18:00:00.000Z",
+            "creditRunId": "",
+            "batchesProcessed": 0,
+            "itemsApplied": 0,
+            "pendingItems": 0
+          }
+        ]
+      }
+    }
   }
 }
