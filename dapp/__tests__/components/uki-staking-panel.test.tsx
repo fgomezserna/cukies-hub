@@ -192,7 +192,7 @@ describe('UkiStakingPanel', () => {
     expect(screen.getAllByText('Depositar')).toHaveLength(1);
   });
 
-  it('oculta el requisito indexado cuando el balance vivo ya cambió', () => {
+  it('oculta el requisito anterior cuando los UKI ya cambiaron', () => {
     mockUseReadContract.mockImplementation((config) => {
       switch (config?.functionName) {
         case 'ukiToken':
@@ -215,7 +215,7 @@ describe('UkiStakingPanel', () => {
     expect(screen.getByText('Actualizando…')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '20.000' }));
     expect(screen.queryByText(/Tendrías .* UKI en staking/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/balance vivo de tu wallet todavía no coincide/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tus UKI han cambiado y estamos actualizando tus cupos/i)).toBeInTheDocument();
   });
 
   it('ofrece cantidades simples sin exponer cálculos internos de la plaza', () => {

@@ -488,18 +488,14 @@ export async function custodialInventoryFromDb(
     })),
   });
   // The indexer projection can lag a confirmed ERC-721 transfer back to the
-  // wallet. Treat only an explicit ownerOf(wallet) result as permission to
-  // discard that stale open row/lock; unknown or vault-owned reads remain
-  // fail-closed and continue blocking a duplicate deposit.
+  // wallet. An ownerOf(wallet) result can clear only the stale custodial row;
+  // it does not invalidate unrelated off-chain reservations. Unknown or
+  // vault-owned reads remain fail-closed and continue blocking a duplicate
+  // deposit.
   const confirmedWalletAssetIds = new Set(
     recovery
-      .filter((item) => item.status === 'not_found')
+      .filter((item) => item.status === 'not_found' && item.reason !== 'POOL_RECOVERY_NO_PROBE')
       .map((item) => item.assetId),
-  );
-  const confirmedWalletLockAssetIds = new Set(
-    inspected
-      .filter((candidate) => confirmedWalletAssetIds.has(candidate.assetId))
-      .flatMap((candidate) => candidate.lockAssetIds),
   );
   const documentsForInventory = documents.map((document) => {
     const candidate = canonicalCustodialCandidate(document, config);
@@ -526,9 +522,10 @@ export async function custodialInventoryFromDb(
     walletAddress,
     now,
     documents: documentsForInventory,
-    locks: locks.filter((lock) => (
-      typeof lock.assetId !== 'string' || !confirmedWalletLockAssetIds.has(lock.assetId)
-    )),
+    // Keep every active lock. The chain owner read proves physical custody,
+    // not that a game, soft-stake, ops-hold, or reconciliation reservation is
+    // stale. A later lifecycle owner/lock process must release those locks.
+    locks,
     openVaultPositions: [...masterPositions, ...poolPositions].filter((position) => (
       typeof position.assetId !== 'string' || !confirmedWalletAssetIds.has(position.assetId)
     )),

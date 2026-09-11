@@ -156,7 +156,7 @@ describe('Pool vault recovery read classification', () => {
         collectionAddress: '0x4444444444444444444444444444444444444444',
         tokenId: '1',
       }],
-    })).resolves.toMatchObject([{ status: 'not_found' }]);
+    })).resolves.toMatchObject([{ status: 'not_found', reason: 'POOL_RECOVERY_NO_PROBE' }]);
   });
 
   it('fails closed for an oversized recovery batch instead of leaving tail assets unchecked', async () => {
@@ -195,7 +195,8 @@ describe('Pool vault recovery read classification', () => {
       { status: 'success', result: activeVault },
       { status: 'success', result: position() },
     ]);
-    mockCreatePublicClient.mockReturnValue({ multicall } as never);
+    const getBlockNumber = jest.fn().mockResolvedValue(BigInt(500));
+    mockCreatePublicClient.mockReturnValue({ multicall, getBlockNumber } as never);
     try {
       const result = await readPoolRecoveryPositions({
         walletNormalized: wallet,
@@ -212,10 +213,11 @@ describe('Pool vault recovery read classification', () => {
       expect(multicall.mock.calls[0]?.[0]).toMatchObject({
         contracts: expect.arrayContaining([expect.objectContaining({ functionName: 'ownerOf' })]),
         allowFailure: true,
+        blockNumber: BigInt(500),
       });
       expect(result).toMatchObject([
-        { assetId: '97:0x4444444444444444444444444444444444444444:1', status: 'current_custody' },
-        { assetId: '97:0x4444444444444444444444444444444444444444:2', status: 'not_found' },
+        { assetId: '97:0x4444444444444444444444444444444444444444:1', status: 'current_custody', observedBlockNumber: '500' },
+        { assetId: '97:0x4444444444444444444444444444444444444444:2', status: 'not_found', observedBlockNumber: '500' },
         { assetId: '56:0x4444444444444444444444444444444444444444:3', status: 'unknown', reason: 'POOL_RECOVERY_OWNER_MISMATCH' },
       ]);
     } finally {
@@ -236,7 +238,8 @@ describe('Pool vault recovery read classification', () => {
     ]);
     const originalUrls = process.env.CHAIN_INDEXER_BSC_TESTNET_RPC_URLS;
     process.env.CHAIN_INDEXER_BSC_TESTNET_RPC_URLS = 'http://rpc97.test';
-    mockCreatePublicClient.mockReturnValue({ multicall } as never);
+    const getBlockNumber = jest.fn().mockResolvedValue(BigInt(500));
+    mockCreatePublicClient.mockReturnValue({ multicall, getBlockNumber } as never);
     try {
       const result = await readPoolRecoveryPositions({
         walletNormalized: wallet,

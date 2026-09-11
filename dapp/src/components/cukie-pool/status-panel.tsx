@@ -170,10 +170,30 @@ type PoolOnChainConfirmation = {
   confirmedAt: number;
 };
 
+type PoolPositionIdentityInput = {
+  chainId: number;
+  collectionAddress: string;
+  tokenId: string;
+  vaultAddress: string;
+};
+
 type EphemeralPendingEntry = {
   operation: NftVaultPendingOperation;
   storageRaw: string | null;
 };
+
+function receiptBlockNumber(receipt: unknown) {
+  if (!receipt || typeof receipt !== 'object') return null;
+  const value = (receipt as { blockNumber?: unknown }).blockNumber;
+  try {
+    if (typeof value === 'bigint' && value >= BigInt(0)) return value;
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+    if (typeof value === 'string' && /^(?:0x[0-9a-f]+|[0-9]+)$/i.test(value)) return BigInt(value);
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 function poolTabFromHash(hash: string) {
   if (hash === 'mi-cukie-pool' || hash === 'mis-cukies-aportados' || hash.startsWith('pool-cukie-')) return 'pool' as const;
@@ -459,56 +479,66 @@ function samePoolStatusIdentity(current: PoolStatus, previous: PoolStatus | null
     && sameAddressSet(current.nftCustody.collectionAddresses, previous.nftCustody.collectionAddresses);
 }
 
+function withoutTerminalWithdrawals(
+  status: PoolStatus,
+  terminalWithdrawals: ReadonlySet<string>,
+) {
+  if (status.mode !== 'custodial_vault' || terminalWithdrawals.size === 0) return status;
+  return {
+    ...status,
+    positions: status.positions.filter((position) => (
+      !terminalWithdrawals.has(poolPositionIdentityKey(position))
+    )),
+    ...(status.recoveryAssets
+      ? {
+        recoveryAssets: status.recoveryAssets.filter((position) => (
+          !terminalWithdrawals.has(poolPositionIdentityKey(position))
+        )),
+      }
+      : {}),
+  };
+}
+
 function retainPoolLists(
   current: PoolStatus,
   previous: PoolStatus | null,
-  terminalWithdrawAssetIds: ReadonlySet<string> = new Set(),
+  terminalWithdrawals: ReadonlySet<string> = new Set(),
 ) {
-  if (!samePoolStatusIdentity(current, previous)) return current;
-  const retained = retainNftVaultLists(current, previous);
-  const withoutTerminalWithdrawals = current.mode === 'custodial_vault'
-    && terminalWithdrawAssetIds.size > 0
-    ? {
-      ...retained,
-      positions: retained.positions.filter((position) => (
-        typeof position === 'object'
-        && position !== null
-        && !terminalWithdrawAssetIds.has(String((position as { assetId?: unknown }).assetId))
-      )),
-      ...(Array.isArray((retained as CustodialStatus).recoveryAssets)
-        ? {
-          recoveryAssets: (retained as CustodialStatus).recoveryAssets!.filter((position) => (
-            !terminalWithdrawAssetIds.has(position.assetId)
-          )),
-        }
-        : {}),
-    } as PoolStatus
-    : retained;
+  const currentVisible = withoutTerminalWithdrawals(current, terminalWithdrawals);
+  const previousVisible = previous
+    ? withoutTerminalWithdrawals(previous, terminalWithdrawals)
+    : null;
+  if (!samePoolStatusIdentity(currentVisible, previousVisible)) return currentVisible;
+  const retained = retainNftVaultLists(currentVisible, previousVisible);
+  const retainedVisible = withoutTerminalWithdrawals(retained, terminalWithdrawals);
   if (
-    current.mode !== 'custodial_vault'
-    || previous?.mode !== 'custodial_vault'
-    || !Array.isArray(current.recoveryAssets)
-    || !Array.isArray(previous.recoveryAssets)
-    || previous.recoveryAssets.length === 0
-  ) return withoutTerminalWithdrawals;
-  if (!current.sourceHealthy) {
-    return current.recoveryAssets.length > 0
-      ? withoutTerminalWithdrawals
-      : { ...withoutTerminalWithdrawals, recoveryAssets: previous.recoveryAssets.filter((asset) => !terminalWithdrawAssetIds.has(asset.assetId)) };
+    currentVisible.mode !== 'custodial_vault'
+    || previousVisible?.mode !== 'custodial_vault'
+    || !Array.isArray(currentVisible.recoveryAssets)
+    || !Array.isArray(previousVisible.recoveryAssets)
+    || previousVisible.recoveryAssets.length === 0
+  ) return retainedVisible;
+  if (!currentVisible.sourceHealthy) {
+    return currentVisible.recoveryAssets.length > 0
+      ? retainedVisible
+      : {
+        ...retainedVisible,
+        recoveryAssets: previousVisible.recoveryAssets,
+      };
   }
-  if (current.availability?.status !== 'partial') return withoutTerminalWithdrawals;
-  const unknownAssetIds = new Set(current.availability.unknownAssetIds ?? []);
-  if (unknownAssetIds.size === 0) return withoutTerminalWithdrawals;
-  const currentAssetIds = new Set(current.recoveryAssets.map((asset) => asset.assetId));
+  if (currentVisible.availability?.status !== 'partial') return retainedVisible;
+  const unknownAssetIds = new Set(currentVisible.availability.unknownAssetIds ?? []);
+  if (unknownAssetIds.size === 0) return retainedVisible;
+  const currentAssetIds = new Set(currentVisible.recoveryAssets.map((asset) => asset.assetId));
   const recoveryAssets = [
-    ...current.recoveryAssets,
-    ...previous.recoveryAssets.filter((asset) => (
+    ...currentVisible.recoveryAssets,
+    ...previousVisible.recoveryAssets.filter((asset) => (
       unknownAssetIds.has(asset.assetId) && !currentAssetIds.has(asset.assetId)
     )),
   ];
-  return recoveryAssets.length === current.recoveryAssets.length
-    ? withoutTerminalWithdrawals
-    : { ...withoutTerminalWithdrawals, recoveryAssets };
+  return recoveryAssets.length === currentVisible.recoveryAssets.length
+    ? retainedVisible
+    : { ...retainedVisible, recoveryAssets };
 }
 
 function mergePoolPositions(status: CustodialStatus) {
@@ -546,6 +576,19 @@ function poolPositionTarget(position: CustodialPosition) {
     position.vaultAddress.toLowerCase(),
     position.depositEpoch,
   ].join('-');
+}
+
+function poolPositionIdentityPrefix(input: PoolPositionIdentityInput) {
+  return [
+    input.chainId,
+    input.collectionAddress.toLowerCase(),
+    input.tokenId,
+    input.vaultAddress.toLowerCase(),
+  ].join(':');
+}
+
+function poolPositionIdentityKey(position: PoolPositionIdentityInput & { depositEpoch: string }) {
+  return `${poolPositionIdentityPrefix(position)}:${position.depositEpoch}`;
 }
 
 function poolAvailableTarget(asset: AvailableAsset) {
@@ -701,8 +744,8 @@ export function CukiePoolStatusPanel() {
   pendingByAssetRef.current = pendingByAsset;
   const pendingEphemeralByContextRef = useRef(new Map<string, Record<string, EphemeralPendingEntry>>());
   const [onChainByAsset, setOnChainByAsset] = useState<Record<string, PoolOnChainConfirmation>>({});
-  const [terminalWithdrawAssetIds, setTerminalWithdrawAssetIds] = useState<Set<string>>(() => new Set());
-  const confirmedReceiptByHashRef = useRef(new Map<string, { status: string; transactionHash?: Hash; logs?: unknown }>());
+  const [terminalWithdrawals, setTerminalWithdrawals] = useState<Set<string>>(() => new Set());
+  const confirmedReceiptByHashRef = useRef(new Map<string, { status: string; transactionHash?: Hash; logs?: unknown; blockNumber?: bigint | number | string }>());
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const operationLocksRef = useRef(new Set<string>());
   const walletOperationLockRef = useRef(false);
@@ -731,9 +774,9 @@ export function CukiePoolStatusPanel() {
   }
   const status = useMemo(() => {
     if (!fetchedStatus) return null;
-    const retained = retainPoolLists(fetchedStatus, lastHealthyStatusRef.current, terminalWithdrawAssetIds);
+    const retained = retainPoolLists(fetchedStatus, lastHealthyStatusRef.current, terminalWithdrawals);
     return mergePendingPoolAssets(retained, lastHealthyStatusRef.current, pendingByAsset);
-  }, [fetchedStatus, pendingByAsset, terminalWithdrawAssetIds]);
+  }, [fetchedStatus, pendingByAsset, terminalWithdrawals]);
   useEffect(() => {
     if (
       fetchedStatus?.sourceHealthy
@@ -852,7 +895,7 @@ export function CukiePoolStatusPanel() {
     setError(null);
     setNotice(null);
     setOnChainByAsset({});
-    setTerminalWithdrawAssetIds(new Set());
+    setTerminalWithdrawals(new Set());
     confirmedReceiptByHashRef.current.clear();
     walletOperationLockRef.current = false;
   }, [address, chainId]);
@@ -998,6 +1041,7 @@ export function CukiePoolStatusPanel() {
     phase: NftVaultPendingPhase;
     txHash: Hash;
     depositEpoch?: string;
+    receiptBlockNumber?: string;
     context?: NftTransactionContext;
     expectedOperation?: NftVaultPendingOperation;
     isCurrent?: () => boolean;
@@ -1030,6 +1074,7 @@ export function CukiePoolStatusPanel() {
       .find((operation) => pendingNftVaultOperationAssetKey(operation) === operationAssetKey);
     if (input.expectedOperation && !pendingNftVaultOperationMatches(previous, input.expectedOperation)) return null;
     const depositEpoch = input.depositEpoch ?? previous?.depositEpoch;
+    const receiptBlockNumber = input.receiptBlockNumber ?? previous?.receiptBlockNumber;
     const operation: NftVaultPendingOperation = {
       version: 1,
       ...storageContext,
@@ -1042,6 +1087,7 @@ export function CukiePoolStatusPanel() {
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
       ...(depositEpoch ? { depositEpoch } : {}),
+      ...(receiptBlockNumber ? { receiptBlockNumber } : {}),
     };
     const persisted = savePendingNftVaultOperation(storage, operation);
     const contextStorageKey = pendingNftVaultStorageKey(storageContext);
@@ -1275,7 +1321,7 @@ export function CukiePoolStatusPanel() {
     };
     const inspectConfirmedOperation = async (
       snapshot: NftVaultPendingOperation,
-      receipt?: { status: string; logs?: unknown },
+      receipt?: { status: string; logs?: unknown; blockNumber?: bigint | number | string },
     ) => {
       let operation = currentOperation(snapshot);
       if (!operation || typeof publicClient.readContract !== 'function') return;
@@ -1303,6 +1349,16 @@ export function CukiePoolStatusPanel() {
         || !sameAddress(confirmedOperation.walletAddress, reconciliationContext.walletAddress)
         || !ukiNftVaults.collectionAddresses.some((collection) => sameAddress(collection, confirmedOperation.collectionAddress))
       ) return;
+      const receiptBlock = receiptBlockNumber(resolvedReceipt)
+        ?? receiptBlockNumber({ blockNumber: confirmedOperation.receiptBlockNumber });
+      if (receiptBlock === null || typeof publicClient.getBlockNumber !== 'function') return;
+      let latestBlock: bigint;
+      try {
+        latestBlock = await publicClient.getBlockNumber();
+      } catch {
+        return;
+      }
+      if (latestBlock < receiptBlock) return;
       if (confirmedOperation.action === 'deposit') {
         const receiptEpoch = depositedEpochFromReceipt(resolvedReceipt, confirmedOperation);
         const depositEpoch = receiptEpoch ?? confirmedOperation.depositEpoch;
@@ -1333,6 +1389,7 @@ export function CukiePoolStatusPanel() {
             abi: cukiePoolNftVaultAbi,
             functionName: 'positionOf',
             args: [operation.collectionAddress as Address, BigInt(operation.tokenId)],
+            blockNumber: receiptBlock,
           });
         } catch {
           // A withdrawn/terminal position can make positionOf revert. The
@@ -1353,6 +1410,7 @@ export function CukiePoolStatusPanel() {
             abi: erc721CustodyAbi,
             functionName: 'ownerOf',
             args: [BigInt(current.tokenId)],
+            blockNumber: receiptBlock,
           });
         } catch {
           return;
@@ -1375,21 +1433,22 @@ export function CukiePoolStatusPanel() {
           abi: cukiePoolNftVaultAbi,
           functionName: 'positionOf',
           args: [operation.collectionAddress as Address, BigInt(operation.tokenId)],
+          blockNumber: receiptBlock,
         });
         if (!isReconciliationCurrent()) return;
         const current = currentOperation(operation);
         if (current && poolPositionMatchesOperation(current, rawPosition, 'request_exit')) markOnChainConfirmation(current);
         return;
       }
-      if (
-        operation.depositEpoch
-        && withdrawnEpochFromReceipt(resolvedReceipt, operation) !== operation.depositEpoch
-      ) return;
+      const withdrawnEpoch = withdrawnEpochFromReceipt(resolvedReceipt, operation);
+      if (operation.depositEpoch && withdrawnEpoch !== operation.depositEpoch) return;
+      if (operation.action === 'withdraw' && !operation.depositEpoch && !withdrawnEpoch) return;
       const owner = await publicClient.readContract({
         address: operation.collectionAddress as Address,
         abi: erc721CustodyAbi,
         functionName: 'ownerOf',
         args: [BigInt(operation.tokenId)],
+        blockNumber: receiptBlock,
       });
       if (!isReconciliationCurrent()) return;
       const current = currentOperation(operation);
@@ -1399,11 +1458,20 @@ export function CukiePoolStatusPanel() {
         // projection is still partial. Do not leave a confirmed withdrawal
         // replayable while waiting for an eventually-consistent row.
         if (current.action === 'withdraw') {
-          const terminalAssetId = pendingNftVaultOperationAssetKey(current);
-          setTerminalWithdrawAssetIds((assetIds) => {
-            if (assetIds.has(terminalAssetId)) return assetIds;
-            return new Set([...assetIds, terminalAssetId]);
-          });
+          const terminalEpoch = current.depositEpoch ?? withdrawnEpoch;
+          if (terminalEpoch) {
+            const terminalIdentity = poolPositionIdentityKey({
+              chainId: current.chainId,
+              collectionAddress: current.collectionAddress,
+              tokenId: current.tokenId,
+              vaultAddress: current.vaultAddress,
+              depositEpoch: terminalEpoch,
+            });
+            setTerminalWithdrawals((identities) => {
+              if (identities.has(terminalIdentity)) return identities;
+              return new Set([...identities, terminalIdentity]);
+            });
+          }
           clearPending(current.assetId, {
             expectedOperation: current,
             isCurrent: isReconciliationCurrent,
@@ -1445,6 +1513,9 @@ export function CukiePoolStatusPanel() {
                 depositEpoch: operation.action === 'deposit'
                   ? depositedEpochFromReceipt(receipt, operation) ?? undefined
                   : undefined,
+                ...(receiptBlockNumber(receipt) !== null
+                  ? { receiptBlockNumber: receiptBlockNumber(receipt)!.toString() }
+                  : {}),
                 context: {
                   wallet: reconciliationContext.walletAddress,
                   chainId: reconciliationContext.chainId,
@@ -1593,6 +1664,9 @@ export function CukiePoolStatusPanel() {
           phase: 'awaiting_receipt',
           txHash: replacement.replacementHash,
           depositEpoch: asset.depositEpoch,
+          ...(receiptBlockNumber(replacement.receipt) !== null
+            ? { receiptBlockNumber: receiptBlockNumber(replacement.receipt)!.toString() }
+            : {}),
           context: expectedContext,
           expectedOperation: originalOperation,
           updateUi: isCurrentContext(isCurrent),
@@ -1608,6 +1682,9 @@ export function CukiePoolStatusPanel() {
           phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
           txHash: hash,
           depositEpoch: asset.depositEpoch,
+          ...(receiptBlockNumber(receipt) !== null
+            ? { receiptBlockNumber: receiptBlockNumber(receipt)!.toString() }
+            : {}),
           context: expectedContext,
           expectedOperation: operation,
           updateUi: isCurrentContext(isCurrent),
@@ -1721,11 +1798,15 @@ export function CukiePoolStatusPanel() {
           .find((item) => pendingNftVaultOperationAssetKey(item) === assetKey)
         : existingPending);
       if (!operationReady()) throw new Error('POOL_OPERATION_CONTEXT_CHANGED_AFTER_RECEIPT');
-      setTerminalWithdrawAssetIds((assetIds) => {
-        if (!assetIds.has(assetKey)) return assetIds;
-        const next = new Set(assetIds);
-        next.delete(assetKey);
-        return next;
+      const terminalPrefix = `${poolPositionIdentityPrefix({
+        chainId: asset.chainId,
+        collectionAddress: asset.collectionAddress,
+        tokenId: asset.tokenId,
+        vaultAddress,
+      })}:`;
+      setTerminalWithdrawals((identities) => {
+        const next = new Set([...identities].filter((identity) => !identity.startsWith(terminalPrefix)));
+        return next.size === identities.size ? identities : next;
       });
       setPhase('idle');
       setMutatingAssetId(null);

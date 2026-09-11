@@ -35,6 +35,8 @@ export type PoolRecoveryAssetInput = {
 export type PoolRecoveryInspection = {
   assetId: string;
   status: 'custodied' | 'current_custody' | 'not_found' | 'unknown';
+  /** Block at which the owner/position probe was explicitly evaluated. */
+  observedBlockNumber?: string;
   vaultAddress: string | null;
   beneficialOwner: string | null;
   /**
@@ -128,6 +130,18 @@ function unknownResult(assetId: string, reason: string): PoolRecoveryInspection 
   };
 }
 
+function notFoundWithoutProbe(assetId: string): PoolRecoveryInspection {
+  return {
+    assetId,
+    status: 'not_found',
+    vaultAddress: null,
+    beneficialOwner: null,
+    exitRequestedAt: null,
+    withdrawableAt: null,
+    reason: 'POOL_RECOVERY_NO_PROBE',
+  };
+}
+
 function recoveryAssetId(input: PoolRecoveryAssetInput) {
   return `${input.chainId}:${input.collectionAddress.toLowerCase()}:${input.tokenId}`;
 }
@@ -154,7 +168,12 @@ export function classifyPoolRecoveryRead(input: {
   activeVaultAddresses?: string[];
   owner: unknown;
   rawPosition: unknown;
+  observedBlockNumber?: unknown;
 }): PoolRecoveryInspection {
+  const observedBlockNumber = uintText(input.observedBlockNumber);
+  const withObservedBlock = (result: PoolRecoveryInspection) => (
+    observedBlockNumber ? { ...result, observedBlockNumber } : result
+  );
   const ownerNormalized = typeof input.owner === 'string' && isAddress(input.owner, { strict: false })
     ? input.owner.toLowerCase()
     : null;
@@ -165,28 +184,28 @@ export function classifyPoolRecoveryRead(input: {
     return unknownResult(input.assetId, 'POOL_RECOVERY_RPC_READ_FAILED');
   }
   if (ownerNormalized === input.walletNormalized.toLowerCase()) {
-    return {
+    return withObservedBlock({
       assetId: input.assetId,
       status: 'not_found',
       vaultAddress: null,
       beneficialOwner: null,
       exitRequestedAt: null,
       withdrawableAt: null,
-    };
+    });
   }
   const activeVaultAddresses = [
     ...(input.activeVaultAddress ? [input.activeVaultAddress] : []),
     ...(input.activeVaultAddresses ?? []),
   ].map((address) => address.toLowerCase());
   if (ownerNormalized && activeVaultAddresses.includes(ownerNormalized)) {
-    return {
+    return withObservedBlock({
       assetId: input.assetId,
       status: 'current_custody',
       vaultAddress: ownerNormalized,
       beneficialOwner: null,
       exitRequestedAt: null,
       withdrawableAt: null,
-    };
+    });
   }
   if (ownerNormalized !== input.vaultAddress.toLowerCase()) {
     return unknownResult(input.assetId, 'POOL_RECOVERY_OWNER_MISMATCH');
@@ -217,7 +236,7 @@ export function classifyPoolRecoveryRead(input: {
   if (beneficialOwnerNormalized !== input.walletNormalized.toLowerCase()) {
     return unknownResult(input.assetId, 'POOL_RECOVERY_OWNER_MISMATCH');
   }
-  return {
+  return withObservedBlock({
     assetId: input.assetId,
     status: 'custodied',
     vaultAddress: input.vaultAddress.toLowerCase(),
@@ -227,7 +246,7 @@ export function classifyPoolRecoveryRead(input: {
     activationAt,
     exitRequestedAt: exitRequestedAt === '0' ? null : exitRequestedAt,
     withdrawableAt: withdrawableAt === '0' ? null : withdrawableAt,
-  };
+  });
 }
 
 /**
@@ -265,14 +284,7 @@ export async function readPoolRecoveryPositions(input: {
     ...(input.activeVaultAddresses ?? []),
   ].filter((address) => isAddress(address));
   if (configuredVaults.length === 0 && !hasActiveProbe) {
-    return assets.map((asset) => ({
-      assetId: asset.assetId,
-      status: 'not_found' as const,
-      vaultAddress: null,
-      beneficialOwner: null,
-      exitRequestedAt: null,
-      withdrawableAt: null,
-    }));
+    return assets.map((asset) => notFoundWithoutProbe(asset.assetId));
   }
   const recoveryChainIds = new Set(configuredVaults.map((vault) => vault.chainId));
   if (hasActiveProbe) recoveryChainIds.add(input.activeVaultChainId!);
@@ -285,26 +297,12 @@ export async function readPoolRecoveryPositions(input: {
     const oversized = new Set(assetsRequiringRecovery.map((asset) => asset.assetId));
     return assets.map((asset) => oversized.has(asset.assetId)
       ? unknownResult(asset.assetId, 'POOL_RECOVERY_ASSET_LIMIT')
-      : {
-          assetId: asset.assetId,
-          status: 'not_found' as const,
-          vaultAddress: null,
-          beneficialOwner: null,
-          exitRequestedAt: null,
-          withdrawableAt: null,
-        });
+      : notFoundWithoutProbe(asset.assetId));
   }
   if (configuredVaults.length > MAX_RECOVERY_VAULTS) {
     return assets.map((asset) => recoveryChainIds.has(asset.chainId)
       ? unknownResult(asset.assetId, 'POOL_RECOVERY_VAULT_LIMIT')
-      : {
-          assetId: asset.assetId,
-          status: 'not_found' as const,
-          vaultAddress: null,
-          beneficialOwner: null,
-          exitRequestedAt: null,
-          withdrawableAt: null,
-        });
+      : notFoundWithoutProbe(asset.assetId));
   }
 
   const inspections = new Map<string, PoolRecoveryInspection>();
@@ -318,14 +316,7 @@ export async function readPoolRecoveryPositions(input: {
     // custody source to inspect; keep the asset available for normal flow.
     if (chainAssets.length === 0) continue;
     if (chainVaults.length === 0 && activeAssets.length === 0) {
-      chainAssets.forEach((asset) => inspections.set(asset.assetId, {
-        assetId: asset.assetId,
-        status: 'not_found',
-        vaultAddress: null,
-        beneficialOwner: null,
-        exitRequestedAt: null,
-        withdrawableAt: null,
-      }));
+      chainAssets.forEach((asset) => inspections.set(asset.assetId, notFoundWithoutProbe(asset.assetId)));
       continue;
     }
     const urls = rpcUrls(chainId);
@@ -375,8 +366,12 @@ export async function readPoolRecoveryPositions(input: {
         chain: chainId === 97 ? bscTestnet : bsc,
         transport: bscReadTransport(urls, chainId),
       });
+      // Pin the batch to an observed block instead of accepting an opaque
+      // provider-relative `latest` result. Callers can therefore distinguish
+      // an owner proof from a branch where no on-chain probe was made.
+      const observedBlockNumber = await client.getBlockNumber();
       const results = await withRecoveryTimeout(
-        client.multicall({ contracts, allowFailure: true }),
+        client.multicall({ contracts, allowFailure: true, blockNumber: observedBlockNumber }),
         12_000,
       );
       lookups.forEach(({ asset, vault }, index) => {
@@ -402,6 +397,7 @@ export async function readPoolRecoveryPositions(input: {
             : [],
           owner,
           rawPosition,
+          observedBlockNumber,
         });
         inspections.set(
           asset.assetId,

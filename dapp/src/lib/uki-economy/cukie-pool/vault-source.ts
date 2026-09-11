@@ -1039,13 +1039,8 @@ export async function listAvailableCukiePoolVaultAssets(
   ).length;
   const confirmedWalletAssetIds = new Set(
     recovery
-      .filter((item) => item.status === 'not_found')
+      .filter((item) => item.status === 'not_found' && item.reason !== 'POOL_RECOVERY_NO_PROBE')
       .map((item) => item.assetId),
-  );
-  const confirmedWalletLegacyAssetIds = new Set(
-    preliminary
-      .filter((item) => confirmedWalletAssetIds.has(item.assetId))
-      .map((item) => item.legacyAssetId),
   );
   const recoveryAssets = preliminary.flatMap((item) => {
     const inspection = recoveryByAssetId.get(item.assetId);
@@ -1135,8 +1130,10 @@ export async function listAvailableCukiePoolVaultAssets(
     assets: preliminary
       .filter((item) => (
         !unavailable.has(item.assetId)
-        && (!lockedLegacyAssets.has(item.legacyAssetId)
-          || confirmedWalletLegacyAssetIds.has(item.legacyAssetId))
+        // ownerOf(wallet) only invalidates stale physical custody. Active
+        // off-chain locks remain authoritative until their own lifecycle
+        // releases them; the lock has no safe epoch binding here.
+        && !lockedLegacyAssets.has(item.legacyAssetId)
       ))
       .map((item) => ({
         assetId: item.assetId,

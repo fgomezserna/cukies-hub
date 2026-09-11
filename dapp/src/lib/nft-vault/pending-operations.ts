@@ -22,6 +22,8 @@ export type NftVaultPendingOperation = NftVaultPendingContext & {
    * operation for an older deposit from clearing a newer position.
    */
   depositEpoch?: string;
+  /** Block containing the successful transaction receipt, when known. */
+  receiptBlockNumber?: string;
   action: NftVaultPendingAction;
   phase: NftVaultPendingPhase;
   txHash: `0x${string}`;
@@ -204,6 +206,9 @@ function isPendingOperation(value: unknown, context: NftVaultPendingContext): va
       || (operation.action !== 'approval'
         && typeof operation.depositEpoch === 'string'
         && /^\d+$/.test(operation.depositEpoch)))
+    && (operation.receiptBlockNumber === undefined
+      || (typeof operation.receiptBlockNumber === 'string'
+        && /^[0-9]+$/.test(operation.receiptBlockNumber)))
     && (
       operation.action === 'approval'
       || operation.action === 'deposit'

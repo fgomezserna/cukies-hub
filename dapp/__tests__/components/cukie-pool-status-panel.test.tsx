@@ -130,6 +130,8 @@ function availableAsset(tokenId = '7', collection = collectionAddress) {
 
 function position(input?: {
   tokenId?: string;
+  depositEpoch?: string;
+  vaultAddress?: string;
   status?: 'pending' | 'active' | 'exit_requested' | 'withdrawable' | 'withdrawn';
   activationAt?: string;
   withdrawableAt?: string;
@@ -137,12 +139,13 @@ function position(input?: {
   exitCalendarVersion?: string;
 }) {
   const tokenId = input?.tokenId ?? '7';
+  const depositEpoch = input?.depositEpoch ?? '1';
   const status = input?.status ?? 'active';
   const assetId = `97:${collectionAddress}:${tokenId}`;
   const exiting = status === 'exit_requested' || status === 'withdrawable' || status === 'withdrawn';
   return {
     source: 'custodial_vault',
-    positionId: `${assetId}:epoch:1`,
+    positionId: `${assetId}:epoch:${depositEpoch}`,
     assetId,
     chain: 'BSC',
     chainId: 97,
@@ -151,9 +154,9 @@ function position(input?: {
     imageUrl: `https://example.com/cukies/${tokenId}.png`,
     generation: 'original',
     rarity: 'rare',
-    vaultAddress,
+    vaultAddress: input?.vaultAddress ?? vaultAddress,
     beneficiaryNormalized: walletAddress,
-    depositEpoch: '1',
+    depositEpoch,
     status,
     lifecycleOpen: status !== 'withdrawn',
     custody: status === 'withdrawn' ? 'wallet' : 'cukie_pool_nft_vault',
@@ -171,14 +174,18 @@ function position(input?: {
   };
 }
 
-function recoveryPosition(tokenId: string) {
+function recoveryPosition(
+  tokenId: string,
+  input: { depositEpoch?: string; vaultAddress?: string } = {},
+) {
   const assetId = `97:${collectionAddress}:${tokenId}`;
+  const depositEpoch = input.depositEpoch ?? '4';
   return {
     ...position({ tokenId, status: 'withdrawable' }),
     source: 'recovery_vault' as const,
-    positionId: `${assetId}:epoch:4`,
-    vaultAddress: otherVaultAddress,
-    depositEpoch: '4',
+    positionId: `${assetId}:epoch:${depositEpoch}`,
+    vaultAddress: input.vaultAddress ?? otherVaultAddress,
+    depositEpoch,
     status: 'recovery' as const,
     lifecycleOpen: true as const,
     custody: 'cukie_pool_recovery' as const,
@@ -250,7 +257,7 @@ function pendingDeposit(asset = availableAsset()): NftVaultPendingOperation {
   };
 }
 
-function pendingWithdraw(asset = availableAsset()): NftVaultPendingOperation {
+function pendingWithdraw(asset = availableAsset(), depositEpoch?: string): NftVaultPendingOperation {
   return {
     version: 1,
     chainId: 97,
@@ -264,6 +271,7 @@ function pendingWithdraw(asset = availableAsset()): NftVaultPendingOperation {
     txHash: withdrawHash,
     createdAt: 1,
     updatedAt: 1,
+    ...(depositEpoch ? { depositEpoch } : {}),
   };
 }
 
@@ -369,7 +377,7 @@ describe('CukiePoolStatusPanel', () => {
         position({ tokenId: '10', status: 'withdrawable' }),
         position({ tokenId: '11', status: 'withdrawable' }),
       ],
-      recoveryAssets: ['1', '3', '4'].map(recoveryPosition),
+      recoveryAssets: ['1', '3', '4'].map((tokenId) => recoveryPosition(tokenId)),
     })));
 
     render(<CukiePoolStatusPanel />);
@@ -529,7 +537,7 @@ describe('CukiePoolStatusPanel', () => {
       position({ tokenId: '10', status: 'withdrawable' }),
       position({ tokenId: '11', status: 'withdrawable' }),
     ];
-    const recovery = ['1', '3', '4'].map(recoveryPosition);
+    const recovery = ['1', '3', '4'].map((tokenId) => recoveryPosition(tokenId));
     const partialRecovery = recovery.slice(0, 2);
     fetchMock
       .mockResolvedValueOnce(successfulResponse(poolStatus({
@@ -616,7 +624,7 @@ describe('CukiePoolStatusPanel', () => {
     fetchMock
       .mockResolvedValueOnce(successfulResponse(poolStatus({ availableAssets: [asset] })))
       .mockReturnValueOnce(new Promise((resolve) => { resolveProjection = resolve; }));
-    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success', blockNumber: BigInt(100) });
     const readContract = jest.fn().mockImplementation((request: { functionName?: string }) => (
       request.functionName === 'positionOf'
         ? Promise.resolve({ beneficialOwner: walletAddress, depositEpoch: BigInt(1), depositedAt: BigInt(100), activationAt: BigInt(200) })
@@ -627,6 +635,7 @@ describe('CukiePoolStatusPanel', () => {
       readContract,
       waitForTransactionReceipt: jest.fn(),
       getTransactionReceipt,
+      getBlockNumber: jest.fn().mockResolvedValue(BigInt(100)),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
 
     render(<CukiePoolStatusPanel />);
@@ -653,7 +662,7 @@ describe('CukiePoolStatusPanel', () => {
     const asset = availableAsset();
     const pending = { ...pendingDeposit(asset), depositEpoch: '1' };
     savePendingNftVaultOperation(window.localStorage, pending);
-    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success', blockNumber: BigInt(100) });
     const readContract = jest.fn().mockImplementation((request: { functionName?: string }) => (
       request.functionName === 'positionOf' ? Promise.resolve(null) : Promise.resolve(walletAddress)
     ));
@@ -661,6 +670,7 @@ describe('CukiePoolStatusPanel', () => {
       readContract,
       waitForTransactionReceipt: jest.fn(),
       getTransactionReceipt,
+      getBlockNumber: jest.fn().mockResolvedValue(BigInt(100)),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
     fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [asset] })));
 
@@ -674,6 +684,151 @@ describe('CukiePoolStatusPanel', () => {
     })).toEqual([]));
     expect(await screen.findByText(/se ha liberado la operación pendiente/i)).toBeInTheDocument();
     expect(readContract).toHaveBeenCalledWith(expect.objectContaining({ functionName: 'ownerOf' }));
+  });
+
+  it('no libera un depósito con un lector atrasado y reintenta cuando alcanza el bloque del receipt', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const asset = availableAsset();
+    const pending = { ...pendingDeposit(asset), depositEpoch: '1' };
+    savePendingNftVaultOperation(window.localStorage, pending);
+    const getTransactionReceipt = jest.fn().mockResolvedValue({
+      status: 'success',
+      blockNumber: BigInt(100),
+    });
+    const getBlockNumber = jest.fn().mockResolvedValue(BigInt(99));
+    const readContract = jest.fn().mockImplementation((request: { functionName?: string }) => (
+      request.functionName === 'positionOf' ? Promise.resolve(null) : Promise.resolve(walletAddress)
+    ));
+    mockUsePublicClient.mockReturnValue({
+      readContract,
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+      getBlockNumber,
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock.mockResolvedValue(successfulResponse(poolStatus({ availableAssets: [asset] })));
+
+    render(<CukiePoolStatusPanel />);
+
+    await waitFor(() => expect(getBlockNumber).toHaveBeenCalled());
+    expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([pending]);
+    expect(readContract).not.toHaveBeenCalled();
+
+    getBlockNumber.mockResolvedValue(BigInt(100));
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: pendingNftVaultStorageKey({ chainId: 97, walletAddress, vaultAddress }),
+    }));
+    await waitFor(() => expect(loadPendingNftVaultOperations(window.localStorage, {
+      chainId: 97,
+      walletAddress,
+      vaultAddress,
+    })).toEqual([]));
+    expect(readContract).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'positionOf',
+      blockNumber: BigInt(100),
+    }));
+  });
+
+  it('oculta solo la retirada epoch 1 y muestra la epoch 2 aunque no haya un depósito local', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const asset = availableAsset();
+    const pending = pendingWithdraw(asset, '1');
+    savePendingNftVaultOperation(window.localStorage, pending);
+    const receipt = {
+      status: 'success',
+      blockNumber: BigInt(100),
+      logs: [{
+        address: vaultAddress,
+        eventName: 'Withdrawn',
+        args: [collectionAddress, BigInt(7), walletAddress, BigInt(1)],
+      }],
+    };
+    const getTransactionReceipt = jest.fn().mockResolvedValue(receipt);
+    const readContract = jest.fn().mockResolvedValue(walletAddress);
+    mockUsePublicClient.mockReturnValue({
+      readContract,
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+      getBlockNumber: jest.fn().mockResolvedValue(BigInt(100)),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock
+      .mockResolvedValueOnce(successfulResponse(poolStatus({
+        positions: [position({ tokenId: '7', status: 'withdrawable', depositEpoch: '1' })],
+      })))
+      .mockResolvedValueOnce(successfulResponse(poolStatus({
+        positions: [position({ tokenId: '7', status: 'withdrawable', depositEpoch: '2' })],
+      })));
+
+    render(<CukiePoolStatusPanel />);
+
+    await screen.findByText(/Retirada confirmada y reflejada en tu wallet/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const button = await screen.findByRole('button', { name: /Retirar a mi wallet desde el Cukie Pool/i });
+    expect(button).toBeEnabled();
+    expect(screen.getAllByText('Cukie #7')).toHaveLength(1);
+    expect(readContract).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'ownerOf',
+      blockNumber: BigInt(100),
+    }));
+  });
+
+  it('no resucita una recuperación parcial de la epoch retirada', async () => {
+    configureVault();
+    mockUseAuth.mockReturnValue(authValue(user, 'evm'));
+    mockUseAccount.mockReturnValue({
+      address: walletAddress,
+      chainId: 97,
+      isConnected: true,
+    } as unknown as ReturnType<typeof useAccount>);
+    const asset = availableAsset();
+    savePendingNftVaultOperation(window.localStorage, pendingWithdraw(asset, '1'));
+    const getTransactionReceipt = jest.fn().mockResolvedValue({
+      status: 'success',
+      blockNumber: BigInt(100),
+      logs: [{
+        address: vaultAddress,
+        eventName: 'Withdrawn',
+        args: [collectionAddress, BigInt(7), walletAddress, BigInt(1)],
+      }],
+    });
+    mockUsePublicClient.mockReturnValue({
+      readContract: jest.fn().mockResolvedValue(walletAddress),
+      waitForTransactionReceipt: jest.fn(),
+      getTransactionReceipt,
+      getBlockNumber: jest.fn().mockResolvedValue(BigInt(100)),
+    } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
+    fetchMock
+      .mockResolvedValueOnce(successfulResponse(poolStatus({
+        positions: [position({ tokenId: '7', status: 'withdrawable', depositEpoch: '1' })],
+      })))
+      .mockResolvedValueOnce(successfulResponse(poolStatus({
+        availability: { status: 'partial', unknownAssets: 1, unknownAssetIds: [asset.assetId] },
+        recoveryAssets: [recoveryPosition('7', { vaultAddress, depositEpoch: '1' })],
+      })));
+
+    render(<CukiePoolStatusPanel />);
+
+    await screen.findByText(/Retirada confirmada y reflejada en tu wallet/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Cukie #7')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Retirar a mi wallet desde el Cukie Pool/i })).not.toBeInTheDocument();
   });
 
   it('ignora un receipt retrasado después de cambiar la red de la wallet', async () => {
@@ -762,7 +917,7 @@ describe('CukiePoolStatusPanel', () => {
       isConnected: true,
     } as unknown as ReturnType<typeof useAccount>);
     const positionRead = deferred<unknown>();
-    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success' });
+    const getTransactionReceipt = jest.fn().mockResolvedValue({ status: 'success', blockNumber: BigInt(100) });
     const readContract = jest.fn().mockImplementation((request: { functionName?: string }) => (
       request.functionName === 'positionOf' ? positionRead.promise : Promise.resolve(walletAddress)
     ));
@@ -771,6 +926,7 @@ describe('CukiePoolStatusPanel', () => {
       readContract,
       waitForTransactionReceipt: jest.fn(),
       getTransactionReceipt,
+      getBlockNumber: jest.fn().mockResolvedValue(BigInt(100)),
     } as unknown as NonNullable<ReturnType<typeof usePublicClient>>);
     const original = pendingDeposit(availableAsset());
     const syncing = { ...original, depositEpoch: '2' };

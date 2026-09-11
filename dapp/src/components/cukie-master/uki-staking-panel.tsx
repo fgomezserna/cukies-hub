@@ -571,7 +571,7 @@ export function UkiStakingPanel({
 
             {routePreviewSynchronizing ? (
               <p role="status" className="mt-4 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-3 text-xs font-semibold leading-relaxed text-amber-100">
-                El balance vivo de tu wallet todavía no coincide con el último snapshot de cupos; ocultamos el requisito anterior hasta reconciliarlo.
+                Tus UKI han cambiado y estamos actualizando tus cupos; ocultamos el requisito anterior hasta terminar.
               </p>
             ) : null}
 

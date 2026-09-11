@@ -269,7 +269,7 @@ export function CukieMasterStatusPanel({
       : 'Comprueba tu posición';
   const overviewDescription = state === 'ready' || state === 'stale'
     ? sourcesComplete && !projectionsMaterialized
-      ? 'La fuente ya está disponible, pero el estado de tus cupos aún se está materializando. El potencial detectado no cuenta como activo hasta completar la proyección.'
+      ? 'Tus UKI han cambiado y estamos actualizando tus cupos. El resumen se actualizará automáticamente.'
       : visibleOverviewSlots === null
       ? 'No hemos podido actualizar tus cupos. Puedes consultar tu staking mientras recuperamos los datos. Volveremos a intentarlo automáticamente.'
       : visibleOverviewSlots > 0
@@ -379,18 +379,18 @@ export function CukieMasterStatusPanel({
               <StatusMetric
                 label="Cupos activos"
                 value={projectionsMaterialized ? `${totalCounts.active}/${status.totals.maxPotentialSlots}` : 'No disponible'}
-                helper={projectionsMaterialized ? `${visibleAllocatedSlots} asignados entre las dos rutas` : 'Esperando la materialización del estado confirmado'}
+                helper={projectionsMaterialized ? `${visibleAllocatedSlots} asignados entre las dos rutas` : 'Esperando la actualización de tus cupos'}
                 tone="lilac"
               />
               <StatusMetric
                 label="En validación"
                 value={projectionsMaterialized ? String(totalCounts.qualifying) : 'No disponible'}
-                helper={projectionsMaterialized ? 'Pendientes del siguiente periodo elegible' : 'Esperando la materialización del estado confirmado'}
+                helper={projectionsMaterialized ? 'Pendientes del siguiente periodo elegible' : 'Esperando la actualización de tus cupos'}
               />
               <StatusMetric
                 label="En gracia"
                 value={projectionsMaterialized ? String(totalCounts.grace) : 'No disponible'}
-                helper={projectionsMaterialized ? 'Cupos que aún puedes conservar ajustando activos' : 'Esperando la materialización del estado confirmado'}
+                helper={projectionsMaterialized ? 'Cupos que aún puedes conservar ajustando activos' : 'Esperando la actualización de tus cupos'}
                 tone={projectionsMaterialized && totalCounts.grace > 0 ? 'warning' : 'neutral'}
               />
             </div>
@@ -498,7 +498,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
       return {
         eyebrow: 'Actualizando',
         title: 'Estamos confirmando tus últimos cambios',
-        description: 'Mostramos el potencial detectado mientras se materializa el estado de tus cupos. No repitas ninguna operación; el resumen se actualizará automáticamente.',
+        description: 'Tus UKI han cambiado y estamos actualizando tus cupos. No repitas ninguna operación; el resumen se actualizará automáticamente.',
         primary: { href: '#uki-staking', label: 'Ver staking UKI' },
         secondary: { href: '#cukie-master-nft-staking', label: 'Ver mis Cukies' },
         warning: false,
@@ -590,7 +590,7 @@ function CukieMasterOverview({ status }: { status: PublicStatus }) {
           <OverviewMetric
             label="Estado actual"
             value={projectionsMaterialized ? `${counts.active} activos` : 'No disponible'}
-            helper={projectionsMaterialized ? `${counts.qualifying} validando · ${counts.grace} en gracia` : 'Esperando la materialización del estado confirmado'}
+            helper={projectionsMaterialized ? `${counts.qualifying} validando · ${counts.grace} en gracia` : 'Esperando la actualización de tus cupos'}
           />
           <OverviewMetric
             label="Créditos diarios"
@@ -718,7 +718,7 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
         <div role="status" className="mb-4 flex gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-3">
           <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
           <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-            El saldo de UKI ya se ha leído, pero todavía no mezclamos ese valor con cupos materializados ni con el umbral anterior.
+            Tus UKI han cambiado y estamos actualizando tus cupos; el resultado anterior no se muestra como vigente hasta terminar.
           </p>
         </div>
       ) : null}
@@ -798,9 +798,9 @@ function StatusMetric({
 
 function RouteTab({ value, label, route }: { value: RouteKey; label: string; route: PublicRoute }) {
   const allocated = route.position?.allocatedSlots ?? 0;
-  const displayed = !route.source.complete
+  const displayed = !route.source.complete || route.synchronizing
     ? null
-    : route.synchronizing ? route.previewSlots ?? null : allocated;
+    : allocated;
   const counts = slotCounts(route);
   return (
     <TabsTrigger
@@ -822,7 +822,7 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
             {!route.source.complete
               ? 'Esperando confirmación'
               : route.synchronizing
-              ? displayed === null ? 'Materialización pendiente' : `${displayed} detectados · sincronizando`
+              ? 'Actualizando tus cupos'
               : `${counts.active} activos · ${counts.qualifying} validando`}
           </span>
         </span>
@@ -832,9 +832,9 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
           aria-valuemin={0}
           aria-valuemax={MAX_ROUTE_SLOTS}
           {...(displayed === null ? {} : { 'aria-valuenow': displayed })}
-            aria-valuetext={displayed === null
+          aria-valuetext={displayed === null
             ? 'Cupos no disponibles; esperando confirmación'
-            : `${displayed} de ${MAX_ROUTE_SLOTS} cupos${route.synchronizing ? ' detectados, sincronizando' : ''}`}
+            : `${displayed} de ${MAX_ROUTE_SLOTS} cupos${route.synchronizing ? ', actualizando' : ''}`}
           className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
         >
           <span className="block h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: displayed === null ? '0%' : `${Math.min(100, displayed * 20)}%` }} />
@@ -847,6 +847,7 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
 function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
   const ukiBreakdown = getUkiBreakdown(route);
   const counts = slotCounts(route);
+  const visibleSlots = route.synchronizing ? [] : route.slots;
   const deficit = route.synchronizing
     ? null
     : route.deficitToPreserveSlots ?? route.deficitToNextSlot;
@@ -860,7 +861,7 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
               {!route.source.complete
                 ? 'Estado pendiente de confirmación'
                 : route.synchronizing
-                  ? 'Materialización pendiente'
+                  ? 'Actualizando tus cupos'
                   : `${counts.active} activos · ${counts.qualifying} en validación · ${counts.grace} en gracia`}
             </span>
           </div>
@@ -876,7 +877,7 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
                 <div role="status" className="mt-4 flex gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-3">
                   <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
                   <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                    Hemos detectado el cambio. Estamos actualizando tus cupos y su periodo de validación; no repitas la operación.
+                    Hemos detectado el cambio. Estamos actualizando tus cupos; no repitas la operación.
                   </p>
                 </div>
               ) : null}
@@ -884,7 +885,7 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
                 <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">UKI que ya cuentan</p>
                   <p className="mt-2 break-words text-base font-black text-[var(--uki-cream)]">
-                    {route.synchronizing ? 'Detectados: ' : ''}{ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
+                    {route.synchronizing ? 'UKI consultados: ' : ''}{ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
                   </p>
                 </div>
               ) : (
@@ -901,20 +902,27 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
           )}
 
           <dl className="mt-4 grid min-w-0 gap-3 text-sm font-semibold sm:grid-cols-2">
-            <RouteMetric label={route.synchronizing ? 'Requisito detectado' : 'Requisito vigente'} value={requirementLabel(route.currentRequirement)} />
             <RouteMetric
-              label={route.deficitToPreserveSlots ? 'Déficit para conservar' : 'Déficit siguiente cupo'}
-              value={deficit
+              label={route.synchronizing ? 'Requisito Cukie Master' : 'Requisito vigente'}
+              value={route.synchronizing ? 'Actualizando…' : requirementLabel(route.currentRequirement)}
+            />
+            <RouteMetric
+              label={route.synchronizing
+                ? 'Siguiente cupo'
+                : route.deficitToPreserveSlots ? 'Déficit para conservar' : 'Déficit siguiente cupo'}
+              value={route.synchronizing
+                ? 'Actualizando…'
+                : deficit
                 ? requirementLabel(deficit)
                 : route.source.complete ? 'Máximo alcanzado' : 'No disponible'}
             />
-            {(route.position?.protectedSlots ?? 0) > 0 || counts.grace > 0 ? (
+            {!route.synchronizing && ((route.position?.protectedSlots ?? 0) > 0 || counts.grace > 0) ? (
               <RouteMetric label="Cupos conservados en gracia" value={String(route.position?.protectedSlots ?? 0)} />
             ) : null}
-            {ukiBreakdown ? <RouteMetric label="Margen tras cupos" value={ukiBreakdown.excess} /> : null}
+            {!route.synchronizing && ukiBreakdown ? <RouteMetric label="Margen tras cupos" value={ukiBreakdown.excess} /> : null}
           </dl>
 
-          {route.pendingRequirement ? (
+          {!route.synchronizing && route.pendingRequirement ? (
             <div className="mt-4 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-3 text-xs font-semibold leading-relaxed text-amber-100">
               Próximo requisito: {requirementLabel(route.pendingRequirement)}. Puedes ajustarte hasta {dateLabel(route.requirementGraceEndsAt) ?? 'el final del periodo de gracia'}.
             </div>
@@ -924,13 +932,13 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
         <div className="min-w-0 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
           <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Estado de cada cupo</p>
           <div className="mt-3 space-y-2">
-            {route.slots.length === 0 ? (
+            {visibleSlots.length === 0 ? (
               <p className="text-sm font-semibold text-[var(--uki-muted)]">
                 {route.synchronizing
-                  ? 'Los cupos aparecerán aquí cuando termine la sincronización.'
+                  ? 'Los cupos aparecerán aquí cuando termine la actualización.'
                   : 'Todavía no hay cupos asignados en esta ruta.'}
               </p>
-            ) : route.slots.map((slot) => (
+            ) : visibleSlots.map((slot) => (
               <div key={`${slot.route}:${slot.ordinal}:${slot.eligibilityEpoch}`} className="flex min-w-0 items-start justify-between gap-3 rounded-[7px] border border-white/10 px-3 py-2.5 text-xs font-semibold">
                 <span className="shrink-0 text-[var(--uki-text)]">Cupo {slot.ordinal}</span>
                 <span className="flex min-w-0 items-start gap-1.5 text-right text-[var(--uki-muted)]">
