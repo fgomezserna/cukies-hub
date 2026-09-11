@@ -224,6 +224,45 @@ describe('DashboardOverviewPanel', () => {
     expect(screen.getAllByText('Créditos').length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText('9 intentos')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Jugar ahora/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Jugar con créditos/i })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: /Jugar con créditos/i })[0]).toHaveAttribute(
+      'href',
+      '/games/treasure-hunt',
+    );
+  });
+
+  it('no habilita la partida con créditos que aún no están confirmados', async () => {
+    fetchMock.mockResolvedValue(response(summary({
+      credits: module({
+        availableCredits: 200,
+        reservedCredits: 0,
+        spentCredits: 25,
+        poolDepositedCredits: 50,
+        poolAvailableCredits: 700,
+        activeReservations: 0,
+      }, 'degraded'),
+      game: module({
+        configured: true,
+        enabled: true,
+        phase: 'closed',
+        campaignId: 'stage-campaign',
+        eligibilityKind: 'uki_staking',
+        attemptsGranted: 9,
+        attemptsUsed: 0,
+        attemptsRemaining: 9,
+        bestRank: 3,
+        totalTickets: 12,
+      }),
+      rewards: module({ claimableRaw: '0', allocations: 0, claims: 0, claimPublished: true, blockedAllocations: 0 }),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByText(/La competición ha terminado/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Jugar con créditos/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Ver créditos/i }).some((link) => (
+      link.getAttribute('href') === '/credits'
+    ))).toBe(true);
   });
 
   it.each(['uki', 'nft'] as const)('mantiene los cupos como desconocidos si la ruta %s no está reconciliada', async (route) => {

@@ -337,6 +337,24 @@ function choosePrimaryAction(input: {
       description: `${integerLabel(input.game.data.attemptsRemaining)} intentos disponibles. Entra cuando quieras y revisa tus créditos antes de comenzar.`,
     };
   }
+  if (input.game?.state === 'ready'
+    && input.game.data.phase === 'closed'
+    && input.credits?.state === 'ready'
+    && (input.credits.data.availableCredits > 0 || input.credits.data.poolAvailableCredits > 0)) {
+    const ownCredits = input.credits.data.availableCredits;
+    const poolCredits = input.credits.data.poolAvailableCredits;
+    const availableCreditDescription = ownCredits > 0 && poolCredits > 0
+      ? `${integerLabel(ownCredits)} personales y ${integerLabel(poolCredits)} del pool disponibles para la próxima partida semanal.`
+      : ownCredits > 0
+        ? `${integerLabel(ownCredits)} créditos personales disponibles para la próxima partida semanal.`
+        : `${integerLabel(poolCredits)} créditos del pool disponibles para la próxima partida semanal.`;
+    return {
+      href: '/games/treasure-hunt',
+      label: 'Jugar con créditos',
+      title: 'Modo créditos disponible',
+      description: availableCreditDescription,
+    };
+  }
   if (input.rewards?.state === 'ready'
     && hasPositiveRaw(input.rewards.data.claimableRaw)
     && input.rewards.data.claimPublished) {
@@ -443,6 +461,7 @@ export function DashboardOverviewPanel() {
   const master = summary ? moduleData(summary.modules.cukieMaster) : null;
   const masterDataReady = isMasterDataReady(masterModule);
   const credits = summary ? moduleData(summary.modules.credits) : null;
+  const creditsForPlay = summary?.modules.credits.state === 'ready' ? credits : null;
   const pool = summary ? moduleData(summary.modules.cukiePool) : null;
   const rewards = summary ? moduleData(summary.modules.rewards) : null;
   const marketplace = summary ? moduleData(summary.modules.marketplace) : null;
@@ -535,7 +554,7 @@ export function DashboardOverviewPanel() {
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
             <section id="dashboard-play" aria-labelledby="dashboard-play-title" className="min-w-0">
               <SectionIntro titleId="dashboard-play-title" eyebrow="Ahora" title="Tu siguiente jugada" description="Comprueba tus intentos y créditos antes de jugar." />
-              <PlayPanel module={summary.modules.game} game={game} credits={credits} />
+              <PlayPanel module={summary.modules.game} game={game} credits={creditsForPlay} />
             </section>
 
             <section id="dashboard-resources" aria-labelledby="dashboard-resources-title" className="min-w-0">
@@ -952,7 +971,16 @@ function PlayPanel({
 }) {
   const attemptsKnown = game?.attemptsRemaining !== null && game?.attemptsRemaining !== undefined;
   const gameUsesCredits = game?.phase === 'closed';
-  const canPlay = Boolean(!gameUsesCredits && game?.enabled && attemptsKnown && game.attemptsRemaining! > 0);
+  const creditModeAvailable = Boolean(
+    gameUsesCredits &&
+    credits &&
+    (credits.availableCredits > 0 || credits.poolAvailableCredits > 0)
+  );
+  const canPlay = Boolean(
+    gameUsesCredits
+      ? creditModeAvailable
+      : Boolean(game?.enabled && attemptsKnown && game.attemptsRemaining! > 0)
+  );
   const gameDescription = module.state === 'unavailable'
     ? 'No podemos consultar el juego ahora.'
     : gameUsesCredits
@@ -1002,8 +1030,8 @@ function PlayPanel({
 
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
         {canPlay ? (
-          <Link href="/games/treasure-hunt/rankings" className="inline-flex min-h-10 items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[#f2c34b] transition hover:text-[var(--uki-cream)]">
-            Ver ranking <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          <Link href={creditModeAvailable ? '/games/treasure-hunt' : '/games/treasure-hunt/rankings'} className="inline-flex min-h-10 items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[#f2c34b] transition hover:text-[var(--uki-cream)]">
+            {creditModeAvailable ? 'Jugar con créditos' : 'Ver ranking'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         ) : (
           <Link href="/credits" className="inline-flex min-h-10 items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-lilac)] transition hover:text-[var(--uki-cream)]">
