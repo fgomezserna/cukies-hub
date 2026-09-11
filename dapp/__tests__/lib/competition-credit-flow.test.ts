@@ -263,6 +263,61 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     expect(repository.state.incidents).toEqual([]);
   });
 
+  it('opens a new NFT cut while retaining an ancillary TOKEN_V2 alarm', async () => {
+    const repository = nftRepositoryForFlow();
+    repository.state.sourceHealth.warnings = [
+      'CHAIN_DEAD_LETTERS_OPEN',
+      'CHAIN_EVENTS_NOT_PROJECTED',
+    ];
+    // The ownership alarm is intentionally visible but does not invalidate
+    // the custodial Master slot source used for this new cut.
+    repository.state.sourceHealth.healthy = true;
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+
+    await expect(service.refreshSourceWatermark({
+      route: 'nft',
+      expectedRuleVersion: 'credits-v1',
+      now: new Date(CUTOFF.getTime() + 1_000),
+    })).resolves.toMatchObject({
+      route: 'nft',
+      status: 'healthy',
+    });
+    const run = await service.createDailyRun({
+      route: 'nft',
+      cutoff: CUTOFF,
+      expectedRuleVersion: 'credits-v1',
+      now: new Date(CUTOFF.getTime() + 2_000),
+    });
+
+    expect(run.status).toBe('snapshotted');
+    expect(repository.state.sourceHealth.warnings).toEqual(expect.arrayContaining([
+      'CHAIN_DEAD_LETTERS_OPEN',
+      'CHAIN_EVENTS_NOT_PROJECTED',
+    ]));
+  });
+
+  it('keeps a Cukie Master vault projection alarm blocking the NFT cut', async () => {
+    const repository = nftRepositoryForFlow();
+    repository.state.sourceHealth.healthy = false;
+    repository.state.sourceHealth.warnings = ['CHAIN_EVENTS_NOT_PROJECTED'];
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+
+    await expect(service.refreshSourceWatermark({
+      route: 'nft',
+      expectedRuleVersion: 'credits-v1',
+      now: new Date(CUTOFF.getTime() + 1_000),
+    })).rejects.toMatchObject({
+      details: expect.objectContaining({
+        reasonCode: 'SOURCE_UNHEALTHY',
+        warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      }),
+    });
+  });
+
   it("grants every eligible UKI and NFT slot exactly once for a 5+5 Cukie Master", async () => {
     const stagingCutoff = new Date("2026-07-10T14:00:00.000Z");
     const maximumWalletSlots = (["uki", "nft"] as const).flatMap((route) =>

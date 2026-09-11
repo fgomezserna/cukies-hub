@@ -68,6 +68,7 @@ type MemoryState = {
   nftSummaries: Map<string, CukieMasterNftRouteSummary>;
   ukiIndexerHealthy: boolean;
   nftIndexerHealthy: boolean;
+  nftIndexerWarnings: string[];
   fenceRoundHook?: (route: CukieMasterRoute) => void;
 };
 
@@ -127,6 +128,7 @@ function memoryRepository() {
     nftSummaries: new Map(),
     ukiIndexerHealthy: true,
     nftIndexerHealthy: true,
+    nftIndexerWarnings: [],
   };
   const positionKey = (wallet: string, route: CukieMasterRoute) => `${wallet}:${route}`;
   const repo: CukieMasterRepository = {
@@ -230,7 +232,7 @@ function memoryRepository() {
     async getNftIndexerHealth(checkedAt) {
       return {
         healthy: state.nftIndexerHealthy,
-        warnings: state.nftIndexerHealthy ? [] : ['NFT pipeline stale'],
+        warnings: state.nftIndexerHealthy ? state.nftIndexerWarnings : ['NFT pipeline stale'],
         checkedAt,
       };
     },
@@ -576,6 +578,21 @@ describe('Cukie Master canonical sources', () => {
     expect(nftFailure.uki.completeness.indexerHealth).toBe(true);
     expect(nftFailure.nft.completeness).toMatchObject({ complete: false, indexerHealth: false });
     expect(nftFailure.nft.completeness.warnings).toContain('NFT pipeline stale');
+  });
+
+  it('keeps ancillary NFT alarms visible without invalidating custodial source completeness', async () => {
+    const { repo, state } = memoryRepository();
+    state.nftIndexerWarnings = ['Existen dead letters del pipeline NFT.'];
+
+    const sources = await readCukieMasterSources(repo, '0xABC', '0xabc', now);
+
+    expect(sources.nft.completeness).toMatchObject({
+      complete: true,
+      indexerHealth: true,
+    });
+    expect(sources.nft.completeness.warnings).toContain(
+      'Existen dead letters del pipeline NFT.',
+    );
   });
 
   it('marks a newer loop error, backlog, or pending future bootstrap unhealthy', () => {

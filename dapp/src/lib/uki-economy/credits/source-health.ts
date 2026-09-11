@@ -45,6 +45,9 @@ export type CreditSourceHealthEvidenceInput = {
   cursors: Array<Record<string, unknown>>;
   deadLetters: number;
   pendingEvents: number;
+  /** Counts for the aliases that can mutate the credit source itself. */
+  blockingDeadLetters?: number;
+  blockingPendingEvents?: number;
   incidents: number;
   sourceRuleVersions: Record<"uki" | "nft", string> | null;
   rounds: Array<Record<string, unknown>>;

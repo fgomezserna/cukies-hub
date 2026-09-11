@@ -1004,6 +1004,13 @@ export function createMongoCompetitionCreditRepository(
       const aliases = route === "uki"
         ? ["UKI_STAKING", "VESTING_VAULT"]
         : ["TOKEN_V2", "CUKIE_MASTER_NFT_VAULT"];
+      // TOKEN_V2 ownership is an ancillary inventory projection for the
+      // custodial NFT route. Credit slots are materialized from the Master
+      // vault events; keep TOKEN_V2 alarms visible without making an old
+      // ownership dead letter force a credit backfill.
+      const blockingEventAliases = route === "nft"
+        ? ["CUKIE_MASTER_NFT_VAULT"]
+        : aliases;
       const expectedCursorIds = route === "uki"
         ? [
             "UKI_STAKING:Staked",
@@ -1026,6 +1033,8 @@ export function createMongoCompetitionCreditRepository(
         cursors,
         deadLetters,
         pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
         incidents,
         rounds,
         stakingPositions,
@@ -1072,6 +1081,19 @@ export function createMongoCompetitionCreditRepository(
         db.collection("chain_events").countDocuments(
           {
             contractAlias: { $in: aliases },
+            status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
+          },
+          options
+        ),
+        db.collection("chain_dead_letters").countDocuments(
+          {
+            contractAlias: { $in: blockingEventAliases },
+          },
+          options
+        ),
+        db.collection("chain_events").countDocuments(
+          {
+            contractAlias: { $in: blockingEventAliases },
             status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
           },
           options
@@ -1364,6 +1386,18 @@ export function createMongoCompetitionCreditRepository(
           }
         : null;
       const sortedWarnings = [...warnings].sort(compareCreditText);
+      const nonBlockingWarnings = new Set(
+        route === "nft"
+          ? [
+              ...(blockingDeadLetters === 0 && deadLetters > 0
+                ? ["CHAIN_DEAD_LETTERS_OPEN"]
+                : []),
+              ...(blockingPendingEvents === 0 && pendingEvents > 0
+                ? ["CHAIN_EVENTS_NOT_PROJECTED"]
+                : []),
+            ]
+          : [],
+      );
       const cukieProjectionHash = stableCreditHash({
         positions: cukiePositions.map((position) => ({
           _id: position._id,
@@ -1407,6 +1441,8 @@ export function createMongoCompetitionCreditRepository(
         })),
         deadLetters,
         pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
         incidents,
         sourceRuleVersions,
         rounds: rounds.map((round) => ({
@@ -1435,7 +1471,9 @@ export function createMongoCompetitionCreditRepository(
         warnings: sortedWarnings,
       });
       return {
-        healthy: sortedWarnings.length === 0,
+        // `warnings` intentionally retains ancillary TOKEN_V2 alarms. Only
+        // warnings outside that explicitly non-blocking set gate new cuts.
+        healthy: sortedWarnings.every((warning) => !nonBlockingWarnings.has(warning)),
         warnings: sortedWarnings,
         observedThrough,
         sourceRuleVersions,
