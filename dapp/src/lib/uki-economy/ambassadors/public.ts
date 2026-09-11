@@ -11,6 +11,7 @@ import { DomainConflictError } from "../errors";
 import type { RewardAccountingAllocationDocument } from "../rewards/accounting-types";
 import {
   findMongoAmbassadorByInvitationCode,
+  findMongoAmbassadorPublicName,
   getMongoAmbassadorEnrollment,
   getOrCreateMongoAmbassadorProfile,
   materializeLockedPresaleAmbassadorAttributions,
@@ -35,6 +36,13 @@ export type AmbassadorCommissionStatus =
   | "claimable"
   | "claimed"
   | "expired";
+
+type PublicInvitation = {
+  invitationCode: string;
+  ambassadorWalletMasked: string;
+  isCukiesWorld: boolean;
+  ambassadorPublicName?: string | null;
+};
 
 function validRaw(value: string) {
   if (!/^(0|[1-9][0-9]*)$/.test(value)) {
@@ -173,15 +181,17 @@ async function currentReferrals(db: Db, walletNormalized: string, now: Date) {
   });
 }
 
-export async function getPublicAmbassadorInvitation(code: string) {
+export async function getPublicAmbassadorInvitation(code: string): Promise<PublicInvitation | null> {
   const invitationCode = assertAmbassadorInvitationCode(code);
   const profile = await findMongoAmbassadorByInvitationCode(await getEconomyDb(), invitationCode);
-  return profile ? {
+  if (!profile) return null;
+  return {
     invitationCode: profile.invitationCode,
     ambassadorWalletMasked: shortWallet(profile.walletNormalized),
+    ambassadorPublicName: await findMongoAmbassadorPublicName(profile.walletNormalized),
     isCukiesWorld: Boolean(process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim())
       && profile.walletNormalized === getDefaultAmbassadorWallet(),
-  } : null;
+  };
 }
 
 export async function getAmbassadorDashboard(wallet: string, now = new Date()) {
@@ -208,6 +218,9 @@ export async function getAmbassadorDashboard(wallet: string, now = new Date()) {
     commissionDashboard(db, walletNormalized, now),
     getMongoAmbassadorEnrollment(db, walletNormalized),
   ]);
+  const ownAttributionPublicName = ownAttribution
+    ? await findMongoAmbassadorPublicName(ownAttribution.ambassadorWalletNormalized)
+    : null;
   const defaultWallet = process.env.AMBASSADOR_DEFAULT_WALLET_ADDRESS?.trim()
     ? getDefaultAmbassadorWallet()
     : null;
@@ -221,6 +234,7 @@ export async function getAmbassadorDashboard(wallet: string, now = new Date()) {
     ownAttribution: ownAttribution ? {
       attributionId: ownAttribution.attributionId,
       ambassadorWalletMasked: shortWallet(ownAttribution.ambassadorWalletNormalized),
+      ambassadorPublicName: ownAttributionPublicName,
       isCukiesWorld: ownAttribution.ambassadorWalletNormalized === defaultWallet,
       source: ownAttribution.source,
       acceptedAt: ownAttribution.acceptedAt.toISOString(),
