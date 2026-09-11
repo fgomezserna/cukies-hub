@@ -23,7 +23,22 @@ describe("GameEconomy productive runtime and commands", () => {
       GAME_ECONOMY_RUNTIME_ENABLED: "true",
       GAME_ECONOMY_TICK_TIMEOUT_MS: "300000",
       GAME_ECONOMY_TICK_LEASE_MS: "300000",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00.000Z",
     })).toThrow(/360000/);
+  });
+
+  it("requires a canonical forward activation boundary for productive rewards", () => {
+    expect(() => loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+    })).toThrow(/REWARD_FORWARD_ACTIVATION_AT/);
+    expect(() => loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00Z",
+    })).toThrow(/ISO UTC canonica/);
+    expect(loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00.000Z",
+    }).rewardForwardActivationAt).toEqual(new Date("2026-07-10T12:00:00.000Z"));
   });
 
   it("recovers stale sagas before expiring sessions under one lease", async () => {
@@ -52,7 +67,13 @@ describe("GameEconomy productive runtime and commands", () => {
     };
     const result = await runGameEconomyRuntimeTick({
       workerId: "runtime-worker",
-      config: { enabled: true, recoveryLimit: 100, expiryLimit: 100, leaseMs: 600_000 },
+      config: {
+        enabled: true,
+        recoveryLimit: 100,
+        expiryLimit: 100,
+        leaseMs: 600_000,
+        rewardForwardActivationAt: new Date("2026-07-10T12:00:00.000Z"),
+      },
       clock: () => new Date(NOW),
       coordinator,
       service,

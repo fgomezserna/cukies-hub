@@ -44,10 +44,14 @@ describe("pending Treasure Hunt reward recovery", () => {
     await expect(settlePendingTreasureHuntRewards({
       now: new Date("2026-08-24T15:00:00.000Z"),
       limit: 2,
+      forwardActivationAt: new Date("2026-08-24T14:00:00.000Z"),
     })).resolves.toEqual({ scanned: 2, settled: 1, replayed: 1 });
 
     const pipeline = aggregate.mock.calls[0][0];
-    expect(pipeline).toEqual(buildPendingTreasureHuntRewardPipeline(2));
+    expect(pipeline).toEqual(buildPendingTreasureHuntRewardPipeline(
+      2,
+      new Date("2026-08-24T14:00:00.000Z"),
+    ));
     const lookupIndex = pipeline.findIndex((stage: object) => "$lookup" in stage);
     const missingIndex = pipeline.findIndex(
       (stage: { $match?: object }) => stage.$match
@@ -67,8 +71,23 @@ describe("pending Treasure Hunt reward recovery", () => {
     });
   });
 
+  it("adds the forward activation boundary to the settled candidate query", () => {
+    const activationAt = new Date("2026-08-24T14:00:00.000Z");
+    expect(buildPendingTreasureHuntRewardPipeline(2, activationAt)[0]).toEqual({
+      $match: {
+        status: "settled",
+        gameId: "treasure-hunt",
+        "rule.version": "staging-test-v4",
+        settledAt: { $type: "date", $gte: activationAt },
+      },
+    });
+  });
+
   it("rejects an unsafe batch bound before reading Mongo", async () => {
-    await expect(settlePendingTreasureHuntRewards({ limit: 1_001 })).rejects.toThrow(
+    await expect(settlePendingTreasureHuntRewards({
+      limit: 1_001,
+      forwardActivationAt: new Date("2026-08-24T14:00:00.000Z"),
+    })).rejects.toThrow(
       /entre 1 y 1000/,
     );
     expect(getEconomyDb).not.toHaveBeenCalled();

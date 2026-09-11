@@ -22,6 +22,12 @@ export type GameEconomyRuntimeConfig = {
   recoveryLimit: number;
   expiryLimit: number;
   leaseMs: number;
+  /**
+   * Lower bound for reward settlement candidates.  This is deliberately
+   * separate from the economic calendar anchor: the anchor may predate a
+   * runtime activation and therefore cannot protect an existing backlog.
+   */
+  rewardForwardActivationAt?: Date;
 };
 
 export type GameEconomyRuntimeResult = {
@@ -130,9 +136,22 @@ function boundedInteger(
   return parsed;
 }
 
+function requiredCanonicalUtcDate(value: string | undefined, name: string) {
+  const normalized = value?.trim();
+  if (!normalized) {
+    throw new GameEconomyRuntimeConfigurationError(`${name} es obligatorio con el runtime activo.`);
+  }
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== normalized) {
+    throw new GameEconomyRuntimeConfigurationError(`${name} debe ser una fecha ISO UTC canonica.`);
+  }
+  return parsed;
+}
+
 export function loadGameEconomyRuntimeConfig(
   env: Record<string, string | undefined> = process.env,
 ): GameEconomyRuntimeConfig {
+  const enabled = strictBoolean(env.GAME_ECONOMY_RUNTIME_ENABLED, "GAME_ECONOMY_RUNTIME_ENABLED");
   const tickTimeoutMs = boundedInteger(
     env.GAME_ECONOMY_TICK_TIMEOUT_MS,
     240_000,
@@ -141,7 +160,7 @@ export function loadGameEconomyRuntimeConfig(
     "GAME_ECONOMY_TICK_TIMEOUT_MS",
   );
   return {
-    enabled: strictBoolean(env.GAME_ECONOMY_RUNTIME_ENABLED, "GAME_ECONOMY_RUNTIME_ENABLED"),
+    enabled,
     recoveryLimit: boundedInteger(
       env.GAME_ECONOMY_RECOVERY_LIMIT,
       100,
@@ -163,6 +182,14 @@ export function loadGameEconomyRuntimeConfig(
       60 * 60_000,
       "GAME_ECONOMY_TICK_LEASE_MS",
     ),
+    ...(enabled
+      ? {
+          rewardForwardActivationAt: requiredCanonicalUtcDate(
+            env.REWARD_FORWARD_ACTIVATION_AT,
+            "REWARD_FORWARD_ACTIVATION_AT",
+          ),
+        }
+      : {}),
   };
 }
 
@@ -272,6 +299,15 @@ export async function runGameEconomyRuntimeTick(input: {
   if (!config.enabled) {
     throw new GameEconomyRuntimeConfigurationError("El runtime GameEconomy esta desactivado.");
   }
+  if (
+    !config.rewardForwardActivationAt
+    || !(config.rewardForwardActivationAt instanceof Date)
+    || Number.isNaN(config.rewardForwardActivationAt.getTime())
+  ) {
+    throw new GameEconomyRuntimeConfigurationError(
+      "REWARD_FORWARD_ACTIVATION_AT es obligatorio con el runtime GameEconomy activo.",
+    );
+  }
   const workerId = validGameText(input.workerId, "workerId");
   const clock = input.clock ?? (() => new Date());
   const now = validGameDate(clock(), "clock");
@@ -291,7 +327,11 @@ export async function runGameEconomyRuntimeTick(input: {
     const rewards = input.service
       ? { scanned: 0, settled: 0, replayed: 0 }
       : await (await import("../rewards/accounting-runtime"))
-        .settlePendingTreasureHuntRewards({ now, limit: config.recoveryLimit });
+        .settlePendingTreasureHuntRewards({
+          now,
+          limit: config.recoveryLimit,
+          forwardActivationAt: config.rewardForwardActivationAt,
+        });
     const completedAt = validGameDate(clock(), "clock");
     const result: GameEconomyRuntimeResult = {
       recovered: recovery.sessions.length,

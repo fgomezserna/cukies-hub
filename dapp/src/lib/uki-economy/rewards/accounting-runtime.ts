@@ -116,9 +116,18 @@ export function assertRewardAccountingActionEnabled(
   }
 }
 
-export function buildPendingTreasureHuntRewardPipeline(limit: number) {
+export function buildPendingTreasureHuntRewardPipeline(
+  limit: number,
+  forwardActivationAt?: Date,
+) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1_000) {
     throw new DomainValidationError("limit debe estar entre 1 y 1000.");
+  }
+  if (
+    forwardActivationAt !== undefined
+    && (!(forwardActivationAt instanceof Date) || Number.isNaN(forwardActivationAt.getTime()))
+  ) {
+    throw new DomainValidationError("forwardActivationAt debe ser una fecha valida.");
   }
   return [
     {
@@ -126,7 +135,10 @@ export function buildPendingTreasureHuntRewardPipeline(limit: number) {
         status: "settled",
         gameId: TREASURE_HUNT_ECONOMY_POLICY.gameId,
         "rule.version": TREASURE_HUNT_ECONOMY_POLICY.gameRuleVersion,
-        settledAt: { $type: "date" },
+        settledAt: {
+          $type: "date",
+          ...(forwardActivationAt ? { $gte: new Date(forwardActivationAt.getTime()) } : {}),
+        },
       },
     },
     { $sort: { settledAt: 1 as const, sessionId: 1 as const } },
@@ -152,10 +164,11 @@ export function buildPendingTreasureHuntRewardPipeline(limit: number) {
 export async function settlePendingTreasureHuntRewards(input: {
   now?: Date;
   limit?: number;
+  forwardActivationAt: Date;
 }) {
   const now = input.now ?? new Date();
   const limit = input.limit ?? 100;
-  const pipeline = buildPendingTreasureHuntRewardPipeline(limit);
+  const pipeline = buildPendingTreasureHuntRewardPipeline(limit, input.forwardActivationAt);
   const { getEconomyDb } = await import("@/lib/indexer-db/mongodb");
   const { rewardCalculationCoordinator } = await import("./coordinator");
   const db = await getEconomyDb();
