@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-11T14:02:39.417Z",
+  "issue": "https://github.com/fgomezserna/cukies-hub/issues/424",
+  "production": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/426",
+    "gitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "deployment": {
+      "id": 1534,
+      "uuid": "uoc84gscocc80oc8c0k0ws0c",
+      "status": "finished",
+      "finishedAt": "2026-09-11T14:01:08Z"
+    },
+    "health": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "production",
+      "gitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+      "gitRef": "main",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "jookw8ow8woks088s44404ok",
+        "fqdn": "cukies.world,www.cukies.world"
+      }
+    },
+    "containers": [
+      {
+        "id": "dfcb3cf1437127ad2dd0560d7746d2420bf5266a493e50d6751b43f53328b664",
+        "name": "/dapp-jookw8ow8woks088s44404ok-135318853162",
+        "image": "jookw8ow8woks088s44404ok-dapp",
+        "imageId": "sha256:deff50590b9473bb556bc1fd5b8604476defebc839445971306144bd718fd675",
+        "state": "running",
+        "health": "healthy",
+        "restarts": 0
+      },
+      {
+        "id": "c1715943ee4c671899173ecae8c4a574a9223a2b59997a3e2b115ef43b4de69b",
+        "name": "/chain-indexer-jookw8ow8woks088s44404ok-135319062051",
+        "image": "jookw8ow8woks088s44404ok-chain-indexer",
+        "imageId": "sha256:0d3240009d62e25e230af0216a33b4bac868cb7c904b5f2055a8988b738c037e",
+        "state": "running",
+        "health": "healthy",
+        "restarts": 0
+      }
+    ],
+    "previousGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a"
+  },
+  "validation": {
+    "mainCandidate": "9ba0054cdf704a9e89a2bae403e96bdc6f88d97e",
+    "mainSuites": 173,
+    "mainTests": 1501,
+    "mainLintTypecheckBuild": "passed",
+    "stagingCandidate": "96d0e214ca787b568d486e5bd80f5ff5487c566d",
+    "stagingSuites": 271,
+    "stagingTests": 2259,
+    "stagingLintTypecheck": "passed",
+    "stagingBackport": "https://github.com/fgomezserna/cukies-hub/pull/428"
+  },
+  "publicInvitationProbes": [
+    {
+      "base": "http://127.0.0.1:3000",
+      "code": "cw-56918691f339",
+      "status": 503,
+      "result": "error",
+      "errorCode": "AMBASSADOR_ELIGIBILITY_UNAVAILABLE",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": null,
+      "age": null,
+      "ms": 1896
+    },
+    {
+      "base": "https://cukies.world",
+      "code": "cw-56918691f339",
+      "status": 503,
+      "result": "error",
+      "errorCode": "AMBASSADOR_ELIGIBILITY_UNAVAILABLE",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": "DYNAMIC",
+      "age": null,
+      "ms": 2155
+    },
+    {
+      "base": "http://127.0.0.1:3000",
+      "code": "cw-4ad84cd7208a",
+      "status": 503,
+      "result": "error",
+      "errorCode": "AMBASSADOR_ELIGIBILITY_UNAVAILABLE",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": null,
+      "age": null,
+      "ms": 1727
+    },
+    {
+      "base": "https://cukies.world",
+      "code": "cw-4ad84cd7208a",
+      "status": 404,
+      "result": "error",
+      "errorCode": "INVITATION_NOT_FOUND",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": "DYNAMIC",
+      "age": null,
+      "ms": 666
+    },
+    {
+      "base": "http://127.0.0.1:3000",
+      "code": "cw-5a8716cd19cd",
+      "status": 404,
+      "result": "error",
+      "errorCode": "INVITATION_NOT_FOUND",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": null,
+      "age": null,
+      "ms": 642
+    },
+    {
+      "base": "https://cukies.world",
+      "code": "cw-5a8716cd19cd",
+      "status": 404,
+      "result": "error",
+      "errorCode": "INVITATION_NOT_FOUND",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": "DYNAMIC",
+      "age": null,
+      "ms": 669
+    },
+    {
+      "base": "http://127.0.0.1:3000",
+      "code": "cw-6e1100bb236d",
+      "status": 404,
+      "result": "error",
+      "errorCode": "INVITATION_NOT_FOUND",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": null,
+      "age": null,
+      "ms": 634
+    },
+    {
+      "base": "https://cukies.world",
+      "code": "cw-6e1100bb236d",
+      "status": 404,
+      "result": "error",
+      "errorCode": "INVITATION_NOT_FOUND",
+      "hasPublicName": false,
+      "walletMasked": null,
+      "cacheControl": "private, no-store, max-age=0",
+      "cacheStatus": "DYNAMIC",
+      "age": null,
+      "ms": 685
+    }
+  ],
+  "protection": {
+    "stagingReleaseUnchangedDuringProductionDeploy": true,
+    "stagingHealthUnchanged": true,
+    "otherContainers": 90,
+    "unchanged": 89,
+    "observedException": {
+      "name": "learn-bot-worker-kcos4s4w4sggg84ksgw4gwoo",
+      "sameIdAndImage": true,
+      "restartsBefore": 3,
+      "restartsAfter": 4,
+      "finishedAt": "2026-09-11T14:00:01.967268038Z",
+      "startedAt": "2026-09-11T14:00:02.142974921Z",
+      "observedExitCode": 0,
+      "oomKilled": false,
+      "attribution": "not determined; no command targeting this service was executed"
+    }
+  },
+  "qa": {
+    "browser": "Edge",
+    "path": "/embajadores/cw-56918691f339",
+    "observed": "El error de elegibilidad conserva el enlace y muestra Reintentar invitación; el reintento cambia a Comprobando la invitación",
+    "performedTransactions": false,
+    "confirmedSponsorA2": "covered by regression tests; not a production relationship mutation",
+    "publicNameA3": "covered by exact-wallet repository tests; sampled live links did not resolve eligible sponsor"
+  },
+  "limits": [
+    "A1 reproduced as AMBASSADOR_ELIGIBILITY_UNAVAILABLE after deploy; source-level RCA remains open",
+    "No signature, attribution change, funding or financial gate activation"
+  ],
+  "staging": {
+    "observedAt": "2026-09-11T14:16:13.227823+00:00",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/428",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34607972412",
+    "gitSha": "ecbf7b9dd83e283f81aafbfdb9f0ab608ce912e5",
+    "health": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "staging",
+      "gitSha": "ecbf7b9dd83e283f81aafbfdb9f0ab608ce912e5",
+      "gitRef": "staging",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "fqdn": null
+      }
+    },
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "changedComponents": [
+      "dapp"
+    ],
+    "changedWorkers": [],
+    "protected": {
+      "total": 82,
+      "preserved": 82,
+      "changed": []
+    },
+    "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "publisherKeyPresence": [
+      {
+        "name": "rwwsc4kkwc0ck84cgk40s8kk-141226704637",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-reward-batch-publisher-1",
+        "keyDefined": true,
+        "keyHasValue": true
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-competition-credit-scheduler-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cukie-master-scheduler-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-chain-indexer-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-game-economy-scheduler-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-legacy-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cukie-pool-scheduler-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-weekly-ranking-scheduler-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-reward-accounting-scheduler-1",
+        "keyDefined": false,
+        "keyHasValue": false
+      }
+    ],
+    "economyCycleSeconds": "1800",
+    "financialGates": {
+      "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+      "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+      "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+      "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+      "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+      "REWARD_POOL_TRANCHES_ENABLED": "false",
+      "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+      "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false"
+    },
+    "productQa": "Edge /embajadores: programa y CTA de conexion renderizados; sin errores de pagina ni aviso de invitacion. Sesion sin wallet, sin firma; A2/A3 autenticados no comprobados en esta observacion."
+  }
+}

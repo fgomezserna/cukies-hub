@@ -192,6 +192,32 @@ describe('UkiStakingPanel', () => {
     expect(screen.getAllByText('Depositar')).toHaveLength(1);
   });
 
+  it('oculta el requisito anterior cuando los UKI ya cambiaron', () => {
+    mockUseReadContract.mockImplementation((config) => {
+      switch (config?.functionName) {
+        case 'ukiToken':
+          return readResult(stakingToken);
+        case 'paused':
+          return readResult(stakingPaused);
+        case 'balanceOf':
+          return readResult(parseUnits('50000', 18));
+        case 'allowance':
+          return readResult(allowance);
+        case 'stakedBalance':
+          return readResult(parseUnits('5000', 18));
+        default:
+          return readResult(undefined);
+      }
+    });
+
+    render(<UkiStakingPanel routePreview={routePreview} />);
+
+    expect(screen.getByText('Actualizando…')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '20.000' }));
+    expect(screen.queryByText(/Tendrías .* UKI en staking/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Tus UKI han cambiado y estamos actualizando tus cupos/i)).toBeInTheDocument();
+  });
+
   it('ofrece cantidades simples sin exponer cálculos internos de la plaza', () => {
     render(<UkiStakingPanel routePreview={routePreview} />);
 
