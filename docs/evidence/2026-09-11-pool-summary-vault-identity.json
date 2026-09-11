@@ -265,10 +265,56 @@
   "validation": {
     "diffCheck": "passed",
     "newTests": "not-added: copy-only change",
-    "fullChecks": "required by staging delivery CI"
+    "fullChecks": {
+      "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34575131969",
+      "conclusion": "success",
+      "lint": "passed",
+      "typecheck": "passed",
+      "testSuites": 270,
+      "tests": 2246
+    }
   },
   "delivery": {
-    "status": "candidate-awaiting-staging-delivery",
-    "branch": "codex/pool-summary-deposit-label-20260911"
+    "status": "deployed-and-runtime-verified",
+    "branch": "codex/pool-summary-deposit-label-20260911",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/417",
+    "mergedSha": "03de2a7030aad3dbcf3f5bb5fd36fbbb5b84490e",
+    "observedAt": "2026-09-11T07:56:51.838164+00:00",
+    "servedSha": "03de2a7030aad3dbcf3f5bb5fd36fbbb5b84490e",
+    "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+    "webImage": "192.168.1.207:5000/cukies-hub/dapp:03de2a7030aad3dbcf3f5bb5fd36fbbb5b84490e-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:1ba93ec7f77fa1d4084afdafa2a16f41d5796f8e133659ef52aa9b97c916f42b",
+    "readyHttpStatus": 200,
+    "changedComponents": [
+      "dapp"
+    ],
+    "workerContainerIdsChanged": [],
+    "protectedContainersPreserved": 82,
+    "protectedContainersTotal": 82,
+    "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+    "releaseJournal": "clean",
+    "economyCycleSeconds": 1800,
+    "financialGatesEnabled": false,
+    "signedTransactions": 0,
+    "databaseWrites": 0,
+    "userAuthenticatedUi": {
+      "observedAt": "2026-09-11T08:03:50Z",
+      "url": "https://cukieshub.eurekand.com/dashboard",
+      "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+      "poolText": [
+        "0 posiciones activas",
+        "0 disponibles para partidas",
+        "7 depósitos registrados"
+      ],
+      "method": "Edge accessibility tree after full navigation",
+      "signed": false
+    }
+  },
+  "recoveryPresentation": {
+    "poolPanelOpenPositions": 2,
+    "myCukiesPoolCustody": 5,
+    "recoveryVaultPositions": 3,
+    "playablePositions": 0,
+    "followUpIssue": "https://github.com/fgomezserna/cukies-hub/issues/419",
+    "scope": "Unify access to current and recovery Pool custody without presenting five positions as active or introducing technical vault terminology."
   }
 }

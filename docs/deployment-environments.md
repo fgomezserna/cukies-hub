@@ -542,7 +542,7 @@ Cada alias BSC con verificacion de identidad incluido en `CHAIN_INDEXER_CONTRACT
 
 ### Publicador de rewards en staging
 
-`reward-batch-publisher` usa la misma imagen versionada que la Dapp, pero es un
+`reward-batch-publisher` usa la imagen `schedulers` de la release y es un
 proceso separado. Consume únicamente `reward_accounting_allocations` finales,
 prefonda `RewardsDistributor`, publica el batch y ejecuta por separado la
 transferencia a tesorería, la reserva única de marketing/desarrollo y la quema.
@@ -550,11 +550,13 @@ UKI tiene supply fijo: este proceso materializa la reserva existente, no mintea.
 
 | Variable | Valor staging | Regla |
 | --- | --- | --- |
-| `REWARD_BATCH_PUBLISHER_ENABLED` | `true` desde el canary controlado del 01-09-2026 | Gate explícito; nunca hereda el gate contable. Antes de activarlo se validaron owner, chain, contratos, base y primer cierre. |
+| `REWARD_BATCH_PUBLISHER_ENABLED` | `false`, verificado el 11-09-2026 | Gate explícito; nunca hereda el gate contable. El canary del 01-09 es evidencia histórica, no el estado actual ni autorización para reactivarlo. |
 | `REWARD_BATCH_PUBLISHER_EXPECTED_SIGNER_ADDRESS` | owner de `RewardsDistributor` | La clave debe resolver exactamente a esta address y el preflight vuelve a contrastarla on-chain. |
-| `REWARD_BATCH_PUBLISHER_PRIVATE_KEY` | secreto Coolify cargado, solo runtime | Solo se inyecta en el contenedor del publicador; no es build arg y no se comparte con Dapp, indexer ni schedulers. |
+| `REWARD_BATCH_PUBLISHER_PRIVATE_KEY` | Secreto exclusivo del publicador; retirada de la configuración web32 el 11-09 08:02 UTC | Debe inyectarse solo en el publicador y nunca como build arg. Eliminadas las dos entradas (runtime/preview) de app32 conservando app28; falta verificar la ausencia en el contenedor web tras el siguiente despliegue. Se verificó presencia/coincidencia sin revelar ni exportar el valor. |
 | `REWARD_BATCH_PUBLISHER_CONFIRMATIONS` | `12` | Cada operación queda firmada de forma durable antes del broadcast y confirmada antes de avanzar. |
 | `REWARD_BATCH_CLAIM_WINDOW_SECONDS` | `7776000` | Ventana inicial de 90 días para staging. |
+
+El [readiness del 11-09](evidence/2026-09-11-direct-rewards-readiness.json) distingue runtime, presupuesto, contabilidad y publicación. El estado vigente se mantiene en la fila 3 del seguimiento; un proceso saludable con su gate apagado no acredita reparto operativo.
 
 La preparación del borrador no requiere ni acepta autoridad on-chain. Con el
 publicador apagado, un operador puede materializar exactamente un cierre

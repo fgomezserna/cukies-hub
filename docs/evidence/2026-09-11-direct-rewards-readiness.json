@@ -1,0 +1,561 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-11T07:35:36.163Z",
+  "readOnly": true,
+  "stageServedShaAtAudit": "5b5ba01963f5490002c087f72713abb00e7de21f",
+  "sourceTreeSha": "31e558cb97e858a398d4d212458213fca495ad6a",
+  "database": "cukieshub-new-staging",
+  "chainId": 97,
+  "cycleSeconds": 1800,
+  "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+  "censusSha256": "17bd38f6a2c9817fdea95a7dd6f4f06e1616b8f9e38edcc216f5eb56d7a4df2c",
+  "pipeline": {
+    "gameFinish": "records reward_weekly_game_sources",
+    "financialSettlement": "settlePendingTreasureHuntRewards -> rewardCalculationCoordinator.settleGame",
+    "runtimeGate": "GAME_ECONOMY_RUNTIME_ENABLED=false",
+    "sourceCode": [
+      "dapp/src/lib/uki-economy/game-economy/runtime.ts",
+      "dapp/src/lib/uki-economy/rewards/accounting-runtime.ts",
+      "dapp/src/lib/uki-economy/rewards/emission-budget.ts"
+    ]
+  },
+  "runtime": {
+    "observedAt": "2026-09-11T07:01:54.787070+00:00",
+    "resources": [
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-reward-batch-publisher-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+          "REWARD_BATCH_PUBLISHER_ENABLED": "false"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-competition-credit-scheduler-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-1",
+        "environment": {
+          "APP_ENV": "staging"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cukie-master-scheduler-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-chain-indexer-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-game-economy-scheduler-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cuki-card-worker-legacy-1",
+        "environment": {
+          "APP_ENV": "staging"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-cukie-pool-scheduler-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-weekly-ranking-scheduler-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false"
+        }
+      },
+      {
+        "name": "u4s804o4wwcckowgk0woo4wg-reward-accounting-scheduler-1",
+        "environment": {
+          "APP_ENV": "staging",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+          "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+          "REWARD_POOL_TRANCHES_ENABLED": "false",
+          "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false"
+        }
+      },
+      {
+        "name": "rwwsc4kkwc0ck84cgk40s8kk-060935122151",
+        "environment": {
+          "APP_ENV": "staging",
+          "ECONOMY_CYCLE_SECONDS": "1800",
+          "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+          "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+          "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+          "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+          "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+          "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+          "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+          "REWARD_POOL_TRANCHES_ENABLED": "false",
+          "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+          "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false"
+        }
+      }
+    ]
+  },
+  "rewardRule": {
+    "id": "reward_allocations:rewards-staging-cycle-v1",
+    "scope": "reward_allocations",
+    "version": "rewards-staging-cycle-v1",
+    "active": true,
+    "activeFrom": "2026-09-07T11:30:00.000Z",
+    "activeUntil": null,
+    "configHash": "7c7a816ebbafebf0b58dcf10424a562ae0eb915a1591e28a99f570efbfbb307f",
+    "runCredits": {
+      "unitScale": 10,
+      "totalUnits": 100,
+      "weeklyReserveUnits": 20,
+      "ambassadorReserveUnits": 5,
+      "ambassadorOrdinaryUnits": 4,
+      "ambassadorWeeklyUnits": 1,
+      "convertibleUnits": 75
+    },
+    "settlementBps": {
+      "poolCredits": 5000,
+      "poolCukieWithOwnCredits": 5000,
+      "poolCukieWithPoolCredits": 2500
+    },
+    "emissionBudget": {
+      "calendar": {
+        "version": "cycle-v1",
+        "chainId": 97,
+        "cycleSeconds": 1800,
+        "anchorAt": "2026-09-07T11:30:00.000Z"
+      },
+      "programStartsAt": "2026-09-07T11:30:00.000Z",
+      "dayBoundarySecondUtc": 50400,
+      "lateReservationGraceSeconds": 86400,
+      "dailyCapRaw": "500000000000000000000000",
+      "lifetimeCapRaw": "450000000000000000000000000",
+      "unusedDailyCapacity": "materialize_undistributed",
+      "overflowPolicy": "block"
+    }
+  },
+  "schedulerBacklog": {
+    "totalSettledTreasureHuntStaging": 6,
+    "missingSourceManifest": 6,
+    "missingWeeklyGameSource": 0,
+    "candidateByRule": [
+      {
+        "gameRuleVersion": "staging-test-v4",
+        "rewardRuleVersion": "rewards-staging-cycle-v1",
+        "count": 6
+      }
+    ],
+    "candidateRowsReturned": 6,
+    "candidateRows": [
+      {
+        "sessionId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+        "sourceId": "game-session:game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+        "status": "settled",
+        "gameRuleVersion": "staging-test-v4",
+        "rewardRuleVersion": "rewards-staging-cycle-v1",
+        "scoreRaw": "43",
+        "weightRaw": "107500000000000000"
+      },
+      {
+        "sessionId": "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+        "sourceId": "game-session:game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+        "status": "settled",
+        "gameRuleVersion": "staging-test-v4",
+        "rewardRuleVersion": "rewards-staging-cycle-v1",
+        "scoreRaw": "2",
+        "weightRaw": "5000000000000000"
+      },
+      {
+        "sessionId": "game-session:ceff2ddbd6c414bad952287bb0927f87fb0a7d2a092dad51439aee5821330839",
+        "sourceId": "game-session:game-session:ceff2ddbd6c414bad952287bb0927f87fb0a7d2a092dad51439aee5821330839",
+        "status": "settled",
+        "gameRuleVersion": "staging-test-v4",
+        "rewardRuleVersion": "rewards-staging-cycle-v1",
+        "scoreRaw": "0",
+        "weightRaw": "0"
+      },
+      {
+        "sessionId": "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+        "sourceId": "game-session:game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+        "status": "settled",
+        "gameRuleVersion": "staging-test-v4",
+        "rewardRuleVersion": "rewards-staging-cycle-v1",
+        "scoreRaw": "6",
+        "weightRaw": "15000000000000000"
+      },
+      {
+        "sessionId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+        "sourceId": "game-session:game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+        "status": "settled",
+        "gameRuleVersion": "staging-test-v4",
+        "rewardRuleVersion": "rewards-staging-cycle-v1",
+        "scoreRaw": "117",
+        "weightRaw": "292500000000000000"
+      },
+      {
+        "sessionId": "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+        "sourceId": "game-session:game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+        "status": "settled",
+        "gameRuleVersion": "staging-test-v4",
+        "rewardRuleVersion": "rewards-staging-cycle-v1",
+        "scoreRaw": "6",
+        "weightRaw": "15000000000000000"
+      }
+    ],
+    "candidateRowsTruncated": false
+  },
+  "targets": [
+    {
+      "sessionId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+      "sourceId": "game-session:game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+      "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+      "scoreRaw": "43",
+      "weightRaw": "107500000000000000",
+      "creditSource": "own",
+      "cukieSource": "seiku",
+      "creditEvidenceHashMatches": true,
+      "cukieEvidenceHashMatches": true,
+      "budgetPreflight": {
+        "sessionId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+        "status": "blocked",
+        "reasons": [
+          "BUDGET_DAY_CLOSED"
+        ],
+        "sourceId": "game-session:game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+        "sourceTotalRaw": "10000000000000000000",
+        "ruleEffectiveAt": "2026-09-08T13:57:02.752Z",
+        "dayId": "2026-09-08T13:30:00.000Z",
+        "reservationClosesAt": "2026-09-09T14:00:00.000Z",
+        "now": "2026-09-11T07:35:36.163Z",
+        "existingEventStatus": null,
+        "existingEventReason": null,
+        "previousDailyRaw": "0",
+        "proposedDailyRaw": "10000000000000000000",
+        "previousLifetimeRaw": "0",
+        "proposedLifetimeRaw": "10000000000000000000"
+      }
+    },
+    {
+      "sessionId": "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+      "sourceId": "game-session:game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+      "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+      "scoreRaw": "2",
+      "weightRaw": "5000000000000000",
+      "creditSource": "own",
+      "cukieSource": "seiku",
+      "creditEvidenceHashMatches": true,
+      "cukieEvidenceHashMatches": true,
+      "budgetPreflight": {
+        "sessionId": "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+        "status": "blocked",
+        "reasons": [
+          "BUDGET_DAY_CLOSED"
+        ],
+        "sourceId": "game-session:game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+        "sourceTotalRaw": "10000000000000000000",
+        "ruleEffectiveAt": "2026-09-08T13:58:06.758Z",
+        "dayId": "2026-09-08T13:30:00.000Z",
+        "reservationClosesAt": "2026-09-09T14:00:00.000Z",
+        "now": "2026-09-11T07:35:36.163Z",
+        "existingEventStatus": null,
+        "existingEventReason": null,
+        "previousDailyRaw": "0",
+        "proposedDailyRaw": "10000000000000000000",
+        "previousLifetimeRaw": "0",
+        "proposedLifetimeRaw": "10000000000000000000"
+      }
+    },
+    {
+      "sessionId": "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+      "sourceId": "game-session:game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+      "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+      "scoreRaw": "6",
+      "weightRaw": "15000000000000000",
+      "creditSource": "own",
+      "cukieSource": "pool_original",
+      "creditEvidenceHashMatches": true,
+      "cukieEvidenceHashMatches": true,
+      "budgetPreflight": {
+        "sessionId": "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+        "status": "ready",
+        "reasons": [],
+        "sourceId": "game-session:game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+        "sourceTotalRaw": "10000000000000000000",
+        "ruleEffectiveAt": "2026-09-10T09:34:58.675Z",
+        "dayId": "2026-09-10T09:30:00.000Z",
+        "reservationClosesAt": "2026-09-11T10:00:00.000Z",
+        "now": "2026-09-11T07:35:36.163Z",
+        "existingEventStatus": null,
+        "existingEventReason": null,
+        "previousDailyRaw": "0",
+        "proposedDailyRaw": "10000000000000000000",
+        "previousLifetimeRaw": "0",
+        "proposedLifetimeRaw": "10000000000000000000"
+      }
+    },
+    {
+      "sessionId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+      "sourceId": "game-session:game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+      "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+      "scoreRaw": "117",
+      "weightRaw": "292500000000000000",
+      "creditSource": "own",
+      "cukieSource": "pool_original",
+      "creditEvidenceHashMatches": true,
+      "cukieEvidenceHashMatches": true,
+      "budgetPreflight": {
+        "sessionId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+        "status": "ready",
+        "reasons": [],
+        "sourceId": "game-session:game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+        "sourceTotalRaw": "10000000000000000000",
+        "ruleEffectiveAt": "2026-09-10T09:44:48.261Z",
+        "dayId": "2026-09-10T09:30:00.000Z",
+        "reservationClosesAt": "2026-09-11T10:00:00.000Z",
+        "now": "2026-09-11T07:35:36.163Z",
+        "existingEventStatus": null,
+        "existingEventReason": null,
+        "previousDailyRaw": "0",
+        "proposedDailyRaw": "10000000000000000000",
+        "previousLifetimeRaw": "0",
+        "proposedLifetimeRaw": "10000000000000000000"
+      }
+    },
+    {
+      "sessionId": "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+      "sourceId": "game-session:game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+      "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+      "scoreRaw": "6",
+      "weightRaw": "15000000000000000",
+      "creditSource": "own",
+      "cukieSource": "pool_original",
+      "creditEvidenceHashMatches": true,
+      "cukieEvidenceHashMatches": true,
+      "budgetPreflight": {
+        "sessionId": "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+        "status": "ready",
+        "reasons": [],
+        "sourceId": "game-session:game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+        "sourceTotalRaw": "10000000000000000000",
+        "ruleEffectiveAt": "2026-09-10T09:59:15.215Z",
+        "dayId": "2026-09-10T09:30:00.000Z",
+        "reservationClosesAt": "2026-09-11T10:00:00.000Z",
+        "now": "2026-09-11T07:35:36.163Z",
+        "existingEventStatus": null,
+        "existingEventReason": null,
+        "previousDailyRaw": "0",
+        "proposedDailyRaw": "10000000000000000000",
+        "previousLifetimeRaw": "0",
+        "proposedLifetimeRaw": "10000000000000000000"
+      }
+    }
+  ],
+  "targetFinancialArtifacts": {
+    "manifests": [],
+    "allocations": [],
+    "accruals": [],
+    "budgetEvents": [],
+    "accountingAllocations": []
+  },
+  "budget": {
+    "state": null,
+    "daysReturned": 0,
+    "daysTotal": 0,
+    "daysTruncated": false,
+    "days": [],
+    "eventsTotal": 0,
+    "eventsByStatus": [],
+    "targetEventsTotal": 0,
+    "targetEventsReturned": 0,
+    "targetEvents": [],
+    "targetEventsTruncated": false
+  },
+  "periods": {
+    "states": [
+      {
+        "id": "C1800-W:2026-09-08T12:00:00.000Z",
+        "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+        "status": "open",
+        "revision": 4,
+        "allocationRevision": 0
+      },
+      {
+        "id": "C1800-W:2026-09-10T06:00:00.000Z",
+        "periodId": "C1800-W:2026-09-10T06:00:00.000Z",
+        "status": "open",
+        "revision": 1,
+        "allocationRevision": 0
+      },
+      {
+        "id": "C1800-W:2026-09-10T09:30:00.000Z",
+        "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "status": "open",
+        "revision": 6,
+        "allocationRevision": 0
+      }
+    ],
+    "seals": []
+  },
+  "accountingForTwoWeeklyAndFourteenDailyPeriods": {
+    "reward_daily_accounting": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    },
+    "reward_weekly_prize_accounting": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    },
+    "reward_accounting_allocations": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    },
+    "reward_pool_tranche_accounting": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    }
+  },
+  "publicationGlobal": {
+    "reward_publication_plans": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    },
+    "reward_claim_batches": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    },
+    "reward_claim_proofs": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    },
+    "reward_claims": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    },
+    "reward_integrity_incidents": {
+      "countsByStatus": [],
+      "amountsByStatus": []
+    }
+  },
+  "chainReadOnlyPreflight": {
+    "observedAt": "2026-09-11T07:09:31.615Z",
+    "mode": "read-only",
+    "chainId": 97,
+    "blockNumber": "130364502",
+    "token": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+    "distributor": "0xc2252D797Da294D16b84282d213604b4Bcf6EE09",
+    "expectedSigner": "0xba84bFFad693EDbd4B3F7899fB6E3cCb0c1D7820",
+    "ownerMatchesExpected": true,
+    "keyMatchesExpected": true,
+    "tokenMatchesExpected": true,
+    "distributorPaused": false,
+    "tokenPaused": false,
+    "distributorFreeBalanceRaw": "0",
+    "operatorTokenBalanceRaw": "493244946300000000000000000",
+    "operatorGasBalanceRaw": "24154984000000000",
+    "distributorCodeHash": "0x654fa2495a76004361c98bf51a10d5b9e7a50564ca4b89ee9e95af04cb92b4fc",
+    "tokenCodeHash": "0x670bc1ea470be67f3b77c5248eaa9f33b20bde55d2a9e21b0a68cdb5e06eea6d",
+    "gateEnabled": false,
+    "walletClientCreated": false,
+    "signed": false
+  },
+  "publisherCredentialIsolation": {
+    "observedAt": "2026-09-11T07:06:59.064307+00:00",
+    "publisherKeyPresent": true,
+    "web32KeyPresent": true,
+    "gameSchedulerKeyPresent": false,
+    "accountingSchedulerKeyPresent": false,
+    "valuesReadIntoEvidence": false,
+    "expectedPolicy": "publisher only",
+    "status": "runtime isolation remediation required; no evidence of public credential disclosure"
+  },
+  "expectedCalculationOnly": {
+    "directPlayerUki": "0.2175",
+    "cukiePoolAccrualUki": "0.16125",
+    "weeklyReserveNominalUki": "10",
+    "ambassadorReserveNominalUki": "2.5",
+    "undistributedPerformanceUki": "37.12125",
+    "sourceTotalNominalUki": "50",
+    "paidOrClaimable": false
+  },
+  "conclusions": [
+    "The five settled sessions have no financial manifests, allocations or accruals. The scheduler path that creates them is disabled in runtime.",
+    "The full scheduler backlog has six settled sessions; the extra score-zero session is outside the five-session recovery scope.",
+    "Two September 8 sessions passed the budget reservation deadline on September 9 at14:00UTC. Open weekly fences do not override DAY_CLOSED.",
+    "At the audit timestamp, the three September10 sessions passed the replicated budget preflight until September11at10:00UTC. This is not an executed canonical settlement or proof of claimability.",
+    "Snapshots bind two sessions to Seiku and three to Pool Original. OWN credits do not imply OWN NFT custody, and historical assignments must be preserved.",
+    "The distributor has zero free balance but the operator has testUKI and tBNB. Funding/publication also consume final accounting and are not authorized by a read-only preflight."
+  ],
+  "nextScope": [
+    "Prepare a bounded canonical recovery plan for the five exact session IDs, preserving source hashes, rules, source NFT, budgets, timestamps and historical ranking.",
+    "Handle overdue sources explicitly; do not change the server clock, generic grace period or sealed historical periods.",
+    "Resolve publisher credential presence in web32 before financial activation; root owns runtime/CI changes.",
+    "Enumerate daily/weekly closure, materialization and publication effects before enabling any generic financial runtime gate.",
+    "Use local/shadow evaluation first; review the concrete plan before remote writes or on-chain publication."
+  ],
+  "mutations": {
+    "databaseWrites": false,
+    "gatesChanged": false,
+    "transactionsSigned": false,
+    "fundsMoved": false,
+    "productionChanged": false
+  },
+  "coordinationIssue": "https://github.com/fgomezserna/cukies-hub/issues/418",
+  "publisherKeyIsolation": {
+    "observedAt": "2026-09-11T08:02:42+00:00",
+    "operation": "isolate-publisher-key-from-staging-web-configuration",
+    "result": {
+      "applicationId": 32,
+      "uuid": "rwwsc4kkwc0ck84cgk40s8kk",
+      "branch": "staging",
+      "removedKey": "REWARD_BATCH_PUBLISHER_PRIVATE_KEY",
+      "deletedRowIds": [
+        2391,
+        2392
+      ],
+      "webConfigKeyPresent": false,
+      "publisherConfigPreserved": true,
+      "publisherConfigKeyPresent": true,
+      "otherWebConfigPreserved": true,
+      "redeploymentPending": true,
+      "gatesChanged": false,
+      "productDatabaseWrites": 0,
+      "signedTransactions": 0
+    }
+  },
+  "recoveryDesign": {
+    "path": "2026-09-11-direct-rewards-recovery-design.md",
+    "status": "design-reviewed-apply-pending-canonical-accounting-plan",
+    "lateReasonPersisted": false,
+    "budgetEventsObserved": 0,
+    "dailyCapUki": "500000",
+    "lifetimeCapUki": "450000000",
+    "twoDayMaterializationNominalUki": "1000000",
+    "liveFinancialWritesAuthorizedByThisDesign": false,
+    "publicationPathValidated": false,
+    "publisherConsumes": "reward_publication_plans built from sealed daily/weekly reward accounting",
+    "sourceDraftIsOperationalPublicationPlan": false
+  },
+  "scopeNote": "Financial diagnosis and chain preflight were read-only. A later scoped Coolify configuration change removed the unused publisher key from staging web32; it is recorded separately under publisherKeyIsolation and awaits web replacement."
+}
