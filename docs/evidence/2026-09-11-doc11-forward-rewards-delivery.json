@@ -229,7 +229,7 @@
         "sanitizedError": "El payloadHash de reward-daily:C1800-D:2026-09-11T20:30:00.000Z no coincide con su cierre inmutable.",
         "affectedReader": "dapp/src/lib/uki-economy/rewards/public.ts:assertDailyRewardAccountingIntegrity"
       },
-      "resolutionStatus": "patch_reviewed_targeted_tests_passed_pending_delivery",
+      "resolutionStatus": "delivered_first_new_period_confirmed",
       "lastConfirmedFailureAt": "2026-09-11T21:13:33.504Z",
       "consecutiveFailures": 11,
       "validation": {
@@ -242,9 +242,197 @@
           "allocation_tampering_rejected",
           "existing_daily_without_snapshot_preserved"
         ],
-        "fullApplicationChecks": "pending_pull_request_ci"
+        "fullApplicationChecks": "passed",
+        "applicationSuites": 272,
+        "applicationTests": 2358,
+        "lint": "passed",
+        "typecheck": "passed",
+        "pullRequestCiRun": 34649330250,
+        "pullRequestCiStatus": "success"
       },
-      "implementationCommit": "e567bc2d20fdd5e7b8613d403739eee6d15e0e87"
+      "implementationCommit": "e567bc2d20fdd5e7b8613d403739eee6d15e0e87",
+      "fixPullRequest": "https://github.com/fgomezserna/cukies-hub/pull/437",
+      "mergeSha": "52684bb822cf6c7d4cacabe989e94321d3b6c7ff",
+      "delivery": {
+        "ciRun": 34649628143,
+        "url": "https://github.com/fgomezserna/cukies-hub/actions/runs/34649628143",
+        "status": "success",
+        "observedAt": "2026-09-11T21:47:20.357809+00:00",
+        "applicationValidation": "passed",
+        "images": "built_and_pushed",
+        "servedSha": "52684bb822cf6c7d4cacabe989e94321d3b6c7ff",
+        "healthHttpStatus": 200,
+        "readyHttpStatus": 200,
+        "productionSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+        "protectedContainersPreserved": 82,
+        "journal": "clean"
+      },
+      "firstDailyBefore": {
+        "id": "782109b7f993",
+        "dayId": "C1800-D:2026-09-11T20:30:00.000Z",
+        "status": "sealed",
+        "sealedAt": "2026-09-11T21:02:38.071Z",
+        "storedPayloadHash": "fe478e8d6bb7adf21042b50114caf95ba0a58b65988b1cb13a6bdedf90cf3bd1",
+        "recomputedPayloadHash": "fe478e8d6bb7adf21042b50114caf95ba0a58b65988b1cb13a6bdedf90cf3bd1",
+        "payloadHashMatches": true,
+        "allocationsCount": 3,
+        "ambassadorSnapshotsCount": 1
+      },
+      "firstDailyAfter": {
+        "id": "782109b7f993",
+        "dayId": "C1800-D:2026-09-11T20:30:00.000Z",
+        "status": "sealed",
+        "sealedAt": "2026-09-11T21:02:38.071Z",
+        "storedPayloadHash": "fe478e8d6bb7adf21042b50114caf95ba0a58b65988b1cb13a6bdedf90cf3bd1",
+        "recomputedPayloadHash": "fe478e8d6bb7adf21042b50114caf95ba0a58b65988b1cb13a6bdedf90cf3bd1",
+        "payloadHashMatches": true,
+        "allocationsCount": 3,
+        "ambassadorSnapshotsCount": 1
+      },
+      "firstDailyUnchanged": true,
+      "firstPeriodPublicationPlan": {
+        "accountingId": "reward-daily:C1800-D:2026-09-11T20:30:00.000Z",
+        "status": "completed",
+        "createdAt": "2026-09-11T21:46:10.056Z",
+        "updatedAt": "2026-09-11T21:46:53.654Z",
+        "totalRaw": "500000000000000000000000",
+        "claimableTotalRaw": "0",
+        "operationSummary": [
+          {
+            "kind": "fund_distributor",
+            "status": "skipped",
+            "transactionHash": null,
+            "amountRaw": "0"
+          },
+          {
+            "kind": "publish_batch",
+            "status": "skipped",
+            "transactionHash": null,
+            "amountRaw": "0"
+          },
+          {
+            "kind": "transfer_treasury",
+            "status": "confirmed",
+            "transactionHash": "0x294a75ce2107eebeb7d1d98ec4c4c980e7df3be6868aefed3cca7fc6dea3eb54",
+            "amountRaw": "400000000000000000000000"
+          },
+          {
+            "kind": "transfer_marketing_development",
+            "status": "confirmed",
+            "transactionHash": "0x0b76545b64df1f3fdbe83f98659d83f27d86a81e87108efbcf049e02264fc390",
+            "amountRaw": "50000000000000000000000"
+          },
+          {
+            "kind": "burn_supply_reduction",
+            "status": "confirmed",
+            "transactionHash": "0xb8918d758be28d61866138e3648f5fede8b4bafbabb08273c53ec83bea417121",
+            "amountRaw": "50000000000000000000000"
+          }
+        ]
+      },
+      "receiptVerification": {
+        "observedAt": "2026-09-11T21:48:22.791Z",
+        "readOnly": true,
+        "chainId": 97,
+        "accountingId": "reward-daily:C1800-D:2026-09-11T20:30:00.000Z",
+        "planStatus": "completed",
+        "claimableTotalRaw": "0",
+        "verified": true,
+        "checks": [
+          {
+            "kind": "transfer_treasury",
+            "transactionHash": "0x294a75ce2107eebeb7d1d98ec4c4c980e7df3be6868aefed3cca7fc6dea3eb54",
+            "amountRaw": "400000000000000000000000",
+            "blockNumber": "130481393",
+            "confirmations": "289",
+            "receiptSuccess": true,
+            "calldataAndTransferLogMatch": true
+          },
+          {
+            "kind": "transfer_marketing_development",
+            "transactionHash": "0x0b76545b64df1f3fdbe83f98659d83f27d86a81e87108efbcf049e02264fc390",
+            "amountRaw": "50000000000000000000000",
+            "blockNumber": "130481424",
+            "confirmations": "258",
+            "receiptSuccess": true,
+            "calldataAndTransferLogMatch": true
+          },
+          {
+            "kind": "burn_supply_reduction",
+            "transactionHash": "0xb8918d758be28d61866138e3648f5fede8b4bafbabb08273c53ec83bea417121",
+            "amountRaw": "50000000000000000000000",
+            "blockNumber": "130481448",
+            "confirmations": "234",
+            "receiptSuccess": true,
+            "calldataAndTransferLogMatch": true
+          }
+        ]
+      },
+      "newOperationsAfterDelivery": {
+        "observedAt": "2026-09-11T21:47:19.410Z",
+        "sessionsStartedSinceBoundary": 0,
+        "sessionsCreatedSinceBoundary": 0,
+        "gameEventsSinceBoundary": 0,
+        "dailyAccountingSinceBoundary": 2,
+        "newAccountingAllocations": 6,
+        "publicationPlansSinceBoundary": 1,
+        "claimBatchesSinceBoundary": 0,
+        "publisherFailureObserved": false
+      },
+      "heartbeatVerification": {
+        "game": {
+          "status": "success",
+          "lastSuccessAt": "2026-09-11T21:47:04.356Z",
+          "consecutiveFailures": 0,
+          "resultStatus": null
+        },
+        "pool": {
+          "status": "success",
+          "lastSuccessAt": "2026-09-11T21:47:04.530Z",
+          "consecutiveFailures": 0,
+          "resultStatus": null
+        },
+        "ranking": {
+          "status": "success",
+          "lastSuccessAt": "2026-09-11T21:47:04.158Z",
+          "consecutiveFailures": 0,
+          "resultStatus": null
+        },
+        "accounting": {
+          "status": "success",
+          "lastSuccessAt": "2026-09-11T21:47:03.941Z",
+          "consecutiveFailures": 0,
+          "resultStatus": null
+        },
+        "publisher": {
+          "status": "success",
+          "lastSuccessAt": "2026-09-11T21:46:53.659Z",
+          "consecutiveFailures": 0,
+          "resultStatus": "completed"
+        }
+      },
+      "weeklyRankingAfterDelivery": {
+        "status": "success",
+        "startedAt": "2026-09-11T21:47:04.086Z",
+        "endedAt": "2026-09-11T21:47:04.117Z",
+        "result": {
+          "status": "waiting",
+          "periodId": null,
+          "runId": null,
+          "manifestId": null,
+          "periodsProcessed": 0,
+          "closures": [],
+          "reason": "FORWARD_PERIOD_NOT_READY",
+          "readyAt": "2026-09-12T00:02:30.000Z"
+        }
+      },
+      "scope": "Primer periodo NUEVO completado con tres salidas de sistema confirmadas. No hubo partidas nuevas; claimableTotalRaw=0 y cero claim_batches son coherentes. No acredita recompensa por partida, reparto a prestador ni cobro personal.",
+      "artifacts": {
+        "runtime": "/tmp/doc11-pr437-runtime-postflight.json",
+        "financialBefore": "/tmp/doc11-pr437-before-publication.json",
+        "financialAfter": "/tmp/doc11-pr437-after-publication.json",
+        "receipts": "/tmp/doc11-pr437-first-period-receipts.json"
+      }
     }
   },
   "limits": [
