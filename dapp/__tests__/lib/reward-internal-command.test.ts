@@ -80,4 +80,35 @@ describe("reward internal command", () => {
     expect(() => parseRewardInternalCommand(Buffer.from(JSON.stringify(envelope))))
       .toThrow(/emissionBudget debe ser un objeto/);
   });
+
+  it("parsea recover_late_settlement con exactamente los seis identificadores autorizados", () => {
+    const rawBody = Buffer.from(JSON.stringify({
+      command: "recover_late_settlement",
+      payload: {
+        sessionId: "game-session:late-1",
+        periodId: "C1800-W:2026-09-08T12:00:00.000Z",
+        expectedRuleVersion: "rewards-staging-cycle-v1",
+        recoveryCaseId: "recovery-case-418",
+        approvalId: "approval-418",
+        planHash: "a".repeat(64),
+      },
+    }));
+    const command = parseRewardInternalCommand(rawBody);
+
+    expect(command).toEqual({
+      command: "recover_late_settlement",
+      payload: {
+        sessionId: "game-session:late-1",
+        periodId: "C1800-W:2026-09-08T12:00:00.000Z",
+        expectedRuleVersion: "rewards-staging-cycle-v1",
+        recoveryCaseId: "recovery-case-418",
+        approvalId: "approval-418",
+        planHash: "a".repeat(64),
+      },
+    });
+    const envelope = JSON.parse(rawBody.toString("utf8"));
+    envelope.payload.operatorRecovery = { approvedBy: "operator-rewards" };
+    expect(() => parseRewardInternalCommand(Buffer.from(JSON.stringify(envelope))))
+      .toThrow(/campos no permitidos: operatorRecovery/);
+  });
 });

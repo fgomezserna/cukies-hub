@@ -1,5 +1,8 @@
 import "server-only";
-import type { EconomyCycleCalendar } from '../cycle-calendar';
+import {
+  loadEconomyCycleCalendar,
+  type EconomyCycleCalendar,
+} from '../cycle-calendar';
 
 import type { ClientSession, Db } from "mongodb";
 
@@ -14,6 +17,7 @@ import {
   type RewardEmissionBudgetDay,
   type RewardEmissionBudgetEvent,
   type RewardEmissionBudgetState,
+  type RewardEconomyRuntimeContext,
   type RewardPeriodSeal,
   type RewardPeriodState,
   type RewardPoolAccrual,
@@ -24,6 +28,7 @@ import {
 import { rewardRuleActiveAtQuery } from "./rules";
 
 export interface RewardRepository {
+  getRewardEconomyRuntimeContext(): RewardEconomyRuntimeContext;
   findRuleAt(at: Date, expectedVersion: string): Promise<RewardRule | null>;
   findRuleByVersion(version: string): Promise<RewardRule | null>;
   findOverlappingActiveRule(
@@ -146,6 +151,16 @@ export function createMongoRewardRepository(
   const options = { session };
 
   return {
+    getRewardEconomyRuntimeContext: () => {
+      const calendar = loadEconomyCycleCalendar();
+      return {
+        databaseName: db.databaseName,
+        chainId: Number(process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID ?? NaN),
+        cycleSeconds: calendar?.cycleSeconds
+          ?? Number(process.env.ECONOMY_CYCLE_SECONDS ?? NaN),
+        ...(calendar ? { calendar } : {}),
+      };
+    },
     findRuleAt: (at, expectedVersion) =>
       rules.findOne(
         {

@@ -289,6 +289,15 @@ export class MongoCompetitionRepository implements CompetitionRepository {
     return withoutMongoId(await (await this.participants()).findOne({ campaignId, walletAddress }));
   }
 
+  async findLatestParticipantByWallet(walletAddress: string, excludeCampaignId?: string) {
+    return withoutMongoId(await (await this.participants()).findOne(
+      excludeCampaignId
+        ? { walletAddress, campaignId: { $ne: excludeCampaignId } }
+        : { walletAddress },
+      { sort: { updatedAt: -1, createdAt: -1, campaignId: 1 } },
+    ));
+  }
+
   async updateParticipantAlias(input: {
     campaignId: string;
     walletAddress: string;
