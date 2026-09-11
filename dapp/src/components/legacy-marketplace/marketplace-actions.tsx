@@ -195,14 +195,19 @@ async function waitForTronReceipt(result: unknown) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
       const info = await getInfo.call(trx, txId);
-      assertTronSendResult(info);
       if (info && typeof info === 'object') {
         const record = info as Record<string, unknown>;
         const receipt = record.receipt && typeof record.receipt === 'object'
           ? record.receipt as Record<string, unknown>
           : null;
         const resultValue = receipt?.result ?? record.contractRet ?? record.result;
-        if (typeof resultValue === 'string' && /success|confirmed/i.test(resultValue)) return;
+        const infoTxId = tronTransactionId(info);
+        // Ignore an unrelated indexed receipt before interpreting its result;
+        // a foreign REVERT must not fail this transaction's confirmation.
+        if (!infoTxId || infoTxId.toLowerCase() === txId.toLowerCase()) {
+          assertTronSendResult(info);
+          if (typeof resultValue === 'string' && resultValue.toLowerCase() === 'success') return;
+        }
       }
     } catch (error) {
       if (error instanceof Error && error.message === 'TRANSACTION_REVERTED') throw error;

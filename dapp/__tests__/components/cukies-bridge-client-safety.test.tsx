@@ -1,12 +1,20 @@
 import { render, screen } from '@testing-library/react';
 
+const mockWagmiConfig = {};
+
 import { BridgeClient } from '@/components/legacy-marketplace/bridge-client';
 
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(),
+  useConfig: jest.fn(() => mockWagmiConfig),
+  usePublicClient: jest.fn(() => null),
   useReadContract: jest.fn(),
   useSwitchChain: jest.fn(),
-  useWriteContract: jest.fn(),
+  useWriteContract: jest.fn(() => ({ writeContractAsync: jest.fn(), isPending: false })),
+}));
+jest.mock('wagmi/actions', () => ({
+  getAccount: jest.fn(() => ({ address: undefined })),
+  getChainId: jest.fn(() => undefined),
 }));
 jest.mock('lucide-react', () => ({
   ArrowRightLeft: () => <span />,

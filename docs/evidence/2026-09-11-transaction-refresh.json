@@ -1,5 +1,5 @@
 {
-  "status": "second-delivery-published-collection-vesting-candidate-under-validation",
+  "status": "third-delivery-published-legacy-followup-under-test",
   "recordedAt": "2026-09-11T00:03:05.483834+00:00",
   "scope": "Automatic UI convergence after confirmed transactions; staging only",
   "baseCommit": "151c33bf02533963973358a2eb486cc9dc5b6087",
@@ -146,10 +146,10 @@
   ],
   "areas": {
     "masterAndRuntime": "PR404 published and read-only browser verified; deferred reconciliation covered by component tests",
-    "marketplaceAndClaims": "Marketplace and rewards PR405 published/verified. Vesting reviewed with released-amount proof and operation-generation CAS; isolated validation next.",
+    "marketplaceAndClaims": "Marketplace and rewards PR405 published/verified; Vesting PR406 published/verified, including released-amount proof and operation-generation CAS.",
     "poolRecovery": "PR405 published/verified; receipt and epoch reconciliation, automatic retry, per-NFT pending locks",
     "bridgeBreeding": "Receipt and refresh correction in progress; existing runtime write gates remain unchanged",
-    "myCukies": "Implemented and root-reviewed: retained inventory, per-asset targets across concurrent sales, all conflicting actions locked, wallet-scoped refresh; isolated validation next."
+    "myCukies": "PR406 published and authenticated navigation verified: 12 cards retained during manual refresh; per-asset convergence, concurrent sales and wallet switch covered by tests."
   },
   "validation": {
     "focal": {
@@ -212,6 +212,16 @@
       "suites": 1,
       "tests": 15,
       "result": "passed including alternate-sale and per-asset pending regressions"
+    },
+    "thirdFull": {
+      "sha": "b3e98e12d4a9255c00b4489523bc71dbb5ac33e7",
+      "suites": 263,
+      "tests": 2198,
+      "test": "passed",
+      "lint": "passed without warnings",
+      "typecheck": "passed",
+      "build": "passed",
+      "isolatedWorktree": true
     }
   },
   "transactionsSignedByAgent": false,
@@ -257,11 +267,9 @@
     }
   },
   "followupScope": {
-    "branch": "codex/tx-confirmation-collection-20260911",
-    "poolRecovery": "receipt, custody/epoch and automatic retry",
-    "marketplaceClaims": "receipt replacement, delayed projections, per-operation locks and shared account refresh",
-    "collectionLegacy": "Third delivery: My Cukies and Vesting. Separate final delivery: Bridge source/transit, Breeding receipt/projection and strict TRON confirmation.",
-    "vesting": "Implemented and root-reviewed: receipt-confirmed claim remains locked until released amount changes; late wallet A cannot overwrite newer B operation"
+    "branch": "codex/tx-confirmation-legacy-20260911",
+    "collectionVesting": "PR406 published and verified",
+    "collectionLegacy": "Final delivery in regression testing: Bridge source/transit, Breeding receipt/projection and strict TRON confirmation. Runtime gates unchanged."
   },
   "secondDelivery": {
     "pr": "https://github.com/fgomezserna/cukies-hub/pull/405",
@@ -318,6 +326,65 @@
       "method": "authenticated read-only navigation after deploy",
       "limit": "No real wallet transaction signed; delayed reads and pending receipt behavior covered by regression tests",
       "rewards": "Por cobrar / Historial tabs hydrate; existing account has zero claimable rewards, with an explicit empty state and no stuck loading"
+    }
+  },
+  "thirdDelivery": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/406",
+    "sourceSha": "b3e98e12d4a9255c00b4489523bc71dbb5ac33e7",
+    "mergeSha": "a61b0f8ab87b6d5ca0ab9546f72c12cc97cc5ba2",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34546843510",
+    "status": "published-and-verified",
+    "scope": [
+      "My Cukies collection refresh",
+      "Vesting claims"
+    ],
+    "build": [
+      "dapp"
+    ],
+    "reuse": [
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer",
+      "treasure-hunt",
+      "world-api",
+      "world-matchmaking"
+    ],
+    "postflight": {
+      "observedAt": "2026-09-11T00:42:02.436624+00:00",
+      "health": {
+        "status": "ok",
+        "app": "cukies-hub",
+        "environment": "staging",
+        "gitSha": "a61b0f8ab87b6d5ca0ab9546f72c12cc97cc5ba2",
+        "gitRef": "staging",
+        "buildTime": null,
+        "coolify": {
+          "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+          "fqdn": null
+        }
+      },
+      "readyHttpStatus": 200,
+      "journal": "clean",
+      "workerCount": 10,
+      "workersRunningNoRestarts": true,
+      "protected": {
+        "total": 25,
+        "preserved": 25,
+        "changed": []
+      },
+      "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a"
+    },
+    "imageDigestsMatchManifest": true,
+    "browser": {
+      "routes": [
+        "/cukies",
+        "/vesting"
+      ],
+      "collection": "12 cards, 4 available and 2 listed in wallet; Master #98000002 has withdrawal action; manual refresh retains cards",
+      "vesting": "No allocation for current wallet; disabled claim and explicit empty state, no pending operation",
+      "method": "authenticated read-only navigation",
+      "limit": "No real wallet signature; delayed transaction behavior verified by regression tests"
     }
   }
 }
