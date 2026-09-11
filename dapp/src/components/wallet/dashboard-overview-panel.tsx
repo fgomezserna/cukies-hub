@@ -529,7 +529,7 @@ export function DashboardOverviewPanel() {
                   label="posiciones activas"
                   details={pool ? [
                     `${integerLabel(pool.activePositions)} disponibles para partidas`,
-                    `${integerLabel(pool.positions)} Cukies aportados en total`,
+                    `${integerLabel(pool.positions)} depósitos registrados`,
                   ] : []}
                 />
               </div>

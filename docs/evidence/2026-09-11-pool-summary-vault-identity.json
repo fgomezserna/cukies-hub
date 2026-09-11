@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "scope": "staging Pool summary by exact vault and deposit epoch",
+  "stageSourceSha": "31e558cb97e858a398d4d212458213fca495ad6a",
+  "stageServedShaAtAudit": "5b5ba01963f5490002c087f72713abb00e7de21f",
+  "readOnly": true,
+  "database": "cukieshub-new-staging",
+  "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+  "chainId": 97,
+  "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+  "projectedState": {
+    "observedAt": "2026-09-11T07:21:05.243Z",
+    "activePoolVault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+    "masterVault": "0x4482eba4d55a1df6aa102a8cc22a4fba252d7edb",
+    "historicalDepositRows": 7,
+    "uniqueHistoricalAssets": 6,
+    "activePositions": 0,
+    "openPoolPositions": [
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000010:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000010",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000010:epoch:1",
+        "tokenId": "98000010",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "exit_requested",
+        "lifecycleOpen": true,
+        "custody": "cukie_pool_nft_vault",
+        "status": "withdrawable"
+      },
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000011:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000011",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000011:epoch:1",
+        "tokenId": "98000011",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "exit_requested",
+        "lifecycleOpen": true,
+        "custody": "cukie_pool_nft_vault",
+        "status": "withdrawable"
+      }
+    ],
+    "openMasterPositions": [
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002:epoch:4",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002:epoch:4",
+        "tokenId": "98000002",
+        "depositEpoch": "4",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_MASTER_NFT_VAULT",
+        "vault": "0x4482eba4d55a1df6aa102a8cc22a4fba252d7edb",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "custodied",
+        "lifecycleOpen": true,
+        "custody": "cukie_master_nft_vault",
+        "status": "active"
+      }
+    ],
+    "allPoolPositions": [
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002:epoch:1",
+        "tokenId": "98000002",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "status": "withdrawn"
+      },
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000006:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000006",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000006:epoch:1",
+        "tokenId": "98000006",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "status": "withdrawn"
+      },
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000006:epoch:2",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000006",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000006:epoch:2",
+        "tokenId": "98000006",
+        "depositEpoch": "2",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "status": "withdrawn"
+      },
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000008:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000008",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000008:epoch:1",
+        "tokenId": "98000008",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "status": "withdrawn"
+      },
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000009:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000009",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000009:epoch:1",
+        "tokenId": "98000009",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "withdrawn",
+        "lifecycleOpen": false,
+        "custody": "wallet",
+        "status": "withdrawn"
+      },
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000010:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000010",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000010:epoch:1",
+        "tokenId": "98000010",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "exit_requested",
+        "lifecycleOpen": true,
+        "custody": "cukie_pool_nft_vault",
+        "status": "withdrawable"
+      },
+      {
+        "id": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000011:epoch:1",
+        "assetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000011",
+        "positionId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000011:epoch:1",
+        "tokenId": "98000011",
+        "depositEpoch": "1",
+        "chainId": 97,
+        "collection": "0xd4c7b16db234d7f62ba6a8f30153faf85feabec8",
+        "vaultAlias": "CUKIE_POOL_NFT_VAULT",
+        "vault": "0x359b8fc829eb6d320df6301c8f323af9ae773b41",
+        "beneficiary": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "lifecycle": "exit_requested",
+        "lifecycleOpen": true,
+        "custody": "cukie_pool_nft_vault",
+        "status": "withdrawable"
+      }
+    ],
+    "identityChecks": {
+      "duplicateOpenAssetIds": [],
+      "duplicateOpenTokenIdentity": [],
+      "openAssetOverlap": [],
+      "masterTokenOverlap": [],
+      "note": "La colision tokenId puede ser benigna entre colecciones; assetId incluye chainId+collection. Un overlap assetId entre vaults es fallo."
+    }
+  },
+  "chainOwnerCheck": {
+    "observedAt": "2026-09-11T07:29:29.993Z",
+    "readOnly": true,
+    "chainId": 97,
+    "blockNumber": "130367161",
+    "collection": "0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8",
+    "owners": [
+      {
+        "tokenId": "98000001",
+        "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b"
+      },
+      {
+        "tokenId": "98000002",
+        "owner": "0x4482ebA4D55a1DF6aA102a8CC22A4fBa252D7eDB"
+      },
+      {
+        "tokenId": "98000003",
+        "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b"
+      },
+      {
+        "tokenId": "98000004",
+        "owner": "0xd405aCFf1Bba872bE893e796C39f3eaCBdE2872b"
+      },
+      {
+        "tokenId": "98000005",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000006",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000007",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000008",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000009",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      },
+      {
+        "tokenId": "98000010",
+        "owner": "0x359b8FC829eB6D320DF6301C8F323AF9AE773B41"
+      },
+      {
+        "tokenId": "98000011",
+        "owner": "0x359b8FC829eB6D320DF6301C8F323AF9AE773B41"
+      },
+      {
+        "tokenId": "98000012",
+        "owner": "0x26789b9743d187174C3E3a87729730824a4D0C13"
+      }
+    ],
+    "signed": false
+  },
+  "finding": {
+    "kind": "display-label-unit",
+    "previousCopy": "7 Cukies aportados en total",
+    "correctedCopy": "7 depósitos registrados",
+    "reason": "El NFT 98000006 tiene dos depositEpoch retiradas. El contador mide depósitos, no NFTs distintos.",
+    "source": "dapp/src/components/wallet/dashboard-overview-panel.tsx",
+    "queryAndAmountsChanged": false
+  },
+  "boundaries": [
+    "La consulta de posiciones usa el vault Pool activo359b y no suma el vault de recuperaciónd405.",
+    "ownerOf confirma que98000001/3/4 siguen en d405; las filas ausentes en la proyección activa no prueban ausencia de custodia.",
+    "98000010/11 están en359b;98000002 en Master4482; los otros seis están en la wallet.",
+    "La revisión de presentación conjunta de recuperación sigue separada; no se declaran retiradas por una lectura Mongo.",
+    "No se han firmado transacciones, cambiado datos, gates, periodos, contratos ni producción."
+  ],
+  "validation": {
+    "diffCheck": "passed",
+    "newTests": "not-added: copy-only change",
+    "fullChecks": "required by staging delivery CI"
+  },
+  "delivery": {
+    "status": "candidate-awaiting-staging-delivery",
+    "branch": "codex/pool-summary-deposit-label-20260911"
+  }
+}
