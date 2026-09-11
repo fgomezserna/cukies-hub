@@ -53,6 +53,7 @@ type AmbassadorDashboard = {
   ownAttribution: {
     attributionId: string;
     ambassadorWalletMasked: string;
+    ambassadorPublicName?: string | null;
     isCukiesWorld: boolean;
     source: AttributionSource;
     acceptedAt: string;
@@ -95,6 +96,8 @@ type SummaryResponse = {
 type Invitation = {
   invitationCode: string;
   ambassadorWalletMasked: string;
+  ambassadorPublicName?: string | null;
+  isCukiesWorld?: boolean;
 };
 
 type InvitationResponse = {
@@ -105,6 +108,7 @@ type InvitationResponse = {
 
 const INVITATION_FALLBACK_COPY =
   'La invitación ya no está disponible. Puedes confirmar Cukies World con una nueva firma.';
+const INVITATION_LOOKUP_TIMEOUT_MS = 8_000;
 
 function isCertainInvitationInvalidation(status: number, code?: string) {
   // El servidor usa 404 cuando confirma que el código/perfil no se puede
@@ -234,6 +238,7 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const [requestState, setRequestState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [invitationState, setInvitationState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [invitationErrorCode, setInvitationErrorCode] = useState<string | null>(null);
+  const [invitationRequest, setInvitationRequest] = useState(0);
   const [invitationFallback, setInvitationFallback] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [consent, setConsent] = useState(false);
@@ -253,6 +258,20 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const pendingInvitationRef = useRef(pendingInvitationCode);
   pendingInvitationRef.current = pendingInvitationCode;
   const currentDashboard = dashboard?.walletNormalized.toLowerCase() === walletKey ? dashboard : null;
+  const hasConfirmedSponsor = Boolean(
+    currentDashboard && (
+      Boolean(currentDashboard.ownAttribution) || currentDashboard.enrollment.hasConfirmedSponsor === true
+    ),
+  );
+  const invitationLookupGate = !walletKey
+    ? 'visitor'
+    : requestState === 'error'
+      ? 'summary-error'
+      : requestState !== 'ready' || !currentDashboard
+        ? 'waiting-summary'
+        : hasConfirmedSponsor
+          ? 'confirmed'
+          : 'ready';
 
   const syncTabFromLocation = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -373,6 +392,13 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
     setConsent(false);
   }, []);
 
+  const retryInvitation = useCallback(() => {
+    if (!pendingInvitationRef.current) return;
+    setInvitationErrorCode(null);
+    setInvitationState('idle');
+    setInvitationRequest((current) => current + 1);
+  }, []);
+
   useEffect(() => {
     setResolvedInvitation(null);
     setInvitationErrorCode(null);
@@ -380,16 +406,47 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
       setInvitationState('idle');
       return;
     }
+    if (invitationLookupGate !== 'visitor' && invitationLookupGate !== 'ready') {
+      setInvitationState('idle');
+      return;
+    }
     setInvitationFallback(false);
     const controller = new AbortController();
+    const requestWalletKey = walletKey;
+    let active = true;
+    let timedOut = false;
+    let lookupErrorCode: string | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     setInvitationState('loading');
-    fetch(`/api/economy/v1/ambassadors/invitations/${encodeURIComponent(pendingInvitationCode)}`, {
+    const responsePromise = fetch(`/api/economy/v1/ambassadors/invitations/${encodeURIComponent(pendingInvitationCode)}`, {
       cache: 'no-store',
       signal: controller.signal,
-    })
-      .then(async (response) => {
-        const body = await response.json() as InvitationResponse;
-        if (controller.signal.aborted) return;
+    }).then(async (response) => {
+      if (!active || currentWallet.current !== requestWalletKey || controller.signal.aborted) {
+        if (timedOut) throw new Error('INVITATION_LOOKUP_TIMEOUT');
+        return null;
+      }
+      const body = await response.json() as InvitationResponse;
+      if (!active || currentWallet.current !== requestWalletKey || controller.signal.aborted) {
+        if (active && timedOut) throw new Error('INVITATION_LOOKUP_TIMEOUT');
+        return null;
+      }
+      return { response, body };
+    });
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      // This race also bounds a response body that has arrived but never
+      // finishes parsing; abort alone does not guarantee that in every fetch
+      // implementation.
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        reject(new Error('INVITATION_LOOKUP_TIMEOUT'));
+      }, INVITATION_LOOKUP_TIMEOUT_MS);
+    });
+    Promise.race([responsePromise, timeoutPromise])
+      .then((result) => {
+        if (!result || !active || currentWallet.current !== requestWalletKey) return;
+        const { response, body } = result;
         if (!response.ok || body.status !== 'ok' || !body.invitation) {
           if (isCertainInvitationInvalidation(response.status, body.code)) {
             if (pendingInvitationRef.current === pendingInvitationCode) {
@@ -397,19 +454,28 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
             }
             return;
           }
-          setInvitationErrorCode(body.code ?? null);
+          lookupErrorCode = body.code ?? null;
+          setInvitationErrorCode(lookupErrorCode);
           throw new Error(body.code ?? `HTTP_${response.status}`);
         }
         setResolvedInvitation(body.invitation);
         setInvitationState('ready');
       })
       .catch(() => {
-        if (controller.signal.aborted) return;
+        if (!active || currentWallet.current !== requestWalletKey || (controller.signal.aborted && !timedOut)) return;
         setResolvedInvitation(null);
+        setInvitationErrorCode(timedOut ? 'INVITATION_LOOKUP_TIMEOUT' : lookupErrorCode);
         setInvitationState('error');
+      })
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
       });
-    return () => controller.abort();
-  }, [forgetPendingInvitation, pendingInvitationCode]);
+    return () => {
+      active = false;
+      if (timeoutId) clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [forgetPendingInvitation, invitationLookupGate, invitationRequest, pendingInvitationCode, walletKey]);
 
   const invitationUrl = useMemo(() => {
     if (
@@ -454,12 +520,9 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
   const isOwnInvitation = Boolean(
     invitation && currentDashboard?.profile?.invitationCode === invitation.invitationCode,
   );
-  const hasConfirmedSponsor = Boolean(
-    currentDashboard && (
-      (currentDashboard.enrollment.hasConfirmedSponsor
-      ?? Boolean(currentDashboard.ownAttribution))
-    ),
-  );
+  // Una relación confirmada, incluida la bloqueada en preventa, oculta el
+  // bloque de invitación aunque el perfil se consulte en paralelo.
+  const shouldHideInvitationProgram = hasConfirmedSponsor;
   const isEligibilityUnknown = Boolean(
     currentDashboard &&
     currentDashboard.enrollment.isCukieMaster === null &&
@@ -567,7 +630,11 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
         </div>
       </header>
 
-      {pendingInvitationCode || (currentDashboard?.enrollment.canChooseSponsor && requestState === 'ready') ? (
+      {!shouldHideInvitationProgram && (
+        pendingInvitationCode
+          ? invitationLookupGate === 'visitor' || invitationLookupGate === 'ready'
+          : currentDashboard?.enrollment.canChooseSponsor && requestState === 'ready'
+      ) ? (
         <section aria-labelledby="invitation-title" className="pt-7">
           <Panel innerClassName="p-5 sm:p-7">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.48fr)] lg:items-center">
@@ -587,17 +654,26 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                     <SpinnerGap className="h-4 w-4 animate-spin text-[var(--uki-lilac)]" /> Comprobando la invitación…
                   </p>
                 ) : invitationState === 'error' ? (
-                  <p role="alert" className="mt-4 flex items-start gap-2 text-sm font-semibold text-amber-200">
-                    <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="fill" /> {invitationErrorCode === 'AMBASSADOR_ELIGIBILITY_UNAVAILABLE'
-                      ? 'No podemos comprobar ahora si el embajador sigue disponible. Tu invitación se conserva; inténtalo más tarde.'
-                      : 'No podemos comprobar esta invitación ahora. Tu invitación se conserva; inténtalo más tarde.'}
-                  </p>
+                  <div role="alert" className="mt-4 flex items-start gap-3 text-sm font-semibold text-amber-200">
+                    <Warning className="mt-0.5 h-4 w-4 shrink-0" weight="fill" />
+                    <div>
+                      <p>{invitationErrorCode === 'AMBASSADOR_ELIGIBILITY_UNAVAILABLE'
+                        ? 'No podemos comprobar ahora si el embajador sigue disponible. Tu invitación se conserva; inténtalo más tarde.'
+                        : invitationErrorCode === 'INVITATION_LOOKUP_TIMEOUT'
+                          ? 'La comprobación de la invitación está tardando demasiado. Tu invitación sigue guardada; vuelve a intentarlo.'
+                          : 'No podemos comprobar esta invitación ahora. Tu invitación sigue guardada; vuelve a intentarlo.'}</p>
+                      <button type="button" onClick={retryInvitation} className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-[8px] border border-amber-200/30 px-3 text-xs font-black text-amber-100">
+                        <ArrowClockwise className="h-4 w-4" weight="bold" /> Reintentar invitación
+                      </button>
+                    </div>
+                  </div>
                 ) : proposedAmbassador ? (
                   <div className="mt-4 flex items-center gap-3">
                     <span className="grid h-11 w-11 place-items-center rounded-full border border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac)]/10">
                       <Crown className="h-5 w-5 text-[var(--uki-lilac)]" weight="fill" />
                     </span>
                     <div>
+                      {invitation?.ambassadorPublicName ? <p className="font-black text-[var(--uki-cream)]">{invitation.ambassadorPublicName}</p> : null}
                       {defaultAmbassador ? <p className="font-black text-[var(--uki-cream)]">Cukies World</p> : null}
                       <p className="font-mono text-base font-black text-[var(--uki-cream)]">{proposedAmbassador.ambassadorWalletMasked}</p>
                       <p className="mt-0.5 text-xs font-semibold text-[var(--uki-muted)]">{currentDashboard && !currentDashboard.enrollment.canChooseSponsor ? 'Wallet que te invita' : 'Será tu embajador directo'}</p>
@@ -802,7 +878,11 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                   </div>
                   {currentDashboard.ownAttribution ? (
                     <div className="mt-5 rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac)]/[0.055] p-5">
-                      {currentDashboard.ownAttribution.isCukiesWorld ? <p className="mb-1 font-black">Cukies World</p> : null}
+                      {currentDashboard.ownAttribution.isCukiesWorld
+                        ? <p className="mb-1 font-black">Cukies World</p>
+                        : currentDashboard.ownAttribution.ambassadorPublicName
+                          ? <p className="mb-1 font-black">{currentDashboard.ownAttribution.ambassadorPublicName}</p>
+                          : null}
                       <p className="font-mono text-lg font-black">{currentDashboard.ownAttribution.ambassadorWalletMasked}</p>
                       <p className="mt-2 text-sm font-semibold text-[var(--uki-lilac)]">{sourceCopy(currentDashboard.ownAttribution.source)}</p>
                       <p className="mt-2 text-xs font-semibold text-[var(--uki-muted)]">Desde el {formatDate(currentDashboard.ownAttribution.acceptedAt)}. No puedes sustituirla desde tu cuenta; administración o soporte puede corregirla con autorización y trazabilidad.</p>
@@ -811,14 +891,20 @@ export function AmbassadorProgram({ initialInvitationCode }: { initialInvitation
                     <div className="mt-5 flex items-start gap-3 rounded-[12px] border border-white/10 bg-white/[0.035] p-5">
                       <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-[var(--uki-lilac)]" weight="bold" />
                       <div>
-                        <p className="font-black">{currentDashboard.enrollment.isPresaleParticipant ? 'Sin embajador en la preventa' : 'Embajador pendiente de confirmar'}</p>
-                        <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{currentDashboard.enrollment.isPresaleParticipant
-                          ? 'Tu participación en la preventa ya no permite asignarte un patrocinador desde aquí.'
-                          : proposedAmbassador
-                            ? 'Conectar tu wallet y navegar no confirma la relación. Solo se guardará cuando la confirmes con una firma específica, sin gas.'
-                            : pendingInvitationCode
-                              ? 'Conservamos tu invitación pendiente. Debe estar disponible antes de que puedas confirmarla.'
-                              : 'Ahora no podemos ofrecerte un embajador. Puedes seguir navegando y volver a intentarlo más adelante.'}</p>
+                        <p className="font-black">{hasConfirmedSponsor
+                          ? 'Patrocinador confirmado'
+                          : currentDashboard.enrollment.isPresaleParticipant
+                            ? 'Sin embajador en la preventa'
+                            : 'Embajador pendiente de confirmar'}</p>
+                        <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">{hasConfirmedSponsor
+                          ? 'La relación ya está confirmada y permanece protegida; la elegibilidad posterior del invitador no la cambia.'
+                          : currentDashboard.enrollment.isPresaleParticipant
+                            ? 'Tu participación en la preventa ya no permite asignarte un patrocinador desde aquí.'
+                            : proposedAmbassador
+                              ? 'Conectar tu wallet y navegar no confirma la relación. Solo se guardará cuando la confirmes con una firma específica, sin gas.'
+                              : pendingInvitationCode
+                                ? 'Conservamos tu invitación pendiente. Debe estar disponible antes de que puedas confirmarla.'
+                                : 'Ahora no podemos ofrecerte un embajador. Puedes seguir navegando y volver a intentarlo más adelante.'}</p>
                       </div>
                     </div>
                   )}

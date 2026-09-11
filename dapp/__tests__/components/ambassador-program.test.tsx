@@ -49,6 +49,7 @@ type DashboardPayloadOptions = {
   hasConfirmedSponsor?: boolean;
   canInvite?: boolean;
   eligibilityReason?: string | null;
+  ambassadorPublicName?: string | null;
 };
 
 function dashboardPayload(options: DashboardPayloadOptions = {}) {
@@ -64,6 +65,7 @@ function dashboardPayload(options: DashboardPayloadOptions = {}) {
     hasConfirmedSponsor = confirmed || presale,
     canInvite = presale || confirmed,
     eligibilityReason = null,
+    ambassadorPublicName = null,
   } = options;
   return {
     status: 'ok',
@@ -83,6 +85,7 @@ function dashboardPayload(options: DashboardPayloadOptions = {}) {
       ownAttribution: confirmed ? {
         attributionId: 'ambassador-attribution:confirmed-wallet',
         ambassadorWalletMasked: isCukiesWorld ? '0x5555…5555' : '0x2222…2222',
+        ambassadorPublicName,
         isCukiesWorld,
         source: attributionSource,
         acceptedAt: '2026-09-07T12:00:00.000Z',
@@ -189,12 +192,11 @@ describe('AmbassadorProgram', () => {
     expect(screen.getByText(/Recibes el 5% de los premios elegibles/)).toBeInTheDocument();
   });
 
-  it('conserva el enlace de preventa pero impide asignar un patrocinador aunque abra una invitación', async () => {
+  it('mantiene el enlace propio de preventa y no muestra avisos de otra invitación cuando el sponsor está confirmado', async () => {
     render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
     expect(await screen.findByRole('button', { name: 'Copiar enlace' })).toBeInTheDocument();
-    expect(screen.getByText('Participaste en la preventa y ya no puedes asignarte un embajador. Conservas tu enlace para invitar.')).toBeInTheDocument();
-    expect(await screen.findByText('Wallet que te invita')).toBeInTheDocument();
-    expect(screen.queryByText('Será tu embajador directo')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wallet que te invita')).not.toBeInTheDocument();
+    expect(screen.queryByText('Has recibido una invitación')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirmar embajador' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(attributionCalls()).toHaveLength(0);
@@ -389,6 +391,168 @@ describe('AmbassadorProgram', () => {
     expect(signMessageAsync).not.toHaveBeenCalled();
   });
 
+  it('trata un timeout como fallo temporal, conserva la invitación y permite reintentar', async () => {
+    jest.useFakeTimers();
+    try {
+      payload = dashboardPayload({ presale: false });
+      let invitationCalls = 0;
+      const defaultFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation((input, init) => {
+        if (String(input).includes('/invitations/')) {
+          invitationCalls += 1;
+          if (invitationCalls === 1) {
+            return new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+            });
+          }
+        }
+        return defaultFetch(input, init);
+      });
+
+      render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(8_000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(screen.getByRole('alert')).toHaveTextContent('está tardando demasiado');
+      expect(screen.getByRole('alert')).toHaveTextContent('sigue guardada; vuelve a intentarlo');
+      expect(sessionStorage.getItem(pendingInvitationKey)).toBe(invitationCode);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reintentar invitación' }));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByText('0x2222…2222')).toBeInTheDocument();
+      expect(invitationCalls).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('ignora el body tardío de una consulta anterior cuando se reintenta', async () => {
+    jest.useFakeTimers();
+    try {
+      payload = dashboardPayload({ presale: false });
+      const oldBody = deferred<{
+        status: 'ok';
+        invitation: {
+          invitationCode: string;
+          ambassadorWalletMasked: string;
+          ambassadorPublicName?: string;
+        };
+      }>();
+      let invitationCalls = 0;
+      const defaultFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation((input, init) => {
+        if (String(input).includes('/invitations/')) {
+          invitationCalls += 1;
+          if (invitationCalls === 1) {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: () => oldBody.promise,
+            } as Response);
+          }
+        }
+        return defaultFetch(input, init);
+      });
+
+      render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+      await act(async () => { await Promise.resolve(); });
+      await act(async () => {
+        jest.advanceTimersByTime(8_000);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent('está tardando demasiado');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reintentar invitación' }));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.getByText('0x2222…2222')).toBeInTheDocument();
+
+      await act(async () => {
+        oldBody.resolve({
+          status: 'ok',
+          invitation: {
+            invitationCode,
+            ambassadorWalletMasked: '0x9999…9999',
+            ambassadorPublicName: 'OldResponse',
+          },
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(screen.queryByText('OldResponse')).not.toBeInTheDocument();
+      expect(screen.getByText('0x2222…2222')).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('descarta una invitación tardía después de cambiar de wallet', async () => {
+    const oldBody = deferred<{
+      status: 'ok';
+      invitation: {
+        invitationCode: string;
+        ambassadorWalletMasked: string;
+        ambassadorPublicName?: string;
+      };
+    }>();
+    payload = dashboardPayload({ presale: false, walletAddress: wallet });
+    let invitationCalls = 0;
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => {
+      if (String(input).includes('/invitations/')) {
+        invitationCalls += 1;
+        if (invitationCalls === 1) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => oldBody.promise,
+          } as Response);
+        }
+      }
+      return defaultFetch(input, init);
+    });
+
+    const view = render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    payload = dashboardPayload({ presale: false, walletAddress: otherWallet });
+    mockUseAuth.mockReturnValue(authValue({ user: { walletAddress: otherWallet } as User }));
+    view.rerender(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText('0x2222…2222')).toBeInTheDocument();
+    await act(async () => {
+      oldBody.resolve({
+        status: 'ok',
+        invitation: {
+          invitationCode,
+          ambassadorWalletMasked: '0x9999…9999',
+          ambassadorPublicName: 'OldWalletResponse',
+        },
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('OldWalletResponse')).not.toBeInTheDocument();
+    expect(screen.queryByText('0x9999…9999')).not.toBeInTheDocument();
+    expect(screen.getByText('0x2222…2222')).toBeInTheDocument();
+    expect(invitationCalls).toBe(2);
+  });
+
   it('trata un código no canónico como enlace inválido', async () => {
     payload = dashboardPayload({ presale: false });
     const defaultFetch = fetchMock.getMockImplementation()!;
@@ -430,6 +594,134 @@ describe('AmbassadorProgram', () => {
     expect(screen.queryByRole('button', { name: 'Confirmar embajador' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(signMessageAsync).not.toHaveBeenCalled();
+  });
+
+  it('oculta avisos de invitación cuando la relación de preventa ya está confirmada', async () => {
+    payload = dashboardPayload({ presale: true, confirmed: false, hasConfirmedSponsor: true, canInvite: true });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/')
+      ? Promise.resolve(response({ status: 'error', code: 'AMBASSADOR_ELIGIBILITY_UNAVAILABLE' }, 503))
+      : defaultFetch(input, init));
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText('Tus invitados')).toBeInTheDocument();
+    expect(screen.getByText('Patrocinador confirmado')).toBeInTheDocument();
+    expect(screen.queryByText('Has recibido una invitación')).not.toBeInTheDocument();
+    expect(screen.queryByText(/No podemos comprobar ahora si el embajador sigue disponible/)).not.toBeInTheDocument();
+  });
+
+  it('espera el resumen antes de validar una invitación y no consulta un sponsor confirmado', async () => {
+    const summary = deferred<Response>();
+    let invitationCalls = 0;
+    payload = dashboardPayload({ presale: true, confirmed: false, hasConfirmedSponsor: true, canInvite: true });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.endsWith('/summary')) return summary.promise;
+      if (url.includes('/invitations/')) {
+        invitationCalls += 1;
+        return Promise.resolve(response({ status: 'error', code: 'AMBASSADOR_ELIGIBILITY_UNAVAILABLE' }, 503));
+      }
+      return defaultFetch(input, init);
+    });
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(invitationCalls).toBe(0);
+    expect(screen.queryByText(/No podemos comprobar/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      summary.resolve(response(payload));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(await screen.findByText('Tus invitados')).toBeInTheDocument();
+    expect(screen.getByText('Patrocinador confirmado')).toBeInTheDocument();
+    expect(invitationCalls).toBe(0);
+    expect(screen.queryByText('Has recibido una invitación')).not.toBeInTheDocument();
+    expect(screen.queryByText(/No podemos comprobar/)).not.toBeInTheDocument();
+  });
+
+  it('consulta una invitación después del resumen cuando la wallet aún no tiene sponsor', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: false, hasConfirmedSponsor: false, canInvite: false });
+    let invitationCalls = 0;
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => {
+      if (String(input).includes('/invitations/')) {
+        invitationCalls += 1;
+      }
+      return defaultFetch(input, init);
+    });
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText('0x2222…2222')).toBeInTheDocument();
+    expect(invitationCalls).toBe(1);
+  });
+
+  it('no juzga la invitación pendiente cuando falla el resumen de la wallet', async () => {
+    let invitationCalls = 0;
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.endsWith('/summary')) {
+        return Promise.resolve(response({ status: 'error', code: 'AMBASSADOR_SERVICE_UNAVAILABLE' }, 503));
+      }
+      if (url.includes('/invitations/')) {
+        invitationCalls += 1;
+      }
+      return defaultFetch(input, init);
+    });
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText(/No podemos actualizar el programa ahora/)).toBeInTheDocument();
+    expect(invitationCalls).toBe(0);
+    expect(sessionStorage.getItem(pendingInvitationKey)).toBe(invitationCode);
+    expect(screen.queryByText('Has recibido una invitación')).not.toBeInTheDocument();
+    expect(screen.queryByText(/No podemos comprobar/)).not.toBeInTheDocument();
+  });
+
+  it('muestra el nombre público del patrocinador y mantiene la wallet como identidad visible', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: true, ambassadorPublicName: 'TreasurePlayer' });
+
+    render(<AmbassadorProgram />);
+
+    expect(await screen.findByText('TreasurePlayer')).toBeInTheDocument();
+    expect(screen.getByText('0x2222…2222')).toBeInTheDocument();
+  });
+
+  it('muestra el nombre público del enlace pendiente junto a su wallet', async () => {
+    payload = dashboardPayload({ presale: false });
+    const defaultFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => String(input).includes('/invitations/')
+      ? Promise.resolve(response({
+        status: 'ok',
+        invitation: {
+          invitationCode,
+          ambassadorWalletMasked: '0x2222…2222',
+          ambassadorPublicName: 'TreasurePlayer',
+        },
+      }))
+      : defaultFetch(input, init));
+
+    render(<AmbassadorProgram initialInvitationCode={invitationCode} />);
+
+    expect(await screen.findByText('TreasurePlayer')).toBeInTheDocument();
+    expect(screen.getByText('0x2222…2222')).toBeInTheDocument();
+  });
+
+  it('conserva la wallet cuando el patrocinador no tiene nombre público', async () => {
+    payload = dashboardPayload({ presale: false, confirmed: true, ambassadorPublicName: null });
+
+    render(<AmbassadorProgram />);
+
+    expect(await screen.findByText('0x2222…2222')).toBeInTheDocument();
+    expect(screen.queryByText('TreasurePlayer')).not.toBeInTheDocument();
   });
 
   it('si el sponsor se revoca después del reto, rechaza esa firma y pide una nueva firma para Cukies World', async () => {
