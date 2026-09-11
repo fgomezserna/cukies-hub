@@ -19,6 +19,7 @@ import {
 import { stableRewardHash } from '@/lib/uki-economy/rewards/rules';
 
 const WALLET = `0x${'a'.repeat(40)}` as `0x${string}`;
+const SECOND_WALLET = `0x${'b'.repeat(40)}` as `0x${string}`;
 const DISTRIBUTOR = `0x${'9'.repeat(40)}` as `0x${string}`;
 const TX = `0x${'1'.repeat(64)}`;
 const BLOCK = `0x${'2'.repeat(64)}`;
@@ -93,30 +94,37 @@ function fixture() {
   return { batch, proof: draft.proofs[0], publicationEvent };
 }
 
-function accountingFixture() {
-  const allocationCore = {
-    allocationId: 'c'.repeat(64),
-    walletNormalized: WALLET,
-    category: 'credit_pool' as const,
-    amountRaw: '750000000000000000',
-    fundingMode: 'daily_emission' as const,
-    sourceIds: ['game-session:stage-public-reward'],
-  };
+function accountingFixtureForAllocations(
+  allocationCores: Array<{
+    allocationId: string;
+    walletNormalized: string;
+    category: 'credit_pool';
+    amountRaw: string;
+    fundingMode: 'daily_emission';
+    sourceIds: string[];
+  }>,
+) {
+  const emissionRaw = allocationCores
+    .reduce((sum, allocation) => sum + BigInt(allocation.amountRaw), BigInt(0))
+    .toString();
+  const sourceIds = [
+    ...new Set(allocationCores.flatMap((allocation) => allocation.sourceIds)),
+  ];
   const accounting = sealDailyRewardAccounting({
     dayId: '2026-09-07',
     ruleVersion: 'rewards-staging-test-v4',
     ruleConfigHash: 'b'.repeat(64),
-    emissionRaw: allocationCore.amountRaw,
+    emissionRaw,
     buckets: {
       playersRaw: '0',
-      creditPoolRaw: allocationCore.amountRaw,
+      creditPoolRaw: emissionRaw,
       cukiePoolRaw: '0',
       ambassadorOrdinaryRaw: '0',
       weeklyPrizeRaw: '0',
       ambassadorWeeklyRaw: '0',
     },
-    sourceIds: allocationCore.sourceIds,
-    allocations: [allocationCore],
+    sourceIds,
+    allocations: allocationCores,
     destinations: {
       treasury: `0x${'6'.repeat(40)}`,
       marketingDevelopment: `0x${'7'.repeat(40)}`,
@@ -124,26 +132,147 @@ function accountingFixture() {
     },
     sealedAt: new Date('2026-09-08T16:00:00.000Z'),
   });
-  const immutable = {
-    accountingId: accounting._id,
-    accountingKind: 'daily' as const,
-    periodId: accounting.dayId,
-    ...allocationCore,
-    availableAt: accounting.sealedAt,
-    status: 'allocated_offchain' as const,
-    createdAt: accounting.sealedAt,
-  };
-  return {
-    accounting,
-    allocation: {
+  const allocations = allocationCores.map((allocationCore) => {
+    const immutable = {
+      accountingId: accounting._id,
+      accountingKind: 'daily' as const,
+      periodId: accounting.dayId,
+      ...allocationCore,
+      availableAt: accounting.sealedAt,
+      status: 'allocated_offchain' as const,
+      createdAt: accounting.sealedAt,
+    };
+    return {
       _id: immutable.allocationId,
       ...immutable,
       payloadHash: stableRewardHash({
         kind: 'reward-accounting-allocation-document',
         ...immutable,
       }),
-    },
+    };
+  });
+  return {
+    accounting,
+    allocations,
   };
+}
+
+function accountingFixture() {
+  const { accounting, allocations } = accountingFixtureForAllocations([
+    {
+      allocationId: 'c'.repeat(64),
+      walletNormalized: WALLET,
+      category: 'credit_pool',
+      amountRaw: '750000000000000000',
+      fundingMode: 'daily_emission',
+      sourceIds: ['game-session:stage-public-reward'],
+    },
+  ]);
+  return { accounting, allocation: allocations[0] };
+}
+
+function canonicalDbFixture(input: {
+  accounting: ReturnType<typeof accountingFixtureForAllocations>['accounting'];
+  allocations: ReturnType<typeof accountingFixtureForAllocations>['allocations'];
+  claims?: unknown[];
+  batches?: unknown[];
+  proofs?: unknown[];
+  events?: unknown[];
+}) {
+  return {
+    collection: (name: string) => ({
+      find: (query?: Record<string, unknown>) =>
+        cursor(
+          name === 'reward_accounting_allocations'
+            ? input.allocations.filter(
+                (allocation) => allocation.walletNormalized === WALLET,
+              )
+            : name === 'reward_daily_accounting'
+            ? [input.accounting]
+            : name === 'reward_claims'
+            ? input.claims ?? []
+            : name === 'reward_claim_batches'
+            ? input.batches ?? []
+            : name === 'reward_claim_proofs'
+            ? '$or' in (query ?? {})
+              ? input.proofs ?? []
+              : []
+            : name === 'chain_events'
+            ? input.events ?? []
+            : [],
+        ),
+      countDocuments: async () => 0,
+    }),
+  };
+}
+
+function validClaimHistoryFixture(count: number) {
+  const claims: unknown[] = [];
+  const batches: unknown[] = [];
+  const proofs: unknown[] = [];
+  const events: unknown[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const amountRaw = '7500';
+    const draft = materializeRewardMerkleDraft({
+      periodId: `claim-period-${index}`,
+      chainId: 56,
+      distributorAddress: DISTRIBUTOR,
+      metadata: `ipfs://rewards/claim-period-${index}`,
+      sourceAllocationSetHash: 'a'.repeat(64),
+      periodSealId: `seal:claim-period-${index}`,
+      ruleVersion: 'rewards-v1',
+      ruleConfigHash: 'b'.repeat(64),
+      sourceIds: [`game-session:claim-${index}`],
+      claims: [{ walletAddress: WALLET, amountRaw }],
+      createdAt: new Date(`2026-07-10T${String(index % 24).padStart(2, '0')}:00:00.000Z`),
+    });
+    const claimEventId = `BSC:REWARDS_DISTRIBUTOR:RewardClaimed:${index}:0`;
+    const transactionHash = `0x${(index + 3).toString(16).padStart(64, '0')}`;
+    const blockHash = `0x${(index + 1003).toString(16).padStart(64, '0')}`;
+    const batch = {
+      ...draft.batch,
+      status: 'published' as const,
+      previewOnly: false as const,
+      publishAuthorized: true as const,
+    };
+    const claim = {
+      _id: claimEventId,
+      eventId: claimEventId,
+      chain: 'BSC' as const,
+      contractAddress: DISTRIBUTOR,
+      batchId: batch.batchId,
+      walletAddress: WALLET,
+      walletNormalized: WALLET,
+      amountRaw,
+      transactionHash,
+      blockNumber: index + 1,
+      blockHash,
+      logIndex: 0,
+      indexedAt: new Date(`2026-07-11T00:${String(index % 60).padStart(2, '0')}:00.000Z`),
+      createdAt: new Date(`2026-07-11T00:${String(index % 60).padStart(2, '0')}:00.000Z`),
+    };
+    claims.push(claim);
+    batches.push(batch);
+    proofs.push(draft.proofs[0]);
+    events.push({
+      _id: claimEventId,
+      chain: 'BSC',
+      contractAlias: 'REWARDS_DISTRIBUTOR',
+      contractAddress: DISTRIBUTOR,
+      eventName: 'RewardClaimed',
+      status: 'projected',
+      txHash: transactionHash,
+      blockHash,
+      blockNumber: index + 1,
+      logIndex: 0,
+      normalized: {
+        batchId: batch.batchId,
+        accountNormalized: WALLET,
+        amountRaw,
+      },
+    });
+  }
+  return { claims, batches, proofs, events };
 }
 
 function cursor(documents: unknown[]) {
@@ -191,6 +320,90 @@ describe('public reward claimable', () => {
         },
       ],
     });
+  });
+
+  it('acepta un cierre compartido cuando la wallet consulta solo sus allocations', async () => {
+    const { accounting, allocations } = accountingFixtureForAllocations([
+      {
+        allocationId: 'c'.repeat(64),
+        walletNormalized: WALLET,
+        category: 'credit_pool',
+        amountRaw: '750000000000000000',
+        fundingMode: 'daily_emission',
+        sourceIds: ['game-session:stage-public-reward-a'],
+      },
+      {
+        allocationId: 'd'.repeat(64),
+        walletNormalized: SECOND_WALLET,
+        category: 'credit_pool',
+        amountRaw: '250000000000000000',
+        fundingMode: 'daily_emission',
+        sourceIds: ['game-session:stage-public-reward-b'],
+      },
+    ]);
+    (getEconomyDb as jest.Mock).mockResolvedValue(
+      canonicalDbFixture({ accounting, allocations }),
+    );
+
+    const result = await listWalletRewardStatus({ walletAddress: WALLET });
+
+    expect(result).toMatchObject({
+      sourceStatus: 'canonical',
+      totalAllocatedRaw: '750000000000000000',
+      publicationStates: [
+        {
+          allocationId: allocations[0].allocationId,
+          amountRaw: allocations[0].amountRaw,
+          status: 'calculated',
+        },
+      ],
+    });
+  });
+
+  it('falla cerrado si falta la allocation propia sellada aunque el cierre tenga otra wallet', async () => {
+    const { accounting, allocations } = accountingFixtureForAllocations([
+      {
+        allocationId: 'c'.repeat(64),
+        walletNormalized: WALLET,
+        category: 'credit_pool',
+        amountRaw: '500000000000000000',
+        fundingMode: 'daily_emission',
+        sourceIds: ['game-session:stage-public-reward-own-a'],
+      },
+      {
+        allocationId: 'd'.repeat(64),
+        walletNormalized: WALLET,
+        category: 'credit_pool',
+        amountRaw: '250000000000000000',
+        fundingMode: 'daily_emission',
+        sourceIds: ['game-session:stage-public-reward-own-b'],
+      },
+      {
+        allocationId: 'e'.repeat(64),
+        walletNormalized: SECOND_WALLET,
+        category: 'credit_pool',
+        amountRaw: '250000000000000000',
+        fundingMode: 'daily_emission',
+        sourceIds: ['game-session:stage-public-reward-other'],
+      },
+    ]);
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => ({
+        find: () =>
+          cursor(
+            name === 'reward_accounting_allocations'
+              ? [allocations[0]]
+              : name === 'reward_daily_accounting'
+              ? [accounting]
+              : [],
+          ),
+        countDocuments: async () => 0,
+      }),
+    });
+
+    await expect(
+      listWalletRewardStatus({ walletAddress: WALLET }),
+    ).rejects.toThrow(/todas las allocations publicables de la wallet/);
   });
 
   it('distingue un plan preparado de una publicación y no habilita el cobro', async () => {
@@ -295,6 +508,30 @@ describe('public reward claimable', () => {
     await expect(
       listWalletRewardStatus({ walletAddress: WALLET }),
     ).rejects.toThrow(/allocation contable/);
+  });
+
+  it('calcula totales globales con mas de cien claims aunque el historial devuelva solo la pagina reciente', async () => {
+    const { accounting, allocation } = accountingFixture();
+    const history = validClaimHistoryFixture(101);
+    (getEconomyDb as jest.Mock).mockResolvedValue(
+      canonicalDbFixture({
+        accounting,
+        allocations: [allocation],
+        claims: history.claims,
+        batches: history.batches,
+        proofs: history.proofs,
+        events: history.events,
+      }),
+    );
+
+    const result = await listWalletRewardStatus({ walletAddress: WALLET });
+
+    expect(result).toMatchObject({
+      totalClaimedRaw: '757500',
+      claimCount: 101,
+      claims: expect.any(Array),
+    });
+    expect(result.claims).toHaveLength(100);
   });
 
   it('falla cerrado si una allocation publica carece de manifest global exacto', async () => {

@@ -33,6 +33,8 @@ const BYTES32 = /^0x[0-9a-f]{64}$/i;
 const RAW = /^(0|[1-9][0-9]*)$/;
 const MAX_WALLET_PROOFS = 1_000;
 const MAX_WALLET_ACCOUNTING_ALLOCATIONS = 100_000;
+const MAX_WALLET_CLAIMS = 100_000;
+const MAX_WALLET_CLAIM_HISTORY = 100;
 const CLAIMABLE_ACCOUNTING_CATEGORIES = [
   'player',
   'credit_pool',
@@ -563,7 +565,14 @@ export function assertRewardAccountingAllocationBindings(
   allocations: RewardAccountingAllocationDocument[],
   dailyClosures: DailyRewardAccounting[],
   weeklyClosures: WeeklyPrizeAccounting[],
+  walletAddress?: string,
 ) {
+  const walletScope = walletAddress
+    ? validRewardWallet(walletAddress)
+    : new Set(allocations.map((allocation) => allocation.walletNormalized)).size ===
+        1
+    ? allocations[0]?.walletNormalized ?? null
+    : null;
   const closures = new Map<
     string,
     {
@@ -637,16 +646,34 @@ export function assertRewardAccountingAllocationBindings(
     const expected = closure.allocations.filter((candidate) =>
       CLAIMABLE_ACCOUNTING_CATEGORY_SET.has(candidate.category),
     );
+    if (
+      new Set(expected.map((candidate) => candidate.allocationId)).size !==
+      expected.length
+    ) {
+      throw new DomainConflictError(
+        `El cierre ${accountingId} contiene allocations publicables duplicadas.`,
+      );
+    }
     const linked = allocations.filter(
       (allocation) => allocation.accountingId === accountingId,
     );
+    const expectedForWallet = walletScope
+      ? expected.filter((candidate) => candidate.walletNormalized === walletScope)
+      : expected;
     if (
-      expected.length !== linked.length ||
-      new Set(expected.map((candidate) => candidate.allocationId)).size !==
-        expected.length
+      linked.some((allocation) =>
+        walletScope !== null && allocation.walletNormalized !== walletScope,
+      ) ||
+      expectedForWallet.length !== linked.length ||
+      expectedForWallet.some(
+        (candidate) =>
+          !linked.some(
+            (allocation) => allocation.allocationId === candidate.allocationId,
+          ),
+      )
     ) {
       throw new DomainConflictError(
-        `El cierre ${accountingId} no tiene todas sus allocations publicables enlazadas.`,
+        `El cierre ${accountingId} no tiene todas las allocations publicables de la wallet enlazadas.`,
       );
     }
   }
@@ -1134,6 +1161,7 @@ export async function listWalletRewardStatus(input: {
       accountingAllocations,
       dailyClosures,
       weeklyClosures,
+      walletNormalized,
     );
   }
 
@@ -1144,12 +1172,12 @@ export async function listWalletRewardStatus(input: {
         ),
       ]
     : [...new Set(legacyPage.map((allocation) => allocation.sourceId))];
-  const [claims, openIncidents, blockedAllocations] = await Promise.all([
+  const [allClaims, openIncidents, blockedAllocations] = await Promise.all([
     db
       .collection<RewardClaim>('reward_claims')
       .find({ walletNormalized })
       .sort({ indexedAt: -1, _id: -1 })
-      .limit(100)
+      .limit(MAX_WALLET_CLAIMS + 1)
       .toArray(),
     sourceIds.length === 0
       ? Promise.resolve(0)
@@ -1167,6 +1195,15 @@ export async function listWalletRewardStatus(input: {
           status: 'blocked',
         }),
   ]);
+  if (allClaims.length > MAX_WALLET_CLAIMS) {
+    throw new DomainConflictError(
+      'La wallet excede el limite de claims publicos reconciliables.',
+    );
+  }
+  // Keep the response/history bounded while validating and totaling the full
+  // claim set. Totals must not change merely because the UI history page is
+  // limited to the most recent entries.
+  const claims = allClaims.slice(0, MAX_WALLET_CLAIM_HISTORY);
 
   let allocationSummary: WalletAmountSummary | undefined;
   let claimSummary: WalletClaimSummary | undefined;
@@ -1274,7 +1311,7 @@ export async function listWalletRewardStatus(input: {
   const candidateBatchIds = candidateProofs.map((proof) =>
     proof.batchId.toLowerCase(),
   );
-  const claimBatchIds = claims.map((claim) => claim.batchId.toLowerCase());
+  const claimBatchIds = allClaims.map((claim) => claim.batchId.toLowerCase());
   const planBatchIds = planRows
     .map((plan) => plan.batchId)
     .filter((batchId): batchId is `0x${string}` => typeof batchId === 'string')
@@ -1282,7 +1319,7 @@ export async function listWalletRewardStatus(input: {
   const allBatchIds: Array<`0x${string}`> = Array.from(
     new Set([...candidateBatchIds, ...claimBatchIds, ...planBatchIds]),
   ) as Array<`0x${string}`>;
-  const claimIds = claims.map((claim) => claim.eventId);
+  const claimIds = allClaims.map((claim) => claim.eventId);
   const [batches, proofsForClaims, claimEvents] = await Promise.all([
     allBatchIds.length === 0
       ? Promise.resolve([] as RewardClaimBatch[])
@@ -1290,12 +1327,12 @@ export async function listWalletRewardStatus(input: {
           .collection<RewardClaimBatch>('reward_claim_batches')
           .find({ batchId: { $in: allBatchIds } })
           .toArray(),
-    claims.length === 0
+    allClaims.length === 0
       ? Promise.resolve([] as RewardClaimProof[])
       : db
           .collection<RewardClaimProof>('reward_claim_proofs')
           .find({
-            $or: claims.map((claim) => ({
+            $or: allClaims.map((claim) => ({
               batchId: claim.batchId,
               walletNormalized: claim.walletNormalized,
             })),
@@ -1309,7 +1346,7 @@ export async function listWalletRewardStatus(input: {
           .toArray(),
   ]);
   if (
-    claims.some((claim) => typeof claim.batchId !== 'string') ||
+    allClaims.some((claim) => typeof claim.batchId !== 'string') ||
     batches.some((batch) => typeof batch.batchId !== 'string') ||
     [...proofsForClaims, ...candidateProofs].some(
       (proof) =>
@@ -1340,7 +1377,7 @@ export async function listWalletRewardStatus(input: {
   const eventById = new Map(
     claimEvents.map((event) => [String(event._id), event]),
   );
-  for (const claim of claims) {
+  for (const claim of allClaims) {
     assertClaimProjection({
       claim,
       batch: batchById.get(claim.batchId.toLowerCase()),
@@ -1368,7 +1405,7 @@ export async function listWalletRewardStatus(input: {
     publicationEvents.map((event) => [String(event._id), event]),
   );
   const claimByBatch = new Map(
-    claims.map((claim) => [claim.batchId.toLowerCase(), claim]),
+    allClaims.map((claim) => [claim.batchId.toLowerCase(), claim]),
   );
   const publishedRewards = candidateProofs.flatMap((proof) => {
     const key = proof.batchId.toLowerCase();
@@ -1515,7 +1552,7 @@ export async function listWalletRewardStatus(input: {
   let sourceStatus: 'canonical' | 'legacy';
   if (hasCanonicalAccounting) {
     totalAllocatedRaw = canonicalTotalRaw;
-    totalClaimedRaw = claims.reduce(
+    totalClaimedRaw = allClaims.reduce(
       (sum, claim) => sum + BigInt(claim.amountRaw),
       BigInt(0),
     );
@@ -1530,7 +1567,7 @@ export async function listWalletRewardStatus(input: {
     scheduledRaw = sumState(['scheduled']) + extraScheduledRaw;
     expiredRaw = sumState(['expired']) + extraExpiredRaw;
     allocationCount = accountingAllocations.length;
-    claimCount = claims.length;
+    claimCount = allClaims.length;
     calculatedRaw = canonicalTotalRaw;
     sourceStatus = 'canonical';
   } else {
