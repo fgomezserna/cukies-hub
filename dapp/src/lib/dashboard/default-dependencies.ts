@@ -200,8 +200,14 @@ async function loadGame(
       issues: ['COMPETITION_NOT_CONFIGURED'],
     };
   }
+  // A closed campaign is now served through Treasure Hunt's credit mode. The
+  // old staking eligibility is still present in the campaign document for
+  // historical rankings, but it must not leak into the current dashboard as
+  // available attempts.
+  const shouldLoadStakingEligibility = runtime.phase !== 'closed'
+    && runtime.campaign.eligibilityKind === 'uki_staking';
   const [eligibility, leaderboard] = await Promise.all([
-    runtime.campaign.eligibilityKind === 'uki_staking'
+    shouldLoadStakingEligibility
       ? service.getStakingEligibility(walletAddress)
       : Promise.resolve(null),
     service.getLeaderboard(walletAddress, 100),

@@ -109,6 +109,8 @@ export interface TreasureHuntLeaderboardMeta {
   };
 }
 
+export type TreasureHuntParticipantScope = 'competition' | 'weekly';
+
 interface CompetitionLeaderboardResponse extends TreasureHuntLeaderboardMeta {
   readonly success: true;
   readonly campaignId: string;
@@ -302,12 +304,19 @@ async function readJson(response: Response): Promise<unknown> {
 
 const sharedStatusRequests = new Map<string, Promise<TreasureHuntCompetitionStatus>>();
 
-function loadSharedCompetitionStatus(identity: string) {
-  const existing = sharedStatusRequests.get(identity);
+function loadSharedCompetitionStatus(
+  identity: string,
+  participantScope: TreasureHuntParticipantScope,
+) {
+  const requestKey = `${identity}:${participantScope}`;
+  const existing = sharedStatusRequests.get(requestKey);
   if (existing) return existing;
 
   const request = (async () => {
-    const response = await fetch(TREASURE_HUNT_COMPETITION_API, {
+    const statusUrl = participantScope === 'weekly'
+      ? `${TREASURE_HUNT_COMPETITION_API}?scope=weekly`
+      : TREASURE_HUNT_COMPETITION_API;
+    const response = await fetch(statusUrl, {
       cache: 'no-store',
       credentials: 'same-origin',
     });
@@ -318,13 +327,13 @@ function loadSharedCompetitionStatus(identity: string) {
     return body;
   })();
 
-  sharedStatusRequests.set(identity, request);
+  sharedStatusRequests.set(requestKey, request);
   void request.then(
     () => {
-      if (sharedStatusRequests.get(identity) === request) sharedStatusRequests.delete(identity);
+      if (sharedStatusRequests.get(requestKey) === request) sharedStatusRequests.delete(requestKey);
     },
     () => {
-      if (sharedStatusRequests.get(identity) === request) sharedStatusRequests.delete(identity);
+      if (sharedStatusRequests.get(requestKey) === request) sharedStatusRequests.delete(requestKey);
     },
   );
   return request;
@@ -362,6 +371,7 @@ export function useTreasureHuntCompetitionOverview(options?: {
   readonly leaderboardPageSize?: number;
   readonly leaderboardMineOnly?: boolean;
   readonly autoRefreshMs?: number;
+  readonly participantScope?: TreasureHuntParticipantScope;
 }) {
   const { user, isLoading: authLoading } = useAuth();
   const identity = user?.walletAddress?.trim()
@@ -374,6 +384,7 @@ export function useTreasureHuntCompetitionOverview(options?: {
   const leaderboardPageSize = options?.leaderboardPageSize ?? 100;
   const leaderboardMineOnly = options?.leaderboardMineOnly ?? false;
   const autoRefreshMs = options?.autoRefreshMs ?? DEFAULT_AUTO_REFRESH_MS;
+  const participantScope = options?.participantScope ?? 'competition';
   const [status, setStatus] = useState<TreasureHuntCompetitionStatus | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly TreasureHuntLeaderboardEntry[]>([]);
   const [leaderboardMeta, setLeaderboardMeta] = useState<TreasureHuntLeaderboardMeta | null>(null);
@@ -402,6 +413,7 @@ export function useTreasureHuntCompetitionOverview(options?: {
     }
     const queryKey = [
       identity,
+      participantScope,
       includeLeaderboard,
       leaderboardMineOnly,
       leaderboardPage,
@@ -414,7 +426,7 @@ export function useTreasureHuntCompetitionOverview(options?: {
       if (!isBackgroundRefresh) setIsLoading(true);
       setError(null);
       try {
-        const statusBody = await loadSharedCompetitionStatus(identity);
+        const statusBody = await loadSharedCompetitionStatus(identity, participantScope);
         if (controller.signal.aborted) return;
         setStatus(statusBody);
 
@@ -479,6 +491,7 @@ export function useTreasureHuntCompetitionOverview(options?: {
   }, [
     authLoading,
     identity,
+    participantScope,
     includeLeaderboard,
     leaderboardMineOnly,
     leaderboardPage,

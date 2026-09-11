@@ -1,7 +1,11 @@
 import "server-only";
 import { loadEconomyCycleCalendar } from '../cycle-calendar';
 
-import { displayCompetitionAlias, generateCompetitionAlias } from "@/lib/treasure-hunt-competition";
+import {
+  displayCompetitionAlias,
+  generateCompetitionAlias,
+  TREASURE_HUNT_WEEKLY_ALIAS_SCOPE,
+} from "@/lib/treasure-hunt-competition";
 import { getEconomyDb } from "@/lib/indexer-db/mongodb";
 import { formatRawAmount, parseRawAmount } from "@/lib/uki-economy/money";
 import { getIsoWeekPeriodId } from "@/lib/uki-economy/periods";
@@ -28,8 +32,10 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 type ParticipantAlias = {
+  campaignId?: string;
   walletAddress: string;
   alias: string;
+  aliasChangedAt?: string | null;
   updatedAt: string;
 };
 
@@ -143,20 +149,41 @@ function publicAlias(wallet: string, alias?: string) {
   return displayCompetitionAlias(alias ?? generateCompetitionAlias(wallet));
 }
 
+function aliasPriority(participant: ParticipantAlias) {
+  if (participant.campaignId !== TREASURE_HUNT_WEEKLY_ALIAS_SCOPE) return 1;
+  return participant.aliasChangedAt != null ? 2 : 0;
+}
+
 async function aliasesFor(wallets: string[]) {
   if (wallets.length === 0) return new Map<string, string>();
   const db = await getEconomyDb();
   const participants = await db.collection<ParticipantAlias>("presale_game_participants")
     .find({ walletAddress: { $in: wallets } })
     .sort({ updatedAt: -1 })
-    .project<ParticipantAlias>({ _id: 0, walletAddress: 1, alias: 1, updatedAt: 1 })
+    .project<ParticipantAlias>({
+      _id: 0,
+      campaignId: 1,
+      walletAddress: 1,
+      alias: 1,
+      aliasChangedAt: 1,
+      updatedAt: 1,
+    })
     .toArray();
-  const aliases = new Map<string, string>();
+  const aliases = new Map<string, ParticipantAlias>();
   for (const participant of participants) {
     const wallet = participant.walletAddress.toLowerCase();
-    if (!aliases.has(wallet)) aliases.set(wallet, participant.alias);
+    const current = aliases.get(wallet);
+    const priority = aliasPriority(participant);
+    const currentPriority = current ? aliasPriority(current) : -1;
+    if (
+      !current ||
+      priority > currentPriority ||
+      (priority === currentPriority && participant.updatedAt > current.updatedAt)
+    ) {
+      aliases.set(wallet, participant);
+    }
   }
-  return aliases;
+  return new Map([...aliases].map(([wallet, participant]) => [wallet, participant.alias]));
 }
 
 async function latestResultFor(walletNormalized: string, weeklyPeriodId: string) {

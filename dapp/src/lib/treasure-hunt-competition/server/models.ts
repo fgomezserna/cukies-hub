@@ -65,6 +65,10 @@ export interface CompetitionRepository {
     campaignId: string,
     walletAddress: string,
   ): Promise<CompetitionParticipantRecord | null>;
+  findLatestParticipantByWallet(
+    walletAddress: string,
+    excludeCampaignId?: string,
+  ): Promise<CompetitionParticipantRecord | null>;
   updateParticipantAlias(input: {
     campaignId: string;
     walletAddress: string;

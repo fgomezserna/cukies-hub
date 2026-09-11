@@ -15,10 +15,15 @@ export async function GET(request: Request) {
     const service = getCompetitionService();
     const runtime = service.getRuntime();
     const identity = await readCompetitionIdentity();
-    const participant = identity && runtime.campaign
-      ? await service.getParticipant(identity.walletAddress)
+    const weeklyAliasScope = new URL(request.url).searchParams.get('scope') === 'weekly';
+    const participant = identity
+      ? weeklyAliasScope
+        ? await service.getWeeklyParticipant(identity.walletAddress)
+        : runtime.campaign
+          ? await service.getParticipant(identity.walletAddress)
+          : null
       : null;
-    const eligibility = identity && runtime.campaign?.eligibilityKind === 'uki_staking'
+    const eligibility = !weeklyAliasScope && identity && runtime.campaign?.eligibilityKind === 'uki_staking'
       ? await service.getStakingEligibility(identity.walletAddress)
       : null;
 
