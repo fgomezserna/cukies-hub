@@ -22,7 +22,7 @@ import type {
   WeeklyRankingRepository,
   WeeklyRankingTransactionRunner,
 } from "@/lib/uki-economy/ranking/repository";
-import { buildCurrentWeeklyRankingRule } from "@/lib/uki-economy/ranking/rules";
+import { buildCurrentWeeklyRankingRule, buildWeeklyRankingRuleConfigHash } from "@/lib/uki-economy/ranking/rules";
 import {
   assertWeeklyRankingSourceIntegrity,
   WeeklyRankingService,
@@ -217,6 +217,70 @@ function service(repository: MemoryRankingRepository) {
 }
 
 describe("weekly ranking sealed producer", () => {
+  it("espera hasta que termina el primer periodo forward y su retardo de liquidacion", async () => {
+    const calendar: EconomyCycleCalendar = {
+      version: "cycle-v1",
+      chainId: 97,
+      cycleSeconds: 1800,
+      anchorAt: "2026-09-07T11:30:00.000Z",
+    };
+    const activationAt = new Date("2026-09-11T20:30:00.000Z");
+    const oldRule = buildCurrentWeeklyRankingRule({
+      version: "ranking-forward-retired",
+      activeFrom: new Date(calendar.anchorAt),
+      activeUntil: activationAt,
+      calendar,
+      now: new Date(calendar.anchorAt),
+    });
+    const rule = buildCurrentWeeklyRankingRule({
+      version: "ranking-forward-repro",
+      activeFrom: activationAt,
+      calendar,
+      now: activationAt,
+    });
+    const repository = new TransitionRankingRepository([oldRule, rule]);
+    const ranking = service(repository);
+    const firstPeriod = getIsoWeekPeriod(activationAt, calendar);
+    const readyAt = new Date(firstPeriod.endExclusive.getTime() + 150_000);
+
+    await expect(ranking.closeCompletedPeriod({
+      now: new Date("2026-09-11T19:43:00.000Z"),
+      pageSize: 5,
+      forwardActivationAt: activationAt,
+    })).resolves.toEqual({
+      status: "waiting",
+      reason: "FORWARD_PERIOD_NOT_READY",
+      periodId: null,
+      runId: null,
+      manifestId: null,
+      readyAt,
+    });
+
+    for (const now of [
+      new Date("2026-09-11T21:00:00.000Z"),
+      new Date(readyAt.getTime() - 1),
+    ]) {
+      await expect(ranking.closeCompletedPeriod({
+        now,
+        pageSize: 5,
+        forwardActivationAt: activationAt,
+      })).resolves.toEqual({
+        status: "waiting",
+        reason: "FORWARD_PERIOD_NOT_READY",
+        periodId: null,
+        runId: null,
+        manifestId: null,
+        readyAt,
+      });
+    }
+
+    await expect(ranking.closeCompletedPeriod({
+      now: readyAt,
+      pageSize: 5,
+      forwardActivationAt: activationAt,
+    })).resolves.toMatchObject({ periodId: firstPeriod.id, replayed: false, sourceCount: 0 });
+  });
+
   it("salta el backlog de una regla jubilada y abre el primer periodo acelerado completo", async () => {
     const calendar: EconomyCycleCalendar = {
       version: "cycle-v1",
@@ -297,6 +361,43 @@ describe("weekly ranking sealed producer", () => {
       pageSize: 5,
       forwardActivationAt: period.start,
     })).resolves.toMatchObject({ periodId: period.id, replayed: false });
+  });
+
+  it("mantiene el conflicto cuando falta la regla que cubre el primer periodo forward", async () => {
+    const oldRule = buildCurrentWeeklyRankingRule({
+      version: "ranking-forward-missing",
+      activeFrom: new Date("2026-08-24T00:00:00.000Z"),
+      activeUntil: new Date("2026-09-07T00:00:00.000Z"),
+      now: new Date("2026-08-24T00:00:00.000Z"),
+    });
+    const repository = new TransitionRankingRepository([oldRule]);
+    await expect(service(repository).closeCompletedPeriod({
+      now: new Date("2026-09-11T19:43:00.000Z"),
+      pageSize: 5,
+      forwardActivationAt: new Date("2026-09-11T20:30:00.000Z"),
+    })).rejects.toThrow(/No existe regla que cubra todo/);
+  });
+
+  it("mantiene el conflicto si la regla vigente termina dentro del primer periodo forward", async () => {
+    const calendar: EconomyCycleCalendar = {
+      version: "cycle-v1",
+      chainId: 97,
+      cycleSeconds: 1800,
+      anchorAt: "2026-09-07T11:30:00.000Z",
+    };
+    const oldRule = Object.assign(buildCurrentWeeklyRankingRule({
+      version: "ranking-forward-partial",
+      activeFrom: new Date("2026-09-11T17:00:00.000Z"),
+      calendar,
+      now: new Date("2026-09-11T17:00:00.000Z"),
+    }), { activeUntil: new Date("2026-09-11T22:00:00.000Z") });
+    oldRule.configHash = buildWeeklyRankingRuleConfigHash(oldRule);
+    const repository = new TransitionRankingRepository([oldRule]);
+    await expect(service(repository).closeCompletedPeriod({
+      now: new Date("2026-09-11T21:00:00.000Z"),
+      pageSize: 5,
+      forwardActivationAt: new Date("2026-09-11T20:30:00.000Z"),
+    })).rejects.toThrow(/No existe regla que cubra todo/);
   });
 
   it("falla antes de leer el repositorio cuando staging no tiene frontera", async () => {
