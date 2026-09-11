@@ -7,7 +7,12 @@ import type { Db } from "mongodb";
 import { getEconomyDb } from "@/lib/indexer-db/mongodb";
 import { DomainConflictError } from "../errors";
 import { validRewardDate, validRewardText } from "../rewards/rules";
-import { weeklyRankingService } from "./service";
+import {
+  weeklyRankingService,
+  type WeeklyRankingCloseResult,
+  type WeeklyRankingForwardWaitingResult,
+  type WeeklyRankingPeriodClosure,
+} from "./service";
 
 const STATE_COLLECTION = "weekly_ranking_runtime_state";
 const RUNS_COLLECTION = "weekly_ranking_runtime_runs";
@@ -22,21 +27,17 @@ export type WeeklyRankingRuntimeConfig = {
 };
 
 export type WeeklyRankingRuntimeResult = {
-  periodId: string;
-  runId: string;
-  manifestId: string;
+  status: "success" | "waiting";
+  periodId: string | null;
+  runId: string | null;
+  manifestId: string | null;
   sourceCount: number;
   participantCount: number;
   replayed: boolean;
   periodsProcessed: number;
-  closures: Array<{
-    periodId: string;
-    runId: string;
-    manifestId: string;
-    sourceCount: number;
-    participantCount: number;
-    replayed: boolean;
-  }>;
+  closures: WeeklyRankingPeriodClosure[];
+  reason?: WeeklyRankingForwardWaitingResult["reason"];
+  readyAt?: string;
   completedAt: string;
 };
 
@@ -76,14 +77,7 @@ export interface WeeklyRankingRuntimeCoordinator {
 }
 
 export interface WeeklyRankingRuntimeService {
-  closeCompletedPeriod(input: { now: Date; pageSize: number }): Promise<{
-    periodId: string;
-    runId: string;
-    manifestId: string;
-    sourceCount: number;
-    participantCount: number;
-    replayed: boolean;
-  }>;
+  closeCompletedPeriod(input: { now: Date; pageSize: number }): Promise<WeeklyRankingCloseResult>;
 }
 
 export class WeeklyRankingRuntimeBusyError extends Error {
@@ -221,6 +215,10 @@ function errorCode(error: unknown) {
   return "TICK_FAILED";
 }
 
+function isWaitingResult(result: WeeklyRankingCloseResult): result is WeeklyRankingForwardWaitingResult {
+  return "status" in result && result.status === "waiting";
+}
+
 export async function runWeeklyRankingRuntimeTick(input: {
   workerId: string;
   config?: WeeklyRankingRuntimeConfig;
@@ -240,19 +238,39 @@ export async function runWeeklyRankingRuntimeTick(input: {
   const runtimeRunId = await coordinator.startRun(workerId, lease, now);
   try {
     const closures: WeeklyRankingRuntimeResult["closures"] = [];
+    let waiting: WeeklyRankingForwardWaitingResult | null = null;
     for (let index = 0; index < config.catchUpLimit; index += 1) {
       const closed = await service.closeCompletedPeriod({ now, pageSize: config.pageSize });
+      if (isWaitingResult(closed)) {
+        waiting = closed;
+        break;
+      }
       closures.push(closed);
       if (closed.replayed) break;
     }
-    const closed = closures[closures.length - 1]!;
     const completedAt = validRewardDate(clock(), "clock");
-    const result: WeeklyRankingRuntimeResult = {
-      ...closed,
-      periodsProcessed: closures.length,
-      closures,
-      completedAt: completedAt.toISOString(),
-    };
+    const result: WeeklyRankingRuntimeResult = waiting && closures.length === 0
+      ? {
+        status: "waiting",
+        periodId: null,
+        runId: null,
+        manifestId: null,
+        sourceCount: 0,
+        participantCount: 0,
+        replayed: false,
+        periodsProcessed: 0,
+        closures: [],
+        reason: waiting.reason,
+        readyAt: waiting.readyAt.toISOString(),
+        completedAt: completedAt.toISOString(),
+      }
+      : {
+        status: "success",
+        ...closures[closures.length - 1]!,
+        periodsProcessed: closures.length,
+        closures,
+        completedAt: completedAt.toISOString(),
+      };
     await coordinator.finishRun(runtimeRunId, lease, completedAt, result);
     return result;
   } catch (error) {

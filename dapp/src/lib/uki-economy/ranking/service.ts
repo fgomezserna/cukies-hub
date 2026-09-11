@@ -50,6 +50,32 @@ import {
 const MAX_PAGE_SIZE = 1_000;
 const WRITE_BATCH_SIZE = 500;
 
+export type WeeklyRankingPeriodClosure = {
+  periodId: string;
+  runId: string;
+  manifestId: string;
+  sourceCount: number;
+  participantCount: number;
+  replayed: boolean;
+};
+
+export type WeeklyRankingForwardWaitingResult = {
+  status: "waiting";
+  reason: "FORWARD_PERIOD_NOT_READY";
+  periodId: null;
+  runId: null;
+  manifestId: null;
+  readyAt: Date;
+};
+
+export type WeeklyRankingCloseResult = WeeklyRankingPeriodClosure | WeeklyRankingForwardWaitingResult;
+
+function isForwardWaitingResult(
+  result: UtcPeriod | WeeklyRankingForwardWaitingResult,
+): result is WeeklyRankingForwardWaitingResult {
+  return "status" in result && result.status === "waiting";
+}
+
 function pageSize(value: number) {
   if (!Number.isSafeInteger(value) || value < 1 || value > MAX_PAGE_SIZE) {
     throw new DomainValidationError(`pageSize debe estar entre 1 y ${MAX_PAGE_SIZE}.`);
@@ -524,12 +550,12 @@ export class WeeklyRankingService {
     }
   }
 
-  async closeCompletedPeriod(input: { now: Date; pageSize?: number; forwardActivationAt?: Date }) {
+  async closeCompletedPeriod(input: { now: Date; pageSize?: number; forwardActivationAt?: Date }): Promise<WeeklyRankingCloseResult> {
     const now = validRewardDate(input.now, "now");
     const forwardActivationAt = input.forwardActivationAt === undefined
       ? resolveTreasureHuntForwardActivationAt()
       : validRewardDate(input.forwardActivationAt, "forwardActivationAt");
-    const period = await this.runTransaction(async (repository) => {
+    const period = await this.runTransaction<UtcPeriod | WeeklyRankingForwardWaitingResult>(async (repository) => {
       const firstRule = await repository.findFirstRuleBefore(now);
       if (!firstRule) {
         throw new DomainConflictError("No hay una regla de ranking activa antes del cierre actual.");
@@ -558,6 +584,33 @@ export class WeeklyRankingService {
       const firstEligibleStart = forwardActivationAt
         ? firstTreasureHuntFullPeriodStartAtOrAfter(forwardActivationAt, "weekly", calendar)
         : null;
+      const firstEligiblePeriod = firstEligibleStart
+        ? getIsoWeekPeriod(firstEligibleStart, calendar)
+        : null;
+      if (firstEligiblePeriod) {
+        const firstEligibleRule = await repository.findRuleCovering(
+          firstEligiblePeriod.start,
+          firstEligiblePeriod.endExclusive,
+        );
+        if (!firstEligibleRule) {
+          throw new DomainConflictError(`No existe regla que cubra todo ${firstEligiblePeriod.id}.`);
+        }
+        assertWeeklyRankingRule(firstEligibleRule, firstEligiblePeriod.start);
+        const readyAt = new Date(
+          firstEligiblePeriod.endExclusive.getTime()
+          + (calendar ? economyCycleDelayMs(2, calendar) : 14 * 60 * 60_000),
+        );
+        if (readyAt.getTime() > now.getTime()) {
+          return {
+            status: "waiting",
+            reason: "FORWARD_PERIOD_NOT_READY",
+            periodId: null,
+            runId: null,
+            manifestId: null,
+            readyAt,
+          } satisfies WeeklyRankingForwardWaitingResult;
+        }
+      }
       let cursor = firstEligibleStart
         ? getIsoWeekPeriod(firstEligibleStart, calendar)
         : getIsoWeekPeriod(firstRule.activeFrom, calendar);
@@ -578,6 +631,7 @@ export class WeeklyRankingService {
       // cualquier settlement tardio que intentase alterar un manifest sellado.
       return latestCovered;
     });
+    if (isForwardWaitingResult(period)) return period;
     return this.closePeriod({ period, now, pageSize: input.pageSize ?? 500 });
   }
 
