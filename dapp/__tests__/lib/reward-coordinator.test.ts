@@ -8,12 +8,37 @@ import {
   RewardCalculationCoordinator,
   type loadSettlementRewardSnapshot,
 } from "@/lib/uki-economy/rewards/coordinator";
+import { rewardLateSettlementRecoveryPlanHash } from "@/lib/uki-economy/rewards/emission-budget";
 import { testRewardRule } from "@/lib/uki-economy/rewards/testing";
 import type { RewardAllocationService } from "@/lib/uki-economy/rewards/service";
 import { stableGameEconomyHash } from "@/lib/uki-economy/game-economy/rules";
 import type { GameEconomySession } from "@/lib/uki-economy/game-economy/types";
 import type { CreditReservation } from "@/lib/uki-economy/credits/types";
 import type { CukiePoolAssignment } from "@/lib/uki-economy/cukie-pool/types";
+
+function recoveryPlan(rule: ReturnType<typeof testRewardRule>, sourceId: string, periodId: string) {
+  const unsigned = {
+    planVersion: "reward-late-settlement-v1" as const,
+    recoveryCaseId: "recovery-case-418",
+    approvalId: "approval-418",
+    approvedAt: new Date("2026-07-10T11:00:00.000Z"),
+    approvedBy: "operator-rewards",
+    databaseName: "cukieshub-new-staging",
+    chainId: 97,
+    cycleSeconds: 1800,
+    sourceIds: [sourceId],
+    periodIds: [periodId],
+    sourceTotalRawById: { [sourceId]: "10000" },
+    expectedRuleVersion: rule.version,
+    expectedRuleConfigHash: rule.configHash,
+    dailyCapRaw: rule.emissionBudget.dailyCapRaw,
+    lifetimeCapRaw: rule.emissionBudget.lifetimeCapRaw,
+    sourceSetHashById: { [sourceId]: "c".repeat(64) },
+    calculationInputHashById: { [sourceId]: "d".repeat(64) },
+    calculationOutputHashById: { [sourceId]: "e".repeat(64) },
+  };
+  return { ...unsigned, planHash: rewardLateSettlementRecoveryPlanHash(unsigned) };
+}
 
 const NOW = new Date("2026-07-10T12:00:00.000Z");
 const PLAYER = `0x${"a".repeat(40)}`;
@@ -311,5 +336,82 @@ describe("RewardCalculationCoordinator", () => {
         { category: "undistributed_pending", amountRaw: "7500" },
       ],
     }));
+  });
+
+  it("resuelve la aprobacion fuera del payload y enlaza el plan al persist", async () => {
+    const persistAllocationSet = jest.fn().mockResolvedValue({
+      status: "allocated",
+      replayed: false,
+      allocations: [],
+      accruals: [],
+      sourceSetHash: "f".repeat(64),
+    });
+    const rule = testRewardRule();
+    const sourceId = "game-session:session:recovery";
+    const loadSnapshot = jest.fn().mockResolvedValue({
+      game: {
+        sessionId: "session:recovery",
+        walletNormalized: PLAYER,
+        rule: {
+          reward: {
+            rewardRuleVersion: rule.version,
+            rewardRuleConfigHash: rule.configHash,
+            maxConvertibleRaw: "7500",
+          },
+        },
+        validation: { weightRaw: "7500", resultHash: "1".repeat(64) },
+      },
+      rule,
+      credit: { reservationId: "credit:recovery", payloadHash: "2".repeat(64), bucket: "own" },
+      assignment: null,
+      ownAssignment: { assignmentId: "own:recovery", requestHash: "3".repeat(64) },
+      arenaRanking: { sourceRankingId: null, evidenceHash: "4".repeat(64), rank: null, rewardBps: 10_000 },
+      periodId: "2026-W28",
+      sourceId,
+      creditSource: "own",
+      cukieSource: "own",
+      rewardEffectiveAt: new Date("2026-07-10T12:00:00.000Z"),
+    }) as unknown as typeof loadSettlementRewardSnapshot;
+    const plan = recoveryPlan(rule, sourceId, "2026-W28");
+    const coordinator = new RewardCalculationCoordinator(
+      { persistAllocationSet } as unknown as RewardAllocationService,
+      loadSnapshot,
+      () => plan,
+    );
+
+    await coordinator.recoverLateSettlement({
+      sessionId: "session:recovery",
+      periodId: "2026-W28",
+      expectedRuleVersion: rule.version,
+      recoveryCaseId: plan.recoveryCaseId,
+      approvalId: plan.approvalId,
+      planHash: plan.planHash,
+      now: new Date("2026-07-11T00:00:00.000Z"),
+    });
+
+    expect(persistAllocationSet).toHaveBeenCalledWith(expect.objectContaining({
+      recoveryPlan: plan,
+      sourceId,
+    }));
+  });
+
+  it("falla cerrado cuando no existe un plan aprobado fuera del payload", async () => {
+    const loadSnapshot = jest.fn();
+    const coordinator = new RewardCalculationCoordinator(
+      {} as RewardAllocationService,
+      loadSnapshot as unknown as typeof loadSettlementRewardSnapshot,
+      () => null,
+    );
+
+    await expect(coordinator.recoverLateSettlement({
+      sessionId: "session:recovery",
+      periodId: "2026-W28",
+      expectedRuleVersion: "rewards-v1",
+      recoveryCaseId: "recovery-case-418",
+      approvalId: "approval-418",
+      planHash: "a".repeat(64),
+      now: NOW,
+    })).rejects.toThrow(/No existe un plan inmutable/);
+    expect(loadSnapshot).not.toHaveBeenCalled();
   });
 });

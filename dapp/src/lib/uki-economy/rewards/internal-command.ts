@@ -6,11 +6,18 @@ import type {
   PersistRewardRuleInput,
   SealRewardPeriodInput,
 } from "./types";
-import type { SettleGameRewardsInput } from "./coordinator";
+import type {
+  RecoverLateSettlementInput,
+  SettleGameRewardsInput,
+} from "./coordinator";
 
 export type RewardInternalCommand =
   | { command: "persist_rule"; payload: Omit<PersistRewardRuleInput, "now"> }
   | { command: "settle_game"; payload: Omit<SettleGameRewardsInput, "now"> }
+  | {
+      command: "recover_late_settlement";
+      payload: Omit<RecoverLateSettlementInput, "now">;
+    }
   | { command: "seal_period"; payload: Omit<SealRewardPeriodInput, "now"> }
   | { command: "create_draft"; payload: Omit<DraftRewardClaimBatchInput, "now"> };
 
@@ -174,6 +181,27 @@ function parseSettlement(value: unknown): Omit<SettleGameRewardsInput, "now"> {
   };
 }
 
+function parseLateSettlementRecovery(
+  value: unknown,
+): Omit<RecoverLateSettlementInput, "now"> {
+  const item = exactKeys(record(value, "payload"), [
+    "sessionId",
+    "periodId",
+    "expectedRuleVersion",
+    "recoveryCaseId",
+    "approvalId",
+    "planHash",
+  ], "payload");
+  return {
+    sessionId: item.sessionId as string,
+    periodId: item.periodId as string,
+    expectedRuleVersion: item.expectedRuleVersion as string,
+    recoveryCaseId: item.recoveryCaseId as string,
+    approvalId: item.approvalId as string,
+    planHash: item.planHash as string,
+  };
+}
+
 function parseSeal(value: unknown): Omit<SealRewardPeriodInput, "now"> {
   const item = exactKeys(record(value, "payload"), [
     "periodId",
@@ -222,6 +250,12 @@ export function parseRewardInternalCommand(rawBody: Buffer): RewardInternalComma
   }
   if (envelope.command === "settle_game") {
     return { command: "settle_game", payload: parseSettlement(envelope.payload) };
+  }
+  if (envelope.command === "recover_late_settlement") {
+    return {
+      command: "recover_late_settlement",
+      payload: parseLateSettlementRecovery(envelope.payload),
+    };
   }
   if (envelope.command === "seal_period") {
     return { command: "seal_period", payload: parseSeal(envelope.payload) };

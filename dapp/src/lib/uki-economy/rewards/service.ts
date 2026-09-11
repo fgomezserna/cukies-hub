@@ -679,6 +679,7 @@ export class RewardAllocationService {
         calculationOutputHash: expected.manifest.calculationOutputHash,
         ruleEffectiveAt,
         now,
+        ...(input.recoveryPlan ? { recoveryPlan: input.recoveryPlan } : {}),
       });
       if (budget.event.status === "blocked") {
         if (

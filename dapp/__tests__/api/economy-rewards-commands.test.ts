@@ -21,7 +21,7 @@ jest.mock("@/lib/uki-economy/internal-auth", () => {
 
 jest.mock("@/lib/uki-economy/rewards", () => ({
   rewardRuleService: { persistRule: jest.fn() },
-  rewardCalculationCoordinator: { settleGame: jest.fn() },
+  rewardCalculationCoordinator: { settleGame: jest.fn(), recoverLateSettlement: jest.fn() },
   rewardPeriodSealService: { sealPeriod: jest.fn() },
   rewardClaimBatchService: { createDraft: jest.fn() },
 }));
@@ -64,6 +64,21 @@ function draftBody(extra: Record<string, unknown> = {}) {
       chainId: 56,
       distributorAddress: `0x${"9".repeat(40)}`,
       metadata: "ipfs://preview",
+      ...extra,
+    },
+  }));
+}
+
+function recoveryBody(extra: Record<string, unknown> = {}) {
+  return Buffer.from(JSON.stringify({
+    command: "recover_late_settlement",
+    payload: {
+      sessionId: "game-session:late-1",
+      periodId: "C1800-W:2026-09-08T12:00:00.000Z",
+      expectedRuleVersion: "rewards-staging-cycle-v1",
+      recoveryCaseId: "recovery-case-418",
+      approvalId: "approval-418",
+      planHash: "a".repeat(64),
       ...extra,
     },
   }));
@@ -116,5 +131,25 @@ describe("POST /api/economy/v1/internal/rewards/commands", () => {
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ status: "error", code: "REPLAYED_REQUEST" });
     expect(rewardClaimBatchService.createDraft).not.toHaveBeenCalled();
+  });
+
+  it("envia recover_late_settlement al coordinador sin convertir el payload en autorizacion", async () => {
+    (readLimitedInternalEconomyRequestBody as jest.Mock).mockResolvedValue(recoveryBody());
+    (rewardCalculationCoordinator.recoverLateSettlement as jest.Mock).mockResolvedValue({
+      status: "allocated",
+      replayed: false,
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(rewardCalculationCoordinator.recoverLateSettlement).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: "game-session:late-1",
+      recoveryCaseId: "recovery-case-418",
+      approvalId: "approval-418",
+      planHash: "a".repeat(64),
+      now: expect.any(Date),
+    }));
+    expect(rewardCalculationCoordinator.settleGame).not.toHaveBeenCalled();
   });
 });

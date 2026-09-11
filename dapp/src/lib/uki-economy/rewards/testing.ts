@@ -7,6 +7,7 @@ import type {
   RewardEmissionBudgetDay,
   RewardEmissionBudgetEvent,
   RewardEmissionBudgetState,
+  RewardEconomyRuntimeContext,
   RewardIntegrityIncident,
   RewardPeriodSeal,
   RewardPeriodState,
@@ -128,8 +129,24 @@ type MemoryState = {
 
 export class MemoryRewardRepository implements RewardRepository {
   state: MemoryState;
+  runtime: RewardEconomyRuntimeContext;
 
-  constructor(rule: RewardRule | null = testRewardRule()) {
+  constructor(
+    rule: RewardRule | null = testRewardRule(),
+    runtime: Partial<RewardEconomyRuntimeContext> = {},
+  ) {
+    this.runtime = {
+      databaseName: "cukieshub-new-staging",
+      chainId: 97,
+      cycleSeconds: 1800,
+      calendar: {
+        version: "cycle-v1",
+        chainId: 97,
+        cycleSeconds: 1800,
+        anchorAt: "2026-07-01T00:00:00.000Z",
+      },
+      ...runtime,
+    };
     this.state = {
       rules: rule ? [clone(rule)] : [],
       allocations: [],
@@ -155,6 +172,10 @@ export class MemoryRewardRepository implements RewardRepository {
 
   restore(state: MemoryState) {
     this.state = clone(state);
+  }
+
+  getRewardEconomyRuntimeContext() {
+    return clone(this.runtime);
   }
 
   async findRuleAt(at: Date, expectedVersion: string) {
