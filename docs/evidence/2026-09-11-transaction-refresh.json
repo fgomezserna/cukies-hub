@@ -1,6 +1,6 @@
 {
-  "status": "third-delivery-published-legacy-followup-under-test",
-  "recordedAt": "2026-09-11T00:03:05.483834+00:00",
+  "status": "transaction-refresh-scope-published-and-verified",
+  "recordedAt": "2026-09-11T01:02:01.334856+00:00",
   "scope": "Automatic UI convergence after confirmed transactions; staging only",
   "baseCommit": "151c33bf02533963973358a2eb486cc9dc5b6087",
   "servedBaseline": "6f755b86a207750fd28cb6be558ce8c8cefa098f",
@@ -148,7 +148,7 @@
     "masterAndRuntime": "PR404 published and read-only browser verified; deferred reconciliation covered by component tests",
     "marketplaceAndClaims": "Marketplace and rewards PR405 published/verified; Vesting PR406 published/verified, including released-amount proof and operation-generation CAS.",
     "poolRecovery": "PR405 published/verified; receipt and epoch reconciliation, automatic retry, per-NFT pending locks",
-    "bridgeBreeding": "Receipt and refresh correction in progress; existing runtime write gates remain unchanged",
+    "bridgeBreeding": "PR407 published: source receipt and projection tracked separately, per-operation context fences, bounded automatic refresh and read-only rechecks; existing write gates unchanged.",
     "myCukies": "PR406 published and authenticated navigation verified: 12 cards retained during manual refresh; per-asset convergence, concurrent sales and wallet switch covered by tests."
   },
   "validation": {
@@ -171,7 +171,7 @@
       "build": "passed",
       "isolatedWorktree": true
     },
-    "public": "PR404 public health SHA d465f95271ced5faa0740dae112f6c9bc7a2f85a, ready200, authenticated Master #98000002 action verified",
+    "public": "Final PR407 public health SHA e82b2b83e6ce7f146609f80885780952e365e726, ready200; authenticated read-only Bridge/Breeding navigation verified. Master, Pool, collection, marketplace and claims browser evidence remains in the preceding deliveries.",
     "secondFocal": {
       "poolRecovery": {
         "suites": 5,
@@ -204,7 +204,7 @@
       "tests": 3,
       "result": "passed",
       "lint": "passed without warnings",
-      "typecheck": "final isolated candidate check pending; shared in-progress Bridge file prevented global tsc",
+      "typecheck": "Passed on final isolated candidates in thirdFull and fourthFull; the earlier shared-worktree typecheck limitation is superseded.",
       "sha": "10acf4f",
       "review": "Confirmed released amount, independent account reads, and operation-generation CAS across wallet changes"
     },
@@ -222,6 +222,36 @@
       "typecheck": "passed",
       "build": "passed",
       "isolatedWorktree": true
+    },
+    "fourthFull": {
+      "sha": "fc9a6af7bf8b4a6649f8e3b8ab01140c360141b1",
+      "suites": 266,
+      "tests": 2210,
+      "test": "passed",
+      "lint": "passed without warnings",
+      "typecheck": "passed",
+      "build": "passed",
+      "isolatedWorktree": true
+    },
+    "legacyFocal": {
+      "components": {
+        "suites": 6,
+        "tests": 24,
+        "result": "passed"
+      },
+      "tronReceiptHelper": {
+        "suites": 1,
+        "tests": 8,
+        "result": "passed"
+      },
+      "regressions": [
+        "Broadcast txid is not confirmed without a successful receipt",
+        "A secondary EVM wallet change preserves the TRON operation",
+        "Source bridge receipt is distinct from destination delivery",
+        "Exhausted refresh can be checked again without another broadcast",
+        "Late wallet-A results do not alter or unlock wallet-B operations",
+        "Previous child with the same parents is not proof of a new opening"
+      ]
     }
   },
   "transactionsSignedByAgent": false,
@@ -267,9 +297,11 @@
     }
   },
   "followupScope": {
-    "branch": "codex/tx-confirmation-legacy-20260911",
-    "collectionVesting": "PR406 published and verified",
-    "collectionLegacy": "Final delivery in regression testing: Bridge source/transit, Breeding receipt/projection and strict TRON confirmation. Runtime gates unchanged."
+    "transactionRefreshDelivery": "Completed through PR404, PR405, PR406 and PR407; no implementation PR from this incident remains waiting for integration.",
+    "legacyRuntime": "Write gates and contracts unchanged. This is a refresh correction, not an activation or certification of all Legacy operations.",
+    "manualSignatureValidation": "No real wallet transaction signed by the agent. Delayed confirmations, context changes and projection convergence verified with regression tests; served UI checked read-only.",
+    "cycles": "The cancelled 30-to-15-minute change remains cancelled.",
+    "completedBreedsIdentity": "The completed Legacy breeds API returns an explicit unknown identity status with no items for the current wallet. This was observed on public read-only QA and remains unverified; no API/identity changes were included in the transaction-refresh delivery."
   },
   "secondDelivery": {
     "pr": "https://github.com/fgomezserna/cukies-hub/pull/405",
@@ -385,6 +417,81 @@
       "vesting": "No allocation for current wallet; disabled claim and explicit empty state, no pending operation",
       "method": "authenticated read-only navigation",
       "limit": "No real wallet signature; delayed transaction behavior verified by regression tests"
+    }
+  },
+  "fourthDelivery": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/407",
+    "sourceSha": "fc9a6af7bf8b4a6649f8e3b8ab01140c360141b1",
+    "mergeSha": "e82b2b83e6ce7f146609f80885780952e365e726",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34548404036",
+    "status": "published-and-verified",
+    "scope": [
+      "Legacy Bridge refresh",
+      "Legacy Breeding refresh",
+      "Strict TRON receipt confirmation in marketplace"
+    ],
+    "build": [
+      "dapp"
+    ],
+    "reuse": [
+      "chain-indexer",
+      "cuki-card-worker",
+      "schedulers",
+      "cukies-bridge-relayer",
+      "treasure-hunt",
+      "world-api",
+      "world-matchmaking"
+    ],
+    "postflight": {
+      "observedAt": "2026-09-11T01:02:01.334856+00:00",
+      "health": {
+        "status": "ok",
+        "app": "cukies-hub",
+        "environment": "staging",
+        "gitSha": "e82b2b83e6ce7f146609f80885780952e365e726",
+        "gitRef": "staging",
+        "buildTime": null,
+        "coolify": {
+          "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+          "fqdn": null
+        }
+      },
+      "readyHttpStatus": 200,
+      "journal": "clean",
+      "workerCount": 10,
+      "workersRunningNoRestarts": true,
+      "protected": {
+        "total": 25,
+        "preserved": 25,
+        "changed": []
+      },
+      "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a"
+    },
+    "imageDigestsMatchManifest": true,
+    "browser": {
+      "observedAt": "2026-09-11T01:04:37.087387+00:00",
+      "observedPublicSha": "e82b2b83e6ce7f146609f80885780952e365e726",
+      "method": "Authenticated read-only browser navigation plus public read-only API response",
+      "routes": [
+        "/bridge",
+        "/breeding"
+      ],
+      "bridge": "Preparar and Seguimiento render; no source NFTs or active transfers for current wallets; existing write gate remains closed.",
+      "breeding": "BSC contract reads verified; start candidates and active breeds show no eligible entries for current wallet. Existing write gate remains closed.",
+      "completedBreeds": {
+        "ui": "Identity cannot be verified; same result after manual read-only refresh",
+        "api": "/api/cukies/breeding/completed?limit=24&offset=0&network=BSC&wallet=0x26789b9743d187174c3e3a87729730824a4d0c13",
+        "response": {
+          "source": "mongo",
+          "items": [],
+          "total": 0,
+          "status": "unknown",
+          "error": "No se pudo verificar la identidad Legacy de los resultados."
+        },
+        "scope": "The existing completed-breeds identity read remains unverified; no certification of complete Legacy functionality. Its API and identity rules were not changed in this delivery."
+      },
+      "transactionsSigned": false,
+      "limit": "Receipt delays, wallet races and automatic projection convergence were verified by deterministic component tests, not new live wallet transactions."
     }
   }
 }
