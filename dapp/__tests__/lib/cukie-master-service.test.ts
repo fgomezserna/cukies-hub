@@ -382,10 +382,28 @@ describe('Cukie Master canonical sources', () => {
       $or: expect.arrayContaining([
         expect.objectContaining({
           contractAlias: 'CUKIE_MASTER_NFT_VAULT',
-          'normalized.beneficiaryNormalized': '0xabc',
+          $or: expect.arrayContaining([
+            { 'normalized.beneficiaryNormalized': '0xabc' },
+            { 'normalized.beneficiaryNormalized': { $exists: false } },
+            { 'normalized.beneficiaryNormalized': null },
+          ]),
         }),
       ]),
     }));
+  });
+
+  it('mantiene bloqueante un evento vault custodial sin beneficiario decodificado', () => {
+    const filter = pendingNftEventFilter({
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+      mode: 'custodial',
+      walletNormalized: '0xabc',
+    });
+    const vaultBranch = ((filter as Record<string, unknown>).$or as Array<Record<string, unknown>>)
+      .find((item) => item.contractAlias === 'CUKIE_MASTER_NFT_VAULT');
+    expect(vaultBranch?.$or).toEqual(expect.arrayContaining([
+      { 'normalized.beneficiaryNormalized': { $exists: false } },
+      { 'normalized.beneficiaryNormalized': null },
+    ]));
   });
 
   it('rejects a corrupt vesting aggregate even when lastEventId still matches', () => {

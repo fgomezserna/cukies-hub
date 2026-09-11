@@ -472,7 +472,13 @@ export function pendingNftEventFilter(input: {
         },
         {
           contractAlias: 'CUKIE_MASTER_NFT_VAULT',
-          'normalized.beneficiaryNormalized': wallet,
+          $or: [
+            { 'normalized.beneficiaryNormalized': wallet },
+            // A pending vault event without a decoded beneficiary cannot be
+            // proven unrelated to this wallet, so keep it blocking.
+            { 'normalized.beneficiaryNormalized': { $exists: false } },
+            { 'normalized.beneficiaryNormalized': null },
+          ],
         },
       ],
     };
@@ -1135,7 +1141,15 @@ export function createMongoCukieMasterRepository(
             status: { $in: [...PENDING_CHAIN_EVENT_STATUSES] },
             contractAlias: 'CUKIE_MASTER_NFT_VAULT',
             ...(walletNormalized
-              ? { 'normalized.beneficiaryNormalized': walletNormalized }
+              ? {
+                  $or: [
+                    { 'normalized.beneficiaryNormalized': walletNormalized },
+                    // An event without a decoded beneficiary cannot be
+                    // proven unrelated to this wallet, so keep it blocking.
+                    { 'normalized.beneficiaryNormalized': { $exists: false } },
+                    { 'normalized.beneficiaryNormalized': null },
+                  ],
+                }
               : {}),
           }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 })
         : pendingEvent;

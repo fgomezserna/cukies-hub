@@ -9,6 +9,7 @@ import {
 } from "@/lib/uki-economy/credits/rules";
 import {
   buildCreditSourceHealthEvidenceHash,
+  classifyCreditSourceHealth,
   creditSourceCursorIsHealthy,
 } from "@/lib/uki-economy/credits/source-health";
 import { testCompetitionCreditRule } from "@/lib/uki-economy/credits/testing";
@@ -172,6 +173,120 @@ describe("competition credit rules", () => {
         warnings: [...base.warnings].reverse(),
       })
     );
+  });
+
+  it.each([
+    {
+      name: 'clean custodial source',
+      nftMode: 'custodial' as const,
+      warnings: [],
+      deadLetters: 0,
+      pendingEvents: 0,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: true,
+      blockingWarnings: [],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'TOKEN_V2 ancillary alarms only',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN', 'CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 3,
+      pendingEvents: 3,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: true,
+      blockingWarnings: [],
+      ancillaryWarnings: ['CHAIN_DEAD_LETTERS_OPEN', 'CHAIN_EVENTS_NOT_PROJECTED'],
+    },
+    {
+      name: 'vault dead letter',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      deadLetters: 1,
+      pendingEvents: 0,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'vault pending event',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 0,
+      pendingEvents: 1,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 1,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'incident or invalid cursor',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_INTEGRITY_INCIDENT_OPEN', 'CURSOR_UNHEALTHY:TOKEN_V2:Transfer'],
+      deadLetters: 0,
+      pendingEvents: 0,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_INTEGRITY_INCIDENT_OPEN', 'CURSOR_UNHEALTHY:TOKEN_V2:Transfer'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'ancillary alarm plus vault blocker',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN', 'CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 4,
+      pendingEvents: 2,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 2,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+    },
+    {
+      name: 'legacy mode never suppresses TOKEN_V2',
+      nftMode: 'legacy' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      deadLetters: 3,
+      pendingEvents: 0,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'invalid mode never suppresses TOKEN_V2',
+      nftMode: 'invalid' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 0,
+      pendingEvents: 3,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+  ])('classifies $name from alias-specific evidence', (scenario) => {
+    const {
+      name: _name,
+      healthy,
+      blockingWarnings,
+      ancillaryWarnings,
+      ...input
+    } = scenario;
+    const result = classifyCreditSourceHealth({
+      route: 'nft',
+      ...input,
+    });
+    expect(result.healthy).toBe(healthy);
+    expect(result.blockingWarnings).toEqual(blockingWarnings);
+    expect(result.ancillaryWarnings).toEqual(ancillaryWarnings);
   });
 
   it("accepts a cursor at or ahead of the completed UKI watermark, never behind it", () => {

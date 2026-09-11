@@ -38,6 +38,50 @@ export function creditSourceCursorIsHealthy(input: {
   );
 }
 
+export type CreditNftSourceMode = 'legacy' | 'custodial' | 'invalid';
+
+export type CreditSourceHealthClassification = {
+  healthy: boolean;
+  blockingWarnings: string[];
+  ancillaryWarnings: string[];
+};
+
+/**
+ * Classifies source warnings without discarding any evidence. In custodial
+ * mode the TOKEN_V2 ownership projection is ancillary to the vault-backed
+ * credit slots; its dead-letter/pending alarms remain visible but do not block
+ * a new cut unless the vault itself also has a pending or dead-letter event.
+ * Legacy and invalid modes keep every NFT warning blocking.
+ */
+export function classifyCreditSourceHealth(input: {
+  route: 'uki' | 'nft';
+  nftMode?: CreditNftSourceMode;
+  warnings: readonly string[];
+  deadLetters: number;
+  pendingEvents: number;
+  blockingDeadLetters: number;
+  blockingPendingEvents: number;
+}): CreditSourceHealthClassification {
+  const ancillaryWarnings = input.route === 'nft'
+    && input.nftMode === 'custodial'
+    ? [
+        ...(input.blockingDeadLetters === 0 && input.deadLetters > 0
+          ? ['CHAIN_DEAD_LETTERS_OPEN']
+          : []),
+        ...(input.blockingPendingEvents === 0 && input.pendingEvents > 0
+          ? ['CHAIN_EVENTS_NOT_PROJECTED']
+          : []),
+      ]
+    : [];
+  const ancillary = new Set(ancillaryWarnings);
+  const blockingWarnings = input.warnings.filter((warning) => !ancillary.has(warning));
+  return {
+    healthy: blockingWarnings.length === 0,
+    blockingWarnings,
+    ancillaryWarnings,
+  };
+}
+
 export type CreditSourceHealthEvidenceInput = {
   successAt: Date | null;
   errorAt: Date | null;
@@ -48,6 +92,7 @@ export type CreditSourceHealthEvidenceInput = {
   /** Counts for the aliases that can mutate the credit source itself. */
   blockingDeadLetters?: number;
   blockingPendingEvents?: number;
+  nftMode?: CreditNftSourceMode;
   incidents: number;
   sourceRuleVersions: Record<"uki" | "nft", string> | null;
   rounds: Array<Record<string, unknown>>;
