@@ -167,6 +167,43 @@ describe('dashboard default dependencies', () => {
     expect(mockPool).toHaveBeenCalledWith({ walletAddress: wallet, limit: 50, now });
   });
 
+  it('no arrastra intentos de staking al modo créditos de una competición cerrada', async () => {
+    const getStakingEligibility = jest.fn(async () => ({
+      ready: true,
+      attemptsGranted: 9,
+      attemptsUsed: 0,
+      attemptsRemaining: 9,
+      totalTickets: 0,
+      indexedAt: now.toISOString(),
+      issues: [],
+    }));
+    const getLeaderboard = jest.fn(async () => ({ entries: [] }));
+    mockCompetitionService.mockReturnValue({
+      getRuntime: () => ({
+        configured: true,
+        enabled: true,
+        phase: 'closed',
+        campaign: { campaignId: 'stage-campaign', eligibilityKind: 'uki_staking' },
+      }),
+      getStakingEligibility,
+      getLeaderboard,
+    } as never);
+
+    const dependencies = dashboardSummaryDependencies({ environment: 'staging', chainId: 97 });
+    const result = await dependencies.loadGame(wallet, now);
+
+    expect(getStakingEligibility).not.toHaveBeenCalled();
+    expect(getLeaderboard).toHaveBeenCalledWith(wallet, 100);
+    expect(result.data).toMatchObject({
+      phase: 'closed',
+      eligibilityKind: 'uki_staking',
+      attemptsGranted: null,
+      attemptsUsed: null,
+      attemptsRemaining: null,
+      totalTickets: null,
+    });
+  });
+
   it('aísla un fallo de rewards sin ocultar los demás dominios', async () => {
     mockRewards.mockRejectedValue(new Error('reward db unavailable'));
     const dependencies = dashboardSummaryDependencies({ environment: 'staging', chainId: 97 });

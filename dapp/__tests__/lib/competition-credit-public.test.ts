@@ -286,8 +286,8 @@ describe('competition credit public status conflicts', () => {
 
     expect(status.pool.availableCredits).toBe(40);
     expect(status.routes.uki.pool.availableCredits).toBe(40);
-    expect(status.routes.uki.pool.reservedCredits).toBeNull();
-    expect(status.balance.reservedCredits).toBeNull();
+    expect(status.routes.uki.pool.reservedCredits).toBe(0);
+    expect(status.pool.reservedCredits).toBe(0);
   });
 
   it('derives a usable own lot even when its account projection is absent', async () => {
@@ -327,8 +327,12 @@ describe('competition credit public status conflicts', () => {
 
     expect(status.balance.availableCredits).toBe(30);
     expect(status.routes.uki.balance.availableCredits).toBe(30);
-    expect(status.routes.uki.balance.grantedCredits).toBeNull();
-    expect(status.balance.spentCredits).toBeNull();
+    expect(status.routes.uki.balance.grantedCredits).toBe(30);
+    expect(status.routes.uki.balance.poolDepositedCredits).toBe(0);
+    expect(status.routes.uki.balance.reservedCredits).toBe(0);
+    expect(status.routes.uki.balance.spentCredits).toBe(0);
+    expect(status.routes.uki.balance.expiredCredits).toBe(0);
+    expect(status.balance.spentCredits).toBe(0);
     expect(status.currentRun.routes[0]).toEqual({ route: 'uki', status: 'open_with_holds' });
   });
 
@@ -512,8 +516,8 @@ describe('competition credit public status conflicts', () => {
         eligibilityEpoch: 1,
         totalCredits: 100,
         poolDepositedCredits: 0,
-        availableCredits: 100,
-        reservedCredits: 0,
+        availableCredits: 90,
+        reservedCredits: 10,
         spentCredits: 0,
         expiredCredits: 0,
         blocked: false,
@@ -525,6 +529,7 @@ describe('competition credit public status conflicts', () => {
 
     expect(status.routes.uki.pool.materialization).toEqual({ state: 'stale' });
     expect(status.routes.uki.pool.availableCredits).toBe(0);
+    expect(status.routes.uki.pool.reservedCredits).toBe(0);
     expect(status.pool.availableCredits).toBe(0);
   });
 
@@ -568,8 +573,8 @@ describe('competition credit public status conflicts', () => {
         eligibilityEpoch: 1,
         totalCredits: 100,
         poolDepositedCredits: 0,
-        availableCredits: 100,
-        reservedCredits: 0,
+        availableCredits: 90,
+        reservedCredits: 10,
         spentCredits: 0,
         expiredCredits: 0,
         blocked: false,
@@ -580,7 +585,9 @@ describe('competition credit public status conflicts', () => {
     const status = await getCompetitionCreditWalletStatus(wallet, now);
 
     expect(status.routes.uki.balance.materialization).toEqual({ state: 'stale' });
+    expect(status.routes.uki.balance.grantedCredits).toBe(100);
     expect(status.routes.uki.balance.availableCredits).toBe(0);
+    expect(status.routes.uki.balance.reservedCredits).toBe(0);
     expect(status.balance.availableCredits).toBe(0);
   });
 

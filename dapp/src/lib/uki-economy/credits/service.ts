@@ -1972,12 +1972,30 @@ export function createCompetitionCreditService(
     const latest = await mappedTransaction(runner, (repository) =>
       repository.findLatestRunByRoute(input.route)
     );
-    if (latest && latest.status !== "open" && latest.status !== "open_with_holds") {
-      return latest.period;
-    }
     let candidateCutoff: Date;
     if (latest) {
-      candidateCutoff = new Date(latest.period.nextCutoff);
+      const latestCutoff = new Date(latest.period.cutoff);
+      const latestNextCutoff = new Date(latest.period.nextCutoff);
+      const acceleratedRunIsBehindCurrent = Boolean(input.rule.calendar) &&
+        Number.isFinite(latestCutoff.getTime()) &&
+        Number.isFinite(latestNextCutoff.getTime()) &&
+        latestCutoff.getTime() < current.cutoff.getTime() &&
+        latestNextCutoff.getTime() <= current.cutoff.getTime();
+
+      if (acceleratedRunIsBehindCurrent) {
+        // Staging is disposable: once the persisted run is behind the
+        // current accelerated period, start from that period instead of
+        // replaying missed historical cuts. This keeps a blocked/stale run
+        // from pinning new test cycles without changing production catch-up.
+        candidateCutoff = new Date(current.cutoff);
+      } else if (
+        latest.status !== "open" &&
+        latest.status !== "open_with_holds"
+      ) {
+        return latest.period;
+      } else {
+        candidateCutoff = latestNextCutoff;
+      }
     } else {
       const oldestRule = await mappedTransaction(runner, (repository) =>
         repository.findOldestRule()

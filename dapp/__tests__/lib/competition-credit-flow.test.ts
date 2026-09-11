@@ -405,6 +405,62 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     })).resolves.toBeNull();
   });
 
+  it.each([
+    ["blocked", "blocked" as const],
+    ["snapshotted", "snapshotted" as const],
+    ["open", "open" as const],
+  ])("starts the current accelerated period instead of replaying a stale %s run", async (_label, status) => {
+    const calendar = {
+      version: "cycle-v1" as const,
+      chainId: 97 as const,
+      cycleSeconds: 1800 as const,
+      anchorAt: CUTOFF.toISOString(),
+    };
+    const rule = testCompetitionCreditRule({
+      calendar,
+      expectedBscChainId: 97,
+      activeFrom: CUTOFF,
+    });
+    const repository = new MemoryCompetitionCreditRepository({ rule, slots: [] });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    await openDailyRun({
+      repository,
+      service,
+      cutoff: CUTOFF,
+      now: new Date(CUTOFF.getTime() + 60_000),
+    });
+    repository.state.runs[0].status = status;
+
+    const currentPeriod = await service.findOldestPendingRoutePeriod({
+      route: "uki",
+      rule,
+      now: new Date(CUTOFF.getTime() + 3_900_000),
+    });
+
+    expect(currentPeriod?.cutoff).toEqual(
+      new Date(CUTOFF.getTime() + 3_600_000),
+    );
+  });
+
+  it("keeps production daily catch-up when the rule has no accelerated calendar", async () => {
+    const repository = new MemoryCompetitionCreditRepository({ slots: [] });
+    const rule = testCompetitionCreditRule();
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    await openDailyRun({ repository, service });
+
+    const pending = await service.findOldestPendingRoutePeriod({
+      route: "uki",
+      rule,
+      now: new Date("2026-07-12T16:00:00.000Z"),
+    });
+
+    expect(pending?.cutoff).toEqual(new Date("2026-07-11T12:00:00.000Z"));
+  });
+
   it("includes a pre-cutoff chain event even when its slot projection is processed afterwards", async () => {
     const delayedSlot = slot({
       sourceBlockNumber: 998,
