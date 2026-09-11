@@ -95,6 +95,35 @@ export type PublicCukiePoolAvailableAsset = {
   canDeposit: true;
 };
 
+/** A Cukie still held by an explicitly configured former Pool vault. */
+export type PublicCukiePoolRecoveryAsset = {
+  source: 'recovery_vault';
+  positionId: string;
+  assetId: string;
+  chain: 'BSC';
+  chainId: 56 | 97;
+  collectionAddress: string;
+  tokenId: string;
+  imageUrl: string | null;
+  generation: CukiePoolGeneration;
+  rarity: CukiePoolRarity;
+  vaultAddress: string;
+  beneficiaryNormalized: string;
+  depositEpoch: string;
+  status: 'recovery' | 'exit_requested' | 'withdrawable';
+  lifecycleOpen: true;
+  custody: 'cukie_pool_recovery';
+  ownerRewardEligible: false;
+  depositedAt: string | null;
+  activationAt: string | null;
+  depositCalendarVersion: null;
+  exitRequestedAt: string | null;
+  withdrawableAt: string | null;
+  exitCalendarVersion: null;
+  withdrawnAt: null;
+  sourceHealthy: true;
+};
+
 /**
  * Recovery checks run in parallel with the indexed projection. A single
  * inconclusive ownerOf/positionOf read must not make every known wallet NFT
@@ -103,9 +132,11 @@ export type PublicCukiePoolAvailableAsset = {
  */
 export type CukiePoolAvailableAssetsResult = {
   assets: PublicCukiePoolAvailableAsset[];
+  recoveryAssets: PublicCukiePoolRecoveryAsset[];
   recovery: {
     status: 'complete' | 'partial';
     unknownAssets: number;
+    unknownAssetIds: string[];
   };
 };
 
@@ -856,6 +887,14 @@ function canonicalVaultOpenPosition(
     && expected.assetIds.has(row.assetId);
 }
 
+function recoveryDate(value: string | null | undefined) {
+  if (!value || value === '0' || !DECIMAL.test(value)) return null;
+  const milliseconds = BigInt(value) * BigInt(1_000);
+  if (milliseconds > BigInt(8_640_000_000_000_000)) return null;
+  const date = new Date(Number(milliseconds));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export async function listAvailableCukiePoolVaultAssets(
   db: Db,
   walletNormalized: string,
@@ -909,7 +948,8 @@ export async function listAvailableCukiePoolVaultAssets(
   if (preliminary.length === 0) {
     return {
       assets: [],
-      recovery: { status: 'complete', unknownAssets: 0 },
+      recoveryAssets: [],
+      recovery: { status: 'complete', unknownAssets: 0, unknownAssetIds: [] },
     };
   }
 
@@ -964,14 +1004,11 @@ export async function listAvailableCukiePoolVaultAssets(
     assetIds,
   }))) return sourceError('la proyeccion abierta de Cukie Master no es canonica.');
 
-  // Resolve current Pool/Master custody before probing former vaults. The
-  // active vaults are authoritative for these assets; querying an old vault
-  // first could turn a valid current position into an inconclusive read.
-  const currentCustody = new Set([
-    ...poolRows.map((row) => String(row.assetId)),
-    ...masterRows.map((row) => String(row.assetId)),
-  ]);
-  const assetsRequiringRecovery = preliminary.filter((item) => !currentCustody.has(item.assetId));
+  // Probe every candidate, including assets with an open indexed projection.
+  // A stale Pool/Master row must not keep a withdrawn NFT blocked after the
+  // collection ownerOf read has already confirmed that it is back in the
+  // authenticated wallet.
+  const assetsRequiringRecovery = preliminary;
   const recovery = await readPoolRecoveryPositions({
     walletNormalized,
     activeVaultAddress: config.vaultAddressNormalized,
@@ -997,12 +1034,94 @@ export async function listAvailableCukiePoolVaultAssets(
   if (batchFailure) {
     return sourceError('no se pudo confirmar la custodia on-chain; la fuente queda temporalmente no disponible.');
   }
-  const unknownAssets = assetsRequiringRecovery.filter(
+  const unknownAssets = preliminary.filter(
     (item) => recoveryByAssetId.get(item.assetId)?.status === 'unknown',
   ).length;
+  const confirmedWalletAssetIds = new Set(
+    recovery
+      .filter((item) => item.status === 'not_found')
+      .map((item) => item.assetId),
+  );
+  const confirmedWalletLegacyAssetIds = new Set(
+    preliminary
+      .filter((item) => confirmedWalletAssetIds.has(item.assetId))
+      .map((item) => item.legacyAssetId),
+  );
+  const recoveryAssets = preliminary.flatMap((item) => {
+    const inspection = recoveryByAssetId.get(item.assetId);
+    if (
+      inspection?.status !== 'custodied'
+      || !inspection.vaultAddress
+      || !inspection.beneficialOwner
+      || !inspection.depositEpoch
+    ) return [];
+    const depositedAt = recoveryDate(inspection.depositedAt);
+    const activationAt = recoveryDate(inspection.activationAt);
+    const exitRequestedAt = recoveryDate(inspection.exitRequestedAt);
+    const withdrawableAt = recoveryDate(inspection.withdrawableAt);
+    const nowSeconds = BigInt(Math.floor(now.getTime() / 1_000));
+    const withdrawableSeconds = withdrawableAt && inspection.withdrawableAt && DECIMAL.test(inspection.withdrawableAt)
+      ? BigInt(inspection.withdrawableAt)
+      : null;
+    const exitRequestedSeconds = exitRequestedAt && inspection.exitRequestedAt && DECIMAL.test(inspection.exitRequestedAt)
+      ? BigInt(inspection.exitRequestedAt)
+      : null;
+    return [{
+      source: 'recovery_vault' as const,
+      positionId: `${item.assetId}:epoch:${inspection.depositEpoch}`,
+      assetId: item.assetId,
+      chain: 'BSC' as const,
+      chainId: config.chainId,
+      collectionAddress: item.collection,
+      tokenId: item.normalized.tokenId!,
+      imageUrl: item.normalized.imageUrl ?? null,
+      generation: item.normalized.generation as CukiePoolGeneration,
+      rarity: item.normalized.rarity as CukiePoolRarity,
+      vaultAddress: inspection.vaultAddress,
+      beneficiaryNormalized: inspection.beneficialOwner,
+      depositEpoch: inspection.depositEpoch,
+      status: withdrawableSeconds !== null && nowSeconds >= withdrawableSeconds
+        ? 'withdrawable' as const
+        : exitRequestedSeconds !== null && exitRequestedSeconds > BigInt(0)
+          ? 'exit_requested' as const
+          : 'recovery' as const,
+      lifecycleOpen: true as const,
+      custody: 'cukie_pool_recovery' as const,
+      ownerRewardEligible: false as const,
+      depositedAt,
+      activationAt,
+      depositCalendarVersion: null,
+      exitRequestedAt,
+      withdrawableAt,
+      exitCalendarVersion: null,
+      withdrawnAt: null,
+      sourceHealthy: true as const,
+    } satisfies PublicCukiePoolRecoveryAsset];
+  });
+  const malformedRecoveryAssets = preliminary.filter((item) => {
+    const inspection = recoveryByAssetId.get(item.assetId);
+    return inspection?.status === 'custodied'
+      && !recoveryAssets.some((asset) => asset.assetId === item.assetId);
+  }).length;
+  const unknownAssetIds = [
+    ...recovery
+      .filter((item) => item.status === 'unknown')
+      .map((item) => item.assetId),
+    ...preliminary
+      .filter((item) => {
+        const inspection = recoveryByAssetId.get(item.assetId);
+        return inspection?.status === 'custodied'
+          && !recoveryAssets.some((asset) => asset.assetId === item.assetId);
+      })
+      .map((item) => item.assetId),
+  ];
   const unavailable = new Set([
-    ...poolRows.map((row) => String(row.assetId)),
-    ...masterRows.map((row) => String(row.assetId)),
+    ...poolRows
+      .map((row) => String(row.assetId))
+      .filter((assetId) => !confirmedWalletAssetIds.has(assetId)),
+    ...masterRows
+      .map((row) => String(row.assetId))
+      .filter((assetId) => !confirmedWalletAssetIds.has(assetId)),
     ...recovery
       .filter((item) => item.status === 'custodied' || item.status === 'current_custody')
       .map((item) => item.assetId),
@@ -1014,7 +1133,11 @@ export async function listAvailableCukiePoolVaultAssets(
   ]);
   return {
     assets: preliminary
-      .filter((item) => !unavailable.has(item.assetId) && !lockedLegacyAssets.has(item.legacyAssetId))
+      .filter((item) => (
+        !unavailable.has(item.assetId)
+        && (!lockedLegacyAssets.has(item.legacyAssetId)
+          || confirmedWalletLegacyAssetIds.has(item.legacyAssetId))
+      ))
       .map((item) => ({
         assetId: item.assetId,
         chain: 'BSC' as const,
@@ -1029,8 +1152,10 @@ export async function listAvailableCukiePoolVaultAssets(
         canDeposit: true as const,
       })),
     recovery: {
-      status: unknownAssets > 0 ? 'partial' : 'complete',
-      unknownAssets,
+      status: unknownAssets + malformedRecoveryAssets > 0 ? 'partial' : 'complete',
+      unknownAssets: unknownAssets + malformedRecoveryAssets,
+      unknownAssetIds: [...new Set(unknownAssetIds)],
     },
+    recoveryAssets,
   };
 }

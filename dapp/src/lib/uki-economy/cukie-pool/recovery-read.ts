@@ -37,6 +37,14 @@ export type PoolRecoveryInspection = {
   status: 'custodied' | 'current_custody' | 'not_found' | 'unknown';
   vaultAddress: string | null;
   beneficialOwner: string | null;
+  /**
+   * The epoch and timestamps are returned only when the former vault exposes
+   * a valid position. Keeping them on the inspection lets the public Pool
+   * surface the same identity that the recovery flow verifies on-chain.
+   */
+  depositEpoch?: string | null;
+  depositedAt?: string | null;
+  activationAt?: string | null;
   exitRequestedAt: string | null;
   withdrawableAt: string | null;
   reason?: string;
@@ -189,12 +197,15 @@ export function classifyPoolRecoveryRead(input: {
     ? beneficialOwner.toLowerCase()
     : null;
   const depositEpoch = uintText(tupleField(input.rawPosition, 'depositEpoch', 1));
+  const depositedAt = uintText(tupleField(input.rawPosition, 'depositedAt', 2));
+  const activationAt = uintText(tupleField(input.rawPosition, 'activationAt', 3));
   const exitRequestedAt = uintText(tupleField(input.rawPosition, 'exitRequestedAt', 4));
   const withdrawableAt = uintText(tupleField(input.rawPosition, 'withdrawableAt', 5));
   if (
     !beneficialOwnerNormalized
     || beneficialOwnerNormalized === ZERO_ADDRESS
     || !depositEpoch
+    || depositEpoch === '0'
     || !exitRequestedAt
     || !withdrawableAt
   ) return unknownResult(
@@ -211,6 +222,9 @@ export function classifyPoolRecoveryRead(input: {
     status: 'custodied',
     vaultAddress: input.vaultAddress.toLowerCase(),
     beneficialOwner: beneficialOwnerNormalized,
+    depositEpoch,
+    depositedAt,
+    activationAt,
     exitRequestedAt: exitRequestedAt === '0' ? null : exitRequestedAt,
     withdrawableAt: withdrawableAt === '0' ? null : withdrawableAt,
   };

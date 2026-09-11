@@ -113,6 +113,7 @@ function slotCounts(route: PublicRoute) {
 }
 
 function visibleRouteSlots(route: PublicRoute): number | null {
+  if (route.synchronizing) return null;
   if (route.source.complete) {
     return route.balanceQualifiedSlots
       ?? route.previewSlots
@@ -180,6 +181,7 @@ export function CukieMasterStatusPanel({
       presaleLockedRaw: route.source.presaleLockedRaw,
       indexedStakedRaw: route.source.stakedUkiRaw,
       allocatedSlots: route.position?.allocatedSlots ?? 0,
+      ...(route.synchronizing ? { synchronizing: true } : {}),
     });
   }, [onUkiRouteData, state, status]);
 
@@ -691,16 +693,18 @@ function OverviewMetric({
 
 function UkiOnlyStatus({ route }: { route: PublicRoute }) {
   const breakdown = getUkiBreakdown(route);
-  const displayedSlots = route.source.complete
+  const displayedSlots = route.source.complete && !route.synchronizing
     ? route.balanceQualifiedSlots
       ?? route.previewSlots
       ?? route.position?.allocatedSlots
       ?? null
     : null;
-  const deficit = route.source.complete
+  const deficit = route.source.complete && !route.synchronizing
     ? route.deficitToPreserveSlots ?? route.deficitToNextSlot
     : null;
-  const nextStep = displayedSlots === null
+  const nextStep = route.synchronizing
+    ? 'Hemos detectado el cambio de UKI y estamos actualizando tus cupos. No repitas la operación.'
+    : displayedSlots === null
     ? 'No podemos confirmar tus cupos hasta recuperar la fuente de UKI.'
     : displayedSlots >= MAX_ROUTE_SLOTS
     ? 'Has alcanzado el máximo de 5 Cukie Masters mediante UKI.'
@@ -710,6 +714,14 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
 
   return (
     <div className="mt-6 min-w-0">
+      {route.synchronizing ? (
+        <div role="status" className="mb-4 flex gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-3">
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
+            El saldo de UKI ya se ha leído, pero todavía no mezclamos ese valor con cupos materializados ni con el umbral anterior.
+          </p>
+        </div>
+      ) : null}
       <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatusMetric
           label="UKI en vesting"
@@ -835,7 +847,9 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
 function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
   const ukiBreakdown = getUkiBreakdown(route);
   const counts = slotCounts(route);
-  const deficit = route.deficitToPreserveSlots ?? route.deficitToNextSlot;
+  const deficit = route.synchronizing
+    ? null
+    : route.deficitToPreserveSlots ?? route.deficitToNextSlot;
   return (
     <div className="min-w-0 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:p-5">
       <div className="grid min-w-0 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
@@ -870,7 +884,7 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
                 <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">UKI que ya cuentan</p>
                   <p className="mt-2 break-words text-base font-black text-[var(--uki-cream)]">
-                    {ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
+                    {route.synchronizing ? 'Detectados: ' : ''}{ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
                   </p>
                 </div>
               ) : (
@@ -887,7 +901,7 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
           )}
 
           <dl className="mt-4 grid min-w-0 gap-3 text-sm font-semibold sm:grid-cols-2">
-            <RouteMetric label="Requisito vigente" value={requirementLabel(route.currentRequirement)} />
+            <RouteMetric label={route.synchronizing ? 'Requisito detectado' : 'Requisito vigente'} value={requirementLabel(route.currentRequirement)} />
             <RouteMetric
               label={route.deficitToPreserveSlots ? 'Déficit para conservar' : 'Déficit siguiente cupo'}
               value={deficit

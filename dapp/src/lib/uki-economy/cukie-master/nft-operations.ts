@@ -224,6 +224,16 @@ function tokenIdQueryCandidates(tokenId: string) {
     : [tokenId];
 }
 
+function staleCustodyState(value: unknown) {
+  if (typeof value !== 'string') return true;
+  const key = value.trim().toLowerCase().replace(/[_-]+/g, ' ');
+  return key === 'in pool'
+    || key === 'pool'
+    || key === 'unknown'
+    || key === 'stale'
+    || key === 'reconciliation';
+}
+
 function canonicalCustodialCandidate(
   document: CustodialCukiesInventoryDocument,
   config: CustodialInventoryConfig,
@@ -311,16 +321,20 @@ export function buildCukieMasterCustodialDepositInventory(input: {
       && normalizedAsset.ownerWallet
       && normalizeWalletAddress(normalizedAsset.ownerWallet).toLowerCase() === walletNormalized
     );
+    // `type`/metadata attributes are canonical rarity aliases in the shared
+    // inventory normalizer. The old raw-number check rejected valid Original
+    // rares (for example #98000003) even though the route summary could
+    // already resolve them to four points.
+    const normalizedRarity = normalizedAsset?.rarity;
     const metadataBlockers: NftInventoryBlocker[] = [
       ...(candidate.document.generation === 1
         ? []
         : [candidate.document.generation === 2
             ? 'second_generation' as const
             : 'missing_generation' as const]),
-      ...(typeof candidate.document.rarity === 'number'
-        && Number.isInteger(candidate.document.rarity)
-        && candidate.document.rarity >= 1
-        && candidate.document.rarity <= 6
+      ...(normalizedRarity
+        && normalizedRarity !== 'unknown'
+        && pointsForRarity(normalizedRarity) !== null
         ? []
         : ['missing_rarity' as const]),
     ];
@@ -473,6 +487,32 @@ export async function custodialInventoryFromDb(
       tokenId: candidate.tokenId,
     })),
   });
+  // The indexer projection can lag a confirmed ERC-721 transfer back to the
+  // wallet. Treat only an explicit ownerOf(wallet) result as permission to
+  // discard that stale open row/lock; unknown or vault-owned reads remain
+  // fail-closed and continue blocking a duplicate deposit.
+  const confirmedWalletAssetIds = new Set(
+    recovery
+      .filter((item) => item.status === 'not_found')
+      .map((item) => item.assetId),
+  );
+  const confirmedWalletLockAssetIds = new Set(
+    inspected
+      .filter((candidate) => confirmedWalletAssetIds.has(candidate.assetId))
+      .flatMap((candidate) => candidate.lockAssetIds),
+  );
+  const documentsForInventory = documents.map((document) => {
+    const candidate = canonicalCustodialCandidate(document, config);
+    if (
+      !candidate
+      || !confirmedWalletAssetIds.has(candidate.assetId)
+      || !staleCustodyState(document.state)
+    ) return document;
+    // ownerOf(wallet) is the authoritative terminal custody signal. Refresh
+    // only the stale custody label in this response; listed/bridging/game
+    // states stay fail-closed and are never rewritten by recovery.
+    return { ...document, state: 'available' };
+  });
   const custodyBlockers = new Map<string, NftInventoryBlocker>();
   for (const item of recovery) {
     if (item.status === 'custodied') custodyBlockers.set(item.assetId, 'in_pool');
@@ -485,9 +525,13 @@ export async function custodialInventoryFromDb(
   const available = buildCukieMasterCustodialDepositInventory({
     walletAddress,
     now,
-    documents,
-    locks,
-    openVaultPositions: [...masterPositions, ...poolPositions],
+    documents: documentsForInventory,
+    locks: locks.filter((lock) => (
+      typeof lock.assetId !== 'string' || !confirmedWalletLockAssetIds.has(lock.assetId)
+    )),
+    openVaultPositions: [...masterPositions, ...poolPositions].filter((position) => (
+      typeof position.assetId !== 'string' || !confirmedWalletAssetIds.has(position.assetId)
+    )),
     config: publicConfig,
     custodyBlockers,
   });

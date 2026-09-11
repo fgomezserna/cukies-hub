@@ -239,12 +239,22 @@ export function UkiStakingPanel({
     !isBusy,
   );
   const txUrl = txHash ? getBscScanTxUrl(txHash) : null;
+  const coherentRoutePreview = useMemo(() => {
+    if (!routePreview || routePreview.synchronizing || stakedBalance === undefined) return null;
+    if (!/^(0|[1-9][0-9]*)$/.test(routePreview.indexedStakedRaw)) return null;
+    try {
+      return BigInt(routePreview.indexedStakedRaw) === stakedBalance ? routePreview : null;
+    } catch {
+      return null;
+    }
+  }, [routePreview, stakedBalance]);
+  const routePreviewSynchronizing = Boolean(routePreview && !coherentRoutePreview);
   const outcomePreview = useMemo(() => buildOutcomePreview({
     operation,
     parsedAmount,
     stakedBalance,
-    routePreview,
-  }), [operation, parsedAmount, routePreview, stakedBalance]);
+    routePreview: coherentRoutePreview,
+  }), [coherentRoutePreview, operation, parsedAmount, stakedBalance]);
 
   useEffect(() => {
     setApprovedAmount(null);
@@ -553,9 +563,17 @@ export function UkiStakingPanel({
               <BalanceCard label="UKI en staking" value={formatTokenAmount(stakedBalance)} />
               <BalanceCard
                 label="Requisito Cukie Master"
-                value={formatRawTokenAmount(routePreview?.currentRequirementRaw)}
+                value={routePreviewSynchronizing
+                  ? 'Actualizando…'
+                  : formatRawTokenAmount(coherentRoutePreview?.currentRequirementRaw)}
               />
             </div>
+
+            {routePreviewSynchronizing ? (
+              <p role="status" className="mt-4 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-3 text-xs font-semibold leading-relaxed text-amber-100">
+                El balance vivo de tu wallet todavía no coincide con el último snapshot de cupos; ocultamos el requisito anterior hasta reconciliarlo.
+              </p>
+            ) : null}
 
             <p className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
               Los UKI pendientes de vesting ya cuentan para tus cupos. Solo deposita la cantidad adicional que quieras sumar.

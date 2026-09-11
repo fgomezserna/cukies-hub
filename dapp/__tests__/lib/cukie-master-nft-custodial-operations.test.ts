@@ -223,8 +223,11 @@ describe('Cukie Master custodial inventory identity', () => {
       blockers: expect.arrayContaining(['missing_generation']),
     });
     expect(inventory.find((item) => item.tokenId === '13')).toMatchObject({
-      canDeposit: false,
-      blockers: expect.arrayContaining(['missing_rarity']),
+      canDeposit: true,
+      rarity: 'rare',
+      rarityPoints: 4,
+      contributionPoints: 0,
+      blockers: [],
     });
   });
 
@@ -302,6 +305,33 @@ describe('Cukie Master custodial inventory identity', () => {
       blockers: ['unknown_state'],
       canDeposit: false,
       canSoftStake: false,
+    }]);
+  });
+
+  it('ignores a stale Pool projection after ownerOf confirms the wallet', async () => {
+    const tokenId = '23';
+    const assetId = `97:${collectionA}:${tokenId}`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'not_found',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('stale-pool', tokenId, collectionA, { state: 'in_pool' })],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true }],
+      nft_asset_locks: [activeLock(assetId)],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(inventory).toMatchObject([{
+      assetId,
+      custody: 'wallet',
+      canDeposit: true,
+      blockers: [],
     }]);
   });
 });

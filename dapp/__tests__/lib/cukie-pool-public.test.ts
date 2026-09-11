@@ -560,6 +560,20 @@ describe('Cukie Pool public source health', () => {
       beneficialOwner: null,
       exitRequestedAt: null,
       withdrawableAt: null,
+    }, {
+      assetId: asset('11'),
+      status: 'current_custody',
+      vaultAddress: VAULT,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }, {
+      assetId: asset('12'),
+      status: 'current_custody',
+      vaultAddress: masterVault,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
     }]);
 
     const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
@@ -587,6 +601,69 @@ describe('Cukie Pool public source health', () => {
       availableAssets: [],
       nftCustody: { indexer: { status: 'unavailable' } },
     });
+  });
+
+  it('releases a stale open projection when ownerOf confirms the wallet again', async () => {
+    vaultConfig.ready.cukiePool = true;
+    vaultConfig.mode.cukiePool = 'custodial';
+    vaultConfig.mode.cukieMaster = 'legacy';
+    const tokenId = '30';
+    const assetId = `97:${COLLECTION}:${tokenId}`;
+    const inventory = {
+      _id: tokenId,
+      tokenId,
+      owner: OWNER,
+      ownerNormalized: OWNER,
+      network: 'BSC',
+      state: 'available',
+      chainId: 97,
+      collectionAddressNormalized: COLLECTION,
+      rarity: 1,
+      generation: 1,
+    };
+    const staleProjection = {
+      ...vaultPosition(tokenId, 'active'),
+      assetId,
+      positionId: `${assetId}:epoch:1`,
+      _id: `${assetId}:epoch:1`,
+    };
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => {
+        const operational = healthyOperationalCollection(name);
+        if (operational) return operational;
+        return {
+          find: (filter: Record<string, unknown>) => cursor(
+            name === 'nft_vault_collections'
+              ? [allowlistProjection()]
+              : name === 'cukie_pool_calendar_versions'
+                ? [calendarVersion()]
+                : name === 'cukies'
+                  ? [inventory]
+                  : name === 'cukie_pool_nft_vault_positions'
+                    ? ('beneficiaryNormalized' in filter ? [] : [staleProjection])
+                    : [],
+          ),
+        };
+      },
+    });
+    recoveryReadMock.mockResolvedValue([{
+      assetId,
+      status: 'not_found',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
+
+    expect(result.availableAssets).toEqual([expect.objectContaining({
+      assetId,
+      tokenId,
+      custody: 'wallet',
+      canDeposit: true,
+    })]);
+    expect(result.availability).toEqual({ status: 'complete', unknownAssets: 0, unknownAssetIds: [] });
   });
 
   it('keeps confirmed wallet assets available when one recovery read is inconclusive', async () => {
