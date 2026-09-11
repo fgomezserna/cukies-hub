@@ -1,10 +1,10 @@
 {
   "issue": "https://github.com/fgomezserna/cukies-hub/issues/414",
   "scope": "Five historical OWN-credit settled Treasure Hunt sessions; weekly leaderboard projection only",
-  "observedAt": "2026-09-11T05:33:14.207Z",
-  "inspectedStagingSha": "64aea9e1b5c0454caa75b3a6b093800116830d68",
-  "servedProductSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
-  "state": "historical leaderboard repaired and verified in staging; operator code awaiting PR integration",
+  "observedAt": "2026-09-11T06:16:38.097325+00:00",
+  "inspectedStagingSha": "5b5ba01963f5490002c087f72713abb00e7de21f",
+  "servedProductSha": "5b5ba01963f5490002c087f72713abb00e7de21f",
+  "state": "historical leaderboard repaired and verified in staging; operator integrated through PR415 and staging delivery verified",
   "sessionIds": [
     "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
     "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
@@ -516,6 +516,212 @@
       "rollbackRejected": true,
       "noPartialWrites": true,
       "explicitUriAndReplicaGuardVerified": true
+    },
+    "ciLinux": {
+      "status": "passed",
+      "attempt": 2,
+      "suites": 270,
+      "tests": 2246,
+      "node": "22.23.2",
+      "pnpm": "10.19.0",
+      "sha": "5b5ba01963f5490002c087f72713abb00e7de21f"
     }
+  },
+  "recoveryObservedAt": "2026-09-11T05:33:14.207Z",
+  "delivery": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/415",
+    "mergeSha": "5b5ba01963f5490002c087f72713abb00e7de21f",
+    "mergedAt": "2026-09-11T05:40:24Z",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34566864794",
+    "attempt": 2,
+    "conclusion": "success",
+    "workflowCompletedAt": "2026-09-11T06:15:35Z",
+    "verifiedAt": "2026-09-11T06:16:38.097325+00:00",
+    "releaseCommit": "5b5ba01963f5490002c087f72713abb00e7de21f",
+    "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+    "publicHealth": {
+      "status": "ok",
+      "app": "cukies-hub",
+      "environment": "staging",
+      "gitSha": "5b5ba01963f5490002c087f72713abb00e7de21f",
+      "gitRef": "staging",
+      "buildTime": null,
+      "coolify": {
+        "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+        "fqdn": null
+      }
+    },
+    "readyHttpStatus": 200,
+    "runningImageDigestsMatchRelease": true,
+    "components": {
+      "dapp": {
+        "image": "192.168.1.207:5000/cukies-hub/dapp:5b5ba01963f5490002c087f72713abb00e7de21f-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:936f95f17d6b1ef7abf2ac473d505f725bf58e7468a499d1d7bbcf4cc450d4ef",
+        "digest": "sha256:936f95f17d6b1ef7abf2ac473d505f725bf58e7468a499d1d7bbcf4cc450d4ef",
+        "tag": "5b5ba01963f5490002c087f72713abb00e7de21f-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "5b5ba01963f5490002c087f72713abb00e7de21f",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "chain-indexer": {
+        "image": "192.168.1.207:5000/cukies-hub/chain-indexer:cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:851524e0d3630a241840e50f0d7250937b6830e5c8c529b6122372d4fa05954c",
+        "digest": "sha256:851524e0d3630a241840e50f0d7250937b6830e5c8c529b6122372d4fa05954c",
+        "tag": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cuki-card-worker": {
+        "image": "192.168.1.207:5000/cukies-hub/cuki-card-worker:cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:db9d527cc334c14cec4bf3d69dd0179593673acb8f58fa0388469b8dc2f8cdf2",
+        "digest": "sha256:db9d527cc334c14cec4bf3d69dd0179593673acb8f58fa0388469b8dc2f8cdf2",
+        "tag": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "schedulers": {
+        "image": "192.168.1.207:5000/cukies-hub/schedulers:5b5ba01963f5490002c087f72713abb00e7de21f-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:249b6ad74bd4f603c848e1909bac8243950a9fd8b577224d60903d39485771fc",
+        "digest": "sha256:249b6ad74bd4f603c848e1909bac8243950a9fd8b577224d60903d39485771fc",
+        "tag": "5b5ba01963f5490002c087f72713abb00e7de21f-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "5b5ba01963f5490002c087f72713abb00e7de21f",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "cukies-bridge-relayer": {
+        "image": "192.168.1.207:5000/cukies-hub/cukies-bridge-relayer:cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:635853cee6e090b4b84b8f5cc6d059d7a4c01a15ff1da3435441b9f79df1179b",
+        "digest": "sha256:635853cee6e090b4b84b8f5cc6d059d7a4c01a15ff1da3435441b9f79df1179b",
+        "tag": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "treasure-hunt": {
+        "image": "192.168.1.207:5000/cukies-hub/treasure-hunt:cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:3fe6c04cb463920a45a7b5471434ac8a2b5a6c66f67c7883d97cf472bfa0bf92",
+        "digest": "sha256:3fe6c04cb463920a45a7b5471434ac8a2b5a6c66f67c7883d97cf472bfa0bf92",
+        "tag": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-api": {
+        "image": "192.168.1.207:5000/cukies-hub/world-api:cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:41d91369c0fc7e9d7b6bac504f0862876560ce145e3013951a52a8776efe132e",
+        "digest": "sha256:41d91369c0fc7e9d7b6bac504f0862876560ce145e3013951a52a8776efe132e",
+        "tag": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+        "environment": "staging",
+        "chainId": "97"
+      },
+      "world-matchmaking": {
+        "image": "192.168.1.207:5000/cukies-hub/world-matchmaking:cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533@sha256:d8506aa6baf76dd61a3a746db9aee9bbf00245bf3d8643f253fd5171f66af769",
+        "digest": "sha256:d8506aa6baf76dd61a3a746db9aee9bbf00245bf3d8643f253fd5171f66af769",
+        "tag": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6-c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+        "sourceSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+        "environment": "staging",
+        "chainId": "97"
+      }
+    },
+    "changedComponents": [
+      "dapp",
+      "schedulers"
+    ],
+    "workers": {
+      "count": 10,
+      "recreatedCount": 10,
+      "allRunning": true,
+      "restarts": 0
+    },
+    "protectedContainers": {
+      "total": 82,
+      "preserved": 82,
+      "changed": []
+    },
+    "productionGitSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+    "journal": "clean"
+  },
+  "ciRetryEvidence": {
+    "observedAt": "2026-09-11T05:49:11.989927+00:00",
+    "runId": 34566864794,
+    "attempt": 1,
+    "conclusion": "failure",
+    "failedCheck": "existing provider test timeout5000ms",
+    "testFile": "dapp/__tests__/providers/app-runtime-provider.test.tsx",
+    "testName": "waits for a pre-transaction GET before issuing the post-transaction read",
+    "passedSuites": 269,
+    "passedTests": 2245,
+    "releaseCommit": "64aea9e1b5c0454caa75b3a6b093800116830d68",
+    "servedSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+    "productionSha": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+    "journal": "clean",
+    "failedBeforeBuildOrDeploy": true,
+    "sameShaLinuxVerification": {
+      "headSha": "5b5ba01963f5490002c087f72713abb00e7de21f",
+      "cleanCheckout": true,
+      "node": "22.23.2",
+      "pnpm": "10.19.0",
+      "testDurationMs": 147,
+      "repetitionsPassed": 8,
+      "repetitionsTotal": 8,
+      "providerFileTests": 24,
+      "providerFilePassed": 24,
+      "providerFileDurationSeconds": 3.728,
+      "cause": "Timeout was not reproduced; no deterministic cause established",
+      "source": "Luna Max bounded read-only verification on the existing Linux CI checkout, reviewed by root"
+    },
+    "retry": {
+      "attempt": 2,
+      "sameSha": true,
+      "codeChanged": false,
+      "timeoutChanged": false,
+      "reason": "One unchanged-SHA retry after focused and full provider-file validation on exact Linux checkout",
+      "conclusion": "success",
+      "completedAt": "2026-09-11T06:15:35Z",
+      "passedSuites": 270,
+      "passedTests": 2246
+    }
+  },
+  "postDeployDataVerification": {
+    "observedAt": "2026-09-11T06:16:36.588Z",
+    "mode": "read-only",
+    "bests": [
+      {
+        "_id": "treasure-weekly-best:af2eef0d532da326134a331a7ddeb2acc5c6de1d074bbcd4774dbe8ee994abb8",
+        "weeklyPeriodId": "C1800-W:2026-09-08T12:00:00.000Z",
+        "scoreRaw": "43",
+        "achievedAt": "2026-09-08T13:57:31.657Z",
+        "winningGameId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+        "creditSource": "own",
+        "cukieSource": "pool",
+        "revision": 0,
+        "updatedAt": "2026-09-11T05:27:55.750Z"
+      },
+      {
+        "_id": "treasure-weekly-best:73f1c2daa5edc4f73d02b50bc9c71d94416e727a03b455d46f16408752b3edd2",
+        "weeklyPeriodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "scoreRaw": "117",
+        "achievedAt": "2026-09-10T09:45:24.912Z",
+        "winningGameId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+        "creditSource": "own",
+        "cukieSource": "pool",
+        "revision": 0,
+        "updatedAt": "2026-09-11T05:27:55.750Z"
+      }
+    ],
+    "sixSourceCollectionFingerprintsUnchanged": true,
+    "periodGuardsUnchanged": true,
+    "financialCollectionsUnchanged": true,
+    "repairReapplied": false
+  },
+  "cleanup": {
+    "localMongoReplica": "stopped and removed",
+    "localMongoStoppedAt": "2026-09-11T05:37:40.045410+00:00",
+    "remoteTemporaryPlan": "removed after digest verification",
+    "reproducibleReviewedPlan": "preserved in this document under plan"
   }
 }
