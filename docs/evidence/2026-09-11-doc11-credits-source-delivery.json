@@ -1,0 +1,242 @@
+{
+  "observedAt": "2026-09-11T17:49:14.615873+00:00",
+  "pr": "https://github.com/fgomezserna/cukies-hub/pull/432",
+  "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34628683317",
+  "releaseSha": "50521eb33b21e75470321bf30cf95bda1133e83f",
+  "servedSha": "50521eb33b21e75470321bf30cf95bda1133e83f",
+  "readyHttpStatus": 200,
+  "journal": "clean",
+  "changedComponents": [
+    "dapp"
+  ],
+  "changedWorkers": [],
+  "protected": {
+    "total": 82,
+    "preserved": 82,
+    "changed": []
+  },
+  "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+  "credits": {
+    "observedAt": "2026-09-11T17:49:02.742Z",
+    "runs": [
+      {
+        "runId": "5dd88246f913f6a5f7d442a79392da74d62c7fac623ca9b77b0915820ae2ca3d",
+        "route": "uki",
+        "settlementPeriod": {
+          "calendar": {
+            "version": "cycle-v1",
+            "chainId": 97,
+            "cycleSeconds": 1800,
+            "anchorAt": "2026-09-07T11:30:00.000Z"
+          },
+          "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+          "cutoff": "2026-09-11T17:30:00.000Z",
+          "nextCutoff": "2026-09-11T18:00:00.000Z",
+          "settlementTarget": "2026-09-11T17:30:00.000Z",
+          "ruleVersion": "credits-staging-cycle-v1",
+          "ruleConfigHash": "810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de"
+        },
+        "status": "open",
+        "createdAt": "2026-09-11T17:31:27.082Z",
+        "updatedAt": "2026-09-11T17:31:27.240Z"
+      },
+      {
+        "runId": "280b92ac64d87def7b1f54a01d814c511b72e84ec13ab1a424c0f1a356d8aabf",
+        "route": "uki",
+        "settlementPeriod": {
+          "calendar": {
+            "version": "cycle-v1",
+            "chainId": 97,
+            "cycleSeconds": 1800,
+            "anchorAt": "2026-09-07T11:30:00.000Z"
+          },
+          "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:00:00.000Z",
+          "cutoff": "2026-09-11T17:00:00.000Z",
+          "nextCutoff": "2026-09-11T17:30:00.000Z",
+          "settlementTarget": "2026-09-11T17:00:00.000Z",
+          "ruleVersion": "credits-staging-cycle-v1",
+          "ruleConfigHash": "810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de"
+        },
+        "status": "open",
+        "createdAt": "2026-09-11T17:01:04.714Z",
+        "updatedAt": "2026-09-11T17:01:04.964Z"
+      },
+      {
+        "runId": "215e1506c9b3e96eeda2857e39f7a720f3aa1e191c2f20ab1c0c4c929fd79fde",
+        "route": "nft",
+        "settlementPeriod": {
+          "calendar": {
+            "version": "cycle-v1",
+            "chainId": 97,
+            "cycleSeconds": 1800,
+            "anchorAt": "2026-09-07T11:30:00.000Z"
+          },
+          "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+          "cutoff": "2026-09-11T17:30:00.000Z",
+          "nextCutoff": "2026-09-11T18:00:00.000Z",
+          "settlementTarget": "2026-09-11T17:30:00.000Z",
+          "ruleVersion": "credits-staging-cycle-v1",
+          "ruleConfigHash": "810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de"
+        },
+        "status": "open",
+        "createdAt": "2026-09-11T17:48:39.856Z",
+        "updatedAt": "2026-09-11T17:48:40.000Z"
+      },
+      {
+        "runId": "2fd58e98a83a2a286a889ed64d4889dd071d05efb3ffa38ea822fab1372b0a22",
+        "route": "nft",
+        "settlementPeriod": {
+          "calendar": {
+            "version": "cycle-v1",
+            "chainId": 97,
+            "cycleSeconds": 1800,
+            "anchorAt": "2026-09-07T11:30:00.000Z"
+          },
+          "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T09:00:00.000Z",
+          "cutoff": "2026-09-11T09:00:00.000Z",
+          "nextCutoff": "2026-09-11T09:30:00.000Z",
+          "settlementTarget": "2026-09-11T09:00:00.000Z",
+          "ruleVersion": "credits-staging-cycle-v1",
+          "ruleConfigHash": "810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de"
+        },
+        "status": "open",
+        "createdAt": "2026-09-11T09:00:52.550Z",
+        "updatedAt": "2026-09-11T09:00:52.647Z"
+      }
+    ],
+    "ticks": [
+      {
+        "runId": "c078868d-3c0d-4fc1-affa-6fb1ce3c2d23",
+        "status": "success",
+        "startedAt": "2026-09-11T17:48:39.641Z",
+        "endedAt": "2026-09-11T17:48:40.061Z",
+        "result": {
+          "status": "open",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            },
+            {
+              "route": "nft",
+              "status": "open",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+              "creditRunId": "215e1506c9b3e96eeda2857e39f7a720f3aa1e191c2f20ab1c0c4c929fd79fde",
+              "batchesProcessed": 1,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            }
+          ]
+        }
+      },
+      {
+        "runId": "3f570308-8f2c-45ba-ad22-92aeb436eae2",
+        "status": "success",
+        "startedAt": "2026-09-11T17:48:09.274Z",
+        "endedAt": "2026-09-11T17:48:09.487Z",
+        "result": {
+          "status": "blocked",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            },
+            {
+              "route": "nft",
+              "status": "blocked",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "errorCode": "DOMAIN_CONFLICT",
+              "reasonCodes": [
+                "SOURCE_UNHEALTHY",
+                "CHAIN_DEAD_LETTERS_OPEN",
+                "CHAIN_EVENTS_NOT_PROJECTED"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "runId": "043f28c4-6ac6-4e4c-9622-d85dce846872",
+        "status": "success",
+        "startedAt": "2026-09-11T17:47:38.941Z",
+        "endedAt": "2026-09-11T17:47:39.125Z",
+        "result": {
+          "status": "blocked",
+          "routeResults": [
+            {
+              "route": "uki",
+              "status": "waiting",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0
+            },
+            {
+              "route": "nft",
+              "status": "blocked",
+              "periodId": "credits-staging-cycle-v1:810def8e2e929e7edcf2f4fb6472997b614cd9c0079b0ea1f5ae8226d06e38de:2026-09-11T17:30:00.000Z",
+              "creditRunId": "",
+              "batchesProcessed": 0,
+              "itemsApplied": 0,
+              "pendingItems": 0,
+              "errorCode": "DOMAIN_CONFLICT",
+              "reasonCodes": [
+                "SOURCE_UNHEALTHY",
+                "CHAIN_DEAD_LETTERS_OPEN",
+                "CHAIN_EVENTS_NOT_PROJECTED"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "deadLetters": [
+      {
+        "_id": {
+          "contractAlias": "TOKEN_V2",
+          "eventName": "Transfer"
+        },
+        "count": 3
+      }
+    ],
+    "pendingEvents": [
+      {
+        "_id": {
+          "contractAlias": "TOKEN_V2",
+          "eventName": "Transfer",
+          "status": "failed"
+        },
+        "count": 3
+      }
+    ],
+    "runtime": {
+      "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+      "COMPETITION_CREDITS_RULE_VERSION": "credits-staging-cycle-v1",
+      "ECONOMY_CYCLE_SECONDS": "1800",
+      "ECONOMY_CYCLE_ANCHOR_AT": "2026-09-07T11:30:00.000Z"
+    },
+    "readOnly": true
+  },
+  "interpretation": {
+    "newNftCutObserved": true,
+    "manualHistoryRecoveryApplied": false,
+    "transferDeadLettersPreserved": 3,
+    "newCreditGrantToEligibleWalletVerified": false,
+    "authenticatedUxVerified": false
+  }
+}
