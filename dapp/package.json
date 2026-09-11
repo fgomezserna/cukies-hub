@@ -20,7 +20,7 @@
     "test:credits:real-mongo:policy": "node --test scripts/test-competition-credit-real-mongo-policy.test.mjs",
     "test": "jest",
     "test:schedulers": "node --test scripts/*scheduler-policy.test.mjs",
-    "test:reward-publisher": "node --test scripts/reward-batch-publisher-policy.test.mjs scripts/lib/reward-batch-publication.test.mjs scripts/lib/reward-publication-preparer.test.mjs",
+    "test:reward-publisher": "node --test scripts/reward-batch-publisher-policy.test.mjs scripts/lib/reward-batch-publication.test.mjs scripts/lib/reward-publication-preparer.test.mjs scripts/lib/reward-publication-plan-acquirer.test.mjs",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },

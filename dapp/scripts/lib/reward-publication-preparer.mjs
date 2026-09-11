@@ -2,6 +2,12 @@ import {
   assertRewardPublicationPlanIntegrity,
   buildRewardPublicationArtifacts,
 } from './reward-batch-publication.mjs';
+import {
+  assertRewardPublicationPeriodForwardEligible,
+  assertRewardPublicationPlanForwardEligible,
+  isRewardPublicationForwardFenceError,
+  rewardPublicationAccountingCollection,
+} from './reward-publication-forward-fence.mjs';
 
 function duplicateKey(error) {
   return Boolean(
@@ -48,7 +54,7 @@ export function buildRewardPublicationCandidatePipeline(
   forwardActivationAt,
 ) {
   const activationAt = validForwardActivationAt(forwardActivationAt);
-  return [
+  const pipeline = [
     { $match: {
       status: 'allocated_offchain',
       availableAt: { $lte: now },
@@ -63,8 +69,13 @@ export function buildRewardPublicationCandidatePipeline(
       },
     },
     { $sort: { availableAt: 1, _id: 1 } },
-    { $limit: maxCandidates },
   ];
+  // With a forward fence, period eligibility is derived from each sealed
+  // accounting document after this aggregation. Do not cap the candidate
+  // groups before that check: a backlog of late-created historical rows must
+  // not starve a valid period that appears later in the stable sort order.
+  if (!activationAt) pipeline.push({ $limit: maxCandidates });
+  return pipeline;
 }
 
 export async function prepareNextRewardPublicationPlan(input) {
@@ -76,7 +87,7 @@ export async function prepareNextRewardPublicationPlan(input) {
   ).toArray();
 
   for (const candidate of candidates) {
-    if (await existingPlan(input.db, candidate._id)) continue;
+    if (!forwardActivationAt && await existingPlan(input.db, candidate._id)) continue;
     if (candidate.accountingKind !== 'daily' && candidate.accountingKind !== 'weekly') {
       throw new Error(`El cierre ${candidate._id} tiene accountingKind invalido.`);
     }
@@ -84,20 +95,13 @@ export async function prepareNextRewardPublicationPlan(input) {
     try {
       let prepared = null;
       let replayed = false;
+      let skipCandidate = false;
       await session.withTransaction(async () => {
-        const current = await existingPlan(input.db, candidate._id, session);
-        if (current) {
-          prepared = current;
-          replayed = true;
-          return;
-        }
         const allocations = await input.db.collection('reward_accounting_allocations')
           .find({ accountingId: candidate._id }, { session })
           .sort({ _id: 1 })
           .toArray();
-        const accountingCollection = candidate.accountingKind === 'daily'
-          ? 'reward_daily_accounting'
-          : 'reward_weekly_prize_accounting';
+        const accountingCollection = rewardPublicationAccountingCollection(candidate.accountingKind);
         const accounting = await input.db.collection(accountingCollection).findOne(
           { _id: candidate._id },
           { session },
@@ -107,6 +111,30 @@ export async function prepareNextRewardPublicationPlan(input) {
           scope: 'reward_allocations',
           version: accounting.ruleVersion,
         }, { session });
+        assertRewardPublicationPeriodForwardEligible({
+          accounting,
+          accountingKind: candidate.accountingKind,
+          allocations,
+          rule,
+          forwardActivationAt,
+        });
+        const current = await existingPlan(input.db, candidate._id, session);
+        if (current) {
+          if (current.status === 'completed' || current.status === 'blocked') {
+            skipCandidate = true;
+            return;
+          }
+          assertRewardPublicationPlanForwardEligible({
+            plan: current,
+            accounting,
+            accountingKind: candidate.accountingKind,
+            rule,
+            forwardActivationAt,
+          });
+          prepared = current;
+          replayed = true;
+          return;
+        }
         const artifacts = buildRewardPublicationArtifacts({
           accountingId: candidate._id,
           accounting,
@@ -137,9 +165,11 @@ export async function prepareNextRewardPublicationPlan(input) {
         readConcern: { level: 'snapshot' },
         writeConcern: { w: 'majority' },
       });
+      if (skipCandidate) continue;
       if (!prepared) throw new Error(`No se preparo el cierre ${candidate._id}.`);
       return { plan: prepared, replayed };
     } catch (error) {
+      if (isRewardPublicationForwardFenceError(error)) continue;
       if (duplicateKey(error)) {
         const replay = await existingPlan(input.db, candidate._id);
         if (replay) return { plan: replay, replayed: true };

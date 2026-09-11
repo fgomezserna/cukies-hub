@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { buildRewardPublisherCanaryFixture } from './reward-batch-publisher-canary-fixture.mjs';
+import { stableRewardPublicationHash } from './reward-batch-publication.mjs';
+import { assertRewardPublicationPlanForwardEligible } from './reward-publication-forward-fence.mjs';
 import {
   buildRewardPublicationCandidatePipeline,
   prepareNextRewardPublicationPlan,
@@ -11,6 +13,7 @@ const DISTRIBUTOR = '0x6666666666666666666666666666666666666666';
 const TOKEN = '0x7777777777777777777777777777777777777777';
 const PLAYER = '0x1111111111111111111111111111111111111111';
 const NOW = new Date('2026-08-20T16:05:00.000Z');
+const FORWARD_ACTIVATION_AT = new Date('2026-08-20T16:00:00.000Z');
 
 function matches(document, filter) {
   return Object.entries(filter).every(([key, expected]) => document[key] === expected);
@@ -77,7 +80,7 @@ class MemoryCollection {
       seen.add(row.accountingId);
       grouped.push({ _id: row.accountingId, accountingKind: row.accountingKind });
     }
-    return new MemoryCursor(grouped.slice(0, limit));
+    return new MemoryCursor(limit === undefined ? grouped : grouped.slice(0, limit));
   }
 
   async insertOne(document) {
@@ -137,14 +140,97 @@ function setup() {
   };
 }
 
-function prepare(input) {
+function prepare(input, options = {}) {
   return prepareNextRewardPublicationPlan({
     ...input,
     chainId: 97,
     tokenAddress: TOKEN,
     distributorAddress: DISTRIBUTOR,
-    now: NOW,
+    now: options.now ?? NOW,
   });
+}
+
+function addCanonicalDailyFixture(context, dayId, input = {}) {
+  const createdAt = input.createdAt ?? NOW;
+  const availableAt = input.availableAt ?? createdAt;
+  const amountRaw = input.amountRaw ?? context.fixture.amountRaw;
+  const accountingId = `reward-daily:${dayId}`;
+  const allocationId = `allocation:${dayId}`;
+  const allocationImmutable = {
+    accountingId,
+    accountingKind: 'daily',
+    periodId: dayId,
+    allocationId,
+    walletNormalized: PLAYER,
+    category: 'player',
+    amountRaw,
+    fundingMode: 'daily_emission',
+    sourceIds: ['source-a'],
+    availableAt,
+    status: 'allocated_offchain',
+    createdAt,
+  };
+  const allocation = {
+    _id: allocationId,
+    ...allocationImmutable,
+    payloadHash: stableRewardPublicationHash({
+      kind: 'reward-accounting-allocation-document',
+      ...allocationImmutable,
+    }),
+  };
+  const sealedAllocation = {
+    allocationId,
+    walletNormalized: PLAYER,
+    category: 'player',
+    amountRaw,
+    fundingMode: 'daily_emission',
+    sourceIds: ['source-a'],
+  };
+  const accountingPayload = {
+    dayId,
+    ruleVersion: context.fixture.rule.version,
+    ruleConfigHash: context.fixture.rule.configHash,
+    sourceIds: ['source-a'],
+    sourceSetHash: 'a'.repeat(64),
+    sourceReservedRaw: amountRaw,
+    capacityMaterializedRaw: '0',
+    priorReservedInflowRaw: '0',
+    topupRaw: '0',
+    emissionRaw: amountRaw,
+    buckets: {
+      playersRaw: amountRaw,
+      creditPoolRaw: '0',
+      cukiePoolRaw: '0',
+      ambassadorOrdinaryRaw: '0',
+      weeklyPrizeRaw: '0',
+      ambassadorWeeklyRaw: '0',
+    },
+    undistributed: {
+      totalRaw: '0',
+      treasuryRaw: '0',
+      marketingDevelopmentRaw: '0',
+      supplyReductionRaw: '0',
+    },
+    priorReservedUndistributed: {
+      totalRaw: '0',
+      treasuryRaw: '0',
+      marketingDevelopmentRaw: '0',
+      supplyReductionRaw: '0',
+    },
+    destinations: context.fixture.accounting.destinations,
+    allocations: [sealedAllocation],
+    conservationRaw: amountRaw,
+  };
+  const accounting = {
+    _id: accountingId,
+    ...accountingPayload,
+    payloadHash: stableRewardPublicationHash(accountingPayload),
+    status: 'sealed',
+    sealedAt: availableAt,
+  };
+  context.db.rows.get('reward_accounting_allocations').push(allocation);
+  context.db.rows.get('reward_daily_accounting').push(accounting);
+  return { accounting, allocation };
 }
 
 test('ordena los cierres despues de agrupar para publicar primero el mas antiguo', () => {
@@ -221,6 +307,101 @@ test('el preparador no crea artefactos para una allocation historica', async () 
   assert.equal(context.db.rows.get('reward_publication_plans').length, 0);
   assert.equal(context.db.rows.get('reward_claim_batches').length, 0);
   assert.equal(context.db.rows.get('reward_claim_proofs').length, 0);
+});
+
+test('el periodo diario canonico no entra aunque su allocation se cree despues de la frontera', async () => {
+  const context = setup();
+  context.db.rows.set('reward_accounting_allocations', []);
+  context.db.rows.set('reward_daily_accounting', []);
+  addCanonicalDailyFixture(context, '2026-08-19', {
+    createdAt: new Date('2026-08-20T16:05:00.000Z'),
+  });
+  const result = await prepare(context, { now: NOW });
+  const fenced = await prepare({
+    ...context,
+    forwardActivationAt: FORWARD_ACTIVATION_AT,
+  }, { now: NOW });
+  assert.equal(result.plan.accountingId, 'reward-daily:2026-08-19');
+  assert.throws(() => assertRewardPublicationPlanForwardEligible({
+    plan: result.plan,
+    accounting: context.db.rows.get('reward_daily_accounting')[0],
+    accountingKind: 'daily',
+    rule: context.fixture.rule,
+    forwardActivationAt: FORWARD_ACTIVATION_AT,
+  }), /comienza antes/);
+  assert.equal(fenced, null);
+  assert.equal(context.db.rows.get('reward_publication_plans').length, 1);
+  assert.equal(context.db.rows.get('reward_claim_batches').length, 1);
+  assert.equal(context.db.rows.get('reward_claim_proofs').length, 1);
+});
+
+test('salta el periodo antiguo y prepara el primer diario completo posterior a la frontera', async () => {
+  const context = setup();
+  context.db.rows.set('reward_accounting_allocations', []);
+  context.db.rows.set('reward_daily_accounting', []);
+  addCanonicalDailyFixture(context, '2026-08-19', {
+    createdAt: new Date('2026-08-20T16:05:00.000Z'),
+    availableAt: new Date('2026-08-20T16:05:00.000Z'),
+  });
+  addCanonicalDailyFixture(context, '2026-08-21', {
+    createdAt: new Date('2026-08-22T16:05:00.000Z'),
+    availableAt: new Date('2026-08-22T16:05:00.000Z'),
+  });
+  const result = await prepare({
+    ...context,
+    forwardActivationAt: FORWARD_ACTIVATION_AT,
+  }, { now: new Date('2026-08-22T16:05:00.000Z') });
+  assert.equal(result.plan.accountingId, 'reward-daily:2026-08-21');
+  assert.equal(context.db.rows.get('reward_publication_plans').length, 1);
+  assert.equal(context.db.rows.get('reward_publication_plans')[0].accountingId, 'reward-daily:2026-08-21');
+});
+
+test('no repite un plan completed cuando existe otro cierre diario elegible', async () => {
+  const context = setup();
+  context.db.rows.set('reward_accounting_allocations', []);
+  context.db.rows.set('reward_daily_accounting', []);
+  addCanonicalDailyFixture(context, '2026-08-21', {
+    createdAt: new Date('2026-08-22T16:05:00.000Z'),
+    availableAt: new Date('2026-08-22T16:05:00.000Z'),
+  });
+  addCanonicalDailyFixture(context, '2026-08-22', {
+    createdAt: new Date('2026-08-23T16:05:00.000Z'),
+    availableAt: new Date('2026-08-23T16:05:00.000Z'),
+  });
+  const input = {
+    ...context,
+    forwardActivationAt: FORWARD_ACTIVATION_AT,
+  };
+  const first = await prepare(input, { now: new Date('2026-08-23T16:05:00.000Z') });
+  assert.equal(first.plan.accountingId, 'reward-daily:2026-08-21');
+  context.db.rows.get('reward_publication_plans')[0].status = 'completed';
+
+  const second = await prepare(input, { now: new Date('2026-08-23T16:05:00.000Z') });
+  assert.equal(second.plan.accountingId, 'reward-daily:2026-08-22');
+  assert.equal(context.db.rows.get('reward_publication_plans').length, 2);
+});
+
+test('recorre todo el backlog candidateado antes de descartar historicos y alcanza un cierre nuevo', async () => {
+  const context = setup();
+  context.db.rows.set('reward_accounting_allocations', []);
+  context.db.rows.set('reward_daily_accounting', []);
+  for (let index = 0; index < 50; index += 1) {
+    const dayId = new Date(Date.UTC(2026, 5, 1 + index)).toISOString().slice(0, 10);
+    addCanonicalDailyFixture(context, dayId, {
+      createdAt: new Date('2026-08-20T16:05:00.000Z'),
+      availableAt: new Date('2026-08-20T16:05:00.000Z'),
+    });
+  }
+  addCanonicalDailyFixture(context, '2026-08-21', {
+    createdAt: new Date('2026-08-22T16:05:00.000Z'),
+    availableAt: new Date('2026-08-22T16:05:00.000Z'),
+  });
+  const result = await prepare({
+    ...context,
+    forwardActivationAt: FORWARD_ACTIVATION_AT,
+  }, { now: new Date('2026-08-22T16:05:00.000Z') });
+  assert.equal(result.plan.accountingId, 'reward-daily:2026-08-21');
+  assert.equal(context.db.rows.get('reward_publication_plans').length, 1);
 });
 
 test('ignora allocations intermedias mientras no exista un cierre contable final', async () => {
