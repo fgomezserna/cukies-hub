@@ -13,6 +13,7 @@ import {
   type RewardEmissionBudgetOperatorRecovery,
   type RewardEmissionBudgetReason,
   type RewardEmissionBudgetState,
+  type RewardEconomyRuntimeContext,
   type RewardLateSettlementRecoveryPlan,
   type RewardRule,
 } from "./types";
@@ -96,13 +97,18 @@ function recoveryHashMap(
   label: string,
   sourceIds: readonly string[],
 ) {
-  if (value === undefined) return undefined;
+  if (value === undefined) {
+    throw new DomainValidationError(`${label} debe fijar todos los sourceIds del plan.`);
+  }
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new DomainValidationError(`${label} debe ser un objeto.`);
   }
   const map = value as Record<string, unknown>;
   const allowed = new Set(sourceIds);
   const keys = Object.keys(map);
+  if (keys.length !== sourceIds.length) {
+    throw new DomainValidationError(`${label} debe fijar todos los sourceIds del plan.`);
+  }
   if (keys.some((key) => !allowed.has(key))) {
     throw new DomainValidationError(`${label} contiene un sourceId fuera del plan.`);
   }
@@ -255,9 +261,9 @@ export function assertRewardLateSettlementRecoveryPlan(
     expectedRuleConfigHash,
     dailyCapRaw,
     lifetimeCapRaw,
-    ...(sourceSetHashById ? { sourceSetHashById } : {}),
-    ...(calculationInputHashById ? { calculationInputHashById } : {}),
-    ...(calculationOutputHashById ? { calculationOutputHashById } : {}),
+    sourceSetHashById: sourceSetHashById!,
+    calculationInputHashById: calculationInputHashById!,
+    calculationOutputHashById: calculationOutputHashById!,
   };
   if (rewardLateSettlementRecoveryPlanHash(planUnsigned(plan)) !== plan.planHash) {
     throw new DomainConflictError("recoveryPlan.planHash no coincide con el plan inmutable.");
@@ -269,6 +275,7 @@ export function assertRewardLateSettlementRecoveryForSource(
   planInput: unknown,
   source: Pick<EmissionBudgetSource, "periodId" | "sourceId" | "sourceTotalRaw" | "sourceSetHash" | "calculationInputHash" | "calculationOutputHash" | "now">,
   rule: RewardRule,
+  runtime?: RewardEconomyRuntimeContext,
 ): RewardEmissionBudgetOperatorRecovery {
   const plan = assertRewardLateSettlementRecoveryPlan(planInput);
   if (!plan.sourceIds.includes(source.sourceId)) {
@@ -289,16 +296,29 @@ export function assertRewardLateSettlementRecoveryForSource(
     throw new DomainConflictError(`La regla o los techos de emision no coinciden con el plan aprobado.`);
   }
   const calendar = rule.emissionBudget.calendar;
-  if (calendar && (calendar.chainId !== plan.chainId || calendar.cycleSeconds !== plan.cycleSeconds)) {
+  if (!calendar) {
+    throw new DomainConflictError("La recuperacion exige un calendario economico sellado.");
+  }
+  if (
+    !runtime
+    || runtime.databaseName !== plan.databaseName
+    || runtime.chainId !== plan.chainId
+    || runtime.cycleSeconds !== plan.cycleSeconds
+    || !runtime.calendar
+    || stableRewardHash(runtime.calendar) !== stableRewardHash(calendar)
+  ) {
+    throw new DomainConflictError("El plan de recuperacion no coincide con el runtime economico abierto.");
+  }
+  if (calendar.chainId !== plan.chainId || calendar.cycleSeconds !== plan.cycleSeconds) {
     throw new DomainConflictError(`El calendario economico no coincide con el plan aprobado.`);
   }
   if (plan.approvedAt.getTime() > source.now.getTime()) {
     throw new DomainConflictError("El plan de recuperacion no estaba aprobado al ejecutar el comando.");
   }
   if (
-    (plan.sourceSetHashById?.[source.sourceId] && plan.sourceSetHashById[source.sourceId] !== source.sourceSetHash)
-    || (plan.calculationInputHashById?.[source.sourceId] && plan.calculationInputHashById[source.sourceId] !== source.calculationInputHash)
-    || (plan.calculationOutputHashById?.[source.sourceId] && plan.calculationOutputHashById[source.sourceId] !== source.calculationOutputHash)
+    plan.sourceSetHashById[source.sourceId] !== source.sourceSetHash
+    || plan.calculationInputHashById[source.sourceId] !== source.calculationInputHash
+    || plan.calculationOutputHashById[source.sourceId] !== source.calculationOutputHash
   ) {
     throw new DomainConflictError(`La evidencia de calculo del source ${source.sourceId} no coincide con el plan aprobado.`);
   }
@@ -654,6 +674,8 @@ export function validateRewardEmissionBudgetEvent(event: RewardEmissionBudgetEve
           )
           && resultingDaily === previousDaily + sourceTotal
           && resultingLifetime === previousLifetime + sourceTotal
+          && resultingDaily <= dailyCap
+          && resultingLifetime <= lifetimeCap
         )
         || (
           event.status === "blocked"
@@ -675,6 +697,7 @@ export function assertRewardEmissionBudgetReplay(
   event: RewardEmissionBudgetEvent,
   rule: RewardRule,
   source: EmissionBudgetSource,
+  runtime?: RewardEconomyRuntimeContext,
 ) {
   if (!validateRewardEmissionBudgetEvent(event)) {
     throw new DomainConflictError(
@@ -712,8 +735,13 @@ export function assertRewardEmissionBudgetReplay(
     );
   }
   const expectedOperatorRecovery = source.recoveryPlan
-    ? assertRewardLateSettlementRecoveryForSource(source.recoveryPlan, source, rule)
+    ? assertRewardLateSettlementRecoveryForSource(source.recoveryPlan, source, rule, runtime)
     : undefined;
+  if (event.operatorRecovery && !source.recoveryPlan) {
+    throw new DomainConflictError(
+      `La decision de presupuesto del source ${source.sourceId} exige volver a presentar el plan de recuperacion.`,
+    );
+  }
   if (stableRewardHash(event.operatorRecovery ?? null) !== stableRewardHash(expectedOperatorRecovery ?? null)) {
     throw new DomainConflictError(
       `La decision de presupuesto del source ${source.sourceId} no coincide con el plan de recuperacion.`,
@@ -755,7 +783,15 @@ export async function reserveRewardEmissionBudget(
   }
   const replay = await repository.findEmissionBudgetEvent(source.sourceId);
   if (replay) {
-    return { event: assertRewardEmissionBudgetReplay(replay, rule, source), replayed: true };
+    return {
+      event: assertRewardEmissionBudgetReplay(
+        replay,
+        rule,
+        source,
+        source.recoveryPlan ? repository.getRewardEconomyRuntimeContext() : undefined,
+      ),
+      replayed: true,
+    };
   }
 
   const config = rule.emissionBudget;
@@ -803,7 +839,12 @@ export async function reserveRewardEmissionBudget(
   let operatorRecovery: RewardEmissionBudgetOperatorRecovery | undefined;
   let effectiveReason = reason;
   if (source.recoveryPlan) {
-    operatorRecovery = assertRewardLateSettlementRecoveryForSource(source.recoveryPlan, source, rule);
+    operatorRecovery = assertRewardLateSettlementRecoveryForSource(
+      source.recoveryPlan,
+      source,
+      rule,
+      repository.getRewardEconomyRuntimeContext(),
+    );
     if (reason !== "DAY_CLOSED") {
       throw new DomainConflictError(
         `El source ${source.sourceId} no requiere una recuperacion DAY_CLOSED autorizada.`,

@@ -33,6 +33,9 @@ function recoveryPlan(rule: ReturnType<typeof testRewardRule>, sourceId: string,
     expectedRuleConfigHash: rule.configHash,
     dailyCapRaw: rule.emissionBudget.dailyCapRaw,
     lifetimeCapRaw: rule.emissionBudget.lifetimeCapRaw,
+    sourceSetHashById: { [sourceId]: "c".repeat(64) },
+    calculationInputHashById: { [sourceId]: "d".repeat(64) },
+    calculationOutputHashById: { [sourceId]: "e".repeat(64) },
   };
   return { ...unsigned, planHash: rewardLateSettlementRecoveryPlanHash(unsigned) };
 }

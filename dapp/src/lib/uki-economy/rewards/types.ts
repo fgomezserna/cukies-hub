@@ -25,6 +25,14 @@ export type RewardEmissionBudgetConfig = {
   overflowPolicy: "block";
 };
 
+/** Runtime identity observed from the opened economy connection. */
+export type RewardEconomyRuntimeContext = {
+  databaseName: string;
+  chainId: number;
+  cycleSeconds: number;
+  calendar?: EconomyCycleCalendar;
+};
+
 export type RewardCategory =
   | "player"
   | "credit_pool_daily"
@@ -270,10 +278,9 @@ export type RewardLateSettlementRecoveryRequest = {
 
 /**
  * Immutable approval material for a late settlement. `sourceIds` and
- * `sourceTotalRawById` keep the recovery bounded to the reviewed census; the
- * optional evidence maps allow a reviewer to pin the exact calculation
- * hashes when they are available. No field in this plan grants publication or
- * claim authority.
+ * `sourceTotalRawById` keep the recovery bounded to the reviewed census; all
+ * three evidence maps pin the exact source-set and calculation hashes for
+ * every source. No field in this plan grants publication or claim authority.
  */
 export type RewardLateSettlementRecoveryPlan = {
   planVersion: typeof REWARD_LATE_SETTLEMENT_RECOVERY_PLAN_VERSION;
@@ -292,9 +299,9 @@ export type RewardLateSettlementRecoveryPlan = {
   expectedRuleConfigHash: string;
   dailyCapRaw: string;
   lifetimeCapRaw: string;
-  sourceSetHashById?: Record<string, string>;
-  calculationInputHashById?: Record<string, string>;
-  calculationOutputHashById?: Record<string, string>;
+  sourceSetHashById: Record<string, string>;
+  calculationInputHashById: Record<string, string>;
+  calculationOutputHashById: Record<string, string>;
 };
 
 /** Metadata persisted on the canonical budget event for a recovered source. */
