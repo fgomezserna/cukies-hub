@@ -169,7 +169,20 @@
       "branch": "codex/doc11-ranking-forward-waiting",
       "issueComment": "https://github.com/fgomezserna/cukies-hub/issues/418#issuecomment-5639796568",
       "symptom": "WEEKLY_RANKING_TICK_HTTP_409 before the first complete forward period",
-      "state": "implementation_in_progress"
+      "state": "reviewed_ready_for_delivery",
+      "implementationSha": "d9294c2fe133e1c886c9944e514a5f57c412975a",
+      "integrationSha": "c2374837",
+      "review": "PASS: first complete forward period and settlement delay, full rule coverage, genuine conflicts and prior closures preserved, noT behavior unchanged",
+      "checks": {
+        "targetedRankingTests": 16,
+        "rankingApiTests": 18,
+        "fullDappSuites": 272,
+        "fullDappTests": 2357,
+        "typecheck": "PASS",
+        "lint": "PASS with pre-existing my-cukies-panel.tsx:513 warning",
+        "diffCheck": "PASS"
+      },
+      "deliveryBaselineArtifact": "/tmp/doc11-ranking-waiting-baseline.json"
     }
   },
   "limits": [

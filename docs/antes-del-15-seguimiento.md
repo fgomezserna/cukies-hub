@@ -202,7 +202,11 @@ readiness, imágenes conservadas y82contenedores protegidos (incluido juego31).
 Partidas, Pool, contabilidad y publicador tienen heartbeat success; publicador idle.
 Las ocho colecciones financieras seleccionadas mantienen sus conteos/hashes previos.
 Ranking devuelve409 durante la espera del primer periodo completo: corrección en
-`codex/doc11-ranking-forward-waiting`, sin cambiar T ni recuperar el pasado. Pool necesita conservar su
+`codex/doc11-ranking-forward-waiting`, sin cambiar T ni recuperar el pasado.
+Corrección revisada en `d9294c2f`, integrada en `c2374837`: espera explícita hasta
+00:02:30UTC del12Sep, sin crear cierres; mantiene los conflictos reales.
+Validación:272suites/2357tests,16tests focales de ranking y18de API,lint/tipos PASS.
+Entrega pendiente; baseline19:56UTC preserva web75d8cc8f y93contenedores. Pool necesita conservar su
 limpieza normal de leases/locks expirados; no recupera premios históricos.
 L6 terminó el diagnóstico sin parche nuevo; A1 permanece abierto. L7 sigue en cola.
 Modelo de las siete: **Luna Max**, con revisión e integración
@@ -249,7 +253,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | --- | --- | --- | --- |
 | R1 | Intentos en Resumen | Desplegado · PR430 | Comprobar con sesión iniciada. |
 | R2 | Avisos en Resumen | Corrección de fuente desplegada · PR432 | Comprobar el resultado visual autenticado. |
-| J1 | Bote en Jugar | Procesos activados; espera inicial del ranking en corrección | Publicar la corrección y comprobar bote/recorrido nuevo. |
+| J1 | Bote en Jugar | Procesos activados; espera del ranking revisada y validada | Publicar d9294c2f y comprobar bote/recorrido nuevo. |
 | J2 | Alias | Desplegado · PR429 | Guardar y recargar con sesión. |
 | J3 | Reparto | Estados/importes desplegados · PR433 | Verificar un reparto nuevo. |
 | M1 | Master tras retirar del Pool | Desplegado · PR425 | Operación posterior al parche y convergencia autenticada. |
