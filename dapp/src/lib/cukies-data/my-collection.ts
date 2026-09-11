@@ -48,7 +48,9 @@ export type CukieSaleEligibilityInput = {
 type UkiMarketplaceEligibilityConfig = Pick<
   typeof ukiMarketplacePublicConfig,
   'ready' | 'chainId' | 'collectionAddresses'
->;
+> & {
+  marketplaceAddress?: `0x${string}` | null;
+};
 
 function sameCollection(network: string, actual: string, expected: string) {
   return network === 'BSC'
@@ -292,19 +294,30 @@ export async function listMyCukieCollectionFromDb(input: {
     poolReady,
     masterReady,
   } = requiredConfig(input.config ?? ukiNftVaults);
+  const configuredMarketplaceAddress = (
+    input.marketplaceConfig?.marketplaceAddress
+      ?? ukiMarketplacePublicConfig.marketplaceAddress
+  )?.toLowerCase() ?? null;
   const activeUkiOrders = await input.db.collection<IndexedUkiMarketplaceOrder>('uki_marketplace_orders')
     .find({
       chainId,
       collectionAddressNormalized: { $in: collections as `0x${string}`[] },
       sellerNormalized: walletNormalized as `0x${string}`,
       status: 'active',
+      ...(configuredMarketplaceAddress
+        ? { marketplaceAddressNormalized: configuredMarketplaceAddress as `0x${string}` }
+        : {}),
     })
     .limit(MAX_COLLECTION_ROWS + 1)
     .toArray();
   if (activeUkiOrders.length > MAX_COLLECTION_ROWS) {
     throw new SchemaNotReadyError('La colección supera el límite seguro de anuncios activos.');
   }
-  const ukiSaleByAsset = new Map<string, true>();
+  const ukiSaleByAsset = new Map<string, {
+    orderId: `0x${string}` | null;
+    collectionAddress: `0x${string}`;
+    tokenId: string;
+  }>();
   for (const order of activeUkiOrders) {
     const id = tokenId(order.tokenId);
     const collection = typeof order.collectionAddressNormalized === 'string'
@@ -320,7 +333,15 @@ export async function listMyCukieCollectionFromDb(input: {
     ) continue;
     const assetId = `${chainId}:${collection}:${id}`;
     if (ukiSaleByAsset.has(assetId)) throw new SchemaNotReadyError('Un Cukie tiene más de un anuncio UKI activo.');
-    ukiSaleByAsset.set(assetId, true);
+    const orderId = typeof order.orderId === 'string'
+      && /^0x[0-9a-f]{64}$/i.test(order.orderId)
+      ? order.orderId.toLowerCase() as `0x${string}`
+      : null;
+    ukiSaleByAsset.set(assetId, {
+      orderId,
+      collectionAddress: collection as `0x${string}`,
+      tokenId: id,
+    });
   }
   const positionFilter = {
     chainId,
@@ -438,10 +459,10 @@ export async function listMyCukieCollectionFromDb(input: {
       && masterVaultAddress
       && recoveryPosition.vaultAddress?.toLowerCase() === masterVaultAddress);
     const legacySale = legacySaleKind(document, walletNormalized, normalized.canonicalState);
-    const ukiSale = ukiSaleByAsset.has(assetId);
+    const ukiSale = ukiSaleByAsset.get(assetId) ?? null;
     const saleKind = master || pool || recoveryPosition?.status === 'custodied' || recoveryPosition?.status === 'current_custody'
       ? null
-      : ukiSale
+        : ukiSale
         ? 'uki' as const
         : legacySale;
     const state = recoveryPosition?.status === 'unknown'
@@ -486,6 +507,7 @@ export async function listMyCukieCollectionFromDb(input: {
       chainId,
       collectionAddress: String(document.collectionAddressNormalized).toLowerCase(),
       saleKind,
+      saleOrderId: ukiSale?.orderId ?? null,
       // Un anuncio activo conserva su origen reconciliado: una orden UKI no
       // se convierte en Legacy aunque ambas rutas compartan colección y cadena.
       marketplaceSurface: saleKind ?? saleEligibility.surface,

@@ -34,6 +34,8 @@ export type MyCukieCollectionItem = {
   saleKind: MyCukieSaleKind;
   /** Superficie que resuelve la identidad del activo, también cuando aún no está listado. */
   marketplaceSurface: MyCukieMarketplaceSurface;
+  /** Identidad exacta del anuncio UKI activo para abrir su acción de cancelación. */
+  saleOrderId?: `0x${string}` | null;
   /** Destinos de publicación disponibles para un activo en wallet. */
   sellSurfaces?: Array<Exclude<MyCukieMarketplaceSurface, null>>;
   availableActions: MyCukieAction[];

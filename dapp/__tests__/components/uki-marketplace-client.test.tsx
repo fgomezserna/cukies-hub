@@ -1,5 +1,17 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 
+let mockWalletAddress: string | null = null;
+
+jest.mock('wagmi', () => ({
+  useAccount: () => ({ address: mockWalletAddress }),
+}));
+
+jest.mock('lucide-react', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const Icon = (props: React.SVGProps<SVGSVGElement>) => React.createElement('svg', props);
+  return { X: Icon };
+});
+
 import { UkiMarketplaceClient } from '@/components/uki-marketplace/marketplace-client';
 
 const order = {
@@ -35,6 +47,7 @@ describe('Marketplace UKI público', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockWalletAddress = null;
   });
 
   it('muestra únicamente el mercado UKI disponible', async () => {
@@ -56,6 +69,23 @@ describe('Marketplace UKI público', () => {
       '/api/marketplace/v1/orders?scope=public&limit=24',
       expect.objectContaining({ cache: 'no-store' }),
     );
+  });
+
+  it('muestra gestión del anuncio en la fila propia en vez de ofrecer compra propia', async () => {
+    mockWalletAddress = order.seller;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', data: { orders: [order] } }),
+    });
+
+    render(<UkiMarketplaceClient />);
+
+    expect(await screen.findByRole('link', { name: 'Gestionar anuncio' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`orderId=${order.orderId}`),
+    );
+    expect(screen.queryByRole('button', { name: 'Comprar' })).not.toBeInTheDocument();
   });
 
   it('no sustituye el mercado UKI por el mercado anterior si el servicio no está disponible', async () => {

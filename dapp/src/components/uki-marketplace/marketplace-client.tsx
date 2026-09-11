@@ -9,9 +9,12 @@ import {
   Cube,
   ShieldCheck,
 } from '@phosphor-icons/react';
+import Link from 'next/link';
+import { useAccount } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
-import { UkiMarketplaceBuyerCheckout } from './buyer-checkout';
+import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
+import { UkiMarketplacePurchaseSheet } from './purchase-sheet';
 import type {
   UkiMarketplaceOrderView,
   UkiMarketplaceOrdersResponse,
@@ -48,10 +51,6 @@ function targetOrderSignature(
   return target ? JSON.stringify(stableOrderSignature(target)) : 'missing';
 }
 
-function shortAddress(address: string) {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
 function formatUkiAmount(raw: string) {
   if (!/^\d+$/.test(raw)) return '—';
   const padded = raw.padStart(19, '0');
@@ -59,6 +58,16 @@ function formatUkiAmount(raw: string) {
   const fraction = padded.slice(-18).slice(0, 4).replace(/0+$/, '');
   const grouped = BigInt(integer || '0').toLocaleString('es-ES');
   return fraction ? `${grouped},${fraction}` : grouped;
+}
+
+function ukiSellerManagementHref(order: UkiMarketplaceOrderView) {
+  const query = new URLSearchParams({
+    tokenId: order.tokenId,
+    collection: order.collectionAddress,
+    chainId: String(order.chainId),
+    orderId: order.orderId,
+  });
+  return `/marketplace?${query.toString()}#mis-anuncios`;
 }
 
 function formatExpiry(value: string) {
@@ -111,20 +120,27 @@ function EmptyFeed() {
 
 function OrderRow({
   order,
-  expanded,
-  onToggle,
+  open,
+  onOpenChange,
   onPurchased,
 }: {
   order: UkiMarketplaceOrderView;
-  expanded: boolean;
-  onToggle: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onPurchased: () => void;
 }) {
+  const { address } = useAccount();
+  const ownOrder = Boolean(address && address.toLowerCase() === order.seller.toLowerCase());
   return (
-    <div>
+    <>
       <article className="grid gap-4 px-4 py-5 transition duration-300 ease-out hover:bg-lilac-300/[0.035] sm:grid-cols-[4rem_minmax(0,1fr)_minmax(12rem,auto)] sm:items-center sm:px-5">
-        <div className="grid h-16 w-16 place-items-center rounded-[8px] border border-lilac-200/15 bg-lilac-200/[0.055] text-lilac-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-          <Cube aria-hidden className="h-7 w-7" weight="duotone" />
+        <div className="relative h-16 w-16 overflow-hidden rounded-[8px] border border-lilac-200/15 bg-lilac-200/[0.055] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+          <CukiImage
+            src={order.imageUrl ?? null}
+            alt={`Cukie #${order.tokenId}`}
+            sizes="64px"
+            className="object-contain p-1"
+          />
         </div>
 
         <div className="min-w-0">
@@ -137,9 +153,7 @@ function OrderRow({
               Validado en vivo
             </span>
           </div>
-          <p className="mt-1 truncate font-mono text-xs text-slate-500">
-            Colección {shortAddress(order.collectionAddress)} · vendedor {shortAddress(order.seller)}
-          </p>
+          <p className="mt-1 text-xs text-slate-400">Red {order.chainId === 97 ? 'BSC Testnet' : 'BSC'} · anuncio UKI</p>
           <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-400">
             <Clock aria-hidden className="h-3.5 w-3.5" />
             Expira {formatExpiry(order.expiresAt)}
@@ -154,25 +168,36 @@ function OrderRow({
             {formatUkiAmount(order.ukiPriceRaw)} <span className="text-sm text-lilac-100">UKI</span>
           </p>
           <p className="mt-1 text-xs text-slate-500">Precio fijado en UKI</p>
-          <Button
-            type="button"
-            size="sm"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            className="mt-3 min-w-32 bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
-          >
-            {expanded ? 'Cerrar compra' : 'Comprar'}
-            <CaretDown
-              aria-hidden
-              className={`ml-2 h-4 w-4 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
-            />
-          </Button>
+          {ownOrder ? (
+            <Link
+              href={ukiSellerManagementHref(order)}
+              className="mt-3 inline-flex min-h-9 items-center justify-center rounded-md bg-lilac-200 px-3 text-sm font-bold text-[#0d0914] hover:bg-lilac-100"
+            >
+              Gestionar anuncio
+            </Link>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => onOpenChange(true)}
+              aria-haspopup="dialog"
+              className="mt-3 min-w-32 bg-lilac-200 text-[#0d0914] hover:bg-lilac-100 active:scale-[0.98]"
+            >
+              Comprar
+              <CaretDown aria-hidden className="ml-2 h-4 w-4 -rotate-90" />
+            </Button>
+          )}
         </div>
       </article>
-      {expanded && (
-        <UkiMarketplaceBuyerCheckout order={order} onPurchased={onPurchased} />
-      )}
-    </div>
+      {!ownOrder ? (
+        <UkiMarketplacePurchaseSheet
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+          onPurchased={onPurchased}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -307,10 +332,8 @@ export function UkiMarketplaceClient() {
             <OrderRow
               key={order.orderId}
               order={order}
-              expanded={selectedOrderId === order.orderId}
-              onToggle={() => setSelectedOrderId((current) => (
-                current === order.orderId ? null : order.orderId
-              ))}
+              open={selectedOrderId === order.orderId}
+              onOpenChange={(open) => setSelectedOrderId(open ? order.orderId : null)}
               onPurchased={() => setReloadKey((value) => value + 1)}
             />
           ))}

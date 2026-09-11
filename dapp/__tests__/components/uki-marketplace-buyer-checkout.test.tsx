@@ -9,6 +9,8 @@ const uki = '0x3333333333333333333333333333333333333333';
 const router = '0x4444444444444444444444444444444444444444';
 const wbnb = '0x5555555555555555555555555555555555555555';
 const usdt = '0x6666666666666666666666666666666666666666';
+const asm = '0x7777777777777777777777777777777777777777';
+const usdc = '0x8888888888888888888888888888888888888888';
 const orderId = `0x${'1'.repeat(64)}` as `0x${string}`;
 const txHash = `0x${'a'.repeat(64)}`;
 const approvalHash = `0x${'b'.repeat(64)}`;
@@ -62,7 +64,10 @@ const readContract = jest.fn(async (input: {
     case 'decimals':
       return input.address === usdt ? 6 : 18;
     case 'symbol':
-      return input.address === usdt ? 'USDT' : 'UKI';
+      if (input.address === usdt) return 'USDT';
+      if (input.address === asm) return 'tASM';
+      if (input.address === usdc) return 'tUSDC';
+      return 'UKI';
     case 'balanceOf':
       return BigInt('1000000000000000000000000');
     case 'allowance':
@@ -113,8 +118,10 @@ jest.mock('@/lib/uki-marketplace/public-config', () => ({
     ready: true,
     checkoutReady: true,
     ukiPaymentReady: true,
+    asmPaymentReady: true,
     bnbPaymentReady: true,
     usdtPaymentReady: true,
+    usdcPaymentReady: true,
     chainId: 97,
     marketplaceAddress: '0x1111111111111111111111111111111111111111',
     collectionAddresses: ['0x2222222222222222222222222222222222222222'],
@@ -122,12 +129,22 @@ jest.mock('@/lib/uki-marketplace/public-config', () => ({
     routerAddress: '0x4444444444444444444444444444444444444444',
     wrappedNativeAddress: '0x5555555555555555555555555555555555555555',
     usdtTokenAddress: '0x6666666666666666666666666666666666666666',
+    asmTokenAddress: '0x7777777777777777777777777777777777777777',
+    usdcTokenAddress: '0x8888888888888888888888888888888888888888',
     bnbPaymentPath: [
       '0x5555555555555555555555555555555555555555',
       '0x3333333333333333333333333333333333333333',
     ],
     usdtPaymentPath: [
       '0x6666666666666666666666666666666666666666',
+      '0x3333333333333333333333333333333333333333',
+    ],
+    asmPaymentPath: [
+      '0x7777777777777777777777777777777777777777',
+      '0x3333333333333333333333333333333333333333',
+    ],
+    usdcPaymentPath: [
+      '0x8888888888888888888888888888888888888888',
       '0x3333333333333333333333333333333333333333',
     ],
     explorerBaseUrl: 'https://testnet.bscscan.com',
@@ -173,6 +190,8 @@ describe('checkout comprador marketplace UKI', () => {
     ukiMarketplacePublicConfig.ukiPaymentReady = true;
     ukiMarketplacePublicConfig.bnbPaymentReady = true;
     ukiMarketplacePublicConfig.usdtPaymentReady = true;
+    ukiMarketplacePublicConfig.asmPaymentReady = true;
+    ukiMarketplacePublicConfig.usdcPaymentReady = true;
     jest.clearAllMocks();
   });
 
@@ -284,13 +303,43 @@ describe('checkout comprador marketplace UKI', () => {
     ]);
   });
 
+  it.each([
+    ['ASM', asm, 'tASM'],
+    ['USDC', usdc, 'tUSDC'],
+  ] as const)('usa buyWithToken para %s con la ruta configurada', async (currency, tokenAddress, symbol) => {
+    render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: currency }));
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
+    const buyButton = await screen.findByRole('button', { name: `Autorizar ${symbol} y comprar` });
+    fireEvent.click(buyButton);
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      address: marketplace,
+      functionName: 'buyWithToken',
+    })));
+    const purchase = writeContractAsync.mock.calls.find(
+      ([input]) => input.functionName === 'buyWithToken',
+    )?.[0];
+    expect(purchase).toBeDefined();
+    expect((purchase as { args: readonly unknown[] }).args).toEqual([
+      orderId,
+      tokenAddress,
+      BigInt('2222000000000000000'),
+      [tokenAddress, uki],
+      BigInt(1_700_000_600),
+    ]);
+  });
+
   it('bloquea la compra de la propia orden', async () => {
     walletAddress = seller;
     render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
 
     const button = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
     expect(button).toBeDisabled();
-    expect(screen.getByText(/Esta orden pertenece a tu wallet/)).toBeInTheDocument();
+    expect(screen.getByText(/Este anuncio pertenece a tu wallet/)).toBeInTheDocument();
   });
 
   it('conserva el éxito del receipt aunque la lectura posterior llegue tarde', async () => {
@@ -338,6 +387,26 @@ describe('checkout comprador marketplace UKI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Comprobar transacción' }));
     await waitFor(() => expect(screen.getByText('Compra y entrega verificadas')).toBeInTheDocument());
     expect(onPurchased).toHaveBeenCalledTimes(1);
+    expect(writeContractAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('no reutiliza una autorización pendiente cuando cambia el anuncio', async () => {
+    waitForTransactionReceipt.mockRejectedValueOnce(new Error('RPC timeout'));
+    const view = render(<UkiMarketplaceBuyerCheckout order={order} onPurchased={jest.fn()} />);
+
+    const reviewButton = await screen.findByRole('button', { name: 'Revisar y confirmar compra' });
+    await waitFor(() => expect(reviewButton).toBeEnabled());
+    fireEvent.click(reviewButton);
+    fireEvent.click(await screen.findByRole('button', { name: 'Autorizar UKI y comprar' }));
+    await screen.findByText('La autorización fue enviada. Comprueba su confirmación sin firmar otra vez.');
+
+    const otherOrder = { ...order, orderId: `0x${'9'.repeat(64)}` as `0x${string}`, tokenId: '74' };
+    view.rerender(<UkiMarketplaceBuyerCheckout order={otherOrder} onPurchased={jest.fn()} />);
+    await waitFor(() => {
+      const nextReview = screen.getByRole('button', { name: 'Revisar y confirmar compra' });
+      expect(nextReview).toBeDisabled();
+    });
+    expect(screen.queryByText('La autorización fue enviada. Comprueba su confirmación sin firmar otra vez.')).not.toBeInTheDocument();
     expect(writeContractAsync).toHaveBeenCalledTimes(1);
   });
 });
