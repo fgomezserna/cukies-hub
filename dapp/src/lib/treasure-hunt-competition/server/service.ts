@@ -8,6 +8,7 @@ import {
   normalizeCompetitionWallet,
   normalizeCompetitionAlias,
   validateCompetitionAlias,
+  TREASURE_HUNT_WEEKLY_ALIAS_SCOPE,
   type CompetitionConfig,
   type CompetitionStakingEligibility,
 } from '..';
@@ -293,6 +294,16 @@ function publicParticipant(participant: CompetitionParticipantRecord) {
   };
 }
 
+function publicGeneratedParticipant(walletAddress: string, createdAt: string) {
+  const alias = displayCompetitionAlias(generateCompetitionAlias(walletAddress));
+  return {
+    alias,
+    canonicalAlias: normalizeCompetitionAlias(alias),
+    aliasChangedAt: null,
+    createdAt,
+  };
+}
+
 function publicAttempt(attempt: CompetitionAttemptRecord, secret: string) {
   return {
     attemptId: attempt.attemptId,
@@ -513,6 +524,29 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
     return publicParticipant(participant);
   }
 
+  async function getWeeklyParticipant(walletAddress: string) {
+    const current = now();
+    const wallet = normalizeCompetitionWallet(walletAddress);
+    if (!isCompetitionWalletAddress(wallet)) {
+      throw new CompetitionServiceError('INVALID_WALLET', 'A valid EVM wallet is required', 400);
+    }
+    const weeklyParticipant = await dependencies.repository.findParticipant(
+      TREASURE_HUNT_WEEKLY_ALIAS_SCOPE,
+      wallet,
+    );
+    if (weeklyParticipant?.aliasChangedAt != null) {
+      return publicParticipant(weeklyParticipant);
+    }
+
+    const fallbackParticipant = await dependencies.repository.findLatestParticipantByWallet(
+      wallet,
+      TREASURE_HUNT_WEEKLY_ALIAS_SCOPE,
+    );
+    if (fallbackParticipant) return publicParticipant(fallbackParticipant);
+    if (weeklyParticipant) return publicParticipant(weeklyParticipant);
+    return publicGeneratedParticipant(wallet, current.toISOString());
+  }
+
   async function updateAlias(walletAddress: string, alias: string) {
     const aliasRuntime = resolveCompetitionRuntime(environment, now());
     if (aliasRuntime.phase === 'closed') {
@@ -554,6 +588,37 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
       alias: participant.alias,
       now: current.toISOString(),
     });
+    return publicParticipant(participant);
+  }
+
+  async function updateWeeklyAlias(walletAddress: string, alias: string) {
+    const current = now();
+    const wallet = normalizeCompetitionWallet(walletAddress);
+    if (!isCompetitionWalletAddress(wallet)) {
+      throw new CompetitionServiceError('INVALID_WALLET', 'A valid EVM wallet is required', 400);
+    }
+    await dependencies.repository.ensureIndexes();
+    await assertParticipantWritesConfigured();
+    const validation = validateCompetitionAlias(alias);
+    if (!validation.valid) {
+      throw new CompetitionServiceError('INVALID_ALIAS', `Invalid alias: ${validation.reason}`, 400);
+    }
+    await dependencies.repository.getOrCreateParticipant({
+      campaignId: TREASURE_HUNT_WEEKLY_ALIAS_SCOPE,
+      walletAddress: wallet,
+      generatedAlias: generateCompetitionAlias(wallet),
+      now: current.toISOString(),
+    });
+    const participant = await dependencies.repository.updateParticipantAlias({
+      campaignId: TREASURE_HUNT_WEEKLY_ALIAS_SCOPE,
+      walletAddress: wallet,
+      alias: validation.alias,
+      canonicalAlias: normalizeCompetitionAlias(validation.alias),
+      now: current.toISOString(),
+    });
+    if (!participant) {
+      throw new CompetitionServiceError('ALIAS_TAKEN', 'This alias is already in use', 409);
+    }
     return publicParticipant(participant);
   }
 
@@ -1425,8 +1490,10 @@ export function createCompetitionService(dependencies: CompetitionServiceDepende
   return {
     getRuntime: () => resolveCompetitionRuntime(environment, now()),
     getParticipant,
+    getWeeklyParticipant,
     getStakingEligibility,
     updateAlias,
+    updateWeeklyAlias,
     startAttempt,
     recordCheckpoint: async (request: AttemptEvidenceRequest) => {
       const result = await appendEvidence(request, 'checkpoint');

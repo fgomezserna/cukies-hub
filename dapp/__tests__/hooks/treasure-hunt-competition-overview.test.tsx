@@ -238,4 +238,22 @@ describe('useTreasureHuntCompetitionOverview', () => {
     pendingB.resolve(new Response(JSON.stringify(responseB), { status: 200 }));
     await waitFor(() => expect(view.result.current.status?.participant?.alias).toBe('Wallet B'));
   });
+
+  it('consulta el alias semanal en un scope separado de la competición especial', async () => {
+    mockAuthState = { user: { id: 'user-a', walletAddress: '0xAa' }, isLoading: false };
+    const fetchMock = jest.fn((input: RequestInfo | URL) => {
+      expect(String(input)).toBe('/api/games/treasure-hunt/competition?scope=weekly');
+      return jsonResponse(statusResponse(false));
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const { result } = renderHook(() => useTreasureHuntCompetitionOverview({
+      includeLeaderboard: false,
+      participantScope: 'weekly',
+      autoRefreshMs: 0,
+    }));
+
+    await waitFor(() => expect(result.current.status?.participant?.alias).toBe('CukiePlayer'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
