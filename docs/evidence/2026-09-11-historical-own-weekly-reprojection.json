@@ -1,0 +1,521 @@
+{
+  "issue": "https://github.com/fgomezserna/cukies-hub/issues/414",
+  "scope": "Five historical OWN-credit settled Treasure Hunt sessions; weekly leaderboard projection only",
+  "observedAt": "2026-09-11T05:33:14.207Z",
+  "inspectedStagingSha": "64aea9e1b5c0454caa75b3a6b093800116830d68",
+  "servedProductSha": "cb39b5575a38fe2ee91e388caffbc3a09282a0a6",
+  "state": "historical leaderboard repaired and verified in staging; operator code awaiting PR integration",
+  "sessionIds": [
+    "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+    "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+    "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+    "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+    "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3"
+  ],
+  "candidates": [
+    {
+      "sessionId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+      "scoreRaw": "43",
+      "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+      "periodStartsAt": "2026-09-08T12:00:00.000Z",
+      "periodEndsAt": "2026-09-08T15:30:00.000Z",
+      "status": "settled"
+    },
+    {
+      "sessionId": "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+      "scoreRaw": "2",
+      "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+      "periodStartsAt": "2026-09-08T12:00:00.000Z",
+      "periodEndsAt": "2026-09-08T15:30:00.000Z",
+      "status": "settled"
+    },
+    {
+      "sessionId": "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+      "scoreRaw": "6",
+      "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+      "periodStartsAt": "2026-09-10T09:30:00.000Z",
+      "periodEndsAt": "2026-09-10T13:00:00.000Z",
+      "status": "settled"
+    },
+    {
+      "sessionId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+      "scoreRaw": "117",
+      "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+      "periodStartsAt": "2026-09-10T09:30:00.000Z",
+      "periodEndsAt": "2026-09-10T13:00:00.000Z",
+      "status": "settled"
+    },
+    {
+      "sessionId": "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+      "scoreRaw": "6",
+      "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+      "periodStartsAt": "2026-09-10T09:30:00.000Z",
+      "periodEndsAt": "2026-09-10T13:00:00.000Z",
+      "status": "settled"
+    }
+  ],
+  "before": {
+    "observedAt": "2026-09-11T05:18:40.204Z",
+    "bests": [],
+    "guards": {
+      "reward_period_states": [
+        {
+          "_id": "C1800-W:2026-09-08T12:00:00.000Z",
+          "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+          "status": "open",
+          "allocationRevision": 0,
+          "revision": 3,
+          "createdAt": "2026-09-08T13:57:31.657Z",
+          "updatedAt": "2026-09-08T13:58:17.574Z"
+        },
+        {
+          "_id": "C1800-W:2026-09-10T09:30:00.000Z",
+          "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+          "status": "open",
+          "allocationRevision": 0,
+          "revision": 5,
+          "createdAt": "2026-09-10T09:35:12.240Z",
+          "updatedAt": "2026-09-10T09:59:23.098Z"
+        }
+      ],
+      "reward_period_seals": [],
+      "weekly_ranking_period_states": [],
+      "weekly_ranking_manifests": [],
+      "reward_weekly_prize_accounting": []
+    },
+    "sourceFingerprints": {
+      "game_economy_sessions": {
+        "count": 5,
+        "sha256": "b41143465b779736840ca315d11d755962b748bdfeab265271f55e6d913e132b"
+      },
+      "treasure_hunt_economy_runs": {
+        "count": 5,
+        "sha256": "2bbbcf5bf0e6947332326e489e259156b733abbeb24bb1537d21d6f7fecf069c"
+      },
+      "reward_weekly_game_sources": {
+        "count": 5,
+        "sha256": "cad9724e59856f0e72e1cb706d3ec458f0ffdf66a627754286c1367e507d2d51"
+      },
+      "competition_credit_reservations": {
+        "count": 5,
+        "sha256": "4c8323d642e61929953032973f68ee34f0c04c3d554d05fa9ff6b3fd8ffaa5ba"
+      },
+      "cukie_pool_assignments": {
+        "count": 5,
+        "sha256": "7c59eff95763cea58a2660a14e22fa415b888c0dd87a918a69b15076ebd9728c"
+      },
+      "game_owned_cukie_assignments": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    "financial": {
+      "reward_source_manifests": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "reward_allocations": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "reward_pool_accruals": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    }
+  },
+  "runtime": {
+    "observedAt": "2026-09-11T05:34:35.779105+00:00",
+    "web": {
+      "APP_ENV": "staging",
+      "ECONOMY_CYCLE_SECONDS": "1800",
+      "NEXT_PUBLIC_UKI_CHAIN_ID": "97",
+      "CHAIN_INDEXER_DB_NAME": "cukieshub-new-staging",
+      "GAME_ECONOMY_RUNTIME_ENABLED": "false",
+      "WEEKLY_RANKING_RUNTIME_ENABLED": "false",
+      "REWARD_ACCOUNTING_RUNTIME_ENABLED": "false",
+      "REWARD_DAILY_ACCOUNTING_ENABLED": "false",
+      "REWARD_WEEKLY_PAYOUT_ENABLED": "false",
+      "REWARD_POOL_TRANCHES_ENABLED": "false",
+      "REWARD_BATCH_PUBLISHER_ENABLED": "false",
+      "REWARD_ACCOUNTING_SCHEDULER_ENABLED": "false"
+    },
+    "resourcesRunning": true,
+    "resourcesCount": 11,
+    "resourcesUnchangedDuringOperation": true
+  },
+  "codeEvidence": [
+    "dapp/src/lib/uki-economy/game-economy/treasure-hunt.ts:finalizeTreasureHuntRun",
+    "dapp/src/lib/uki-economy/game-economy/treasure-hunt-weekly-public.ts:getTreasureHuntWeeklyOverview"
+  ],
+  "limitations": [
+    "The public weekly endpoint selects the current period. Recovered scores43/117 remain in their original September8/10 periods and do not appear in the current-period list.",
+    "Recorded NFT sources remain two Seiku and three pool_original; no source is rewritten as OWN.",
+    "Direct reward allocations and accounting are not activated or repaired by this work.",
+    "Daily OWN quota decision remains pending in issue412.",
+    "Stage cycle remains1800 seconds; main and production are outside scope."
+  ],
+  "plan": {
+    "version": "historical-own-weekly-reprojection-v1",
+    "databaseName": "cukieshub-new-staging",
+    "chainId": 97,
+    "gameId": "treasure-hunt",
+    "walletNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "sessionIds": [
+      "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+      "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+      "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+      "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+      "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3"
+    ],
+    "plannedAt": "2026-09-11T05:27:55.750Z",
+    "entries": [
+      {
+        "sessionId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+        "runId": "treasure-run-717fe93faa40e7199593f1462634e772fa164c92ca07f79174c509414c09f2f7",
+        "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+        "scoreRaw": "43",
+        "scoreDigits": 2,
+        "achievedAt": "2026-09-08T13:57:31.657Z",
+        "recordFingerprint": "328ad5182d8322e322a9a3c6eb0087b7aef93a18ce013992d9394b75b1368400",
+        "sourceFingerprint": "2deedbeee1aad51ce5578c4064edfdf720e36f12a6593d46e26fa4491b6add02",
+        "periodStateFingerprint": "2f172d956d9a48a14cfbb409982797302af85d134a45b30aeb568cb1c133f8a3",
+        "currentBestFingerprint": null,
+        "action": "insert",
+        "winner": true
+      },
+      {
+        "sessionId": "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52",
+        "runId": "treasure-run-767b57e73a3737a263f6484389e6aeb59735c0cc7974484ce05d8dca5d9261f6",
+        "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+        "scoreRaw": "2",
+        "scoreDigits": 1,
+        "achievedAt": "2026-09-08T13:58:17.574Z",
+        "recordFingerprint": "7290a7d558f68d1252f86098f35b4d3f964243a0785b43270f1200ddbdfbb1ad",
+        "sourceFingerprint": "6efab0b022bc73df44e9ccc5a57275a39628f3a411ccc46686dd6d56debf0df7",
+        "periodStateFingerprint": "2f172d956d9a48a14cfbb409982797302af85d134a45b30aeb568cb1c133f8a3",
+        "currentBestFingerprint": null,
+        "action": "covered_by_candidate",
+        "winner": false
+      },
+      {
+        "sessionId": "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+        "runId": "treasure-run-d65def2d53d0fcbd682ec08b251ce843fff6cf127a2ca2a0d630b7c9c739bc55",
+        "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "scoreRaw": "6",
+        "scoreDigits": 1,
+        "achievedAt": "2026-09-10T09:35:12.240Z",
+        "recordFingerprint": "a782f80113be6223ea024df0dc5225a0c1b7d489a0062730d5d5cd83bc0be264",
+        "sourceFingerprint": "3c0d7a073ae07085518995b83ddb430a45c3221014ee650c55f69e63764a40fe",
+        "periodStateFingerprint": "b2ee1e4f626b54e6bd7ad2231944a9a3a274cc447ed60d1947385147b4dac193",
+        "currentBestFingerprint": null,
+        "action": "covered_by_candidate",
+        "winner": false
+      },
+      {
+        "sessionId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+        "runId": "treasure-run-bcd440b594efe390496c56b45a8bd7c56efd40b2b87ea988c1f8c46709d8aa9c",
+        "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "scoreRaw": "117",
+        "scoreDigits": 3,
+        "achievedAt": "2026-09-10T09:45:24.912Z",
+        "recordFingerprint": "836e2f7a3e400761ef448feaee5c2b073c55371a79a74309173f2b76b4883271",
+        "sourceFingerprint": "d3fa8ebcf434739d9b9afc2ddc0415c317486e6faef499cbda99088d3389d61c",
+        "periodStateFingerprint": "b2ee1e4f626b54e6bd7ad2231944a9a3a274cc447ed60d1947385147b4dac193",
+        "currentBestFingerprint": null,
+        "action": "insert",
+        "winner": true
+      },
+      {
+        "sessionId": "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3",
+        "runId": "treasure-run-af4e481b554a38dbea0265d142f8eb70426e7a139ff7996749e43d248e253f71",
+        "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "scoreRaw": "6",
+        "scoreDigits": 1,
+        "achievedAt": "2026-09-10T09:59:23.098Z",
+        "recordFingerprint": "e78bc15ca5695780b21d834c19838c76ae8d548e5545a613091b745b028c5b48",
+        "sourceFingerprint": "29b443beb0d16f0b74e27e4cbfa07e14e9c27b1ecf9b90b3da2e8bcadabfc084",
+        "periodStateFingerprint": "b2ee1e4f626b54e6bd7ad2231944a9a3a274cc447ed60d1947385147b4dac193",
+        "currentBestFingerprint": null,
+        "action": "covered_by_candidate",
+        "winner": false
+      }
+    ],
+    "periods": [
+      {
+        "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+        "state": {
+          "revision": 3,
+          "allocationRevision": 0,
+          "fingerprint": "2f172d956d9a48a14cfbb409982797302af85d134a45b30aeb568cb1c133f8a3",
+          "createdAt": "2026-09-08T13:57:31.657Z",
+          "updatedAt": "2026-09-08T13:58:17.574Z"
+        },
+        "currentBest": null,
+        "desiredBest": {
+          "_id": "treasure-weekly-best:af2eef0d532da326134a331a7ddeb2acc5c6de1d074bbcd4774dbe8ee994abb8",
+          "walletNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+          "weeklyPeriodId": "C1800-W:2026-09-08T12:00:00.000Z",
+          "gameId": "treasure-hunt",
+          "scoreRaw": "43",
+          "scoreDigits": 2,
+          "achievedAt": "2026-09-08T13:57:31.657Z",
+          "winningGameId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+          "authorityGameSessionId": "game_372445286bf3e645626654d9c27b18d3562c99c4b691842d7e30dfef5632ec68",
+          "creditSource": "own",
+          "creditReservationId": "7f92a3789accf5a6d3f622ef6b11eecac1d74e4989503ce85f45bdef729022c2",
+          "cukieSource": "pool",
+          "cukieAssignmentId": "674f27643a893a1fe52726c02860c7d8c8957c249013c1de76e138ff5aa724fb",
+          "cukieAssetId": "seiku:a016d5ed3dd99b5fd02bcc20f430620523567e4f02967fc101b0c3b4d133dfe2",
+          "revision": 0,
+          "createdAt": "2026-09-11T05:27:55.750Z",
+          "updatedAt": "2026-09-11T05:27:55.750Z"
+        },
+        "action": "insert",
+        "entries": [
+          "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+          "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52"
+        ]
+      },
+      {
+        "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "state": {
+          "revision": 5,
+          "allocationRevision": 0,
+          "fingerprint": "b2ee1e4f626b54e6bd7ad2231944a9a3a274cc447ed60d1947385147b4dac193",
+          "createdAt": "2026-09-10T09:35:12.240Z",
+          "updatedAt": "2026-09-10T09:59:23.098Z"
+        },
+        "currentBest": null,
+        "desiredBest": {
+          "_id": "treasure-weekly-best:73f1c2daa5edc4f73d02b50bc9c71d94416e727a03b455d46f16408752b3edd2",
+          "walletNormalized": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+          "weeklyPeriodId": "C1800-W:2026-09-10T09:30:00.000Z",
+          "gameId": "treasure-hunt",
+          "scoreRaw": "117",
+          "scoreDigits": 3,
+          "achievedAt": "2026-09-10T09:45:24.912Z",
+          "winningGameId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+          "authorityGameSessionId": "game_6f1e39c0f440e363f4e40797526364d6a7443260cf494159dd5aac8b84fd3f75",
+          "creditSource": "own",
+          "creditReservationId": "833cadc2bd5d405f8cfe7160ee7ece705abefede6dccad90c02f599e67496f77",
+          "cukieSource": "pool",
+          "cukieAssignmentId": "59fedf1bcb080d188a0bcf974173cb3a2d38977c8c1900b01a488ef99e4f3adf",
+          "cukieAssetId": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+          "revision": 0,
+          "createdAt": "2026-09-11T05:27:55.750Z",
+          "updatedAt": "2026-09-11T05:27:55.750Z"
+        },
+        "action": "insert",
+        "entries": [
+          "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+          "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+          "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3"
+        ]
+      }
+    ],
+    "planHash": "c0d46b815dbd4032fe1132d6fbe07d0c06e85ff8b020f0260140ccb5740fab3e"
+  },
+  "planSummary": {
+    "sessionCount": 5,
+    "periodCount": 2,
+    "periods": [
+      {
+        "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+        "action": "insert",
+        "candidateSessionIds": [
+          "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+          "game-session:5024d0013ce78a516fbdc2445e0aa7f7c38e8ccd4c6f57512cfd18f709840a52"
+        ],
+        "scoreRaw": "43"
+      },
+      {
+        "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "action": "insert",
+        "candidateSessionIds": [
+          "game-session:e29ec49ed3fb1bac136731be3340e6c5ff3d6776ebc9344e61681b5efedbb6d4",
+          "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+          "game-session:ef7bf6f01a00306f067284ad2ab627682eef6e7511c4b63ee5e2c7371be87ca3"
+        ],
+        "scoreRaw": "117"
+      }
+    ],
+    "expectedWrites": {
+      "periodStateFences": 2,
+      "bestsInserted": 2,
+      "bestsReplaced": 0
+    },
+    "untouched": [
+      "game_economy_sessions",
+      "treasure_hunt_economy_runs",
+      "competition_credit_reservations",
+      "cukie_pool_assignments",
+      "game_owned_cukie_assignments",
+      "reward_weekly_game_sources",
+      "reward_period_seals",
+      "weekly_ranking_manifests",
+      "weekly_ranking_runs",
+      "weekly_ranking_period_states",
+      "weekly_ranking_audit_events",
+      "game_weekly_rankings",
+      "reward_weekly_prize_accounting",
+      "reward_source_manifests",
+      "reward_allocations",
+      "reward_pool_accruals"
+    ]
+  },
+  "operator": {
+    "sourceCommit": "7f5c4e1d537d77da71b376c298b067e41ab789ca",
+    "validatedCommit": "d9c90ce3c0a54758d5165b9a8757b59d6e9fd4c0",
+    "bundleSha256": "5de2e2963b45d8ed9560fa375d7c4419712d07e505c273553c466b304eeba3d1",
+    "entrypoint": "dapp/scripts/reproject-historical-own-weekly.ts",
+    "execution": "Reviewed CLI bundle through existing staging indexer; runtime credentials remained inside that container",
+    "applyConfirmation": "APPLY_HISTORICAL_OWN_WEEKLY_STAGE97"
+  },
+  "apply": {
+    "status": "applied",
+    "replayed": false,
+    "planHash": "c0d46b815dbd4032fe1132d6fbe07d0c06e85ff8b020f0260140ccb5740fab3e",
+    "periodsFenced": 2,
+    "bestsInserted": 2,
+    "bestsReplaced": 0
+  },
+  "replay": {
+    "status": "replayed",
+    "replayed": true,
+    "planHash": "c0d46b815dbd4032fe1132d6fbe07d0c06e85ff8b020f0260140ccb5740fab3e",
+    "periodsFenced": 0,
+    "bestsInserted": 0,
+    "bestsReplaced": 0
+  },
+  "after": {
+    "observedAt": "2026-09-11T05:33:14.207Z",
+    "bests": [
+      {
+        "_id": "treasure-weekly-best:af2eef0d532da326134a331a7ddeb2acc5c6de1d074bbcd4774dbe8ee994abb8",
+        "weeklyPeriodId": "C1800-W:2026-09-08T12:00:00.000Z",
+        "scoreRaw": "43",
+        "achievedAt": "2026-09-08T13:57:31.657Z",
+        "winningGameId": "game-session:412dfbfccef619e0452992c9f181907915257d3aeb7998f21524a3164e8db7f9",
+        "creditSource": "own",
+        "cukieSource": "pool",
+        "revision": 0,
+        "updatedAt": "2026-09-11T05:27:55.750Z"
+      },
+      {
+        "_id": "treasure-weekly-best:73f1c2daa5edc4f73d02b50bc9c71d94416e727a03b455d46f16408752b3edd2",
+        "weeklyPeriodId": "C1800-W:2026-09-10T09:30:00.000Z",
+        "scoreRaw": "117",
+        "achievedAt": "2026-09-10T09:45:24.912Z",
+        "winningGameId": "game-session:9864a7d4ebe69efc09b167354b00d9ece218507df3a4300eb4f375b00d3ea3df",
+        "creditSource": "own",
+        "cukieSource": "pool",
+        "revision": 0,
+        "updatedAt": "2026-09-11T05:27:55.750Z"
+      }
+    ],
+    "guards": {
+      "reward_period_states": [
+        {
+          "_id": "C1800-W:2026-09-08T12:00:00.000Z",
+          "periodId": "C1800-W:2026-09-08T12:00:00.000Z",
+          "status": "open",
+          "allocationRevision": 0,
+          "revision": 4,
+          "createdAt": "2026-09-08T13:57:31.657Z",
+          "updatedAt": "2026-09-11T05:27:55.750Z"
+        },
+        {
+          "_id": "C1800-W:2026-09-10T09:30:00.000Z",
+          "periodId": "C1800-W:2026-09-10T09:30:00.000Z",
+          "status": "open",
+          "allocationRevision": 0,
+          "revision": 6,
+          "createdAt": "2026-09-10T09:35:12.240Z",
+          "updatedAt": "2026-09-11T05:27:55.750Z"
+        }
+      ],
+      "reward_period_seals": [],
+      "weekly_ranking_period_states": [],
+      "weekly_ranking_manifests": [],
+      "reward_weekly_prize_accounting": []
+    },
+    "sourceFingerprints": {
+      "game_economy_sessions": {
+        "count": 5,
+        "sha256": "b41143465b779736840ca315d11d755962b748bdfeab265271f55e6d913e132b"
+      },
+      "treasure_hunt_economy_runs": {
+        "count": 5,
+        "sha256": "2bbbcf5bf0e6947332326e489e259156b733abbeb24bb1537d21d6f7fecf069c"
+      },
+      "reward_weekly_game_sources": {
+        "count": 5,
+        "sha256": "cad9724e59856f0e72e1cb706d3ec458f0ffdf66a627754286c1367e507d2d51"
+      },
+      "competition_credit_reservations": {
+        "count": 5,
+        "sha256": "4c8323d642e61929953032973f68ee34f0c04c3d554d05fa9ff6b3fd8ffaa5ba"
+      },
+      "cukie_pool_assignments": {
+        "count": 5,
+        "sha256": "7c59eff95763cea58a2660a14e22fa415b888c0dd87a918a69b15076ebd9728c"
+      },
+      "game_owned_cukie_assignments": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    "financial": {
+      "reward_source_manifests": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "reward_allocations": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "reward_pool_accruals": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    "historicalSourcesUnchanged": true,
+    "financialArtifactsUnchanged": true
+  },
+  "publicCurrentWeek": {
+    "period": {
+      "periodId": "C1800-W:2026-09-11T03:00:00.000Z",
+      "startsAt": "2026-09-11T03:00:00.000Z",
+      "endsAt": "2026-09-11T06:30:00.000Z"
+    },
+    "totalRankedWallets": 0,
+    "entries": [],
+    "historicalResultsMovedToCurrentPeriod": false
+  },
+  "validation": {
+    "dappJest": {
+      "suites": 270,
+      "tests": 2246,
+      "status": "passed"
+    },
+    "finalFocusedJest": {
+      "tests": 15,
+      "status": "passed"
+    },
+    "typecheck": "passed",
+    "lint": "passed with one pre-existing useMemo dependency warning in my-cukies-panel.tsx:513",
+    "stagingBuild": "passed",
+    "realMongo": {
+      "source": "Luna tester; reviewed by root",
+      "replica": "ownWeeklyQA on loopback, synthetic fixtures only",
+      "appliedBests": 2,
+      "replayWrites": 0,
+      "sourceUnchanged": true,
+      "stalePlanRejected": true,
+      "rollbackRejected": true,
+      "noPartialWrites": true,
+      "explicitUriAndReplicaGuardVerified": true
+    }
+  }
+}
