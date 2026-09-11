@@ -90,6 +90,7 @@ type VestingTransactionState =
   | { kind: 'error'; message: string };
 
 type PendingVestingTransaction = {
+  operationId: number;
   hash: `0x${string}`;
   wallet: string;
   chainId: number;
@@ -116,6 +117,7 @@ export default function PublicVestingPage() {
     chainId: chainId ?? null,
   });
   const pendingTransactionRef = useRef<PendingVestingTransaction | null>(null);
+  const operationGenerationRef = useRef(0);
   const refreshAbortRef = useRef<AbortController | null>(null);
   contextRef.current = { address: address ?? null, chainId: chainId ?? null };
 
@@ -176,11 +178,17 @@ export default function PublicVestingPage() {
     const current = pendingTransactionRef.current;
     return Boolean(
       current
+      && current.operationId === pending.operationId
+      && operationGenerationRef.current === pending.operationId
       && current.hash.toLowerCase() === pending.hash.toLowerCase()
       && current.wallet.toLowerCase() === pending.wallet.toLowerCase()
       && current.chainId === pending.chainId
       && pendingBelongsToCurrent(),
     );
+  }
+
+  function operationIsCurrent(operationId: number) {
+    return operationGenerationRef.current === operationId;
   }
 
   function isLiveContext(expectedAddress: string, expectedChainId: number) {
@@ -353,6 +361,8 @@ export default function PublicVestingPage() {
   async function recheckPendingClaim() {
     const pending = pendingTransactionRef.current;
     if (!pending || !publicClient || transactionState.kind === 'confirming') return;
+    const operationId = pending.operationId;
+    if (!operationIsCurrent(operationId) || pendingTransactionRef.current !== pending) return;
     try {
       assertLiveContext(pending.wallet, pending.chainId);
     } catch {
@@ -360,6 +370,7 @@ export default function PublicVestingPage() {
     }
 
     if (pending.receiptConfirmed) {
+      if (!operationIsCurrent(operationId) || pendingTransactionRef.current !== pending) return;
       setPendingTransaction(pending);
       setTransactionState({
         kind: 'pending',
@@ -385,6 +396,7 @@ export default function PublicVestingPage() {
         baselineReleased: pending.baselineReleased,
       };
       assertLiveContext(pending.wallet, pending.chainId);
+      if (!operationIsCurrent(operationId) || pendingTransactionRef.current !== pending) return;
       setClaimTxHash(confirmed.hash);
       pendingTransactionRef.current = confirmedPending;
       setPendingTransaction(confirmedPending);
@@ -397,7 +409,7 @@ export default function PublicVestingPage() {
       void refreshVestingReads(confirmedPending);
     } catch (reason) {
       if (!mountedRef.current) return;
-      if (!isLiveContext(pending.wallet, pending.chainId)) return;
+      if (!isLiveContext(pending.wallet, pending.chainId) || !operationIsCurrent(operationId) || pendingTransactionRef.current !== pending) return;
       if (reason instanceof Error && reason.message === 'TRANSACTION_REVERTED') {
         pendingTransactionRef.current = null;
         setPendingTransaction(null);
@@ -407,7 +419,7 @@ export default function PublicVestingPage() {
         const updated = { ...pending, hash: reason.hash };
         pendingTransactionRef.current = updated;
         setPendingTransaction(updated);
-        setTransactionState({ kind: 'pending', hash: reason.hash, message: 'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.' });
+        setTransactionState({ kind: 'pending', hash: reason.hash, message: 'La wallet actualizó la transacción; sigue pendiente. Puedes comprobarla sin firmar otra vez.' });
       } else if (reason instanceof TransactionReplacementError) {
         pendingTransactionRef.current = null;
         setPendingTransaction(null);
@@ -435,6 +447,8 @@ export default function PublicVestingPage() {
 
   async function claimAll() {
     if (!contractAddress || !publicClient || !address || chainId !== ukiSaleContracts.chainId || pendingBelongsToCurrent()) return;
+    const operationId = operationGenerationRef.current + 1;
+    operationGenerationRef.current = operationId;
     const expectedAddress = address;
     const expectedChainId = ukiSaleContracts.chainId;
     const baselineReleased = releasedAmount;
@@ -451,6 +465,7 @@ export default function PublicVestingPage() {
       });
       submittedHash = hash;
       assertLiveContext(expectedAddress, expectedChainId);
+      if (!operationIsCurrent(operationId)) return;
       setClaimTxHash(hash);
       setTransactionState({ kind: 'confirming', hash });
       let confirmedHash = hash;
@@ -462,8 +477,8 @@ export default function PublicVestingPage() {
         submittedHash = confirmedHash;
       } catch (reason) {
         if (reason instanceof TransactionReplacementError || reason instanceof TransactionReplacementPendingError) throw reason;
-        if (!isLiveContext(expectedAddress, expectedChainId)) throw new Error('WALLET_CONTEXT_CHANGED');
-        const pending = { hash, wallet: expectedAddress, chainId: expectedChainId, baselineReleased } satisfies PendingVestingTransaction;
+        if (!isLiveContext(expectedAddress, expectedChainId) || !operationIsCurrent(operationId)) throw new Error('WALLET_CONTEXT_CHANGED');
+        const pending = { operationId, hash, wallet: expectedAddress, chainId: expectedChainId, baselineReleased } satisfies PendingVestingTransaction;
         pendingTransactionRef.current = pending;
         if (mountedRef.current) {
           setPendingTransaction(pending);
@@ -474,8 +489,10 @@ export default function PublicVestingPage() {
       if (receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
       receiptConfirmed = true;
       assertLiveContext(expectedAddress, expectedChainId);
+      if (!operationIsCurrent(operationId)) return;
       setClaimTxHash(confirmedHash);
       const pending = {
+        operationId,
         hash: confirmedHash,
         wallet: expectedAddress,
         chainId: expectedChainId,
@@ -494,8 +511,9 @@ export default function PublicVestingPage() {
     } catch (reason) {
       if (!mountedRef.current) return;
       if (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED') {
-        if (submittedHash) {
+        if (submittedHash && operationIsCurrent(operationId)) {
           const pending = {
+            operationId,
             hash: submittedHash,
             wallet: expectedAddress,
             chainId: expectedChainId,
@@ -514,9 +532,10 @@ export default function PublicVestingPage() {
             });
           }
         }
-      } else if (!isLiveContext(expectedAddress, expectedChainId)) {
-        if (reason instanceof TransactionReplacementPendingError) {
+      } else if (!operationIsCurrent(operationId) || !isLiveContext(expectedAddress, expectedChainId)) {
+        if (reason instanceof TransactionReplacementPendingError && operationIsCurrent(operationId)) {
           pendingTransactionRef.current = {
+            operationId,
             hash: reason.hash,
             wallet: expectedAddress,
             chainId: expectedChainId,
@@ -530,10 +549,10 @@ export default function PublicVestingPage() {
         setClaimTxHash(null);
         setTransactionState({ kind: 'error', message: 'El cobro fue revertido. Puedes volver a intentarlo.' });
       } else if (reason instanceof TransactionReplacementPendingError) {
-        const pending = { hash: reason.hash, wallet: expectedAddress, chainId: expectedChainId, baselineReleased } satisfies PendingVestingTransaction;
+        const pending = { operationId, hash: reason.hash, wallet: expectedAddress, chainId: expectedChainId, baselineReleased } satisfies PendingVestingTransaction;
         pendingTransactionRef.current = pending;
         setPendingTransaction(pending);
-        setTransactionState({ kind: 'pending', hash: reason.hash, message: 'La transacción fue repriciada y sigue pendiente. Conservamos el hash nuevo; compruébala sin firmar otra vez.' });
+        setTransactionState({ kind: 'pending', hash: reason.hash, message: 'La wallet actualizó la transacción; sigue pendiente. Puedes comprobarla sin firmar otra vez.' });
       } else if (reason instanceof TransactionReplacementError) {
         pendingTransactionRef.current = null;
         setPendingTransaction(null);

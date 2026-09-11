@@ -11,6 +11,7 @@ import {
 const wallet = '0x00000000000000000000000000000000000000aa';
 const vault = '0x9999999999999999999999999999999999999999';
 const transactionHash = `0x${'a'.repeat(64)}` as `0x${string}`;
+const replacementTransactionHash = `0x${'b'.repeat(64)}` as `0x${string}`;
 const oneUki = BigInt('1000000000000000000');
 const twoUki = BigInt('2000000000000000000');
 const tenUki = BigInt('10000000000000000000');
@@ -242,5 +243,70 @@ describe('PublicVestingPage', () => {
     expect(screen.queryByText(/Cobro confirmado en la cadena/)).not.toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(writeContractAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('conserva el pending de la wallet B si el receipt tardío de A termina después', async () => {
+    let accountState = {
+      address: wallet,
+      chainId: 97,
+      isConnected: true,
+    };
+    mockUseAccount.mockImplementation(() => accountState as unknown as ReturnType<typeof useAccount>);
+    const resolveReceiptA = jest.fn();
+    const resolveReceiptB = jest.fn();
+    const receiptA = new Promise<{ status: string; transactionHash: `0x${string}` }>((resolve) => {
+      resolveReceiptA.mockImplementation(resolve);
+    });
+    const receiptB = new Promise<{ status: string; transactionHash: `0x${string}` }>((resolve) => {
+      resolveReceiptB.mockImplementation(resolve);
+    });
+    waitForTransactionReceipt.mockImplementation((input: { hash: string }) => (
+      input.hash === transactionHash ? receiptA : receiptB
+    ));
+    writeContractAsync
+      .mockResolvedValueOnce(transactionHash)
+      .mockResolvedValueOnce(replacementTransactionHash);
+
+    const view = render(<PublicVestingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reclamar UKI disponible' }));
+    await waitFor(() => expect(waitForTransactionReceipt).toHaveBeenCalledWith({
+      hash: transactionHash,
+      onReplaced: expect.any(Function),
+    }));
+
+    accountState = {
+      address: '0x00000000000000000000000000000000000000bb',
+      chainId: 97,
+      isConnected: true,
+    };
+    view.rerender(<PublicVestingPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Reclamar UKI disponible' }));
+    await waitFor(() => expect(waitForTransactionReceipt).toHaveBeenCalledWith({
+      hash: replacementTransactionHash,
+      onReplaced: expect.any(Function),
+    }));
+
+    await act(async () => {
+      resolveReceiptB({ status: 'success', transactionHash: replacementTransactionHash });
+    });
+    await flushAsyncWork();
+    expect(screen.getByRole('button', { name: 'Cobro pendiente' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: /Transacción de reclamación enviada/ })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/tx/${replacementTransactionHash}`,
+    );
+
+    await act(async () => {
+      resolveReceiptA({ status: 'success', transactionHash });
+    });
+    await flushAsyncWork();
+    expect(screen.getByRole('button', { name: 'Cobro pendiente' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Comprobar cobro' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Transacción de reclamación enviada/ })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/tx/${replacementTransactionHash}`,
+    );
+    expect(screen.queryByText(new RegExp(transactionHash))).not.toBeInTheDocument();
+    expect(writeContractAsync).toHaveBeenCalledTimes(2);
   });
 });
