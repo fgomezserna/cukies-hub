@@ -209,7 +209,43 @@
       },
       "deliveryWorkflowResult": "SUCCESS"
     },
-    "financialComparisonArtifact": "/tmp/doc11-forward-accounting-state-after-pr435.json"
+    "financialComparisonArtifact": "/tmp/doc11-forward-accounting-state-after-pr435.json",
+    "firstPeriodObservation": {
+      "observedAt": "2026-09-11T21:03:52.702Z",
+      "startedSessionsSinceBoundary": 0,
+      "createdSessionsSinceBoundary": 0,
+      "dailyAccountingRecords": 1,
+      "newAccountingAllocations": 3,
+      "publicationPlans": 0,
+      "claimBatches": 0,
+      "publisherStatus": "failure",
+      "publisherLastFailureAt": "2026-09-11T21:03:33.346Z",
+      "state": "publisher_payload_hash_mismatch_confirmed",
+      "readOnlyArtifact": "/tmp/doc11-new-operations-20260911.json",
+      "rootCause": {
+        "codePath": "dapp/scripts/lib/reward-batch-publication.mjs:assertAccountingPayloadHash",
+        "omittedCanonicalField": "ambassadorSnapshots",
+        "evidence": "El hash guardado coincide con el payload completo del writer; el publisher omite ambassadorSnapshots y rechaza el cierre inmutable.",
+        "sanitizedError": "El payloadHash de reward-daily:C1800-D:2026-09-11T20:30:00.000Z no coincide con su cierre inmutable.",
+        "affectedReader": "dapp/src/lib/uki-economy/rewards/public.ts:assertDailyRewardAccountingIntegrity"
+      },
+      "resolutionStatus": "patch_reviewed_targeted_tests_passed_pending_delivery",
+      "lastConfirmedFailureAt": "2026-09-11T21:13:33.504Z",
+      "consecutiveFailures": 11,
+      "validation": {
+        "review": "root_accepted",
+        "publisherTests": 32,
+        "publicRewardTests": 13,
+        "regressions": [
+          "daily_with_ambassador_snapshot_accepted",
+          "snapshot_tampering_rejected",
+          "allocation_tampering_rejected",
+          "existing_daily_without_snapshot_preserved"
+        ],
+        "fullApplicationChecks": "pending_pull_request_ci"
+      },
+      "implementationCommit": "e567bc2d20fdd5e7b8613d403739eee6d15e0e87"
+    }
   },
   "limits": [
     "Five runtime processes verified, ranking explicitly waiting for the first complete forward period",

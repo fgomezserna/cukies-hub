@@ -259,7 +259,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | R2 | Avisos en Resumen | Corrección de fuente desplegada · PR432 | Comprobar el resultado visual autenticado. |
 | J1 | Bote en Jugar | PR435 desplegada; espera inicial del ranking verificada | Comprobar bote y recorrido de una partida nueva. |
 | J2 | Alias | Desplegado · PR429 | Guardar y recargar con sesión. |
-| J3 | Reparto | Estados/importes desplegados · PR433 | Verificar un reparto nuevo. |
+| J3 | Reparto | Estados/importes desplegados · PR433; lector de cierres corregido y revisado localmente | Publicar el parche de integridad y verificar el cierre completo en Premios. |
 | M1 | Master tras retirar del Pool | Desplegado · PR425 | Operación posterior al parche y convergencia autenticada. |
 | M2 | Originales elegibles | Desplegado · PR425 | Comprobar selección autenticada. |
 | C1 | Cuatro indicadores de créditos | Desplegado · PR430 | Comprobar indicadores con sesión. |
@@ -267,7 +267,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | P1 | Depósito del Pool atascado | Desplegado · PR425 | Depósito nuevo posterior al arreglo. |
 | W1 | UKI por partida | Proceso verificado; frontera20:30UTC | Partida nueva iniciada desde la frontera y recompensa. |
 | W2 | Recompensa del prestador | Proceso verificado; reparto sin verificar | Atribución a los prestadores reales y reparto nuevos. |
-| W3 | Premios por periodo y cobro | Publicador verificado y esperando; PR433 desplegada | Publicación y cobro nuevos; déficit exacto financiado por el owner cuando exista lote. |
+| W3 | Premios por periodo y cobro | Publicador y lector corregidos; revisión raíz y45tests focales correctos · pendiente de despliegue | CI, merge a staging y comprobar cierre nuevo y recibos. Cero partidas nuevas ni cobro de usuario verificado. |
 | A1 | Invitación válida intermitente | Diagnóstico abierto | Causa del503 sin demostrar; reproducir con sponsor elegible. |
 | A2 | Aviso tras confirmar embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |
 | A3 | Nombre y wallet del embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |

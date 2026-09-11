@@ -331,6 +331,9 @@ function assertAccountingPayloadHash(accounting, accountingKind) {
       destinations: accounting.destinations,
       allocations: accounting.allocations,
       conservationRaw: accounting.conservationRaw,
+      ...(Array.isArray(accounting.ambassadorSnapshots) && accounting.ambassadorSnapshots.length > 0
+        ? { ambassadorSnapshots: accounting.ambassadorSnapshots }
+        : {}),
     };
   } else {
     payload = {

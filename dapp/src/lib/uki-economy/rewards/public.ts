@@ -544,6 +544,7 @@ function assertDailyRewardAccountingIntegrity(
       priorReservedUndistributedRaw:
         accounting.priorReservedUndistributed.totalRaw,
       allocations: accounting.allocations,
+      ambassadorSnapshots: accounting.ambassadorSnapshots,
       destinations: accounting.destinations,
       sealedAt: accounting.sealedAt,
     });
