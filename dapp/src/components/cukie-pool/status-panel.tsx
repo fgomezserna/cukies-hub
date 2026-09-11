@@ -68,7 +68,7 @@ const erc721CustodyAbi = [
 
 type PoolGeneration = 'original' | 'second_generation';
 type PoolRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'goat';
-type PoolPositionStatus = 'pending' | 'active' | 'exit_requested' | 'withdrawable' | 'withdrawn';
+type PoolPositionStatus = 'pending' | 'active' | 'recovery' | 'exit_requested' | 'withdrawable' | 'withdrawn';
 
 type AvailableAsset = {
   assetId: string;
@@ -85,7 +85,7 @@ type AvailableAsset = {
 };
 
 type CustodialPosition = {
-  source: 'custodial_vault';
+  source: 'custodial_vault' | 'recovery_vault';
   positionId: string;
   assetId: string;
   chain: 'BSC';
@@ -100,11 +100,11 @@ type CustodialPosition = {
   depositEpoch: string;
   status: PoolPositionStatus;
   lifecycleOpen: boolean;
-  custody: 'cukie_pool_nft_vault' | 'wallet';
+  custody: 'cukie_pool_nft_vault' | 'cukie_pool_recovery' | 'wallet';
   ownerRewardEligible: boolean;
-  depositedAt: string;
-  activationAt: string;
-  depositCalendarVersion: string;
+  depositedAt: string | null;
+  activationAt: string | null;
+  depositCalendarVersion: string | null;
   exitRequestedAt: string | null;
   withdrawableAt: string | null;
   exitCalendarVersion: string | null;
@@ -125,10 +125,12 @@ type CustodialStatus = {
   walletNormalized: string;
   nftCustody: PoolCustody;
   positions: CustodialPosition[];
+  recoveryAssets?: CustodialPosition[];
   availableAssets: AvailableAsset[];
   availability?: {
     status: 'complete' | 'partial';
     unknownAssets: number;
+    unknownAssetIds?: string[];
   };
   sourceHealthy: boolean;
 };
@@ -146,6 +148,16 @@ type PendingAsset = Pick<AvailableAsset, 'assetId' | 'chainId' | 'collectionAddr
   depositEpoch?: string;
 };
 type PoolTab = 'pool' | 'available';
+type PoolRequestedIdentity = {
+  tokenId: string | null;
+  chainId: 56 | 97 | null;
+  chainIdInvalid: boolean;
+  collection: string | null;
+  collectionInvalid: boolean;
+  vault: string | null;
+  vaultInvalid: boolean;
+  hasIdentityQuery: boolean;
+};
 
 type PoolOnChainConfirmation = {
   context: NftVaultPendingContext;
@@ -158,10 +170,30 @@ type PoolOnChainConfirmation = {
   confirmedAt: number;
 };
 
+type PoolPositionIdentityInput = {
+  chainId: number;
+  collectionAddress: string;
+  tokenId: string;
+  vaultAddress: string;
+};
+
 type EphemeralPendingEntry = {
   operation: NftVaultPendingOperation;
   storageRaw: string | null;
 };
+
+function receiptBlockNumber(receipt: unknown) {
+  if (!receipt || typeof receipt !== 'object') return null;
+  const value = (receipt as { blockNumber?: unknown }).blockNumber;
+  try {
+    if (typeof value === 'bigint' && value >= BigInt(0)) return value;
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
+    if (typeof value === 'string' && /^(?:0x[0-9a-f]+|[0-9]+)$/i.test(value)) return BigInt(value);
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 function poolTabFromHash(hash: string) {
   if (hash === 'mi-cukie-pool' || hash === 'mis-cukies-aportados' || hash.startsWith('pool-cukie-')) return 'pool' as const;
@@ -220,6 +252,7 @@ function dailyGamesCapacity(generation: PoolGeneration, rarity: PoolRarity) {
 function statusLabel(value: PoolPositionStatus) {
   if (value === 'pending') return 'Activándose';
   if (value === 'active') return 'Disponible para partidas';
+  if (value === 'recovery') return 'En recuperación';
   if (value === 'exit_requested') return 'Salida solicitada';
   if (value === 'withdrawable') return 'Listo para retirar';
   return 'Retirado';
@@ -419,7 +452,7 @@ function mergePendingPoolAssets(
         || pendingNftVaultOperationAssetKey(operation) === asset.assetId
       ))
     ) continue;
-    if (status.positions.some((position) => (
+    if ([...status.positions, ...(status.recoveryAssets ?? [])].some((position) => (
       position.assetId === operation.assetId
       || pendingNftVaultOperationAssetKey(operation) === position.assetId
     ))) continue;
@@ -434,7 +467,168 @@ function mergePendingPoolAssets(
     : { ...status, availableAssets };
 }
 
+function samePoolStatusIdentity(current: PoolStatus, previous: PoolStatus | null) {
+  if (
+    !previous
+    || current.mode !== 'custodial_vault'
+    || previous.mode !== 'custodial_vault'
+  ) return false;
+  return current.walletNormalized.toLowerCase() === previous.walletNormalized.toLowerCase()
+    && current.nftCustody.chainId === previous.nftCustody.chainId
+    && sameAddress(current.nftCustody.vaultAddress, previous.nftCustody.vaultAddress)
+    && sameAddressSet(current.nftCustody.collectionAddresses, previous.nftCustody.collectionAddresses);
+}
+
+function withoutTerminalWithdrawals(
+  status: PoolStatus,
+  terminalWithdrawals: ReadonlySet<string>,
+) {
+  if (status.mode !== 'custodial_vault' || terminalWithdrawals.size === 0) return status;
+  return {
+    ...status,
+    positions: status.positions.filter((position) => (
+      !terminalWithdrawals.has(poolPositionIdentityKey(position))
+    )),
+    ...(status.recoveryAssets
+      ? {
+        recoveryAssets: status.recoveryAssets.filter((position) => (
+          !terminalWithdrawals.has(poolPositionIdentityKey(position))
+        )),
+      }
+      : {}),
+  };
+}
+
+function retainPoolLists(
+  current: PoolStatus,
+  previous: PoolStatus | null,
+  terminalWithdrawals: ReadonlySet<string> = new Set(),
+) {
+  const currentVisible = withoutTerminalWithdrawals(current, terminalWithdrawals);
+  const previousVisible = previous
+    ? withoutTerminalWithdrawals(previous, terminalWithdrawals)
+    : null;
+  if (!samePoolStatusIdentity(currentVisible, previousVisible)) return currentVisible;
+  const retained = retainNftVaultLists(currentVisible, previousVisible);
+  const retainedVisible = withoutTerminalWithdrawals(retained, terminalWithdrawals);
+  if (
+    currentVisible.mode !== 'custodial_vault'
+    || previousVisible?.mode !== 'custodial_vault'
+    || !Array.isArray(currentVisible.recoveryAssets)
+    || !Array.isArray(previousVisible.recoveryAssets)
+    || previousVisible.recoveryAssets.length === 0
+  ) return retainedVisible;
+  if (!currentVisible.sourceHealthy) {
+    return currentVisible.recoveryAssets.length > 0
+      ? retainedVisible
+      : {
+        ...retainedVisible,
+        recoveryAssets: previousVisible.recoveryAssets,
+      };
+  }
+  if (currentVisible.availability?.status !== 'partial') return retainedVisible;
+  const unknownAssetIds = new Set(currentVisible.availability.unknownAssetIds ?? []);
+  if (unknownAssetIds.size === 0) return retainedVisible;
+  const currentAssetIds = new Set(currentVisible.recoveryAssets.map((asset) => asset.assetId));
+  const recoveryAssets = [
+    ...currentVisible.recoveryAssets,
+    ...previousVisible.recoveryAssets.filter((asset) => (
+      unknownAssetIds.has(asset.assetId) && !currentAssetIds.has(asset.assetId)
+    )),
+  ];
+  return recoveryAssets.length === currentVisible.recoveryAssets.length
+    ? retainedVisible
+    : { ...retainedVisible, recoveryAssets };
+}
+
+function mergePoolPositions(status: CustodialStatus) {
+  const positions: CustodialPosition[] = [];
+  const seenAssets = new Set<string>();
+  for (const position of status.positions) {
+    if (!position.lifecycleOpen || seenAssets.has(position.assetId)) continue;
+    seenAssets.add(position.assetId);
+    positions.push(position);
+  }
+  for (const position of status.recoveryAssets ?? []) {
+    if (!position.lifecycleOpen || seenAssets.has(position.assetId)) continue;
+    seenAssets.add(position.assetId);
+    positions.push(position);
+  }
+  return positions;
+}
+
+function recoveryHref(position: CustodialPosition) {
+  const query = new URLSearchParams({
+    tokenId: position.tokenId,
+    chainId: String(position.chainId),
+    collection: position.collectionAddress,
+    recoveryVault: position.vaultAddress,
+  });
+  return `/cukie-hodler/recuperar?${query.toString()}#pool-recovery`;
+}
+
+function poolPositionTarget(position: CustodialPosition) {
+  return [
+    'pool-cukie',
+    position.chainId,
+    position.collectionAddress.toLowerCase(),
+    position.tokenId,
+    position.vaultAddress.toLowerCase(),
+    position.depositEpoch,
+  ].join('-');
+}
+
+function poolPositionIdentityPrefix(input: PoolPositionIdentityInput) {
+  return [
+    input.chainId,
+    input.collectionAddress.toLowerCase(),
+    input.tokenId,
+    input.vaultAddress.toLowerCase(),
+  ].join(':');
+}
+
+function poolPositionIdentityKey(position: PoolPositionIdentityInput & { depositEpoch: string }) {
+  return `${poolPositionIdentityPrefix(position)}:${position.depositEpoch}`;
+}
+
+function poolAvailableTarget(asset: AvailableAsset) {
+  return [
+    'pool-available',
+    asset.chainId,
+    asset.collectionAddress.toLowerCase(),
+    asset.tokenId,
+  ].join('-');
+}
+
+function poolTargetElement(target: string) {
+  return document.getElementById(target)
+    ?? [...document.querySelectorAll<HTMLElement>('[data-pool-target]')]
+      .find((element) => element.dataset.poolTarget === target)
+    ?? null;
+}
+
 function scheduleSummary(position: CustodialPosition) {
+  if (position.custody === 'cukie_pool_recovery') {
+    if (position.status === 'withdrawable') {
+      return {
+        label: 'Retirada disponible desde',
+        timestamp: position.withdrawableAt,
+        detail: 'La espera terminó. Abre la retirada para que este Cukie vuelva a tu wallet.',
+      };
+    }
+    if (position.status === 'exit_requested') {
+      return {
+        label: 'Podrás retirarlo desde',
+        timestamp: position.withdrawableAt,
+        detail: 'Este Cukie sigue protegido y no está disponible para partidas mientras termina la espera.',
+      };
+    }
+    return {
+      label: 'Recuperación pendiente',
+      timestamp: null,
+      detail: 'Este Cukie sigue protegido y no está disponible para partidas. Abre su estado para continuar.',
+    };
+  }
   if (position.status === 'pending') {
     return {
       label: 'Disponible para partidas desde',
@@ -534,13 +728,24 @@ export function CukiePoolStatusPanel() {
   const [navigationReady, setNavigationReady] = useState(false);
   const [hashTarget, setHashTarget] = useState<string | null>(null);
   const hashScrollHandledRef = useRef<string | null>(null);
-  const [requestedTokenId, setRequestedTokenId] = useState<string | null>(null);
+  const validatedHashTargetRef = useRef<string | null>(null);
+  const [requestedIdentity, setRequestedIdentity] = useState<PoolRequestedIdentity>({
+    tokenId: null,
+    chainId: null,
+    chainIdInvalid: false,
+    collection: null,
+    collectionInvalid: false,
+    vault: null,
+    vaultInvalid: false,
+    hasIdentityQuery: false,
+  });
   const [pendingByAsset, setPendingByAsset] = useState<Record<string, NftVaultPendingOperation>>({});
   const pendingByAssetRef = useRef(pendingByAsset);
   pendingByAssetRef.current = pendingByAsset;
   const pendingEphemeralByContextRef = useRef(new Map<string, Record<string, EphemeralPendingEntry>>());
   const [onChainByAsset, setOnChainByAsset] = useState<Record<string, PoolOnChainConfirmation>>({});
-  const confirmedReceiptByHashRef = useRef(new Map<string, { status: string; transactionHash?: Hash; logs?: unknown }>());
+  const [terminalWithdrawals, setTerminalWithdrawals] = useState<Set<string>>(() => new Set());
+  const confirmedReceiptByHashRef = useRef(new Map<string, { status: string; transactionHash?: Hash; logs?: unknown; blockNumber?: bigint | number | string }>());
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const operationLocksRef = useRef(new Set<string>());
   const walletOperationLockRef = useRef(false);
@@ -569,13 +774,15 @@ export function CukiePoolStatusPanel() {
   }
   const status = useMemo(() => {
     if (!fetchedStatus) return null;
-    const retained = fetchedStatus.sourceHealthy
-      ? fetchedStatus
-      : retainNftVaultLists(fetchedStatus, lastHealthyStatusRef.current);
+    const retained = retainPoolLists(fetchedStatus, lastHealthyStatusRef.current, terminalWithdrawals);
     return mergePendingPoolAssets(retained, lastHealthyStatusRef.current, pendingByAsset);
-  }, [fetchedStatus, pendingByAsset]);
+  }, [fetchedStatus, pendingByAsset, terminalWithdrawals]);
   useEffect(() => {
-    if (fetchedStatus?.sourceHealthy) {
+    if (
+      fetchedStatus?.sourceHealthy
+      && fetchedStatus.mode === 'custodial_vault'
+      && fetchedStatus.availability?.status !== 'partial'
+    ) {
       lastHealthyStatusRef.current = mergePendingPoolAssets(fetchedStatus, lastHealthyStatusRef.current, pendingByAsset);
     }
   }, [fetchedStatus, pendingByAsset]);
@@ -587,10 +794,41 @@ export function CukiePoolStatusPanel() {
     const syncTabFromLocation = () => {
       const target = window.location.hash.slice(1);
       const tab = poolTabFromHash(target) ?? 'pool';
-      const tokenId = new URLSearchParams(window.location.search).get('tokenId');
+      const params = new URLSearchParams(window.location.search);
+      const tokenId = params.get('tokenId');
+      const rawChainId = params.get('chainId');
+      const chainId = rawChainId === '56' || rawChainId === '97' ? Number(rawChainId) as 56 | 97 : null;
+      const rawCollection = params.get('collection');
+      const collection = rawCollection?.trim() || null;
+      const rawVault = params.get('vault');
+      const rawRecoveryVault = params.get('recoveryVault');
+      const vault = (rawVault ?? rawRecoveryVault)?.trim() || null;
+      const vaultConflict = rawVault !== null
+        && rawRecoveryVault !== null
+        && !sameAddress(rawVault, rawRecoveryVault);
+      const collectionInvalid = rawCollection !== null
+        && (!collection || !isAddress(collection, { strict: false }));
+      const vaultInvalid = rawVault !== null || rawRecoveryVault !== null
+        ? !vault || vaultConflict || !isAddress(vault, { strict: false })
+        : false;
+      const hasIdentityQuery = params.has('tokenId')
+        || params.has('chainId')
+        || params.has('collection')
+        || params.has('vault')
+        || params.has('recoveryVault');
       hashScrollHandledRef.current = null;
-      setHashTarget(target || null);
-      setRequestedTokenId(tokenId);
+      validatedHashTargetRef.current = null;
+      setHashTarget(hasIdentityQuery ? null : target || null);
+      setRequestedIdentity({
+        tokenId,
+        chainId,
+        chainIdInvalid: rawChainId !== null && chainId === null,
+        collection,
+        collectionInvalid,
+        vault,
+        vaultInvalid,
+        hasIdentityQuery,
+      });
       if (tab) {
         setActiveTab(tab);
         setVisitedTabs((current) => current.has(tab) ? current : new Set([...current, tab]));
@@ -618,7 +856,11 @@ export function CukiePoolStatusPanel() {
     let observer: MutationObserver | null = null;
     const scrollToTarget = () => {
       if (disposed) return false;
-      const target = document.getElementById(hashTarget);
+      if (
+        requestedIdentity.hasIdentityQuery
+        && hashTarget !== validatedHashTargetRef.current
+      ) return false;
+      const target = poolTargetElement(hashTarget);
       if (!target || target.closest('[hidden]')) return false;
       target.scrollIntoView?.({ block: 'start' });
       hashScrollHandledRef.current = hashTarget;
@@ -635,7 +877,7 @@ export function CukiePoolStatusPanel() {
       observer?.disconnect();
       window.clearTimeout(timeout);
     };
-  }, [activeTab, authLoading, hashTarget, loadState, status]);
+  }, [activeTab, authLoading, hashTarget, loadState, requestedIdentity.hasIdentityQuery, status]);
 
   function selectTab(tab: PoolTab) {
     setActiveTab(tab);
@@ -653,6 +895,7 @@ export function CukiePoolStatusPanel() {
     setError(null);
     setNotice(null);
     setOnChainByAsset({});
+    setTerminalWithdrawals(new Set());
     confirmedReceiptByHashRef.current.clear();
     walletOperationLockRef.current = false;
   }, [address, chainId]);
@@ -798,6 +1041,7 @@ export function CukiePoolStatusPanel() {
     phase: NftVaultPendingPhase;
     txHash: Hash;
     depositEpoch?: string;
+    receiptBlockNumber?: string;
     context?: NftTransactionContext;
     expectedOperation?: NftVaultPendingOperation;
     isCurrent?: () => boolean;
@@ -830,6 +1074,7 @@ export function CukiePoolStatusPanel() {
       .find((operation) => pendingNftVaultOperationAssetKey(operation) === operationAssetKey);
     if (input.expectedOperation && !pendingNftVaultOperationMatches(previous, input.expectedOperation)) return null;
     const depositEpoch = input.depositEpoch ?? previous?.depositEpoch;
+    const receiptBlockNumber = input.receiptBlockNumber ?? previous?.receiptBlockNumber;
     const operation: NftVaultPendingOperation = {
       version: 1,
       ...storageContext,
@@ -842,6 +1087,7 @@ export function CukiePoolStatusPanel() {
       createdAt: previous?.createdAt ?? now,
       updatedAt: now,
       ...(depositEpoch ? { depositEpoch } : {}),
+      ...(receiptBlockNumber ? { receiptBlockNumber } : {}),
     };
     const persisted = savePendingNftVaultOperation(storage, operation);
     const contextStorageKey = pendingNftVaultStorageKey(storageContext);
@@ -1075,7 +1321,7 @@ export function CukiePoolStatusPanel() {
     };
     const inspectConfirmedOperation = async (
       snapshot: NftVaultPendingOperation,
-      receipt?: { status: string; logs?: unknown },
+      receipt?: { status: string; logs?: unknown; blockNumber?: bigint | number | string },
     ) => {
       let operation = currentOperation(snapshot);
       if (!operation || typeof publicClient.readContract !== 'function') return;
@@ -1103,6 +1349,23 @@ export function CukiePoolStatusPanel() {
         || !sameAddress(confirmedOperation.walletAddress, reconciliationContext.walletAddress)
         || !ukiNftVaults.collectionAddresses.some((collection) => sameAddress(collection, confirmedOperation.collectionAddress))
       ) return;
+      const receiptBlock = receiptBlockNumber(resolvedReceipt)
+        ?? receiptBlockNumber({ blockNumber: confirmedOperation.receiptBlockNumber });
+      if (receiptBlock === null || typeof publicClient.getBlockNumber !== 'function') return;
+      let latestBlock: bigint;
+      try {
+        latestBlock = await publicClient.getBlockNumber();
+      } catch {
+        return;
+      }
+      if (latestBlock < receiptBlock) return;
+      // Deposit/exit confirmation must resolve the current contract state:
+      // a receipt block can still show the position before a later withdrawal.
+      // Withdraw confirmation remains receipt-scoped so its epoch cannot be
+      // confused with a newer deposit of the same NFT.
+      const stateBlock = confirmedOperation.action === 'withdraw'
+        ? receiptBlock
+        : latestBlock;
       if (confirmedOperation.action === 'deposit') {
         const receiptEpoch = depositedEpochFromReceipt(resolvedReceipt, confirmedOperation);
         const depositEpoch = receiptEpoch ?? confirmedOperation.depositEpoch;
@@ -1126,16 +1389,49 @@ export function CukiePoolStatusPanel() {
           operation = updated;
         }
         if (!operation.depositEpoch || !isReconciliationCurrent()) return;
-        const rawPosition = await publicClient.readContract({
-          address: operation.vaultAddress as Address,
-          abi: cukiePoolNftVaultAbi,
-          functionName: 'positionOf',
-          args: [operation.collectionAddress as Address, BigInt(operation.tokenId)],
-        });
+        let rawPosition: unknown = null;
+        try {
+          rawPosition = await publicClient.readContract({
+            address: operation.vaultAddress as Address,
+            abi: cukiePoolNftVaultAbi,
+            functionName: 'positionOf',
+            args: [operation.collectionAddress as Address, BigInt(operation.tokenId)],
+            blockNumber: stateBlock,
+          });
+        } catch {
+          // A withdrawn/terminal position can make positionOf revert. The
+          // collection owner read below is the only fallback that may close
+          // this exact receipt-scoped pending deposit.
+        }
         if (!isReconciliationCurrent()) return;
         const current = currentOperation(operation);
-        if (!current || !inspectPoolDepositPosition(current, rawPosition)) return;
-        markOnChainConfirmation(current, current.depositEpoch);
+        if (!current) return;
+        if (inspectPoolDepositPosition(current, rawPosition)) {
+          markOnChainConfirmation(current, current.depositEpoch);
+          return;
+        }
+        let owner: unknown;
+        try {
+          owner = await publicClient.readContract({
+            address: current.collectionAddress as Address,
+            abi: erc721CustodyAbi,
+            functionName: 'ownerOf',
+            args: [BigInt(current.tokenId)],
+            blockNumber: stateBlock,
+          });
+        } catch {
+          return;
+        }
+        if (!isReconciliationCurrent()) return;
+        const latest = currentOperation(current);
+        if (!latest || !sameAddress(owner as string, latest.walletAddress)) return;
+        clearPending(latest.assetId, {
+          expectedOperation: latest,
+          isCurrent: isReconciliationCurrent,
+        });
+        if (isReconciliationCurrent()) {
+          setNotice('La lectura actual confirma que el Cukie está en tu wallet; se ha liberado la operación pendiente.');
+        }
         return;
       }
       if (operation.action === 'request_exit') {
@@ -1144,25 +1440,54 @@ export function CukiePoolStatusPanel() {
           abi: cukiePoolNftVaultAbi,
           functionName: 'positionOf',
           args: [operation.collectionAddress as Address, BigInt(operation.tokenId)],
+          blockNumber: stateBlock,
         });
         if (!isReconciliationCurrent()) return;
         const current = currentOperation(operation);
         if (current && poolPositionMatchesOperation(current, rawPosition, 'request_exit')) markOnChainConfirmation(current);
         return;
       }
-      if (
-        operation.depositEpoch
-        && withdrawnEpochFromReceipt(resolvedReceipt, operation) !== operation.depositEpoch
-      ) return;
+      const withdrawnEpoch = withdrawnEpochFromReceipt(resolvedReceipt, operation);
+      if (operation.depositEpoch && withdrawnEpoch !== operation.depositEpoch) return;
+      if (operation.action === 'withdraw' && !operation.depositEpoch && !withdrawnEpoch) return;
       const owner = await publicClient.readContract({
         address: operation.collectionAddress as Address,
         abi: erc721CustodyAbi,
         functionName: 'ownerOf',
         args: [BigInt(operation.tokenId)],
+        blockNumber: receiptBlock,
       });
       if (!isReconciliationCurrent()) return;
       const current = currentOperation(operation);
-      if (current && sameAddress(owner as string, current.walletAddress)) markOnChainConfirmation(current);
+      if (current && sameAddress(owner as string, current.walletAddress)) {
+        markOnChainConfirmation(current);
+        // ownerOf(wallet) is a terminal custody proof even if the indexed
+        // projection is still partial. Do not leave a confirmed withdrawal
+        // replayable while waiting for an eventually-consistent row.
+        if (current.action === 'withdraw') {
+          const terminalEpoch = current.depositEpoch ?? withdrawnEpoch;
+          if (terminalEpoch) {
+            const terminalIdentity = poolPositionIdentityKey({
+              chainId: current.chainId,
+              collectionAddress: current.collectionAddress,
+              tokenId: current.tokenId,
+              vaultAddress: current.vaultAddress,
+              depositEpoch: terminalEpoch,
+            });
+            setTerminalWithdrawals((identities) => {
+              if (identities.has(terminalIdentity)) return identities;
+              return new Set([...identities, terminalIdentity]);
+            });
+          }
+          clearPending(current.assetId, {
+            expectedOperation: current,
+            isCurrent: isReconciliationCurrent,
+          });
+          if (isReconciliationCurrent()) {
+            setNotice('Retirada confirmada y reflejada en tu wallet.');
+          }
+        }
+      }
     };
 
     const reconcile = async () => {
@@ -1195,6 +1520,9 @@ export function CukiePoolStatusPanel() {
                 depositEpoch: operation.action === 'deposit'
                   ? depositedEpochFromReceipt(receipt, operation) ?? undefined
                   : undefined,
+                ...(receiptBlockNumber(receipt) !== null
+                  ? { receiptBlockNumber: receiptBlockNumber(receipt)!.toString() }
+                  : {}),
                 context: {
                   wallet: reconciliationContext.walletAddress,
                   chainId: reconciliationContext.chainId,
@@ -1343,6 +1671,9 @@ export function CukiePoolStatusPanel() {
           phase: 'awaiting_receipt',
           txHash: replacement.replacementHash,
           depositEpoch: asset.depositEpoch,
+          ...(receiptBlockNumber(replacement.receipt) !== null
+            ? { receiptBlockNumber: receiptBlockNumber(replacement.receipt)!.toString() }
+            : {}),
           context: expectedContext,
           expectedOperation: originalOperation,
           updateUi: isCurrentContext(isCurrent),
@@ -1358,6 +1689,9 @@ export function CukiePoolStatusPanel() {
           phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
           txHash: hash,
           depositEpoch: asset.depositEpoch,
+          ...(receiptBlockNumber(receipt) !== null
+            ? { receiptBlockNumber: receiptBlockNumber(receipt)!.toString() }
+            : {}),
           context: expectedContext,
           expectedOperation: operation,
           updateUi: isCurrentContext(isCurrent),
@@ -1471,6 +1805,16 @@ export function CukiePoolStatusPanel() {
           .find((item) => pendingNftVaultOperationAssetKey(item) === assetKey)
         : existingPending);
       if (!operationReady()) throw new Error('POOL_OPERATION_CONTEXT_CHANGED_AFTER_RECEIPT');
+      const terminalPrefix = `${poolPositionIdentityPrefix({
+        chainId: asset.chainId,
+        collectionAddress: asset.collectionAddress,
+        tokenId: asset.tokenId,
+        vaultAddress,
+      })}:`;
+      setTerminalWithdrawals((identities) => {
+        const next = new Set([...identities].filter((identity) => !identity.startsWith(terminalPrefix)));
+        return next.size === identities.size ? identities : next;
+      });
       setPhase('idle');
       setMutatingAssetId(null);
       setNotice('Depósito confirmado en BSC. Este Cukie seguirá bloqueado mientras actualizamos el inventario; ya puedes operar con otro.');
@@ -1587,7 +1931,7 @@ export function CukiePoolStatusPanel() {
 
   const custodialStatus = status?.mode === 'custodial_vault' ? status : null;
   const openPositions = useMemo(
-    () => custodialStatus?.positions.filter((item) => item.lifecycleOpen) ?? [],
+    () => custodialStatus ? mergePoolPositions(custodialStatus) : [],
     [custodialStatus],
   );
   const confirmedWithdrawalCount = openPositions.filter((item) => {
@@ -1605,24 +1949,65 @@ export function CukiePoolStatusPanel() {
       && pendingOperationForAsset(item)?.phase === 'syncing_projection'
     )
   )).length;
+  const poolUnknownAssetIds = new Set(
+    custodialStatus?.availability?.status === 'partial'
+      ? custodialStatus.availability.unknownAssetIds ?? []
+      : [],
+  );
+  const poolUnknownCount = custodialStatus?.availability?.status === 'partial'
+    ? custodialStatus.availability.unknownAssets
+    : 0;
+  const unknownVisiblePoolCount = openPositions.filter((item) => poolUnknownAssetIds.has(item.assetId)).length;
+  const poolConfirmedCount = Math.max(0, poolPositionCount - unknownVisiblePoolCount);
+  const poolSummaryCount = poolUnknownCount > 0
+    ? `${poolConfirmedCount} confirmados · ${poolUnknownCount} por comprobar`
+    : `${poolPositionCount} en total`;
   const availableOriginalCount = custodialStatus?.availableAssets.filter((item) => item.generation === 'original').length ?? 0;
   const availableSecondGenerationCount = (custodialStatus?.availableAssets.length ?? 0) - availableOriginalCount;
 
   useEffect(() => {
-    if (!requestedTokenId || hashTarget || !custodialStatus) return;
-    const available = custodialStatus.availableAssets.some((asset) => asset.tokenId === requestedTokenId);
-    const inPool = openPositions.some((position) => position.tokenId === requestedTokenId);
-    if (!available && !inPool) {
+    const { tokenId: requestedTokenId } = requestedIdentity;
+    if (
+      !requestedTokenId
+      || !custodialStatus
+      || requestedIdentity.chainIdInvalid
+      || requestedIdentity.collectionInvalid
+      || requestedIdentity.vaultInvalid
+    ) return;
+    if (!/^\d+$/.test(requestedTokenId)) return;
+    const matchesIdentity = (item: { chainId: number; collectionAddress: string; vaultAddress?: string }) => (
+      item.chainId === (requestedIdentity.chainId ?? item.chainId)
+      && (!requestedIdentity.collection || sameAddress(item.collectionAddress, requestedIdentity.collection))
+      && (!requestedIdentity.vault || sameAddress(item.vaultAddress, requestedIdentity.vault))
+    );
+    const availableMatches = custodialStatus.availableAssets.filter((asset) => (
+      asset.tokenId === requestedTokenId && matchesIdentity(asset)
+    ));
+    const poolMatches = openPositions.filter((position) => (
+      position.tokenId === requestedTokenId && matchesIdentity(position)
+    ));
+    const matches = [...availableMatches, ...poolMatches];
+    if (matches.length === 0) {
       setActiveTab('pool');
       setVisitedTabs((current) => current.has('pool') ? current : new Set([...current, 'pool']));
       return;
     }
+    if (matches.length > 1) return;
+    const [match] = matches;
+    const available = availableMatches.length === 1;
     const tab: PoolTab = available ? 'available' : 'pool';
-    const target = available ? `pool-available-${requestedTokenId}` : `pool-cukie-${requestedTokenId}`;
+    const target = requestedIdentity.chainId || requestedIdentity.collection || requestedIdentity.vault
+      ? available
+      ? poolAvailableTarget(match as AvailableAsset)
+        : poolPositionTarget(match as CustodialPosition)
+      : available
+        ? `pool-available-${requestedTokenId}`
+        : `pool-cukie-${requestedTokenId}`;
     setActiveTab(tab);
     setVisitedTabs((current) => current.has(tab) ? current : new Set([...current, tab]));
+    validatedHashTargetRef.current = target;
     setHashTarget(target);
-  }, [custodialStatus, hashTarget, openPositions, requestedTokenId]);
+  }, [custodialStatus, openPositions, requestedIdentity]);
 
   return (
     <section id="mi-cukie-pool" className="relative z-[2] w-full pb-10 pt-7">
@@ -1749,7 +2134,7 @@ export function CukiePoolStatusPanel() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">
-                      En el pool · {poolPositionCount} en total
+                      En el pool · {poolSummaryCount}
                     </p>
                     <h3 className="mt-2 min-w-0 text-balance font-headline text-xl font-black leading-tight text-[var(--uki-cream)] sm:text-3xl">
                       {activeCount === 0
@@ -1841,7 +2226,14 @@ export function CukiePoolStatusPanel() {
                       busy: Boolean(mutatingAssetId && mutatingAssetId !== asset.assetId),
                     });
                     return (
-                    <article id={`pool-available-${asset.tokenId}`} key={asset.assetId} className="min-w-0 scroll-mt-24 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914] transition-transform duration-200 active:scale-[0.99] sm:grid sm:grid-cols-[11rem_minmax(0,1fr)]">
+                    <article
+                      id={status.availableAssets.filter((candidate) => candidate.tokenId === asset.tokenId).length === 1
+                        ? `pool-available-${asset.tokenId}`
+                        : undefined}
+                      data-pool-target={poolAvailableTarget(asset)}
+                      key={asset.assetId}
+                      className="min-w-0 scroll-mt-24 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914] transition-transform duration-200 active:scale-[0.99] sm:grid sm:grid-cols-[11rem_minmax(0,1fr)]"
+                    >
                       <div className="relative aspect-[4/3] min-w-0 overflow-hidden border-b border-white/10 bg-[#160d21] sm:aspect-auto sm:min-h-[13.5rem] sm:border-b-0 sm:border-r">
                         <CukiImage
                           src={asset.imageUrl}
@@ -1922,7 +2314,9 @@ export function CukiePoolStatusPanel() {
                   </p>
                 </div>
                 <span className="shrink-0 text-xs font-bold text-[var(--uki-muted)]">
-                  {poolPositionCount} en el pool{confirmedWithdrawalCount > 0 ? ` · ${confirmedWithdrawalCount} actualizando colección` : ''}
+                  {poolUnknownCount > 0
+                    ? `${poolConfirmedCount} confirmados · ${poolUnknownCount} por comprobar`
+                    : `${poolPositionCount} en el pool${confirmedWithdrawalCount > 0 ? ` · ${confirmedWithdrawalCount} actualizando colección` : ''}`}
                 </span>
               </div>
               {openPositions.length === 0 ? (
@@ -1937,7 +2331,14 @@ export function CukiePoolStatusPanel() {
                       && pending.phase === 'syncing_projection';
                     const confirmingExit = exitConfirmationId === position.positionId;
                     return (
-                    <article id={`pool-cukie-${position.tokenId}`} key={position.positionId} className="min-w-0 scroll-mt-24 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914]">
+                    <article
+                      id={openPositions.filter((candidate) => candidate.tokenId === position.tokenId).length === 1
+                        ? `pool-cukie-${position.tokenId}`
+                        : undefined}
+                      data-pool-target={poolPositionTarget(position)}
+                      key={position.positionId}
+                      className="min-w-0 scroll-mt-24 overflow-hidden rounded-[12px] border border-white/10 bg-[#0d0914]"
+                    >
                       <div className="grid min-w-0 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
                         <div className="relative aspect-[4/3] min-w-0 overflow-hidden border-b border-white/10 bg-[#160d21] sm:aspect-auto sm:min-h-[15.5rem] sm:border-b-0 sm:border-r">
                           <CukiImage
@@ -1949,7 +2350,7 @@ export function CukiePoolStatusPanel() {
                           <span className={`absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black ${positionStatusClass(position.status)}`}>
                             {withdrawalConfirmed ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
                             {!withdrawalConfirmed && position.status === 'active' ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
-                            {!withdrawalConfirmed && (position.status === 'pending' || position.status === 'exit_requested') ? <Clock3 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                            {!withdrawalConfirmed && (position.status === 'pending' || position.status === 'recovery' || position.status === 'exit_requested') ? <Clock3 className="h-3.5 w-3.5" aria-hidden="true" /> : null}
                             {!withdrawalConfirmed && position.status === 'withdrawable' ? <Unlock className="h-3.5 w-3.5" aria-hidden="true" /> : null}
                             {withdrawalConfirmed ? 'Retirada confirmada' : statusLabel(position.status)}
                           </span>
@@ -1971,6 +2372,10 @@ export function CukiePoolStatusPanel() {
                           <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
                             Retirada confirmada en BSC. Estamos actualizando tu colección; no tienes que volver a firmar.
                           </p>
+                        ) : position.custody === 'cukie_pool_recovery' ? (
+                          <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                            Este Cukie sigue protegido y no está disponible para partidas. Abre su estado para gestionar la retirada.
+                          </p>
                         ) : position.status === 'active' && position.ownerRewardEligible ? (
                           <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
                             Está disponible para partidas. Si se utiliza en una partida válida, optará al reparto de su generación.
@@ -1989,7 +2394,19 @@ export function CukiePoolStatusPanel() {
                           </p>
                         )}
 
-                        {position.lifecycleOpen && (position.status === 'pending' || position.status === 'active') ? (
+                        {position.custody === 'cukie_pool_recovery' ? (
+                          <Link
+                            href={recoveryHref(position)}
+                            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-[var(--uki-lilac)] px-4 py-2 text-xs font-black uppercase text-black transition-transform active:scale-[0.98]"
+                          >
+                            <Unlock className="h-3.5 w-3.5" />
+                            {position.status === 'withdrawable'
+                              ? 'Retirar del Cukie Pool'
+                              : position.status === 'exit_requested'
+                                ? 'Ver salida del Cukie Pool'
+                                : 'Solicitar salida del Cukie Pool'}
+                          </Link>
+                        ) : position.lifecycleOpen && (position.status === 'pending' || position.status === 'active') ? (
                           confirmingExit ? (
                             <div className="mt-4 rounded-[8px] border border-amber-300/25 bg-amber-300/[0.06] p-3">
                               <p className="text-sm font-semibold leading-relaxed text-amber-100">
@@ -2059,9 +2476,9 @@ export function CukiePoolStatusPanel() {
             </Tabs>
 
             <p className="text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
-              Este resumen muestra solo los Cukies que puedes gestionar desde el pool: los que ya
-              aportaste y los que están disponibles en tu wallet. Los depositados en Cukie Master
-              aparecen en <Link href="/cukies" className="font-black text-[var(--uki-lilac)] underline decoration-[var(--uki-lilac)]/45 underline-offset-4">Mis Cukies</Link>.
+              Este resumen muestra los Cukies que puedes gestionar desde el pool, incluidos los que
+              están en proceso de recuperación, y los que puedes aportar desde tu wallet. Los
+              depositados en Cukie Master aparecen en <Link href="/cukies" className="font-black text-[var(--uki-lilac)] underline decoration-[var(--uki-lilac)]/45 underline-offset-4">Mis Cukies</Link>.
             </p>
 
             <PoolMovements

@@ -402,7 +402,7 @@ describe('CukieMasterStatusPanel', () => {
     expect(onUkiRouteData).toHaveBeenLastCalledWith(null);
   });
 
-  it('muestra cupos detectados sin reutilizar slots viejos y sigue consultando mientras sincroniza', async () => {
+  it('oculta los cupos anteriores y sigue consultando mientras actualiza', async () => {
     jest.useFakeTimers();
     try {
       mockUseAuth.mockReturnValue(authValue(user));
@@ -411,16 +411,19 @@ describe('CukieMasterStatusPanel', () => {
         totals: { desiredSlots: 0, allocatedSlots: 0, maxPotentialSlots: 10 },
         routes: {
           uki: {
-            position: null,
+            position: { status: 'active', desiredSlots: 1, allocatedSlots: 1, protectedSlots: 1, graceEndsAt: '2026-09-12T00:00:00.000Z' },
             projectionFresh: false,
             synchronizing: true,
             previewSlots: 1,
             currentRequirement: { route: 'uki', ukiRaw: '20000000000000000000000' },
-            pendingRequirement: null,
+            pendingRequirement: { route: 'uki', ukiRaw: '30000000000000000000000' },
             requirementGraceEndsAt: null,
             deficitToNextSlot: { route: 'uki', ukiRaw: '19700000000000000000000' },
-            deficitToPreserveSlots: null,
-            slots: [],
+            deficitToPreserveSlots: { route: 'uki', ukiRaw: '29000000000000000000000' },
+            slots: [{
+              route: 'uki', ordinal: 1, eligibilityEpoch: 1, status: 'active',
+              creditEligibleFrom: '2026-08-01T00:00:00.000Z', graceEndsAt: null,
+            }],
             source: {
               complete: true,
               status: 'available',
@@ -459,10 +462,11 @@ describe('CukieMasterStatusPanel', () => {
 
       render(<CukieMasterStatusPanel />);
 
-      expect(await screen.findByText('1/5')).toBeInTheDocument();
-      expect(screen.getByText('3/5')).toBeInTheDocument();
-      expect(screen.getAllByText(/detectados · sincronizando/i)).toHaveLength(2);
+      expect((await screen.findAllByText('No disponible')).length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText(/Actualizando tus cupos/i).length).toBeGreaterThanOrEqual(2);
       expect(screen.queryByText('Cupos conservados en gracia')).not.toBeInTheDocument();
+      expect(screen.queryByText('Cupo 1')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Próximo requisito:/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/Elige qué Cukies usar/i)).not.toBeInTheDocument();
 
       await act(async () => {

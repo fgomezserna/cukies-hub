@@ -55,13 +55,16 @@ function metadata(
   };
 }
 
-function activeLock(assetId: string): NftAssetLockDocument {
+function activeLock(
+  assetId: string,
+  reason: NftAssetLockDocument['reason'] = 'game_assignment',
+): NftAssetLockDocument {
   return {
     _id: `lock:${assetId}`,
     lockId: `lock:${assetId}`,
     assetId,
     ownerNormalized: wallet,
-    reason: 'game_assignment',
+    reason,
     status: 'active',
     fencingToken: 1,
     createdBy: 'test',
@@ -120,6 +123,7 @@ function openMasterPosition(tokenId: string) {
       observedAt: now,
     },
     lastEventId: `deposit:${tokenId}`,
+    lastBlockNumber: 123,
     updatedAt: now,
   };
 }
@@ -223,8 +227,11 @@ describe('Cukie Master custodial inventory identity', () => {
       blockers: expect.arrayContaining(['missing_generation']),
     });
     expect(inventory.find((item) => item.tokenId === '13')).toMatchObject({
-      canDeposit: false,
-      blockers: expect.arrayContaining(['missing_rarity']),
+      canDeposit: true,
+      rarity: 'rare',
+      rarityPoints: 4,
+      contributionPoints: 0,
+      blockers: [],
     });
   });
 
@@ -304,4 +311,125 @@ describe('Cukie Master custodial inventory identity', () => {
       canSoftStake: false,
     }]);
   });
+
+  it('ignores a stale Pool projection after ownerOf confirms the wallet', async () => {
+    const tokenId = '23';
+    const assetId = `97:${collectionA}:${tokenId}`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'not_found',
+      observedBlockNumber: '500',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('stale-pool', tokenId, collectionA, { state: 'in_pool' })],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true, lastBlockNumber: 500 }],
+      nft_asset_locks: [],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(inventory).toMatchObject([{
+      assetId,
+      custody: 'wallet',
+      canDeposit: true,
+      blockers: [],
+    }]);
+  });
+
+  it('does not clear a Pool projection when ownerOf is older than its last indexed block', async () => {
+    const tokenId = '26';
+    const assetId = `97:${collectionA}:${tokenId}`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'not_found',
+      observedBlockNumber: '499',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('stale-pool-older-read', tokenId, collectionA, { state: 'in_pool' })],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true, lastBlockNumber: 500 }],
+      nft_asset_locks: [],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(inventory).toEqual([]);
+  });
+
+  it('does not treat a not_found result without an observed block as proof', async () => {
+    const tokenId = '27';
+    const assetId = `97:${collectionA}:${tokenId}`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'not_found',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('stale-pool-unobserved', tokenId, collectionA, { state: 'in_pool' })],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true, lastBlockNumber: 500 }],
+      nft_asset_locks: [],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(inventory).toEqual([]);
+  });
+
+  it('does not clear a stale Pool projection when no recovery probe ran', async () => {
+    const tokenId = '25';
+    const assetId = `97:${collectionA}:${tokenId}`;
+    mockRecovery.mockResolvedValueOnce([{
+      assetId,
+      status: 'not_found',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+      reason: 'POOL_RECOVERY_NO_PROBE',
+    }]);
+
+    const inventory = await custodialInventoryFromDb(fakeDb({
+      cukies: [metadata('unprobed-pool', tokenId, collectionA, { state: 'in_pool' })],
+      cukie_master_nft_positions: [],
+      cukie_pool_nft_vault_positions: [{ assetId, lifecycleOpen: true }],
+      nft_asset_locks: [],
+    }), wallet, now, undefined, config([collectionA]));
+
+    expect(inventory).toEqual([]);
+  });
+
+  it.each(['game_assignment', 'soft_stake', 'ops_hold'] as const)(
+    'preserves an active %s reservation after ownerOf confirms the wallet',
+    async (reason) => {
+      const tokenId = '24';
+      const assetId = `97:${collectionA}:${tokenId}`;
+      mockRecovery.mockResolvedValueOnce([{
+        assetId,
+        status: 'not_found',
+        vaultAddress: null,
+        beneficialOwner: null,
+        exitRequestedAt: null,
+        withdrawableAt: null,
+      }]);
+
+      const inventory = await custodialInventoryFromDb(fakeDb({
+        cukies: [metadata(`locked-${reason}`, tokenId, collectionA, { state: 'in_pool' })],
+        cukie_master_nft_positions: [],
+        cukie_pool_nft_vault_positions: [],
+        nft_asset_locks: [activeLock(assetId, reason)],
+      }), wallet, now, undefined, config([collectionA]));
+
+      expect(inventory).toEqual([]);
+    },
+  );
 });

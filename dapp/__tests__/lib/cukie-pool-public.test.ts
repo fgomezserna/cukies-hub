@@ -15,6 +15,7 @@ jest.mock('@/lib/uki-economy/cukie-pool/recovery-read', () => ({
 }));
 
 import type { NormalizedNftAsset } from '@/lib/nft-inventory';
+import type { NftAssetLockDocument } from '@/lib/nft-inventory/lock-types';
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 import { listCukiePoolWalletPositions } from '@/lib/uki-economy/cukie-pool/public';
@@ -198,6 +199,26 @@ function vaultPosition(
     lastEventId: `event:${tokenId}:${state}`,
     lastBlockNumber: 100 + Number(tokenId),
     lastLogIndex: 0,
+  };
+}
+
+function activeInventoryLock(
+  assetId: string,
+  reason: NftAssetLockDocument['reason'],
+): NftAssetLockDocument {
+  return {
+    _id: `lock:${assetId}:${reason}`,
+    lockId: `lock:${assetId}:${reason}`,
+    assetId,
+    ownerNormalized: OWNER,
+    reason,
+    status: 'active',
+    fencingToken: 1,
+    createdBy: 'test',
+    idempotencyKey: `test:${assetId}:${reason}`,
+    payloadHash: `sha256:${assetId}:${reason}`,
+    createdAt: NOW,
+    updatedAt: NOW,
   };
 }
 
@@ -560,6 +581,20 @@ describe('Cukie Pool public source health', () => {
       beneficialOwner: null,
       exitRequestedAt: null,
       withdrawableAt: null,
+    }, {
+      assetId: asset('11'),
+      status: 'current_custody',
+      vaultAddress: VAULT,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }, {
+      assetId: asset('12'),
+      status: 'current_custody',
+      vaultAddress: masterVault,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
     }]);
 
     const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
@@ -588,6 +623,246 @@ describe('Cukie Pool public source health', () => {
       nftCustody: { indexer: { status: 'unavailable' } },
     });
   });
+
+  it('releases a stale open projection when ownerOf confirms the wallet again', async () => {
+    vaultConfig.ready.cukiePool = true;
+    vaultConfig.mode.cukiePool = 'custodial';
+    vaultConfig.mode.cukieMaster = 'legacy';
+    const tokenId = '30';
+    const assetId = `97:${COLLECTION}:${tokenId}`;
+    const inventory = {
+      _id: tokenId,
+      tokenId,
+      owner: OWNER,
+      ownerNormalized: OWNER,
+      network: 'BSC',
+      state: 'available',
+      chainId: 97,
+      collectionAddressNormalized: COLLECTION,
+      rarity: 1,
+      generation: 1,
+    };
+    const staleProjection = {
+      ...vaultPosition(tokenId, 'active'),
+      assetId,
+      positionId: `${assetId}:epoch:1`,
+      _id: `${assetId}:epoch:1`,
+    };
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => {
+        const operational = healthyOperationalCollection(name);
+        if (operational) return operational;
+        return {
+          find: (filter: Record<string, unknown>) => cursor(
+            name === 'nft_vault_collections'
+              ? [allowlistProjection()]
+              : name === 'cukie_pool_calendar_versions'
+                ? [calendarVersion()]
+                : name === 'cukies'
+                  ? [inventory]
+                  : name === 'cukie_pool_nft_vault_positions'
+                    ? ('beneficiaryNormalized' in filter ? [] : [staleProjection])
+                    : [],
+          ),
+        };
+      },
+    });
+    recoveryReadMock.mockResolvedValue([{
+      assetId,
+      status: 'not_found',
+      observedBlockNumber: '130',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
+
+    expect(result.availableAssets).toEqual([expect.objectContaining({
+      assetId,
+      tokenId,
+      custody: 'wallet',
+      canDeposit: true,
+    })]);
+    expect(result.availability).toEqual({ status: 'complete', unknownAssets: 0, unknownAssetIds: [] });
+  });
+
+  it('does not release an open projection when ownerOf is older than its last indexed block', async () => {
+    vaultConfig.ready.cukiePool = true;
+    vaultConfig.mode.cukiePool = 'custodial';
+    vaultConfig.mode.cukieMaster = 'legacy';
+    const tokenId = '33';
+    const assetId = `97:${COLLECTION}:${tokenId}`;
+    const inventory = {
+      _id: tokenId,
+      tokenId,
+      owner: OWNER,
+      ownerNormalized: OWNER,
+      network: 'BSC',
+      state: 'available',
+      chainId: 97,
+      collectionAddressNormalized: COLLECTION,
+      rarity: 1,
+      generation: 1,
+    };
+    const staleProjection = {
+      ...vaultPosition(tokenId, 'active'),
+      assetId,
+      positionId: `${assetId}:epoch:1`,
+      _id: `${assetId}:epoch:1`,
+    };
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => {
+        const operational = healthyOperationalCollection(name);
+        if (operational) return operational;
+        return {
+          find: (filter: Record<string, unknown>) => cursor(
+            name === 'nft_vault_collections'
+              ? [allowlistProjection()]
+              : name === 'cukie_pool_calendar_versions'
+                ? [calendarVersion()]
+                : name === 'cukies'
+                  ? [inventory]
+                  : name === 'cukie_pool_nft_vault_positions'
+                    ? ('beneficiaryNormalized' in filter ? [] : [staleProjection])
+                    : [],
+          ),
+        };
+      },
+    });
+    recoveryReadMock.mockResolvedValue([{
+      assetId,
+      status: 'not_found',
+      observedBlockNumber: '132',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+    }]);
+
+    const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
+
+    expect(result.availableAssets).toEqual([]);
+    expect(result.availability).toEqual({ status: 'complete', unknownAssets: 0, unknownAssetIds: [] });
+  });
+
+  it('keeps a stale open projection when the recovery branch did not probe the chain', async () => {
+    vaultConfig.ready.cukiePool = true;
+    vaultConfig.mode.cukiePool = 'custodial';
+    vaultConfig.mode.cukieMaster = 'legacy';
+    const tokenId = '32';
+    const assetId = `97:${COLLECTION}:${tokenId}`;
+    const inventory = {
+      _id: tokenId,
+      tokenId,
+      owner: OWNER,
+      ownerNormalized: OWNER,
+      network: 'BSC',
+      state: 'available',
+      chainId: 97,
+      collectionAddressNormalized: COLLECTION,
+      rarity: 1,
+      generation: 1,
+    };
+    const staleProjection = {
+      ...vaultPosition(tokenId, 'active'),
+      assetId,
+      positionId: `${assetId}:epoch:1`,
+      _id: `${assetId}:epoch:1`,
+    };
+    (getEconomyDb as jest.Mock).mockResolvedValue({
+      collection: (name: string) => {
+        const operational = healthyOperationalCollection(name);
+        if (operational) return operational;
+        return {
+          find: (filter: Record<string, unknown>) => cursor(
+            name === 'nft_vault_collections'
+              ? [allowlistProjection()]
+              : name === 'cukie_pool_calendar_versions'
+                ? [calendarVersion()]
+                : name === 'cukies'
+                  ? [inventory]
+                  : name === 'cukie_pool_nft_vault_positions'
+                    ? ('beneficiaryNormalized' in filter ? [] : [staleProjection])
+                    : [],
+          ),
+        };
+      },
+    });
+    recoveryReadMock.mockResolvedValue([{
+      assetId,
+      status: 'not_found',
+      vaultAddress: null,
+      beneficialOwner: null,
+      exitRequestedAt: null,
+      withdrawableAt: null,
+      reason: 'POOL_RECOVERY_NO_PROBE',
+    }]);
+
+    const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
+
+    expect(result.availableAssets).toEqual([]);
+    expect(result.availability).toEqual({ status: 'complete', unknownAssets: 0, unknownAssetIds: [] });
+  });
+
+  it.each(['game_assignment', 'soft_stake', 'ops_hold'] as const)(
+    'keeps an active %s lock after ownerOf confirms the wallet',
+    async (reason) => {
+      vaultConfig.ready.cukiePool = true;
+      vaultConfig.mode.cukiePool = 'custodial';
+      vaultConfig.mode.cukieMaster = 'legacy';
+      const tokenId = '31';
+      const assetId = `97:${COLLECTION}:${tokenId}`;
+      const inventory = {
+        _id: tokenId,
+        tokenId,
+        owner: OWNER,
+        ownerNormalized: OWNER,
+        network: 'BSC',
+        state: 'available',
+        chainId: 97,
+        collectionAddressNormalized: COLLECTION,
+        rarity: 1,
+        generation: 1,
+      };
+      const lock = activeInventoryLock(`cukies:${tokenId}`, reason);
+      (getEconomyDb as jest.Mock).mockResolvedValue({
+        collection: (name: string) => {
+          const operational = healthyOperationalCollection(name);
+          if (operational) return operational;
+          return {
+            find: (filter: Record<string, unknown>) => cursor(
+              name === 'nft_vault_collections'
+                ? [allowlistProjection()]
+                : name === 'cukie_pool_calendar_versions'
+                  ? [calendarVersion()]
+                  : name === 'cukies'
+                    ? [inventory]
+                    : name === 'nft_asset_locks'
+                      ? [lock]
+                      : name === 'cukie_pool_nft_vault_positions'
+                        ? ('beneficiaryNormalized' in filter ? [] : [])
+                        : [],
+            ),
+          };
+        },
+      });
+      recoveryReadMock.mockResolvedValue([{
+        assetId,
+        status: 'not_found',
+        vaultAddress: null,
+        beneficialOwner: null,
+        exitRequestedAt: null,
+        withdrawableAt: null,
+      }]);
+
+      const result = await listCukiePoolWalletPositions({ walletAddress: OWNER, now: NOW });
+
+      expect(result.availableAssets).toEqual([]);
+      expect(result.availability).toEqual({ status: 'complete', unknownAssets: 0, unknownAssetIds: [] });
+    },
+  );
 
   it('keeps confirmed wallet assets available when one recovery read is inconclusive', async () => {
     vaultConfig.ready.cukiePool = true;

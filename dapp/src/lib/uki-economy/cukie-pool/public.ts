@@ -24,6 +24,7 @@ import {
   getCukiePoolVaultMode,
   listAvailableCukiePoolVaultAssets,
   requireCukiePoolVaultConfig,
+  type PublicCukiePoolRecoveryAsset,
 } from './vault-source';
 
 const BSC_ADDRESS = /^0x[0-9a-f]{40}$/;
@@ -415,7 +416,8 @@ export async function listCukiePoolWalletPositions(input: {
     };
     let availableAssets: Awaited<ReturnType<typeof listAvailableCukiePoolVaultAssets>> = {
       assets: [],
-      recovery: { status: 'complete', unknownAssets: 0 },
+      recoveryAssets: [],
+      recovery: { status: 'complete', unknownAssets: 0, unknownAssetIds: [] },
     };
     if (indexerStatus === 'ready') {
       try {
@@ -430,7 +432,8 @@ export async function listCukiePoolWalletPositions(input: {
         indexerStatus = 'unavailable';
         availableAssets = {
           assets: [],
-          recovery: { status: 'complete', unknownAssets: 0 },
+          recoveryAssets: [],
+          recovery: { status: 'complete', unknownAssets: 0, unknownAssetIds: [] },
         };
       }
     }
@@ -478,6 +481,7 @@ export async function listCukiePoolWalletPositions(input: {
         };
       }),
       availableAssets: availableAssets.assets,
+      recoveryAssets: availableAssets.recoveryAssets as PublicCukiePoolRecoveryAsset[],
       availability: availableAssets.recovery,
       nextCursor: positions.length > limit ? page.at(-1)?._id ?? null : null,
       sourceHealthy: indexerStatus === 'ready',

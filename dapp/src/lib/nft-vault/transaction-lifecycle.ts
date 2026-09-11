@@ -12,6 +12,7 @@ export type NftTransactionReceipt = {
   status: string;
   transactionHash?: Hash;
   logs?: unknown;
+  blockNumber?: bigint | number | string;
 };
 
 export type NftTransactionReplacement = {
