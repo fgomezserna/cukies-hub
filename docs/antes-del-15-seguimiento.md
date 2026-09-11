@@ -155,22 +155,31 @@ el usuario ha retirado NFTs después y se comprobará de nuevo por identidad.
 El alias de competición y el nombre público general son fuentes distintas;
 no se supone una relación entre ambos sin verificarla.
 
-Foto de arranque comprobada el **11 de septiembre de 2026, 12:25 UTC**: tareas L1 y L6 activas,
-las otras cinco terminaron únicamente su acuse de cola, sin herramientas ni
-implementación. Modelo de las siete: **Luna Max**, con revisión e integración
+Estado comprobado el **11 de septiembre de 2026, 13:10 UTC**: L1 entregó PR425
+y está corrigiendo hallazgos de revisión; L6 entregó PR426, en revisión de raíz.
+L4 está activa; L2, L3, L5 y L7 conservan su acuse de cola sin implementación.
+Modelo de las siete: **Luna Max**, con revisión e integración
 de **Astra Max** en la tarea raíz `01a07aec-6bc1-7203-8f43-357ed4b8931c`.
-Base Git verificada: staging `03de2a7030aad3dbcf3f5bb5fd36fbbb5b84490e`;
+Base Git verificada: staging `b374505ec664e601d6f477f85a21a6c766a957ce` (PR420 documental);
 main `e962897fb90f7e90a83fbb6dbeb1852d5223892a`.
 No se afirma todavía corrección ni despliegue de estos siete lotes.
 
+Revisión registrada en [PR425](https://github.com/fgomezserna/cukies-hub/pull/425#issuecomment-5634965800)
+y [PR426](https://github.com/fgomezserna/cukies-hub/pull/426#issuecomment-5634966184).
+L1 también debe acreditar que la lectura usada para limpiar custodia no sea
+anterior al recibo o proyección. En L6 queda el aviso durante la carga de una
+cuenta ya confirmada. El sondeo productivo de las13:10UTC no reprodujo el503;
+sí verificó que el404 usa cabeceras cacheables. Se ha pedido el enlace activo
+exacto para contrastar A1; no se considera diagnosticado por ese sondeo.
+
 | Lote | Cobertura y resultado exigido | Issue y tarea responsable | Estado, rama y destino |
 | --- | --- | --- | --- |
-| L1 | M1, M2, P1, O2: custodia entre Master/Pool/Mis Cukies, elegibilidad de Originales y convergencia tras recibo. | [#419](https://github.com/fgomezserna/cukies-hub/issues/419) · **11-Sep · Custodia y actualización de Cukies**, tarea `01a09068-1787-7a20-a4bf-c2c2b28f5586` | En ejecución; parche anterior aplicado en el nuevo worktree, pendiente de revisión y QA. Rama actual `codex/doc11-custody-refresh` → `staging`. |
+| L1 | M1, M2, P1, O2: custodia entre Master/Pool/Mis Cukies, elegibilidad de Originales y convergencia tras recibo. | [#419](https://github.com/fgomezserna/cukies-hub/issues/419) · **11-Sep · Custodia y actualización de Cukies**, tarea `01a09068-1787-7a20-a4bf-c2c2b28f5586` | [PR425](https://github.com/fgomezserna/cukies-hub/pull/425), primera entrega `f69e57a`, 2254 tests reportados. Corrección activa: conservar reservas off-chain aunque ownerOf sea la wallet y limitar retiradas terminales a vault/epoch. Pendiente revisión y QA. `codex/doc11-custody-refresh` → `staging`. |
 | L2 | R1, R2, C1, C2: intentos obsoletos, avisos de Resumen, cuatro indicadores de créditos y corte sin finalizar. | [#421](https://github.com/fgomezserna/cukies-hub/issues/421) · **11-Sep · Créditos y datos de Resumen**, tarea `01a09068-7652-7c61-86e8-cccc3647b589` | En cola; acuse recibido. Coordinar la interfaz de salud/refresco con L1. Rama prevista `codex/doc11-credits-summary` → `staging`. |
 | L3 | J2: guardar y volver a leer el alias del perfil con sesión válida. | [#422](https://github.com/fgomezserna/cukies-hub/issues/422) · **11-Sep · Guardado del alias**, tarea `01a09068-a8af-79e0-877d-228e413065a1` | En cola; acuse recibido. Escritura de alias separada de lectura pública de L6. Rama prevista `codex/doc11-profile-alias` → `staging`. |
-| L4 | J1, W1, W2: reserva del bote, UKI directo y reparto a los prestadores de los recursos usados. | [#418](https://github.com/fgomezserna/cukies-hub/issues/418) · **11-Sep · Recompensas y bote semanal**, tarea `01a09068-e5f9-7a01-838b-82f98da5a5a2` | En cola; acuse recibido. Siguiente lote financiero; ampliar censo antes de aplicar. Rama prevista `codex/doc11-reward-accrual` → `staging`. |
+| L4 | J1, W1, W2: reserva del bote, UKI directo y reparto a los prestadores de los recursos usados. | [#418](https://github.com/fgomezserna/cukies-hub/issues/418) · **11-Sep · Recompensas y bote semanal**, tarea `01a09068-e5f9-7a01-838b-82f98da5a5a2` | Activada a las12:56UTC desde `b374505`; censo acotado y diagnóstico antes del parche. Sin apply financiero. `codex/doc11-reward-accrual` → `staging`. |
 | L5 | J3, W3: cierre del periodo, publicación, estado del premio y disponibilidad para cobrar. | [#423](https://github.com/fgomezserna/cukies-hub/issues/423) · **11-Sep · Cierre y cobro de premios**, tarea `01a09069-25af-7e12-9a37-7054fdc8dcac` | En cola; acuse recibido. Depende de allocations/fuentes canónicas de L4. Rama prevista `codex/doc11-rewards-publication` → `staging`. |
-| L6 | A1, A2, A3: invitación válida, relación ya confirmada y nombre público del patrocinador. | [#424](https://github.com/fgomezserna/cukies-hub/issues/424) · **11-Sep · Hotfix de embajadores**, tarea `01a09068-3c90-7ff3-b7a5-16dac47d66c1` | En ejecución desde main; pendiente de revisión y entrega del hotfix. Rama actual `codex/doc11-ambassadors-hotfix` → `main`. |
+| L6 | A1, A2, A3: invitación válida, relación ya confirmada y nombre público del patrocinador. | [#424](https://github.com/fgomezserna/cukies-hub/issues/424) · **11-Sep · Hotfix de embajadores**, tarea `01a09068-3c90-7ff3-b7a5-16dac47d66c1` | [PR426](https://github.com/fgomezserna/cukies-hub/pull/426), `2dc4bde`, lint/typecheck/build y138 tests reportados. Revisión de raíz y contraste live pendientes. `codex/doc11-ambassadors-hotfix` → `main`, luego staging. |
 | L7 | O1: partidas diarias restantes con Cukies propios elegibles, sin reinicio por transferir. | [#412](https://github.com/fgomezserna/cukies-hub/issues/412) · **11-Sep · Partidas con Cukies propios**, tarea `01a09069-7cdf-71d1-b03d-5d246eacc44e` | En cola; acuse recibido. Matriz diaria y anti-reset pendientes de respuesta; depende de L1/L4. Rama prevista `codex/doc11-own-cukie-quota` → `staging`. |
 
 ### Dependencias, integración y comprobación
