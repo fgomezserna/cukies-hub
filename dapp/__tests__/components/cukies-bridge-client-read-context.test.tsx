@@ -1,14 +1,23 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+const mockWagmiConfig = {};
+
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(() => ({
     address: '0x00000000000000000000000000000000000000aa',
     chainId: 56,
     isConnected: true,
   })),
+  useConfig: jest.fn(() => mockWagmiConfig),
+  usePublicClient: jest.fn(() => null),
   useReadContract: jest.fn(() => ({ data: undefined })),
   useSwitchChain: jest.fn(() => ({ switchChain: jest.fn(), isPending: false })),
-  useWriteContract: jest.fn(() => ({ writeContract: jest.fn(), isPending: false })),
+  useWriteContract: jest.fn(() => ({ writeContractAsync: jest.fn(), isPending: false })),
+}));
+
+jest.mock('wagmi/actions', () => ({
+  getAccount: jest.fn(() => ({ address: undefined })),
+  getChainId: jest.fn(() => undefined),
 }));
 
 jest.mock('lucide-react', () => {

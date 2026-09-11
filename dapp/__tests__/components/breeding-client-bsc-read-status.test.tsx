@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+const mockWagmiConfig = {};
+
 jest.mock('wagmi', () => ({
   useAccount: jest.fn(() => ({
     address: '0x00000000000000000000000000000000000000aa',
     chainId: 97,
     isConnected: true,
   })),
+  useConfig: jest.fn(() => mockWagmiConfig),
   useReadContract: jest.fn((args: { functionName: string }) => {
     if (args.functionName === 'getMaxBreedsByCukie') return { data: BigInt(1), isLoading: false, isError: false };
     if (args.functionName === 'getPoints') return { data: BigInt(0), isLoading: false, isError: false };
@@ -13,7 +16,11 @@ jest.mock('wagmi', () => ({
     return { data: BigInt(25), isLoading: false, isError: false };
   }),
   useSwitchChain: jest.fn(() => ({ switchChain: jest.fn(), isPending: false })),
-  useWriteContract: jest.fn(() => ({ writeContract: jest.fn(), isPending: false })),
+  useWriteContract: jest.fn(() => ({ writeContractAsync: jest.fn(), isPending: false })),
+}));
+jest.mock('wagmi/actions', () => ({
+  getAccount: jest.fn(() => ({ address: '0x00000000000000000000000000000000000000aa' })),
+  getChainId: jest.fn(() => 97),
 }));
 jest.mock('lucide-react', () => {
   const React = jest.requireActual<typeof import('react')>('react');
