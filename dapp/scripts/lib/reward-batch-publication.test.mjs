@@ -49,7 +49,7 @@ function allocation(index, category, walletNormalized, amountRaw) {
   };
 }
 
-function input() {
+function input({ ambassadorSnapshots } = {}) {
   const allocations = [
     allocation(1, 'player', PLAYER, '20'),
     allocation(2, 'ambassador_ordinary', PLAYER, '5'),
@@ -104,6 +104,9 @@ function input() {
     },
     allocations: sealedAllocations,
     conservationRaw: '100',
+    ...(Array.isArray(ambassadorSnapshots) && ambassadorSnapshots.length > 0
+      ? { ambassadorSnapshots }
+      : {}),
   };
   return {
     accountingId: 'reward-daily:2026-08-19',
@@ -156,6 +159,35 @@ test('materializa solo beneficiarios como claims y separa transferencias/quema',
       { kind: 'transfer_marketing_development', amountRaw: '6', status: 'pending' },
       { kind: 'burn_supply_reduction', amountRaw: '7', status: 'pending' },
     ],
+  );
+});
+
+test('acepta el hash diario con snapshots ambassador y rechaza mutaciones selladas', () => {
+  const ambassadorSnapshots = [{
+    participantWallet: PLAYER.toLowerCase(),
+    ambassadorWallet: PLAYER_TWO.toLowerCase(),
+    commissionEligible: true,
+    capturedAt: new Date('2026-08-19T23:59:00.000Z'),
+    evidenceHash: 'e'.repeat(64),
+  }];
+  const candidate = input({ ambassadorSnapshots });
+  const artifacts = buildRewardPublicationArtifacts(candidate);
+  assert.equal(artifacts.plan.claimableTotalRaw, '35');
+
+  const tamperedSnapshot = input({
+    ambassadorSnapshots: ambassadorSnapshots.map((snapshot) => ({ ...snapshot })),
+  });
+  tamperedSnapshot.accounting.ambassadorSnapshots[0].commissionEligible = false;
+  assert.throws(
+    () => buildRewardPublicationArtifacts(tamperedSnapshot),
+    /payloadHash/,
+  );
+
+  const tamperedAllocation = input({ ambassadorSnapshots });
+  tamperedAllocation.accounting.allocations[0].amountRaw = '21';
+  assert.throws(
+    () => buildRewardPublicationArtifacts(tamperedAllocation),
+    /no coinciden con su cierre sellado/,
   );
 });
 

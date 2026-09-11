@@ -9,7 +9,10 @@ import {
 import { getEconomyDb } from '@/lib/indexer-db/mongodb';
 import { calculateSettlementRewardAllocations } from '@/lib/uki-economy/rewards/calculation';
 import { sealDailyRewardAccounting } from '@/lib/uki-economy/rewards/accounting';
-import type { RewardAccountingAllocationDocument } from '@/lib/uki-economy/rewards/accounting-types';
+import type {
+  RewardAccountingAllocationDocument,
+  RewardAccountingAmbassadorSnapshot,
+} from '@/lib/uki-economy/rewards/accounting-types';
 import { RewardAllocationService } from '@/lib/uki-economy/rewards/service';
 import {
   createMemoryRewardTransactionRunner,
@@ -103,6 +106,7 @@ function accountingFixtureForAllocations(
     fundingMode: 'daily_emission';
     sourceIds: string[];
   }>,
+  ambassadorSnapshots: RewardAccountingAmbassadorSnapshot[] = [],
 ) {
   const emissionRaw = allocationCores
     .reduce((sum, allocation) => sum + BigInt(allocation.amountRaw), BigInt(0))
@@ -125,6 +129,7 @@ function accountingFixtureForAllocations(
     },
     sourceIds,
     allocations: allocationCores,
+    ambassadorSnapshots,
     destinations: {
       treasury: `0x${'6'.repeat(40)}`,
       marketingDevelopment: `0x${'7'.repeat(40)}`,
@@ -320,6 +325,49 @@ describe('public reward claimable', () => {
         },
       ],
     });
+  });
+
+  it('acepta snapshots ambassador sellados y rechaza su mutacion', async () => {
+    const ambassadorSnapshots: RewardAccountingAmbassadorSnapshot[] = [{
+      participantWallet: WALLET,
+      ambassadorWallet: SECOND_WALLET,
+      commissionEligible: true,
+      capturedAt: new Date('2026-09-07T23:59:00.000Z'),
+      evidenceHash: 'e'.repeat(64),
+    }];
+    const { accounting, allocations } = accountingFixtureForAllocations([
+      {
+        allocationId: 'c'.repeat(64),
+        walletNormalized: WALLET,
+        category: 'credit_pool',
+        amountRaw: '750000000000000000',
+        fundingMode: 'daily_emission',
+        sourceIds: ['game-session:stage-public-reward'],
+      },
+    ], ambassadorSnapshots);
+    const allocation = allocations[0];
+    (getEconomyDb as jest.Mock).mockResolvedValue(
+      canonicalDbFixture({ accounting, allocations: [allocation] }),
+    );
+
+    await expect(listWalletRewardStatus({ walletAddress: WALLET })).resolves.toMatchObject({
+      sourceStatus: 'canonical',
+      calculatedRaw: allocation.amountRaw,
+    });
+
+    const tampered = {
+      ...accounting,
+      ambassadorSnapshots: accounting.ambassadorSnapshots!.map((snapshot) => ({
+        ...snapshot,
+        commissionEligible: false,
+      })),
+    };
+    (getEconomyDb as jest.Mock).mockResolvedValue(
+      canonicalDbFixture({ accounting: tampered, allocations: [allocation] }),
+    );
+    await expect(
+      listWalletRewardStatus({ walletAddress: WALLET }),
+    ).rejects.toThrow(/cierre diario .*canonico/);
   });
 
   it('acepta un cierre compartido cuando la wallet consulta solo sus allocations', async () => {
