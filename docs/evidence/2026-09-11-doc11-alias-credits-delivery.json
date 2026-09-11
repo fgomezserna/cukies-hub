@@ -1,0 +1,81 @@
+{
+  "observedAt": "2026-09-11T16:16:41.821608+00:00",
+  "alias": {
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/429",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34618773937",
+    "sha": "0ca4c8ed1f92f224e7c0f5f8d3fbaaddfb94d912",
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "changedComponents": [
+      "dapp"
+    ],
+    "changedWorkers": [],
+    "protected": {
+      "total": 82,
+      "preserved": 82,
+      "changed": []
+    },
+    "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "authenticatedSaveReadback": "not_verified_browser_selection_timeout"
+  },
+  "creditsBefore430": {
+    "observedAt": "2026-09-11T16:02:11.301Z",
+    "readOnly": true,
+    "runtime": {
+      "COMPETITION_CREDITS_RUNTIME_ENABLED": "true",
+      "COMPETITION_CREDITS_RULE_VERSION": "credits-staging-cycle-v1",
+      "ECONOMY_CYCLE_SECONDS": "1800",
+      "ECONOMY_CYCLE_ANCHOR_AT": "2026-09-07T11:30:00.000Z"
+    },
+    "latestByRoute": [
+      {
+        "route": "uki",
+        "cutoff": "2026-09-11T16:00:00.000Z",
+        "status": "open"
+      },
+      {
+        "route": "nft",
+        "cutoff": "2026-09-11T09:00:00.000Z",
+        "status": "open"
+      }
+    ],
+    "blockedNftReasonCodes": [
+      "SOURCE_UNHEALTHY",
+      "CHAIN_DEAD_LETTERS_OPEN",
+      "CHAIN_EVENTS_NOT_PROJECTED"
+    ],
+    "interpretation": "NFT source blockage remains separate from advancing a stale test cycle; no historic recovery was run."
+  },
+  "creditsDelivery": {
+    "observedAt": "2026-09-11T16:16:41.821608+00:00",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/430",
+    "workflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34619798496",
+    "sha": "6e63ca53deaab664e9aa49c16cf9eda0c31be5f3",
+    "readyHttpStatus": 200,
+    "journal": "clean",
+    "changedComponents": [
+      "dapp"
+    ],
+    "changedWorkers": [],
+    "protected": {
+      "total": 82,
+      "preserved": 82,
+      "changed": []
+    },
+    "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "authenticatedUi": "not_verified",
+    "latestByRoute": [
+      {
+        "route": "uki",
+        "cutoff": "2026-09-11T16:00:00.000Z",
+        "status": "open"
+      },
+      {
+        "route": "nft",
+        "cutoff": "2026-09-11T09:00:00.000Z",
+        "status": "open"
+      }
+    ],
+    "nftSourceIssue": "remains_open"
+  }
+}

@@ -23,7 +23,46 @@ describe("GameEconomy productive runtime and commands", () => {
       GAME_ECONOMY_RUNTIME_ENABLED: "true",
       GAME_ECONOMY_TICK_TIMEOUT_MS: "300000",
       GAME_ECONOMY_TICK_LEASE_MS: "300000",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00.000Z",
     })).toThrow(/360000/);
+  });
+
+  it("requires a canonical forward activation boundary only for staging", () => {
+    expect(() => loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
+    })).toThrow(/REWARD_FORWARD_ACTIVATION_AT/);
+    expect(() => loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00Z",
+    })).toThrow(/ISO UTC canonica/);
+    expect(loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "97",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "97",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00.000Z",
+    }).rewardForwardActivationAt).toEqual(new Date("2026-07-10T12:00:00.000Z"));
+    expect(loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "production",
+    }).rewardForwardActivationAt).toBeUndefined();
+    expect(() => loadGameEconomyRuntimeConfig({
+      GAME_ECONOMY_RUNTIME_ENABLED: "true",
+      APP_ENV: "staging",
+      STAGING_ONLY_GUARD: "true",
+      NEXT_PUBLIC_UKI_CHAIN_ID: "56",
+      CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: "56",
+      REWARD_FORWARD_ACTIVATION_AT: "2026-07-10T12:00:00.000Z",
+    })).toThrow(/TREASURE_HUNT_STAGING_RUNTIME_REQUIRED/);
   });
 
   it("recovers stale sagas before expiring sessions under one lease", async () => {
@@ -52,7 +91,13 @@ describe("GameEconomy productive runtime and commands", () => {
     };
     const result = await runGameEconomyRuntimeTick({
       workerId: "runtime-worker",
-      config: { enabled: true, recoveryLimit: 100, expiryLimit: 100, leaseMs: 600_000 },
+      config: {
+        enabled: true,
+        recoveryLimit: 100,
+        expiryLimit: 100,
+        leaseMs: 600_000,
+        rewardForwardActivationAt: new Date("2026-07-10T12:00:00.000Z"),
+      },
       clock: () => new Date(NOW),
       coordinator,
       service,

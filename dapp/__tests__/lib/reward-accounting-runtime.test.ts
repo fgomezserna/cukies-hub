@@ -44,10 +44,14 @@ describe("pending Treasure Hunt reward recovery", () => {
     await expect(settlePendingTreasureHuntRewards({
       now: new Date("2026-08-24T15:00:00.000Z"),
       limit: 2,
+      forwardActivationAt: new Date("2026-08-24T14:00:00.000Z"),
     })).resolves.toEqual({ scanned: 2, settled: 1, replayed: 1 });
 
     const pipeline = aggregate.mock.calls[0][0];
-    expect(pipeline).toEqual(buildPendingTreasureHuntRewardPipeline(2));
+    expect(pipeline).toEqual(buildPendingTreasureHuntRewardPipeline(
+      2,
+      new Date("2026-08-24T14:00:00.000Z"),
+    ));
     const lookupIndex = pipeline.findIndex((stage: object) => "$lookup" in stage);
     const missingIndex = pipeline.findIndex(
       (stage: { $match?: object }) => stage.$match
@@ -67,8 +71,55 @@ describe("pending Treasure Hunt reward recovery", () => {
     });
   });
 
+  it("uses the canonical session start boundary, not settledAt, for staging", () => {
+    const activationAt = new Date("2026-08-24T14:00:00.000Z");
+    type CandidateMatch = {
+      status: string;
+      gameId: string;
+      "rule.version": string;
+      createdAt: { $type: "date"; $gte: Date };
+      settledAt: { $type: "date" };
+    };
+    const match = (buildPendingTreasureHuntRewardPipeline(2, activationAt)[0] as {
+      $match: CandidateMatch;
+    }).$match;
+    expect(match).toEqual({
+      status: "settled",
+      gameId: "treasure-hunt",
+      "rule.version": "staging-test-v4",
+      createdAt: { $type: "date", $gte: activationAt },
+      settledAt: { $type: "date" },
+    });
+    const historicalCompletedLate = {
+      createdAt: new Date(activationAt.getTime() - 1),
+      settledAt: new Date(activationAt.getTime() + 1),
+    };
+    const newSessionCompleted = {
+      createdAt: activationAt,
+      settledAt: new Date(activationAt.getTime() + 1),
+    };
+    expect(historicalCompletedLate.createdAt.getTime()).toBeLessThan(
+      match.createdAt.$gte.getTime(),
+    );
+    expect(newSessionCompleted.createdAt.getTime()).toBeGreaterThanOrEqual(
+      match.createdAt.$gte.getTime(),
+    );
+    expect(match.settledAt).toEqual({ $type: "date" });
+  });
+
+  it("keeps the production catch-up query free of the staging lower bound", () => {
+    const match = (buildPendingTreasureHuntRewardPipeline(2)[0] as {
+      $match: { createdAt: { $type: string }; settledAt: { $type: string } };
+    }).$match;
+    expect(match.createdAt).toEqual({ $type: "date" });
+    expect(match.settledAt).toEqual({ $type: "date" });
+  });
+
   it("rejects an unsafe batch bound before reading Mongo", async () => {
-    await expect(settlePendingTreasureHuntRewards({ limit: 1_001 })).rejects.toThrow(
+    await expect(settlePendingTreasureHuntRewards({
+      limit: 1_001,
+      forwardActivationAt: new Date("2026-08-24T14:00:00.000Z"),
+    })).rejects.toThrow(
       /entre 1 y 1000/,
     );
     expect(getEconomyDb).not.toHaveBeenCalled();
