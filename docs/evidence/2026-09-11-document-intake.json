@@ -1,0 +1,317 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-11",
+  "kind": "document-requirement-intake",
+  "source": {
+    "name": "cambios actualizado (11-Sept).docx",
+    "localPath": "/Users/fgomezserna/Downloads/cambios actualizado (11-Sept).docx",
+    "sha256": "e1132a57a6842f4a00aaf5fd3d52bbddeba4b61f9430c058e52f3c76811d5d8b",
+    "pages": 6,
+    "embeddedImages": 15,
+    "bodyParagraphNumbering": "Posición del bloque en document.xml; blancos conservados.",
+    "review": "Texto completo y las15 capturas embebidas revisadas. El Word no se modifica."
+  },
+  "statusAuthority": "docs/antes-del-15-seguimiento.md",
+  "rulesAuthority": "docs/uki-current-operating-rules.md",
+  "baseline": {
+    "staging": "03de2a7030aad3dbcf3f5bb5fd36fbbb5b84490e",
+    "main": "e962897fb90f7e90a83fbb6dbeb1852d5223892a",
+    "note": "Foto de código al preparar el encargo. Las capturas son reportes del usuario; no diagnostican por sí solas la causa ni certifican el runtime actual."
+  },
+  "observations": [
+    {
+      "id": "R1",
+      "section": "Resumen",
+      "blocks": [
+        3,
+        7
+      ],
+      "images": [
+        1,
+        2
+      ],
+      "task": "L2",
+      "requirement": "Retirar los intentos heredados de la competición de staking cuando la pantalla usa el juego por créditos."
+    },
+    {
+      "id": "R2",
+      "section": "Resumen",
+      "blocks": [
+        10
+      ],
+      "images": [
+        3
+      ],
+      "task": "L2",
+      "requirement": "Diagnosticar los avisos de Créditos/Vesting y mostrar estados ciertos y accionables, sin ocultar indisponibilidad real."
+    },
+    {
+      "id": "J1",
+      "section": "Jugar",
+      "blocks": [
+        13
+      ],
+      "images": [
+        4
+      ],
+      "task": "L4",
+      "requirement": "Reservar la parte correspondiente al bote semanal y mostrarla conciliada con la contabilidad de las partidas."
+    },
+    {
+      "id": "J2",
+      "section": "Jugar",
+      "blocks": [
+        15,
+        16
+      ],
+      "images": [
+        5
+      ],
+      "task": "L3",
+      "requirement": "Corregir el error al guardar el alias y verificar persistencia con la identidad autorizada."
+    },
+    {
+      "id": "J3",
+      "section": "Jugar",
+      "blocks": [
+        18
+      ],
+      "images": [],
+      "task": "L5",
+      "requirement": "Aclarar y comprobar el reparto al cerrar la competición o periodo aplicable; el documento no define una regla económica nueva.",
+      "ambiguity": "La frase «Reparto al final del torneo..??» requiere contrastar modo y reglas vigentes."
+    },
+    {
+      "id": "M1",
+      "section": "Cukie Master",
+      "blocks": [
+        20,
+        24,
+        26
+      ],
+      "images": [
+        6,
+        7,
+        8
+      ],
+      "task": "L1",
+      "requirement": "Tras retirar Originales del Pool, Master debe reflejar su disponibilidad coherentemente con Mis Cukies y Pool, sin bloqueo de comprobación persistente."
+    },
+    {
+      "id": "M2",
+      "section": "Cukie Master",
+      "blocks": [
+        30
+      ],
+      "images": [
+        9
+      ],
+      "task": "L1",
+      "requirement": "Explicar y corregir la inelegibilidad incorrecta del Original raro #98000003 para Master, según identidad y custodia reales."
+    },
+    {
+      "id": "C1",
+      "section": "Créditos",
+      "blocks": [
+        35
+      ],
+      "images": [
+        10
+      ],
+      "task": "L2",
+      "requirement": "Mostrar En partidas, Ya usados, Aportados al Pool y Caducados con datos confirmados; no convertir ausencia de fuente en cero."
+    },
+    {
+      "id": "C2",
+      "section": "Créditos",
+      "blocks": [
+        38
+      ],
+      "images": [
+        11
+      ],
+      "task": "L2",
+      "requirement": "Investigar y resolver el reparto que permanecía pendiente25min tras el corte09:30UTC.",
+      "unverifiedHypothesis": "Jugar con dos wallets no demuestra la causa del aviso."
+    },
+    {
+      "id": "P1",
+      "section": "Pool de Cukies",
+      "blocks": [
+        41
+      ],
+      "images": [
+        12
+      ],
+      "task": "L1",
+      "requirement": "Resolver el pendiente «Actualizando depósito» de #98000006 cuando la otra vista lo muestra en wallet, siguiendo recibo y proyecciones."
+    },
+    {
+      "id": "W1",
+      "section": "Premios",
+      "blocks": [
+        44
+      ],
+      "images": [],
+      "task": "L4",
+      "requirement": "Asignar las recompensas UKI directas de partidas válidas según sus fuentes y reglas canónicas; el cobro posterior depende de L5."
+    },
+    {
+      "id": "W2",
+      "section": "Premios",
+      "blocks": [
+        44
+      ],
+      "images": [],
+      "task": "L4",
+      "requirement": "Atribuir correctamente las recompensas al prestador de créditos y al prestador de NFT cuando cada recurso se utilizó realmente."
+    },
+    {
+      "id": "W3",
+      "section": "Premios",
+      "blocks": [
+        44
+      ],
+      "images": [],
+      "task": "L5",
+      "requirement": "Completar cierre, publicación y disponibilidad de premios del ranking del periodo terminado."
+    },
+    {
+      "id": "A1",
+      "section": "Embajadores",
+      "blocks": [
+        46
+      ],
+      "images": [
+        13
+      ],
+      "task": "L6",
+      "environment": "production",
+      "requirement": "Corregir el aviso intermitente para una invitación activa; separar fallo temporal de invitación inválida."
+    },
+    {
+      "id": "A2",
+      "section": "Embajadores",
+      "blocks": [
+        48
+      ],
+      "images": [
+        14
+      ],
+      "task": "L6",
+      "environment": "production",
+      "requirement": "Con patrocinador confirmado, mostrar la relación sin avisos de validez del link ni revalidar su permanencia."
+    },
+    {
+      "id": "A3",
+      "section": "Embajadores",
+      "blocks": [
+        52
+      ],
+      "images": [
+        15
+      ],
+      "task": "L6",
+      "environment": "production",
+      "requirement": "Mostrar nombre/alias público del patrocinador además de la wallet, con fallback a la dirección."
+    },
+    {
+      "id": "O1",
+      "section": "Otros",
+      "blocks": [
+        56
+      ],
+      "images": [],
+      "task": "L7",
+      "requirement": "Mostrar partidas diarias restantes con Cukies propios elegibles, excluyendo staking Master, préstamo y venta.",
+      "productDecision": "La matriz y semántica diaria/anti-reset se coordinan en issue412; la fuente no aporta los valores."
+    },
+    {
+      "id": "O2",
+      "section": "Otros",
+      "blocks": [
+        57
+      ],
+      "images": [],
+      "task": "L1",
+      "requirement": "Coordinar saldoUKI, cupos, umbral y avisos tras25000→5000UKI para evitar datos derivados contradictorios.",
+      "priorityNote": "El usuario lo considera de menor importancia."
+    }
+  ],
+  "groups": [
+    {
+      "id": "L1",
+      "issue": 419,
+      "base": "staging",
+      "coverage": [
+        "M1",
+        "M2",
+        "P1",
+        "O2"
+      ],
+      "title": "11-Sep · Custodia y actualización de Cukies"
+    },
+    {
+      "id": "L6",
+      "issue": 424,
+      "base": "main",
+      "coverage": [
+        "A1",
+        "A2",
+        "A3"
+      ],
+      "title": "11-Sep · Hotfix de embajadores"
+    },
+    {
+      "id": "L2",
+      "issue": 421,
+      "base": "staging",
+      "coverage": [
+        "R1",
+        "R2",
+        "C1",
+        "C2"
+      ],
+      "title": "11-Sep · Créditos y datos de Resumen"
+    },
+    {
+      "id": "L3",
+      "issue": 422,
+      "base": "staging",
+      "coverage": [
+        "J2"
+      ],
+      "title": "11-Sep · Guardado del alias"
+    },
+    {
+      "id": "L4",
+      "issue": 418,
+      "base": "staging",
+      "coverage": [
+        "J1",
+        "W1",
+        "W2"
+      ],
+      "title": "11-Sep · Recompensas y bote semanal"
+    },
+    {
+      "id": "L5",
+      "issue": 423,
+      "base": "staging",
+      "coverage": [
+        "J3",
+        "W3"
+      ],
+      "title": "11-Sep · Cierre y cobro de premios"
+    },
+    {
+      "id": "L7",
+      "issue": 412,
+      "base": "staging",
+      "coverage": [
+        "O1"
+      ],
+      "title": "11-Sep · Partidas con Cukies propios"
+    }
+  ]
+}
