@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-11T19:45:44.402504+00:00",
+  "observedAt": "2026-09-11T20:19:41.182877+00:00",
   "pr": "https://github.com/fgomezserna/cukies-hub/pull/434",
   "scope": "Staging forward session settlement, canonical daily/weekly accounting and publication queues, ranking boundary and Compose propagation",
   "codeSha": "2e13c72c",
@@ -63,7 +63,7 @@
     "postflightArtifact": "/tmp/cukies-pool-custody-postflight-20260911-pr434.json"
   },
   "activation": {
-    "state": "enabled_ranking_wait_fix_pending",
+    "state": "enabled_verified_waiting_first_period",
     "forwardActivationAt": "2026-09-11T20:30:00.000Z",
     "financialGates": true,
     "cycleSeconds": 1800,
@@ -91,19 +91,17 @@
     },
     "configurationVerified": true,
     "runtimePostflight": {
-      "ok": false,
-      "observedAt": "2026-09-11T19:45:44.402504+00:00",
-      "heartbeatFailures": [
-        "HEARTBEAT_STATUS_ranking"
-      ],
+      "ok": true,
+      "observedAt": "2026-09-11T20:19:41.182877+00:00",
+      "heartbeatFailures": [],
       "heartbeats": {
         "game": {
           "_id": "scheduler-heartbeat:coolify-staging-primary",
           "schedulerId": "coolify-staging-primary",
           "status": "success",
-          "lastAttemptAt": "2026-09-11T19:45:27.576Z",
-          "lastSuccessAt": "2026-09-11T19:45:27.576Z",
-          "updatedAt": "2026-09-11T19:45:27.576Z",
+          "lastAttemptAt": "2026-09-11T20:19:40.827Z",
+          "lastSuccessAt": "2026-09-11T20:19:40.827Z",
+          "updatedAt": "2026-09-11T20:19:40.827Z",
           "createdAt": "2026-09-11T19:40:25.070Z",
           "consecutiveFailures": 0
         },
@@ -111,30 +109,30 @@
           "_id": "scheduler-heartbeat:coolify-staging-primary",
           "schedulerId": "coolify-staging-primary",
           "status": "success",
-          "lastAttemptAt": "2026-09-11T19:45:27.753Z",
-          "lastSuccessAt": "2026-09-11T19:45:28.034Z",
-          "updatedAt": "2026-09-11T19:45:28.034Z",
+          "lastAttemptAt": "2026-09-11T20:19:11.937Z",
+          "lastSuccessAt": "2026-09-11T20:19:12.139Z",
+          "updatedAt": "2026-09-11T20:19:12.139Z",
           "createdAt": "2026-09-11T19:40:25.301Z",
           "consecutiveFailures": 0
         },
         "ranking": {
           "_id": "scheduler-heartbeat:coolify-staging-primary",
           "schedulerId": "coolify-staging-primary",
-          "status": "error",
-          "lastAttemptAt": "2026-09-11T19:45:25.698Z",
-          "lastFailureAt": "2026-09-11T19:45:25.698Z",
-          "updatedAt": "2026-09-11T19:45:25.698Z",
+          "status": "success",
+          "lastAttemptAt": "2026-09-11T20:19:31.812Z",
+          "lastSuccessAt": "2026-09-11T20:19:31.812Z",
+          "lastFailureAt": "2026-09-11T20:18:31.630Z",
+          "updatedAt": "2026-09-11T20:19:31.812Z",
           "createdAt": "2026-09-11T19:40:24.482Z",
-          "consecutiveFailures": 6,
-          "lastErrorCode": "WEEKLY_RANKING_TICK_HTTP_409"
+          "consecutiveFailures": 0
         },
         "accounting": {
           "_id": "scheduler-heartbeat:coolify-staging-primary",
           "schedulerId": "coolify-staging-primary",
           "status": "success",
-          "lastAttemptAt": "2026-09-11T19:45:25.600Z",
-          "lastSuccessAt": "2026-09-11T19:45:25.600Z",
-          "updatedAt": "2026-09-11T19:45:25.600Z",
+          "lastAttemptAt": "2026-09-11T20:19:31.212Z",
+          "lastSuccessAt": "2026-09-11T20:19:31.212Z",
+          "updatedAt": "2026-09-11T20:19:31.212Z",
           "createdAt": "2026-09-11T19:40:24.438Z",
           "consecutiveFailures": 0
         },
@@ -143,15 +141,15 @@
           "schedulerId": "coolify-staging-primary",
           "schedulerKind": "reward_batch_publisher",
           "status": "success",
-          "lastAttemptAt": "2026-09-11T19:45:32.347Z",
-          "lastSuccessAt": "2026-09-11T19:45:32.352Z",
+          "lastAttemptAt": "2026-09-11T20:19:32.765Z",
+          "lastSuccessAt": "2026-09-11T20:19:32.771Z",
           "lastFailureAt": "2026-09-01T09:57:27.769Z",
-          "updatedAt": "2026-09-11T19:45:32.352Z",
+          "updatedAt": "2026-09-11T20:19:32.771Z",
           "createdAt": "2026-08-20T20:46:33.107Z",
           "consecutiveFailures": 0,
           "result": {
             "status": "idle",
-            "completedAt": "2026-09-11T19:45:32.347Z"
+            "completedAt": "2026-09-11T20:19:32.765Z"
           }
         }
       },
@@ -161,15 +159,15 @@
       },
       "readyHttpStatus": 200,
       "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
-      "artifact": "/tmp/doc11-activation-postflight-partial.json"
+      "artifact": "/tmp/doc11-pr435-activation-postflight.json"
     },
     "selectedFinancialRecordsUnchangedBeforeBoundary": true,
-    "financialComparisonObservedAt": "2026-09-11T19:41:44.987Z",
+    "financialComparisonObservedAt": "2026-09-11T20:19:39.242Z",
     "rankingFollowup": {
       "branch": "codex/doc11-ranking-forward-waiting",
       "issueComment": "https://github.com/fgomezserna/cukies-hub/issues/418#issuecomment-5639796568",
       "symptom": "WEEKLY_RANKING_TICK_HTTP_409 before the first complete forward period",
-      "state": "reviewed_ready_for_delivery",
+      "state": "deployed_verified_waiting",
       "implementationSha": "d9294c2fe133e1c886c9944e514a5f57c412975a",
       "integrationSha": "c2374837",
       "review": "PASS: first complete forward period and settlement delay, full rule coverage, genuine conflicts and prior closures preserved, noT behavior unchanged",
@@ -182,12 +180,40 @@
         "lint": "PASS with pre-existing my-cukies-panel.tsx:513 warning",
         "diffCheck": "PASS"
       },
-      "deliveryBaselineArtifact": "/tmp/doc11-ranking-waiting-baseline.json"
-    }
+      "deliveryBaselineArtifact": "/tmp/doc11-ranking-waiting-baseline.json",
+      "pr": "https://github.com/fgomezserna/cukies-hub/pull/435",
+      "stagingSha": "987729bf9497ce716171999bc47eece4d6a0fc80",
+      "prCi": "https://github.com/fgomezserna/cukies-hub/actions/runs/34642340413",
+      "deliveryWorkflow": "https://github.com/fgomezserna/cukies-hub/actions/runs/34642459565",
+      "verifiedAt": "2026-09-11T20:19:41.182877+00:00",
+      "postflightArtifact": "/tmp/doc11-pr435-activation-postflight.json",
+      "changedComponents": [
+        "dapp"
+      ],
+      "workersPreserved": 10,
+      "protectedPreserved": 82,
+      "runtimeResult": {
+        "status": "success",
+        "startedAt": "2026-09-11T20:19:31.752Z",
+        "endedAt": "2026-09-11T20:19:31.775Z",
+        "result": {
+          "status": "waiting",
+          "periodId": null,
+          "runId": null,
+          "manifestId": null,
+          "periodsProcessed": 0,
+          "closures": [],
+          "reason": "FORWARD_PERIOD_NOT_READY",
+          "readyAt": "2026-09-12T00:02:30.000Z"
+        }
+      },
+      "deliveryWorkflowResult": "SUCCESS"
+    },
+    "financialComparisonArtifact": "/tmp/doc11-forward-accounting-state-after-pr435.json"
   },
   "limits": [
-    "All runtime gates configured and four processes verified; ranking waiting-state correction pending",
-    "No personal wallet signatures, reward funding or historical recovery",
+    "Five runtime processes verified, ranking explicitly waiting for the first complete forward period",
+    "No personal wallet signatures, manual reward funding or historical recovery",
     "Functional new game, lender allocation, publication and claim still pending"
   ],
   "fundingReadOnly": {
