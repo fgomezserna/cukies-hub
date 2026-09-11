@@ -202,6 +202,30 @@ describe('DashboardOverviewPanel', () => {
     expect(screen.getByText('Tienes una partida lista')).toBeInTheDocument();
   });
 
+  it('retira los intentos históricos cuando Treasure Hunt está en modo créditos', async () => {
+    fetchMock.mockResolvedValue(response(summary({
+      game: module({
+        configured: true,
+        enabled: true,
+        phase: 'closed',
+        campaignId: 'stage-campaign',
+        eligibilityKind: 'uki_staking',
+        attemptsGranted: 9,
+        attemptsUsed: 0,
+        attemptsRemaining: 9,
+        bestRank: 3,
+        totalTickets: 12,
+      }),
+    })));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByText(/La competición ha terminado/)).toBeInTheDocument();
+    expect(screen.getAllByText('Créditos').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText('9 intentos')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Jugar ahora/i })).not.toBeInTheDocument();
+  });
+
   it.each(['uki', 'nft'] as const)('mantiene los cupos como desconocidos si la ruta %s no está reconciliada', async (route) => {
     fetchMock.mockResolvedValue(response(summary({
       cukieMaster: module({
@@ -422,6 +446,45 @@ describe('DashboardOverviewPanel', () => {
 
     expect(await screen.findByText('Algunos datos no están disponibles')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Ver Marketplace/i })).toHaveAttribute('href', '#dashboard-module-marketplace');
+  });
+
+  it('explica la causa de Créditos y Vesting y enlaza a sus apartados', async () => {
+    const data = summary({
+      credits: {
+        ...module({
+          availableCredits: 200,
+          reservedCredits: 0,
+          spentCredits: 25,
+          poolDepositedCredits: 50,
+          poolAvailableCredits: 700,
+          activeReservations: 0,
+        }, 'degraded'),
+        issues: ['CREDIT_GRANTS_NOT_FRESH'],
+      },
+      vesting: {
+        ...module({
+          chainId: 97,
+          configFrozen: false,
+          hasPosition: true,
+          totalAmountRaw: '100000000000000000000',
+          releasedAmountRaw: '20000000000000000000',
+          releasableRaw: '10000000000000000000',
+          lockedAmountRaw: '70000000000000000000',
+          progressBps: 3000,
+        }, 'degraded'),
+        issues: ['VESTING_CONFIG_NOT_FROZEN'],
+      },
+    });
+    fetchMock.mockResolvedValue(response(data));
+
+    render(<DashboardOverviewPanel />);
+
+    expect(await screen.findByText(/La fuente de cupos aún no está actualizada/)).toBeInTheDocument();
+    expect(screen.getByText(/El calendario de liberación aún no está confirmado/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ver Créditos/i })).toHaveAttribute('href', '/credits');
+    expect(screen.getAllByRole('link', { name: /Ver Vesting/i }).some((link) => (
+      link.getAttribute('href') === '/vesting'
+    ))).toBe(true);
   });
 
   it('mantiene geometría estable mientras llega la primera lectura', () => {

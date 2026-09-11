@@ -156,6 +156,23 @@ function safeProjectedCredits(
   return exactCredits(projection[field], label);
 }
 
+function materializedOrProjectedCredits(
+  materialization: PublicLotMaterialization,
+  state: CreditMaterializationState,
+  projection: Record<string, unknown> | null,
+  field: keyof PublicLotMaterialization['totals'],
+  label: string,
+) {
+  // Once every current-period lot has been reconciled, its accounting fields
+  // are the source of truth even if the denormalized projection document has
+  // not been written yet. Never use this fallback for blocked/unknown/stale
+  // materializations: those states must remain visible to the caller.
+  if (state === 'ready') {
+    return exactCredits(materialization.totals[field], label);
+  }
+  return safeProjectedCredits(projection, field, label);
+}
+
 export async function getCompetitionCreditWalletStatus(
   walletAddress: string,
   nowInput = new Date(),
@@ -386,16 +403,6 @@ export async function getCompetitionCreditWalletStatus(
     blocked: boolean;
     materialization: { state: CreditMaterializationState };
   };
-  const emptyBalance: PublicBalance = {
-    grantedCredits: null,
-    poolDepositedCredits: null,
-    availableCredits: 0,
-    reservedCredits: null,
-    spentCredits: null,
-    expiredCredits: null,
-    blocked: false,
-    materialization: { state: 'ready' },
-  };
   const routeStatus = Object.fromEntries(routes.map((route) => {
     const account = accounts.find((candidate) => candidate.route === route);
     const pool = pools.find((candidate) => candidate.route === route);
@@ -444,30 +451,23 @@ export async function getCompetitionCreditWalletStatus(
     const observedThrough = watermark?.observedThrough instanceof Date
       ? new Date(watermark.observedThrough.getTime())
       : null;
+    const accountProjection = account as unknown as Record<string, unknown> | null;
+    const poolProjection = pool as unknown as Record<string, unknown> | null;
     return [route, {
-      balance: account ? {
-        grantedCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'grantedCredits', `${route}.grantedCredits`),
-        poolDepositedCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'poolDepositedCredits', `${route}.poolDepositedCredits`),
+      balance: {
+        grantedCredits: materializedOrProjectedCredits(ownLotState, accountState, accountProjection, 'totalCredits', `${route}.grantedCredits`),
+        poolDepositedCredits: materializedOrProjectedCredits(ownLotState, accountState, accountProjection, 'poolDepositedCredits', `${route}.poolDepositedCredits`),
         availableCredits: accountState === 'ready' ? ownLotState.usableCredits : 0,
-        reservedCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'reservedCredits', `${route}.reservedCredits`),
-        spentCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'spentCredits', `${route}.spentCredits`),
-        expiredCredits: safeProjectedCredits(account as unknown as Record<string, unknown>, 'expiredCredits', `${route}.expiredCredits`),
-        blocked: account.blocked === true,
-        materialization: { state: accountState },
-      } : {
-        ...emptyBalance,
-        availableCredits: accountState === 'ready' ? ownLotState.usableCredits : 0,
+        reservedCredits: materializedOrProjectedCredits(ownLotState, accountState, accountProjection, 'reservedCredits', `${route}.reservedCredits`),
+        spentCredits: materializedOrProjectedCredits(ownLotState, accountState, accountProjection, 'spentCredits', `${route}.spentCredits`),
+        expiredCredits: materializedOrProjectedCredits(ownLotState, accountState, accountProjection, 'expiredCredits', `${route}.expiredCredits`),
+        blocked: account?.blocked === true,
         materialization: { state: accountState },
       },
-      pool: pool ? {
+      pool: {
         availableCredits: poolState === 'ready' ? poolLotState.usableCredits : 0,
-        reservedCredits: safeProjectedCredits(pool as unknown as Record<string, unknown>, 'reservedCredits', `${route}.pool.reservedCredits`),
-        blocked: pool.blocked === true,
-        materialization: { state: poolState },
-      } : {
-        availableCredits: poolState === 'ready' ? poolLotState.usableCredits : 0,
-        reservedCredits: null,
-        blocked: false,
+        reservedCredits: materializedOrProjectedCredits(poolLotState, poolState, poolProjection, 'reservedCredits', `${route}.pool.reservedCredits`),
+        blocked: pool?.blocked === true,
         materialization: { state: poolState },
       },
       grants: {
@@ -485,14 +485,10 @@ export async function getCompetitionCreditWalletStatus(
     grants: { healthy: boolean; sourceObservedThrough: Date | null; openIncidents: number };
   }>;
   const accountProjectionComplete = routes.every((route) => (
-    accounts.some((candidate) => (
-      candidate.route === route && routeStatus[route].balance.materialization.state === 'ready'
-    ))
+    routeStatus[route].balance.materialization.state === 'ready'
   ));
   const poolProjectionComplete = routes.every((route) => (
-    pools.some((candidate) => (
-      candidate.route === route && routeStatus[route].pool.materialization.state === 'ready'
-    ))
+    routeStatus[route].pool.materialization.state === 'ready'
   ));
   const balanceMaterialization = routes.reduce<CreditMaterializationState>(
     (state, route) => worseMaterializationState(

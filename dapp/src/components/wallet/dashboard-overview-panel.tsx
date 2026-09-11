@@ -230,6 +230,53 @@ const MODULE_ANCHORS: Record<DashboardModuleId, string> = {
   game: 'dashboard-module-game',
 };
 
+const MODULE_ACTION_LINKS: Partial<Record<DashboardModuleId, string>> = {
+  credits: '/credits',
+  vesting: '/vesting',
+};
+
+function moduleActionHref(module: DashboardModuleId) {
+  return MODULE_ACTION_LINKS[module] ?? `#${MODULE_ANCHORS[module]}`;
+}
+
+function moduleAlertDescription(
+  alert: DashboardSummary['alerts'][number],
+  modules: DashboardSummary['modules'],
+) {
+  const issues: readonly string[] = modules[alert.module].issues;
+  if (alert.module === 'credits') {
+    if (alert.code === 'MODULE_UNAVAILABLE') {
+      return 'No podemos consultar tus créditos ahora. Abre Créditos para reintentar la lectura.';
+    }
+    if (issues.includes('CREDIT_GRANTS_NOT_FRESH')) {
+      return 'La fuente de cupos aún no está actualizada; revisa en Créditos el periodo y el último saldo confirmado.';
+    }
+    if (issues.includes('CREDIT_BALANCE_BLOCKED') || issues.includes('CREDIT_POOL_BLOCKED')) {
+      return 'Una parte del saldo está bloqueada para revisión; consulta Créditos antes de repartir o jugar.';
+    }
+    if (issues.includes('CREDIT_PROJECTION_MATERIALIZATION_UNAVAILABLE')) {
+      return 'La contabilidad del periodo todavía no se puede confirmar; consulta Créditos para ver el estado y el siguiente corte.';
+    }
+    if (issues.includes('CREDIT_BALANCE_PROJECTION_INCOMPLETE')) {
+      return 'Falta confirmar una parte de la proyección del periodo; consulta Créditos para ver el último valor válido.';
+    }
+    return 'La lectura de Créditos necesita confirmación; consulta el periodo antes de actuar.';
+  }
+  if (alert.module === 'vesting') {
+    if (alert.code === 'MODULE_UNAVAILABLE') {
+      return 'No podemos consultar tu vesting ahora. Abre Vesting para reintentar la lectura.';
+    }
+    if (issues.includes('VESTING_CONFIG_NOT_FROZEN')) {
+      return 'El calendario de liberación aún no está confirmado; consulta Vesting antes de iniciar una acción.';
+    }
+    return 'El estado de Vesting requiere confirmación; consulta el calendario antes de actuar.';
+  }
+  if (alert.code === 'MODULE_UNAVAILABLE') {
+    return `No podemos consultar ${MODULE_LABELS[alert.module]} ahora. Abre su apartado para reintentar la lectura.`;
+  }
+  return `La lectura de ${MODULE_LABELS[alert.module]} requiere atención; revisa su apartado antes de continuar.`;
+}
+
 function formatUpdatedAt(value: string) {
   return new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
@@ -279,6 +326,7 @@ function choosePrimaryAction(input: {
   hasPartialData: boolean;
 }) : PrimaryAction {
   if (input.game?.state === 'ready'
+    && input.game.data.phase !== 'closed'
     && input.game.data.enabled
     && input.game.data.attemptsRemaining !== null
     && input.game.data.attemptsRemaining > 0) {
@@ -478,7 +526,11 @@ export function DashboardOverviewPanel() {
             </div>
           ) : null}
 
-          <DataHealthNotices unavailableModules={unavailableModules} reviewModules={reviewModules} />
+          <DataHealthNotices
+            unavailableModules={unavailableModules}
+            reviewModules={reviewModules}
+            modules={summary.modules}
+          />
 
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
             <section id="dashboard-play" aria-labelledby="dashboard-play-title" className="min-w-0">
@@ -697,9 +749,11 @@ function DashboardError() {
 function DataHealthNotices({
   unavailableModules,
   reviewModules,
+  modules,
 }: {
   unavailableModules: DashboardSummary['alerts'];
   reviewModules: DashboardSummary['alerts'];
+  modules: DashboardSummary['modules'];
 }) {
   if (unavailableModules.length === 0 && reviewModules.length === 0) return null;
   return (
@@ -710,6 +764,7 @@ function DataHealthNotices({
           tone="error"
           description={<>Ahora mismo no podemos mostrar: {unavailableModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}. Puedes seguir usando el resto de tu cuenta.</>}
           modules={unavailableModules}
+          moduleData={modules}
         />
       ) : null}
       {reviewModules.length > 0 ? (
@@ -718,6 +773,7 @@ function DataHealthNotices({
           tone="warning"
           description={<>Puedes consultar los datos de {reviewModules.map((alert) => MODULE_LABELS[alert.module]).join(', ')}. Revisa sus avisos antes de continuar.</>}
           modules={reviewModules}
+          moduleData={modules}
         />
       ) : null}
     </div>
@@ -728,11 +784,13 @@ function DataHealthNotice({
   title,
   description,
   modules,
+  moduleData,
   tone,
 }: {
   title: string;
   description: ReactNode;
   modules: DashboardSummary['alerts'];
+  moduleData: DashboardSummary['modules'];
   tone: 'error' | 'warning';
 }) {
   const toneClass = tone === 'error'
@@ -745,11 +803,18 @@ function DataHealthNotice({
         <div className="min-w-0">
           <p className="text-sm font-black">{title}</p>
           <p className="mt-1 text-xs font-semibold leading-relaxed opacity-75">{description}</p>
+          <ul className="mt-2 space-y-1 text-xs font-semibold leading-relaxed opacity-75">
+            {modules.map((alert) => (
+              <li key={`${alert.module}-${alert.code}`}>
+                {moduleAlertDescription(alert, moduleData)}
+              </li>
+            ))}
+          </ul>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             {modules.map((alert) => (
               <a
                 key={alert.module}
-                href={`#${MODULE_ANCHORS[alert.module]}`}
+                href={moduleActionHref(alert.module)}
                 className="inline-flex min-h-8 items-center text-[11px] font-black uppercase tracking-[0.08em] underline decoration-current/40 underline-offset-2 transition hover:decoration-current"
               >
                 Ver {MODULE_LABELS[alert.module]}
@@ -826,6 +891,7 @@ function rewardsMetric(module: DashboardModule<'rewards'>) {
 
 function MetricStrip({ summary, masterDataReady }: { summary: DashboardSummary; masterDataReady: boolean }) {
   const game = moduleData(summary.modules.game);
+  const gameUsesCredits = game?.phase === 'closed';
   const credits = moduleData(summary.modules.credits);
   const master = moduleData(summary.modules.cukieMaster);
   const rewards = moduleData(summary.modules.rewards);
@@ -834,13 +900,15 @@ function MetricStrip({ summary, masterDataReady }: { summary: DashboardSummary; 
     {
       label: 'Para jugar',
       value: game
-        ? game.enabled
+        ? gameUsesCredits
+          ? 'Créditos'
+          : game.enabled
           ? game.attemptsRemaining === null
             ? 'En revisión'
             : game.attemptsRemaining > 0 ? `${integerLabel(game.attemptsRemaining)} intentos` : 'Sin intentos'
           : 'No disponible'
         : 'No disponible',
-      detail: game?.enabled ? 'Treasure Hunt' : 'Revisa el juego',
+      detail: gameUsesCredits ? 'Modo créditos' : game?.enabled ? 'Treasure Hunt' : 'Revisa el juego',
     },
     {
       label: 'Créditos',
@@ -883,9 +951,12 @@ function PlayPanel({
   credits: DashboardModulePayloads['credits'] | null;
 }) {
   const attemptsKnown = game?.attemptsRemaining !== null && game?.attemptsRemaining !== undefined;
-  const canPlay = Boolean(game?.enabled && attemptsKnown && game.attemptsRemaining! > 0);
+  const gameUsesCredits = game?.phase === 'closed';
+  const canPlay = Boolean(!gameUsesCredits && game?.enabled && attemptsKnown && game.attemptsRemaining! > 0);
   const gameDescription = module.state === 'unavailable'
     ? 'No podemos consultar el juego ahora.'
+    : gameUsesCredits
+      ? 'La competición ha terminado. Treasure Hunt está ahora en modo créditos; consulta tus créditos para preparar la próxima partida.'
     : !game?.configured
       ? 'El juego todavía no está configurado para esta cuenta.'
       : !game.enabled
@@ -914,9 +985,11 @@ function PlayPanel({
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <div className="rounded-[9px] border border-white/10 bg-black/20 px-4 py-3">
-          <p className="uki-label">Intentos disponibles</p>
+          <p className="uki-label">{gameUsesCredits ? 'Modo de juego' : 'Intentos disponibles'}</p>
           <p className="mt-1 text-sm font-black text-[var(--uki-cream)]">
-            {game && attemptsKnown ? `${integerLabel(game.attemptsRemaining)} intentos` : 'No disponible'}
+            {gameUsesCredits
+              ? 'Créditos'
+              : game && attemptsKnown ? `${integerLabel(game.attemptsRemaining)} intentos` : 'No disponible'}
           </p>
         </div>
         <div className="rounded-[9px] border border-white/10 bg-black/20 px-4 py-3">
