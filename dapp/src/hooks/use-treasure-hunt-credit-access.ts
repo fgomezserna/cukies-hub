@@ -39,6 +39,15 @@ type CreditStatus = {
       status: string;
     }>;
   };
+  ownCukie?: {
+    status: 'ready' | 'unknown';
+    periodId: string | null;
+    periodStartsAt: string | null;
+    periodEndsAt: string | null;
+    totalGamesRemaining: number | null;
+    eligibleCukies: number | null;
+    unknownCukies: number;
+  };
 };
 
 export function nextTreasureHuntCreditSource(input: {
@@ -100,12 +109,26 @@ function isCreditStatus(value: unknown): value is CreditStatus {
         run && typeof run.status === 'string'
       ))
     ))
+    && (!candidate.ownCukie || (
+      (candidate.ownCukie.status === 'ready' || candidate.ownCukie.status === 'unknown')
+      && (candidate.ownCukie.periodId === null || typeof candidate.ownCukie.periodId === 'string')
+      && (candidate.ownCukie.periodStartsAt === null || typeof candidate.ownCukie.periodStartsAt === 'string')
+      && (candidate.ownCukie.periodEndsAt === null || typeof candidate.ownCukie.periodEndsAt === 'string')
+      && (candidate.ownCukie.totalGamesRemaining === null
+        || (Number.isSafeInteger(candidate.ownCukie.totalGamesRemaining)
+          && candidate.ownCukie.totalGamesRemaining >= 0))
+      && (candidate.ownCukie.eligibleCukies === null
+        || (Number.isSafeInteger(candidate.ownCukie.eligibleCukies)
+          && candidate.ownCukie.eligibleCukies >= 0))
+      && Number.isSafeInteger(candidate.ownCukie.unknownCukies)
+      && candidate.ownCukie.unknownCukies >= 0
+    ))
   );
 }
 
 async function loadCreditStatus(walletAddress: string, signal: AbortSignal) {
   const response = await fetch(
-    `/api/economy/v1/credits?walletAddress=${encodeURIComponent(walletAddress)}`,
+    `/api/economy/v1/credits?walletAddress=${encodeURIComponent(walletAddress)}&includeOwnCukie=1`,
     {
       cache: 'no-store',
       credentials: 'same-origin',
@@ -191,6 +214,9 @@ export function useTreasureHuntCreditAccess() {
     poolAvailableCredits,
     poolContributedCredits: statusUnavailable ? null : query.data?.balance.poolDepositedCredits ?? null,
     spentCredits: statusUnavailable ? null : query.data?.balance.spentCredits ?? null,
+    // Credits and NFT games are independent resources: a stale credit
+    // projection must not turn a verified OWN quota into zero/unknown.
+    ownCukieAvailability: queryHasError ? null : query.data?.ownCukie ?? null,
     creditSource,
     availabilityReason,
     reservedCredits: statusUnavailable ? null : query.data?.balance.reservedCredits ?? null,

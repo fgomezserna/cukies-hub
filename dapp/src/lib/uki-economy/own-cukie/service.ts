@@ -27,8 +27,10 @@ import {
   cloneOwnCukieAssignment,
   cloneOwnCukieEpoch,
   normalizeOwnCukieWallet,
+  ownCukieAssetHasUnknownEligibilitySignals,
   ownCukieAssignmentId,
   ownCukieEpochId,
+  ownCukiePeriodEpochId,
   ownCukieQuota,
   OWN_CUKIE_SELECTION_POLICY,
   requiredOwnCukieText,
@@ -41,6 +43,8 @@ import type {
   OwnCukieEpoch,
   OwnCukieEvent,
   OwnCukieEventOperation,
+  OwnCukieAvailability,
+  OwnCukieQuotaPeriod,
   ReserveOwnCukieInput,
 } from "./types";
 
@@ -102,13 +106,20 @@ function assertEventReplay(
 function buildInitialEpoch(input: {
   asset: ReturnType<typeof assertOwnCukieAssetEligible>;
   walletNormalized: string;
+  quotaPeriod?: OwnCukieQuotaPeriod;
   now: Date;
 }) {
-  const epochId = ownCukieEpochId({
-    assetId: input.asset.asset.assetId,
-    ownerNormalized: input.walletNormalized,
-    ownershipEventId: input.asset.asset.ownershipEventId,
-  });
+  const epochId = input.quotaPeriod
+    ? ownCukiePeriodEpochId({
+        assetId: input.asset.asset.assetId,
+        periodId: input.quotaPeriod.periodId,
+        quotaPolicyVersion: input.quotaPeriod.policyVersion,
+      })
+    : ownCukieEpochId({
+        assetId: input.asset.asset.assetId,
+        ownerNormalized: input.walletNormalized,
+        ownershipEventId: input.asset.asset.ownershipEventId,
+      });
   const quota = ownCukieQuota(input.asset.generation, input.asset.rarity);
   return assertOwnCukieEpochIntegrity({
     _id: epochId,
@@ -125,13 +136,70 @@ function buildInitialEpoch(input: {
     revision: 0,
     createdAt: input.now,
     updatedAt: input.now,
+    ...(input.quotaPeriod
+      ? {
+          periodId: input.quotaPeriod.periodId,
+          periodStartsAt: new Date(input.quotaPeriod.startsAt),
+          periodEndsAt: new Date(input.quotaPeriod.endsAt),
+          quotaPolicyVersion: input.quotaPeriod.policyVersion,
+        }
+      : {}),
   } satisfies OwnCukieEpoch);
+}
+
+function periodScopedEpoch(epoch: OwnCukieEpoch) {
+  return Boolean(epoch.periodId && epoch.quotaPolicyVersion);
+}
+
+async function findQuotaEpoch(
+  repository: OwnCukieTransactionContext["repository"],
+  epochId: string,
+  periodScoped: boolean,
+) {
+  if (periodScoped && repository.findPeriodEpoch) {
+    return repository.findPeriodEpoch(epochId);
+  }
+  return repository.findEpoch(epochId);
+}
+
+async function insertQuotaEpoch(
+  repository: OwnCukieTransactionContext["repository"],
+  epoch: OwnCukieEpoch,
+) {
+  if (periodScopedEpoch(epoch) && repository.insertPeriodEpoch) {
+    await repository.insertPeriodEpoch(epoch);
+    return;
+  }
+  await repository.insertEpoch(epoch);
+}
+
+async function compareAndSetQuotaEpoch(
+  repository: OwnCukieTransactionContext["repository"],
+  current: OwnCukieEpoch,
+  replacement: OwnCukieEpoch,
+) {
+  if (periodScopedEpoch(current) && repository.compareAndSetPeriodEpoch) {
+    return repository.compareAndSetPeriodEpoch(current, replacement);
+  }
+  return repository.compareAndSetEpoch(current, replacement);
+}
+
+function assertQuotaPeriod(input: OwnCukieQuotaPeriod) {
+  const periodId = requiredOwnCukieText(input.periodId, "quotaPeriod.periodId");
+  const policyVersion = requiredOwnCukieText(input.policyVersion, "quotaPeriod.policyVersion");
+  const startsAt = validOwnCukieDate(input.startsAt, "quotaPeriod.startsAt");
+  const endsAt = validOwnCukieDate(input.endsAt, "quotaPeriod.endsAt");
+  if (endsAt.getTime() <= startsAt.getTime()) {
+    throw new DomainValidationError("quotaPeriod.endsAt debe ser posterior a startsAt.");
+  }
+  return { periodId, startsAt, endsAt, policyVersion } satisfies OwnCukieQuotaPeriod;
 }
 
 async function assignCandidate(
   context: OwnCukieTransactionContext,
   input: {
     epoch: OwnCukieEpoch;
+    asset?: ReturnType<typeof assertOwnCukieAssetEligible>;
     softStakeLockId: string | null;
     sessionId: string;
     walletNormalized: string;
@@ -180,16 +248,28 @@ async function assignCandidate(
     });
   }
 
-  const assignedEpoch = assertOwnCukieEpochIntegrity({
+  const assignedEpochValue: OwnCukieEpoch = {
     ...cloneOwnCukieEpoch(input.epoch),
+    ...(input.asset
+      ? {
+          tokenId: input.asset.asset.tokenId!,
+          ownerNormalized: input.walletNormalized,
+          ownershipEventId: input.asset.asset.ownershipEventId,
+          generation: input.asset.generation,
+          rarity: input.asset.rarity,
+        }
+      : {}),
     status: "assigned",
     gamesRemaining: input.epoch.gamesRemaining - 1,
     assignmentSessionId: input.sessionId,
     assignmentExpiresAt: input.expiresAt,
     revision: input.epoch.revision + 1,
     updatedAt: input.now,
-  });
-  const persistedEpoch = await repository.compareAndSetEpoch(input.epoch, assignedEpoch);
+  };
+  delete assignedEpochValue.invalidatedAt;
+  delete assignedEpochValue.invalidationReason;
+  const assignedEpoch = assertOwnCukieEpochIntegrity(assignedEpochValue);
+  const persistedEpoch = await compareAndSetQuotaEpoch(repository, input.epoch, assignedEpoch);
   if (!persistedEpoch) throw new StaleFenceError(`CAS obsoleto para ${input.epoch.epochId}.`);
 
   const assignmentId = ownCukieAssignmentId(input.sessionId);
@@ -214,6 +294,14 @@ async function assignCandidate(
     expiresAt: input.expiresAt,
     revision: 0,
     updatedAt: input.now,
+    ...(periodScopedEpoch(persistedEpoch)
+      ? {
+          periodId: persistedEpoch.periodId,
+          periodStartsAt: persistedEpoch.periodStartsAt,
+          periodEndsAt: persistedEpoch.periodEndsAt,
+          quotaPolicyVersion: persistedEpoch.quotaPolicyVersion,
+        }
+      : {}),
   });
   await repository.insertAssignment(assignment);
   await repository.insertEvent(buildEvent({
@@ -357,6 +445,7 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
       }
       const idempotencyKey = requiredOwnCukieText(input.idempotencyKey, "idempotencyKey");
       const requestHash = canonicalHash(input.requestHash, "requestHash");
+      const quotaPeriod = input.quotaPeriod ? assertQuotaPeriod(input.quotaPeriod) : undefined;
 
       return runner(async (context) => {
         const prior = await context.repository.findEventByIdempotencyKey(idempotencyKey);
@@ -383,21 +472,35 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
           } catch {
             continue;
           }
-          const epochId = ownCukieEpochId({
-            assetId: candidate.assetId,
-            ownerNormalized: walletNormalized,
-            ownershipEventId: candidate.ownershipEventId,
-          });
-          let epoch = await context.repository.findEpoch(epochId);
+          const epochId = quotaPeriod
+            ? ownCukiePeriodEpochId({
+                assetId: candidate.assetId,
+                periodId: quotaPeriod.periodId,
+                quotaPolicyVersion: quotaPeriod.policyVersion,
+              })
+            : ownCukieEpochId({
+                assetId: candidate.assetId,
+                ownerNormalized: walletNormalized,
+                ownershipEventId: candidate.ownershipEventId,
+              });
+          let epoch = await findQuotaEpoch(context.repository, epochId, Boolean(quotaPeriod));
           if (!epoch) {
-            epoch = buildInitialEpoch({ asset: eligible, walletNormalized, now });
-            await context.repository.insertEpoch(epoch);
+            epoch = buildInitialEpoch({ asset: eligible, walletNormalized, quotaPeriod, now });
+            await insertQuotaEpoch(context.repository, epoch);
           } else {
             assertOwnCukieEpochIntegrity(epoch);
+            if (quotaPeriod && !periodScopedEpoch(epoch)) {
+              throw new DomainConflictError("El ledger diario del Cukie no tiene periodo canonico.");
+            }
           }
-          if (epoch.status !== "active" || epoch.gamesRemaining === 0) continue;
+          if (
+            (epoch.status !== "active"
+              && !(quotaPeriod && epoch.status === "invalidated" && epoch.gamesRemaining > 0))
+            || epoch.gamesRemaining === 0
+          ) continue;
           return assignCandidate(context, {
             epoch,
+            asset: eligible,
             softStakeLockId: eligible.softStakeLockId,
             sessionId,
             walletNormalized,
@@ -408,6 +511,90 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
           });
         }
         return null;
+      });
+    },
+
+    /**
+     * Read-only aggregate for the current period. It deliberately does not
+     * create or repair epochs: an absent ledger means the full policy quota,
+     * while a malformed ledger makes the aggregate unknown instead of zero.
+     */
+    async availability(input: {
+      walletAddress: string;
+      quotaPeriod: OwnCukieQuotaPeriod;
+      now?: Date;
+    }): Promise<OwnCukieAvailability> {
+      const now = validOwnCukieDate(input.now, "now", new Date());
+      const walletNormalized = normalizeOwnCukieWallet(input.walletAddress);
+      const quotaPeriod = assertQuotaPeriod(input.quotaPeriod);
+      return runner(async (context) => {
+        const assets = await context.repository.listWalletAssets(walletNormalized, now);
+        let totalGamesRemaining = 0;
+        let eligibleCukies = 0;
+        let unknownCukies = 0;
+        for (const candidate of assets) {
+          if (ownCukieAssetHasUnknownEligibilitySignals(candidate)) {
+            unknownCukies += 1;
+            continue;
+          }
+          let eligible: ReturnType<typeof assertOwnCukieAssetEligible>;
+          try {
+            eligible = assertOwnCukieAssetEligible(candidate, walletNormalized);
+          } catch {
+            continue;
+          }
+          eligibleCukies += 1;
+          const epochId = ownCukiePeriodEpochId({
+            assetId: candidate.assetId,
+            periodId: quotaPeriod.periodId,
+            quotaPolicyVersion: quotaPeriod.policyVersion,
+          });
+          const epoch = await findQuotaEpoch(context.repository, epochId, true);
+          if (!epoch) {
+            totalGamesRemaining += ownCukieQuota(eligible.generation, eligible.rarity);
+            continue;
+          }
+          try {
+            assertOwnCukieEpochIntegrity(epoch);
+          } catch {
+            unknownCukies += 1;
+            continue;
+          }
+          if (
+            !periodScopedEpoch(epoch)
+            || epoch.periodId !== quotaPeriod.periodId
+            || epoch.quotaPolicyVersion !== quotaPeriod.policyVersion
+            || epoch.assetId !== candidate.assetId
+            || (epoch.status === "assigned" && candidate.activeLocks.length === 0)
+          ) {
+            unknownCukies += 1;
+            continue;
+          }
+          // An ownership drift invalidates the reservation, not the consumed
+          // slot. Once the asset is currently eligible, its remaining stable
+          // period balance is still visible and can be reserved by the owner.
+          totalGamesRemaining += epoch.gamesRemaining;
+        }
+        if (unknownCukies > 0) {
+          return {
+            status: "unknown",
+            periodId: quotaPeriod.periodId,
+            periodStartsAt: quotaPeriod.startsAt,
+            periodEndsAt: quotaPeriod.endsAt,
+            totalGamesRemaining: null,
+            eligibleCukies: null,
+            unknownCukies,
+          } satisfies OwnCukieAvailability;
+        }
+        return {
+          status: "ready",
+          periodId: quotaPeriod.periodId,
+          periodStartsAt: quotaPeriod.startsAt,
+          periodEndsAt: quotaPeriod.endsAt,
+          totalGamesRemaining,
+          eligibleCukies,
+          unknownCukies,
+        } satisfies OwnCukieAvailability;
       });
     },
 
@@ -451,9 +638,16 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
         if (assignment.status !== "active") {
           throw new DomainConflictError(`La asignacion propia ya termino como ${assignment.status}.`);
         }
-        const epoch = await context.repository.findEpoch(assignment.epochId);
+        const epoch = await findQuotaEpoch(
+          context.repository,
+          assignment.epochId,
+          Boolean(assignment.periodId || assignment.quotaPolicyVersion),
+        );
         if (!epoch) throw new DomainConflictError("No existe el ownership epoch de la asignacion.");
         assertOwnCukieEpochIntegrity(epoch);
+        if (assignment.periodId && assignment.quotaPolicyVersion && !periodScopedEpoch(epoch)) {
+          throw new DomainConflictError("El ledger diario de la asignacion no tiene periodo canonico.");
+        }
         if (
           epoch.status !== "assigned"
           || epoch.assignmentSessionId !== sessionId
@@ -506,7 +700,7 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
         delete nextEpochValue.assignmentSessionId;
         delete nextEpochValue.assignmentExpiresAt;
         const nextEpoch = assertOwnCukieEpochIntegrity(nextEpochValue);
-        const persistedEpoch = await context.repository.compareAndSetEpoch(epoch, nextEpoch);
+        const persistedEpoch = await compareAndSetQuotaEpoch(context.repository, epoch, nextEpoch);
         if (!persistedEpoch) throw new StaleFenceError("CAS terminal obsoleto para ownership epoch.");
 
         const nextAssignment = assertOwnCukieAssignmentIntegrity({

@@ -37,8 +37,68 @@ function CreditMetric({
   );
 }
 
+function ownCukieCopy(access: ReturnType<typeof useTreasureHuntCreditAccess>) {
+  const availability = access.ownCukieAvailability;
+  if (!access.walletConnected) {
+    return {
+      value: 'Conecta tu wallet',
+      detail: 'Consulta tus Cukies elegibles antes de jugar',
+    };
+  }
+  if (access.isLoading) {
+    return {
+      value: 'Comprobando Cukies…',
+      detail: 'Estamos consultando tus Cukies para mostrar el saldo del periodo',
+    };
+  }
+  if (access.isError) {
+    return {
+      value: 'No disponible',
+      detail: 'No hemos podido verificar tus Cukies. Puedes volver a intentarlo',
+    };
+  }
+  if (
+    !availability
+    || availability.status !== 'ready'
+    || availability.totalGamesRemaining === null
+    || !availability.periodId
+    || !availability.periodStartsAt
+    || !availability.periodEndsAt
+  ) {
+    return {
+      value: 'No verificado · Cukies',
+      detail: 'Estamos consultando tus Cukies. Puedes volver a intentarlo',
+    };
+  }
+  const periodStartsAt = new Date(availability.periodStartsAt);
+  const periodEndsAt = new Date(availability.periodEndsAt);
+  if (
+    !Number.isFinite(periodStartsAt.getTime())
+    || !Number.isFinite(periodEndsAt.getTime())
+    || periodEndsAt.getTime() <= periodStartsAt.getTime()
+  ) {
+    return {
+      value: 'No verificado · Cukies',
+      detail: 'Estamos consultando tus Cukies. Puedes volver a intentarlo',
+    };
+  }
+  const eligible = availability.eligibleCukies ?? 0;
+  const renewal = new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(periodEndsAt);
+  return {
+    value: `${availability.totalGamesRemaining} partida${availability.totalGamesRemaining === 1 ? '' : 's'}`,
+    detail: `${eligible} Cukie${eligible === 1 ? '' : 's'} elegible${eligible === 1 ? '' : 's'} · renueva ${renewal} UTC`,
+  };
+}
+
 export function TreasureHuntCreditModeBanner() {
   const access = useTreasureHuntCreditAccess();
+  const ownCopy = ownCukieCopy(access);
   const creditUnavailable = access.isError;
   const creditBlocked = access.blocked && !creditUnavailable;
   const selectedSource = access.canPlay && !access.blocked ? access.creditSource : null;
@@ -125,7 +185,7 @@ export function TreasureHuntCreditModeBanner() {
           </p>
         </div>
 
-        <dl className="grid overflow-hidden rounded-[7px] border border-[var(--uki-lilac-border)] bg-black/10 sm:grid-cols-3 sm:divide-x sm:divide-[var(--uki-lilac-border)]">
+        <dl className="grid overflow-hidden rounded-[7px] border border-[var(--uki-lilac-border)] bg-black/10 sm:grid-cols-2 sm:divide-x sm:divide-[var(--uki-lilac-border)] lg:grid-cols-4">
           <CreditMetric label="Coste" value={costLabel} detail="Al iniciar" />
           <CreditMetric
             label="Tus créditos"
@@ -133,6 +193,7 @@ export function TreasureHuntCreditModeBanner() {
             detail={access.walletConnected ? contributedDetail : 'Conecta para consultarlo'}
           />
           <CreditMetric label="Próxima partida" value={sourceLabel} detail={sourceDetail} />
+          <CreditMetric label="Cukies propios" value={ownCopy.value} detail={ownCopy.detail} />
         </dl>
 
         <div className="grid grid-cols-2 gap-2 lg:col-span-2 xl:col-span-1 xl:grid-cols-1 2xl:grid-cols-2">
@@ -196,6 +257,7 @@ export function TreasureHuntCreditModeSidebar({
   readonly onStartSinglePlayer: () => void;
 }) {
   const access = useTreasureHuntCreditAccess();
+  const ownCopy = ownCukieCopy(access);
   const creditUnavailable = access.isError;
   const creditBlocked = access.blocked && !creditUnavailable;
   const waitingForRun = access.availabilityReason === 'run_pending';
@@ -314,6 +376,12 @@ export function TreasureHuntCreditModeSidebar({
           label="Cukie de la partida"
           value={creditBlocked ? 'Pendiente de confirmar' : 'Se asigna al empezar'}
           detail={creditBlocked ? 'Se asignará cuando el acceso con créditos esté disponible' : 'Se usa uno propio o disponible en el pool'}
+        />
+        <SidebarRow
+          icon={<Stack className="h-4 w-4" weight="fill" aria-hidden="true" />}
+          label="Partidas con Cukies propios"
+          value={ownCopy.value}
+          detail={ownCopy.detail}
         />
       </dl>
 

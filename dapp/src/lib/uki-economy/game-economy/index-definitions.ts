@@ -9,6 +9,7 @@ export const GAME_ECONOMY_COLLECTIONS = [
   "game_economy_events",
   "game_economy_resource_bindings",
   "game_owned_cukie_epochs",
+  "game_owned_cukie_period_epochs",
   "game_owned_cukie_assignments",
   "game_owned_cukie_events",
   "game_result_evidence",
@@ -134,6 +135,21 @@ export const GAME_ECONOMY_INDEX_DEFINITIONS = [
     collection: "game_owned_cukie_epochs",
     keys: { epochId: 1 },
     options: { unique: true, name: "game_owned_cukie_epoch_unique" },
+  },
+  {
+    collection: "game_owned_cukie_period_epochs",
+    keys: { epochId: 1 },
+    options: { unique: true, name: "game_owned_cukie_period_epoch_unique" },
+  },
+  {
+    collection: "game_owned_cukie_period_epochs",
+    keys: { assetId: 1, periodId: 1, quotaPolicyVersion: 1 },
+    options: { unique: true, name: "game_owned_cukie_period_identity_unique" },
+  },
+  {
+    collection: "game_owned_cukie_period_epochs",
+    keys: { assetId: 1, periodId: 1, status: 1, gamesRemaining: -1, _id: 1 },
+    options: { name: "game_owned_cukie_period_wallet_quota" },
   },
   {
     collection: "game_owned_cukie_epochs",

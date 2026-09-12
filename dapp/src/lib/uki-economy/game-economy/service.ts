@@ -55,8 +55,12 @@ import type {
 import {
   TREASURE_HUNT_ECONOMY_POLICY,
   assertTreasureHuntStagingRuntime,
+  getTreasureHuntDailyPeriod,
   resolveTreasureHuntForwardActivationAt,
 } from "./treasure-hunt-policy";
+import {
+  OWN_CUKIE_DAILY_QUOTA_POLICY_VERSION,
+} from "../own-cukie/rules";
 
 const TERMINAL_STATUSES = new Set<GameEconomySessionStatus>([
   "settled",
@@ -530,6 +534,23 @@ export function createGameEconomyService(
             requestHash: resource.reservationRequestHash,
             fenceToken: session.operation!.fenceToken,
             expiresAt: session.expiresAt,
+            ...(session.gameId === TREASURE_HUNT_ECONOMY_POLICY.gameId
+              && session.rule.cukie.selectionPolicy === "owned_bsc_quota_then_pool_v1"
+              ? (() => {
+                  const period = getTreasureHuntDailyPeriod(
+                    session.createdAt,
+                    session.rule.calendar,
+                  );
+                  return {
+                    quotaPeriod: {
+                      periodId: period.periodId,
+                      startsAt: period.startsAt,
+                      endsAt: period.endsAt,
+                      policyVersion: OWN_CUKIE_DAILY_QUOTA_POLICY_VERSION,
+                    },
+                  };
+                })()
+              : {}),
           });
     const verified = validReservationResult(result, kind);
     return persistFenced(
