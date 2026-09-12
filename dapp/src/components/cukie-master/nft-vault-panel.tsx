@@ -591,11 +591,19 @@ export function CukieMasterNftVaultPanel() {
     // read and leave the panel without an inventory while the readback pair
     // is converging.
     if (!pendingHydrated || !pendingContext || !statusResource.data) return;
+    let registeredProjection = false;
     for (const operation of Object.values(pendingByAsset)) {
       if (operation.phase !== 'syncing_projection' || operation.action === 'approval') continue;
       registerNftExpectation(operation);
+      registeredProjection = true;
     }
-  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, registerNftExpectation, runtimeSessionReady, statusResource.data]);
+    if (registeredProjection) {
+      // Hydrated operations do not pass through the receipt callback, so kick
+      // off the provider's paired Master+Credits readback immediately rather
+      // than waiting for its periodic retry interval.
+      void Promise.resolve(refreshAfterTransaction('master-nft')).catch(() => undefined);
+    }
+  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, refreshAfterTransaction, registerNftExpectation, runtimeSessionReady, statusResource.data]);
 
   const persistPending = useCallback((input: {
     asset: PublicNft;
