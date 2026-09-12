@@ -534,6 +534,12 @@
       "lane": "D12-1/D12-3",
       "reportedObservation": "PR449 deployment34699288472 succeeded. Public web and game health report fb841f84; release state records exact web/game images and live game container is healthy. PR450 merged staging af41cce6 at14:43:08UTC, beginning C2/notice deployment.",
       "verificationBoundary": "Deployment and game readiness are verified; no personal-wallet gameplay or historical reward repair performed. O2 remains a separate active implementation."
+    },
+    {
+      "reportedAt": "2026-09-12T14:47:36.473863+00:00",
+      "lane": "D12-3",
+      "reportedObservation": "O2 root review identified singleton NFT expectation overwrites, stale automatic-query closure publication, and a deposit fixture incorrectly reducing NFT points. Worker requested to fix these bounded cases before acceptance. C2 deployment34700104183 continues separately.",
+      "verificationBoundary": "These are implementation/review findings, not a request for human validation. No runtime or accounting mutation."
     }
   ]
 }
