@@ -500,6 +500,34 @@
       "lane": "D12-1/D12-4",
       "reportedObservation": "PR451 deployed successfully; public staging health confirms2c7a3882. Production invitation code returns legitimate INVITATION_NOT_FOUND in the separate staging database. PR449 merged stagingfb841f84 at14:26:25UTC; CI34699288472 deploying web and treasure-hunt.",
       "verificationBoundary": "Stage404 is not presented as a regression or as positive active-invitation QA. No private wallet signatures."
+    },
+    {
+      "reportedAt": "2026-09-12T14:32:21.221769+00:00",
+      "lane": "D12-4",
+      "reportedObservation": "A valid invitation in the isolated staging database returns200 with ambassadorPublicName present; another invitation returns404. Main code is absent in staging, as expected for distinct databases.",
+      "apiProbe": {
+        "at": "2026-09-12T14:29:45.354388+00:00",
+        "sourceSha": "2c7a3882b31fc0d89876e2376b46a4ef608acf48",
+        "probes": [
+          {
+            "invitationCode": "cw-56918691f339",
+            "http": "200",
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": true
+          },
+          {
+            "invitationCode": "cw-d58770a3fcd1",
+            "http": "404",
+            "status": "error",
+            "code": "INVITATION_NOT_FOUND",
+            "invitationPresent": false,
+            "publicNamePresent": false
+          }
+        ]
+      },
+      "verificationBoundary": "Read-only public endpoints and minimal invitation-code Mongo projection. No public-name values, wallets, credentials or profile mutations recorded. Existing confirmed-attribution behavior is regression-tested, not newly mutated as QA."
     }
   ]
 }
