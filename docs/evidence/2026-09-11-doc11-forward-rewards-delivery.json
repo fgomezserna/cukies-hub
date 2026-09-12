@@ -433,6 +433,246 @@
         "financialAfter": "/tmp/doc11-pr437-after-publication.json",
         "receipts": "/tmp/doc11-pr437-first-period-receipts.json"
       }
+    },
+    "firstWeeklyObservation": {
+      "observedAt": "2026-09-12T00:14:34.389Z",
+      "rankingObservedAt": "2026-09-12T00:12:15.253Z",
+      "environment": "staging",
+      "chainId": 97,
+      "codeSha": "52684bb822cf6c7d4cacabe989e94321d3b6c7ff",
+      "releaseShaAtObservation": "59fdb079390ca21c0801a06896a70f040eb4d3d4",
+      "readOnly": true,
+      "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+      "forwardActivationAt": "2026-09-11T20:30:00.000Z",
+      "rankingRuntime": {
+        "periodRunCount": 12,
+        "firstRunWithTwoClosures": [
+          {
+            "id": "848eff6806d3",
+            "status": "success",
+            "startedAt": "2026-09-12T00:03:28.771Z",
+            "endedAt": "2026-09-12T00:03:28.857Z",
+            "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+            "periodsProcessed": 2,
+            "closures": [
+              {
+                "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+                "runId": "32ab3eb5737c",
+                "manifestId": "7e4574398c37",
+                "sourceCount": 0,
+                "participantCount": 0,
+                "replayed": false
+              },
+              {
+                "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+                "runId": "32ab3eb5737c",
+                "manifestId": "7e4574398c37",
+                "sourceCount": 0,
+                "participantCount": 0,
+                "replayed": true
+              }
+            ]
+          }
+        ],
+        "latestObservedRun": {
+          "id": "1afdaeaf6b33",
+          "status": "success",
+          "startedAt": "2026-09-12T00:14:30.912Z",
+          "endedAt": "2026-09-12T00:14:30.954Z",
+          "resultStatus": "success",
+          "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+          "runId": "32ab3eb5737c",
+          "manifestId": "7e4574398c37",
+          "sourceCount": 0,
+          "participantCount": 0,
+          "periodsProcessed": 1,
+          "replayed": true,
+          "closures": [
+            {
+              "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+              "runId": "32ab3eb5737c",
+              "manifestId": "7e4574398c37",
+              "sourceCount": 0,
+              "participantCount": 0,
+              "replayed": true
+            }
+          ]
+        }
+      },
+      "manifest": {
+        "count": 1,
+        "rows": [
+          {
+            "id": "7e4574398c37",
+            "manifestId": "7e4574398c37",
+            "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+            "periodStart": "2026-09-11T20:30:00.000Z",
+            "periodEndExclusive": "2026-09-12T00:00:00.000Z",
+            "ruleVersion": "weekly-ranking-staging-cycle-v1",
+            "sourceCount": 0,
+            "participantCount": 0,
+            "runId": "32ab3eb5737c",
+            "status": "sealed",
+            "createdAt": "2026-09-12T00:03:28.771Z",
+            "sealedAt": "2026-09-12T00:03:28.771Z",
+            "storedPayloadHash": "49534f9642af167435704d3b766e84b0248ab0d1eca672fca3d6f8ec0fd2a846",
+            "recomputedPayloadHash": "49534f9642af167435704d3b766e84b0248ab0d1eca672fca3d6f8ec0fd2a846",
+            "payloadHashMatches": true
+          }
+        ]
+      },
+      "rankingRun": {
+        "count": 1,
+        "rows": [
+          {
+            "id": "32ab3eb5737c",
+            "runId": "32ab3eb5737c",
+            "manifestId": "7e4574398c37",
+            "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+            "status": "sealed",
+            "sourceCount": 0,
+            "participantCount": 0,
+            "startedAt": "2026-09-12T00:03:28.771Z",
+            "sealedAt": "2026-09-12T00:03:28.771Z",
+            "storedPayloadHash": "245252fc9bddc69778a85c8f7d6a7b085c42ac7a09215cd6f704ba55e5e32dc1",
+            "recomputedPayloadHash": "245252fc9bddc69778a85c8f7d6a7b085c42ac7a09215cd6f704ba55e5e32dc1",
+            "payloadHashMatches": true
+          }
+        ]
+      },
+      "periodState": {
+        "count": 1,
+        "rows": [
+          {
+            "id": "76c87a57ff6b",
+            "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+            "status": "sealed",
+            "revision": 1,
+            "runId": "32ab3eb5737c",
+            "manifestId": "7e4574398c37",
+            "sourceSetHash": "cd77881f67090fd116bdb28061a4240841e8bcc274415bf3f562edbfb2255df3",
+            "createdAt": "2026-09-12T00:03:28.771Z",
+            "updatedAt": "2026-09-12T00:03:28.771Z",
+            "sealedAt": "2026-09-12T00:03:28.771Z"
+          }
+        ]
+      },
+      "auditEvent": {
+        "count": 1,
+        "rows": [
+          {
+            "id": "c8bc4e840959",
+            "eventId": "c8bc4e840959",
+            "type": "period_sealed",
+            "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+            "runId": "32ab3eb5737c",
+            "manifestId": "7e4574398c37",
+            "sourceCount": 0,
+            "participantCount": 0,
+            "createdAt": "2026-09-12T00:03:28.771Z",
+            "storedPayloadHash": "b9a43c7a4aaf43f9ab2c04e025ccffc524103ab34a99f2a0c14270c3d6b7331c",
+            "recomputedPayloadHash": "b9a43c7a4aaf43f9ab2c04e025ccffc524103ab34a99f2a0c14270c3d6b7331c",
+            "payloadHashMatches": true
+          }
+        ]
+      },
+      "sources": {
+        "count": 0,
+        "uniqueSourceIds": 0,
+        "gameIds": [],
+        "rows": [],
+        "sourceSetHashFromRows": "cd77881f67090fd116bdb28061a4240841e8bcc274415bf3f562edbfb2255df3"
+      },
+      "snapshots": {
+        "count": 0,
+        "uniqueIds": 0,
+        "gameIds": [],
+        "rows": [],
+        "snapshotSetHashFromRows": "aeee4fb95e64a469383982e857c9534645521a3aa7c6899595642acca232b03b"
+      },
+      "weeklyPrize": {
+        "count": 1,
+        "rows": [
+          {
+            "id": "0f28b6a735b3",
+            "periodId": "C1800-W:2026-09-11T20:30:00.000Z",
+            "status": "sealed",
+            "sealedAt": "2026-09-12T00:05:32.944Z",
+            "payloadHash": "ebc122d9c3c8ededc5165a33b01f7f05a94df4f7394b8b447569571b28faa270",
+            "recomputedPayloadHash": "ebc122d9c3c8ededc5165a33b01f7f05a94df4f7394b8b447569571b28faa270",
+            "payloadHashMatches": true,
+            "accountingIdCanonical": true,
+            "fundingMode": "reserved_no_mint",
+            "sourceDailyAccountingIdsCount": 7,
+            "winnersCount": 0,
+            "poolReservationsCount": 0,
+            "poolTrancheScheduleCount": 7,
+            "ambassadorPayoutsCount": 0,
+            "allocationsCount": 0,
+            "allocatedRaw": "0",
+            "claimableTotalRaw": null,
+            "conservationRaw": "0",
+            "lotteryEntropyHashMatches": true,
+            "sealedAfterEntropyConfirmed": true
+          }
+        ]
+      },
+      "weeklyPublicationPlans": {
+        "count": 0,
+        "rows": []
+      },
+      "weeklyClaimBatches": {
+        "count": 0,
+        "rows": []
+      },
+      "reconciliation": {
+        "expectedPeriodStart": "2026-09-11T20:30:00.000Z",
+        "closurePeriods": [
+          "C1800-W:2026-09-11T20:30:00.000Z",
+          "C1800-W:2026-09-11T20:30:00.000Z"
+        ],
+        "allClosurePeriodsTarget": true,
+        "closureUniquePeriods": [
+          "C1800-W:2026-09-11T20:30:00.000Z"
+        ],
+        "manifestRunLink": true,
+        "manifestAuditLink": true,
+        "manifestStateLink": true,
+        "sourceSetHashMatchesManifest": true,
+        "snapshotSetHashMatchesManifest": true,
+        "oneDocumentEach": true,
+        "sourceAndSnapshotIdsUnique": true,
+        "weeklyEmptyNoFinancialClaims": true
+      },
+      "interpretation": "El primer tick registra el cierre y su relectura idempotente del mismo periodo, run y manifiesto; existe un solo documento por entidad y revision 1. No es un segundo cierre ni recuperacion de otra semana.",
+      "newOperationsAtInitialCheck": {
+        "observedAt": "2026-09-12T00:06:18.193Z",
+        "sessionsStartedSinceBoundary": 0,
+        "sessionsCreatedSinceBoundary": 0,
+        "gameEventsSinceBoundary": 0,
+        "dailyAccountingSinceBoundary": 7,
+        "newAccountingAllocations": 21,
+        "publicationPlansSinceBoundary": 7,
+        "claimBatchesSinceBoundary": 0,
+        "publisherFailureObserved": false
+      },
+      "rootReview": {
+        "status": "accepted",
+        "hashContract": "dapp/src/lib/uki-economy/rewards/accounting.ts:1302",
+        "checks": "Hashes de manifiesto, run, audit y accounting semanal recalculados; enlaces, unicidad, entropia y sellado contrastados."
+      },
+      "limits": [
+        "Periodo sin partidas, fuentes, participantes, ganadores, reservas ni asignaciones personales.",
+        "La ausencia de planes y claims semanales es coherente con allocatedRaw=0; no demuestra cobro de usuario.",
+        "A1 y O1 mantienen sus pendientes; no se cumple todavia la condicion de pausar la coordinacion."
+      ],
+      "artifacts": [
+        "/tmp/doc11-first-weekly-20260912.json",
+        "/tmp/doc11-first-weekly-20260912.md",
+        "/tmp/doc11-first-weekly-readonly.py",
+        "/tmp/doc11-heartbeat-0005-operations.json",
+        "/tmp/doc11-weekly-release-baseline.json"
+      ]
     }
   },
   "limits": [
