@@ -552,6 +552,12 @@
       "lane": "D12-3/C2 runtime",
       "reportedObservation": "PR450 af41cce6 deployment34700104183 completed successfully and exact SHA served. Runtime source failure predates it: one open nft_lock_asset_identity_invalid at09:47:47UTC for canonical cukies:97:<collection>:98000002, which parseCukiesAssetLookup rejects because identity contains colons. Three TOKEN_V2 Transfer dead letters11-Sep for98000001/3/4 retain canonical-owner mismatch. These remain separate implementation/operational work before credit-source closure.",
       "verificationBoundary": "Canonical asset identity and sanitized error codes only; no profile/secret reads and no removal or reconstruction of historical records."
+    },
+    {
+      "reportedAt": "2026-09-12T15:02:51.620699+00:00",
+      "lane": "D12-5",
+      "reportedObservation": "Created native Luna Max task01a09621-6fb0-75c1-bce1-2d3caa5d8296 in isolatedacfe worktree for canonical NFT identity/source-integrity blocker of C2. O2 worker remains sole owner of provider/panel. D12-1 code remains frozen; authenticated new-game QA lacks an established controlled wallet and is also blocked by credit-source health.",
+      "verificationBoundary": "No confirmed new-game or claim evidence. No historical repair or secret exposure."
     }
   ]
 }
