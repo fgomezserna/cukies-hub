@@ -5,6 +5,10 @@ jest.mock('@/lib/uki-economy/credits', () => ({
   getCompetitionCreditWalletHistory: jest.fn(),
   getCompetitionCreditWalletStatus: jest.fn(),
 }));
+jest.mock('@/lib/uki-economy/own-cukie', () => ({
+  OWN_CUKIE_DAILY_QUOTA_POLICY_VERSION: 'own-cukie-daily-v1',
+  ownCukieService: { availability: jest.fn() },
+}));
 
 import { NextRequest } from 'next/server';
 
@@ -15,6 +19,7 @@ import {
   getCompetitionCreditWalletHistory,
   getCompetitionCreditWalletStatus,
 } from '@/lib/uki-economy/credits';
+import { ownCukieService } from '@/lib/uki-economy/own-cukie';
 import { DomainConflictError } from '@/lib/uki-economy/errors';
 
 const wallet = '0x1111111111111111111111111111111111111111';
@@ -65,6 +70,15 @@ describe('/api/economy/v1/credits', () => {
       effectiveCutoff: new Date('2026-07-11T12:00:00.000Z'),
       ruleVersion: 'credits-v1',
     });
+    (ownCukieService.availability as jest.Mock).mockResolvedValue({
+      status: 'ready',
+      periodId: 'th-day:2026-09-12T14:00:00.000Z',
+      periodStartsAt: new Date('2026-09-12T14:00:00.000Z'),
+      periodEndsAt: new Date('2026-09-13T14:00:00.000Z'),
+      totalGamesRemaining: 6,
+      eligibleCukies: 2,
+      unknownCukies: 0,
+    });
   });
 
   it('returns only the authenticated wallet status without caching', async () => {
@@ -75,9 +89,11 @@ describe('/api/economy/v1/credits', () => {
     expect(verifyWalletAuth).toHaveBeenCalledWith(wallet);
     expect(getCompetitionCreditWalletStatus).toHaveBeenCalledWith(wallet);
     expect(getCompetitionCreditWalletHistory).toHaveBeenCalledWith(wallet, 0);
+    expect(ownCukieService.availability).not.toHaveBeenCalled();
     expect(await response.json()).toMatchObject({
       status: 'ok',
       data: {
+        ownCukie: null,
         history: {
           available: true,
           totals: { receivedCredits: 100, spentCredits: 10 },
@@ -99,6 +115,101 @@ describe('/api/economy/v1/credits', () => {
         history: { available: false, page: 0, entries: [] },
       },
     });
+  });
+
+  it('incluye la disponibilidad OWN solo cuando el consumidor la solicita', async () => {
+    const response = await GET(new NextRequest(
+      `http://localhost/api/economy/v1/credits?walletAddress=${wallet}&includeOwnCukie=1`,
+    ));
+
+    expect(response.status).toBe(200);
+    expect(ownCukieService.availability).toHaveBeenCalledWith(expect.objectContaining({
+      walletAddress: wallet,
+      quotaPeriod: expect.objectContaining({
+        policyVersion: 'own-cukie-daily-v1',
+      }),
+    }));
+    expect(await response.json()).toMatchObject({
+      status: 'ok',
+      data: {
+        ownCukie: {
+          status: 'ready',
+          totalGamesRemaining: 6,
+          eligibleCukies: 2,
+        },
+      },
+    });
+  });
+
+  it('propaga una disponibilidad OWN parcial sin convertirla en saldo completo', async () => {
+    (ownCukieService.availability as jest.Mock).mockResolvedValueOnce({
+      status: 'partial',
+      periodId: 'th-day:2026-09-12T14:00:00.000Z',
+      periodStartsAt: new Date('2026-09-12T14:00:00.000Z'),
+      periodEndsAt: new Date('2026-09-13T14:00:00.000Z'),
+      totalGamesRemaining: 62,
+      eligibleCukies: 11,
+      unknownCukies: 1,
+    });
+    const response = await GET(new NextRequest(
+      `http://localhost/api/economy/v1/credits?walletAddress=${wallet}&includeOwnCukie=1`,
+    ));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'ok',
+      data: {
+        ownCukie: {
+          status: 'partial',
+          totalGamesRemaining: 62,
+          eligibleCukies: 11,
+          unknownCukies: 1,
+        },
+      },
+    });
+  });
+
+  it('no inventa un periodo diario si el calendario acelerado es invalido', async () => {
+    const environmentKeys = [
+      'APP_ENV',
+      'ECONOMY_CYCLE_SECONDS',
+      'ECONOMY_CYCLE_ANCHOR_AT',
+      'STAGING_ONLY_GUARD',
+      'NEXT_PUBLIC_UKI_CHAIN_ID',
+      'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID',
+      'CHAIN_INDEXER_DB_NAME',
+    ] as const;
+    const previous = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
+    process.env.APP_ENV = 'production';
+    process.env.ECONOMY_CYCLE_SECONDS = '1800';
+    delete process.env.ECONOMY_CYCLE_ANCHOR_AT;
+    try {
+      const response = await GET(new NextRequest(
+        `http://localhost/api/economy/v1/credits?walletAddress=${wallet}&includeOwnCukie=1`,
+      ));
+
+      expect(response.status).toBe(200);
+      expect(ownCukieService.availability).not.toHaveBeenCalled();
+      expect(await response.json()).toMatchObject({
+        status: 'ok',
+        data: {
+          ownCukie: {
+            status: 'unknown',
+            periodId: null,
+            periodStartsAt: null,
+            periodEndsAt: null,
+            totalGamesRemaining: null,
+            eligibleCukies: null,
+          },
+        },
+      });
+    } finally {
+      for (const key of environmentKeys) {
+        const value = previous[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it('rejects an invalid history page before reading private wallet data', async () => {

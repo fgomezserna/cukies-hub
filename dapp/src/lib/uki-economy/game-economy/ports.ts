@@ -3,6 +3,7 @@ import type {
   GameEconomyRuleSnapshot,
   GameEconomySession,
 } from "./types";
+import type { OwnCukieQuotaPeriod } from "../own-cukie/types";
 
 export type GameResourceReservationResult = {
   reservationId: string;
@@ -40,6 +41,8 @@ export type ReserveGameCukieInput = {
   requestHash: string;
   fenceToken: number;
   expiresAt: Date;
+  /** Immutable period captured by Treasure Hunt before server-side selection. */
+  quotaPeriod?: OwnCukieQuotaPeriod;
 };
 
 export type FinishGameResourceInput = {

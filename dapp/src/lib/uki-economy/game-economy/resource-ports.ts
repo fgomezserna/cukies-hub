@@ -298,6 +298,7 @@ export async function reserveServerSelectedCukie(
         idempotencyKey: input.idempotencyKey,
         requestHash: input.requestHash,
         expiresAt: input.expiresAt,
+        ...(input.quotaPeriod ? { quotaPeriod: input.quotaPeriod } : {}),
         now,
       })
     : null;

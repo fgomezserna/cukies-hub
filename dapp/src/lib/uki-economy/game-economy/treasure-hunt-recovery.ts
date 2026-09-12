@@ -1569,17 +1569,26 @@ async function readSnapshot(
     `${session.sessionId}:cukie:release`,
   ];
   const poolEventKeys = ownEventKeys;
-  const ownEpochRead = await readBounded(
-    input.db
-      .collection<OwnCukieEpoch>("game_owned_cukie_epochs")
-      .find({
-        $or: [
-          ...(ownAssignments.length === 1 ? [{ _id: ownAssignments[0].epochId }] : []),
-          { assignmentSessionId: session.sessionId },
-        ],
-      } as Filter<OwnCukieEpoch>),
-    MAX_RECOVERY_ASSIGNMENTS,
-  );
+  const ownEpochFilter = {
+    $or: [
+      ...(ownAssignments.length === 1 ? [{ _id: ownAssignments[0].epochId }] : []),
+      { assignmentSessionId: session.sessionId },
+    ],
+  } as Filter<OwnCukieEpoch>;
+  const [ownLegacyEpochRead, ownPeriodEpochRead] = await Promise.all([
+    readBounded(
+      input.db.collection<OwnCukieEpoch>("game_owned_cukie_epochs").find(ownEpochFilter),
+      MAX_RECOVERY_ASSIGNMENTS,
+    ),
+    readBounded(
+      input.db.collection<OwnCukieEpoch>("game_owned_cukie_period_epochs").find(ownEpochFilter),
+      MAX_RECOVERY_ASSIGNMENTS,
+    ),
+  ]);
+  const ownEpochRead = {
+    values: [...ownLegacyEpochRead.values, ...ownPeriodEpochRead.values],
+    complete: ownLegacyEpochRead.complete && ownPeriodEpochRead.complete,
+  };
   const ownEpoch = ownEpochRead.values.length === 1 ? ownEpochRead.values[0] : null;
   const ownEventsRead = await readBounded(
     input.db

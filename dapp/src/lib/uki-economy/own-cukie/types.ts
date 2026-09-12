@@ -14,8 +14,9 @@ export type OwnCukieEpochStatus =
   | "invalidated";
 
 /**
- * Quota de una tenencia canonica. No tiene recarga temporal: una transferencia
- * genera otro ownershipEventId y, por tanto, otro epoch inmutable.
+ * Quota ligada a una identidad canónica. Los documentos legacy omiten
+ * `periodId` y conservan su semántica lifetime; los ledgers nuevos incluyen
+ * periodo/política y son estables ante cambios de propietario.
  */
 export type OwnCukieEpoch = {
   _id: string;
@@ -32,6 +33,15 @@ export type OwnCukieEpoch = {
   revision: number;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Daily ledgers are stored with a stable asset/period identity. Legacy
+   * ownership epochs intentionally omit these fields and keep their original
+   * lifetime semantics.
+   */
+  periodId?: string;
+  periodStartsAt?: Date;
+  periodEndsAt?: Date;
+  quotaPolicyVersion?: string;
   assignmentSessionId?: string;
   assignmentExpiresAt?: Date;
   invalidatedAt?: Date;
@@ -65,6 +75,11 @@ export type OwnCukieAssignment = {
   expiresAt: Date;
   revision: number;
   updatedAt: Date;
+  /** Present for period-scoped reservations; absent on legacy reservations. */
+  periodId?: string;
+  periodStartsAt?: Date;
+  periodEndsAt?: Date;
+  quotaPolicyVersion?: string;
   terminalAt?: Date;
   terminalReason?: string;
 };
@@ -100,7 +115,28 @@ export type ReserveOwnCukieInput = {
   idempotencyKey: string;
   requestHash: string;
   expiresAt: Date;
+  quotaPeriod?: OwnCukieQuotaPeriod;
   now?: Date;
+};
+
+export type OwnCukieQuotaPeriod = {
+  periodId: string;
+  startsAt: Date;
+  endsAt: Date;
+  policyVersion: string;
+};
+
+export type OwnCukieAvailability = {
+  /** `partial` exposes confirmed capacity while some assets remain unresolved. */
+  status: "ready" | "partial" | "unknown";
+  /** Null when the calendar itself could not be resolved safely. */
+  periodId: string | null;
+  periodStartsAt: Date | null;
+  periodEndsAt: Date | null;
+  /** On `partial`, these are confirmed lower-bound totals only. */
+  totalGamesRemaining: number | null;
+  eligibleCukies: number | null;
+  unknownCukies: number;
 };
 
 export type FinishOwnCukieInput = {

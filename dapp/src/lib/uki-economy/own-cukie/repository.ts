@@ -48,6 +48,18 @@ export interface OwnCukieRepository {
     current: OwnCukieEpoch,
     replacement: OwnCukieEpoch,
   ): Promise<OwnCukieEpoch | null>;
+  /**
+   * Period ledgers live in their own collection so the legacy ownership-epoch
+   * unique index cannot reject a later period for the same asset/event.
+   * Adapters used by legacy tests may omit these methods; the service falls
+   * back to the original epoch methods for those in-memory repositories.
+   */
+  findPeriodEpoch?(epochId: string): Promise<OwnCukieEpoch | null>;
+  insertPeriodEpoch?(epoch: OwnCukieEpoch): Promise<void>;
+  compareAndSetPeriodEpoch?(
+    current: OwnCukieEpoch,
+    replacement: OwnCukieEpoch,
+  ): Promise<OwnCukieEpoch | null>;
   findAssignmentById(assignmentId: string): Promise<OwnCukieAssignment | null>;
   findAssignmentBySessionId(sessionId: string): Promise<OwnCukieAssignment | null>;
   findAssignmentByIdempotencyKey(idempotencyKey: string): Promise<OwnCukieAssignment | null>;
@@ -246,10 +258,13 @@ async function hydrateAssets(
   return documents.flatMap((document) => {
     const assetId = buildCukiesAssetId(document);
     const eventId = ownershipEventId(document) ?? compatibleOwnershipIds.get(assetId) ?? null;
-    if (!eventId) return [];
+    // Keep an inventory row whose ownership history is incomplete in the
+    // snapshot. The availability reader can then surface it as `unknown`
+    // instead of silently turning an unresolved Cukie into zero capacity;
+    // reservation eligibility still rejects the empty event id.
     return [{
       ...normalizeCukiesInventoryDocument(document, byAsset.get(assetId) ?? [], now),
-      ownershipEventId: eventId,
+      ownershipEventId: eventId ?? "",
     } satisfies OwnCukieAssetSnapshot];
   });
 }
@@ -270,6 +285,7 @@ export function createMongoOwnCukieRepository(
   const locks = db.collection<InventoryLockDocument>("nft_asset_locks");
   const chainEvents = db.collection("chain_events");
   const epochs = db.collection<OwnCukieEpoch>("game_owned_cukie_epochs");
+  const periodEpochs = db.collection<OwnCukieEpoch>("game_owned_cukie_period_epochs");
   const assignments = db.collection<OwnCukieAssignment>("game_owned_cukie_assignments");
   const events = db.collection<OwnCukieEvent>("game_owned_cukie_events");
   const options = { session };
@@ -304,6 +320,22 @@ export function createMongoOwnCukieRepository(
     async compareAndSetEpoch(current, replacement) {
       const { _id: _ignored, ...withoutId } = replacement;
       return epochs.findOneAndReplace({
+        _id: current._id,
+        revision: current.revision,
+        status: current.status,
+        gamesRemaining: current.gamesRemaining,
+        ...exactOptionalText("assignmentSessionId", current.assignmentSessionId),
+        ...exactOptionalDate("assignmentExpiresAt", current.assignmentExpiresAt),
+      }, withoutId as OptionalUnlessRequiredId<OwnCukieEpoch>, {
+        ...options,
+        returnDocument: "after",
+      });
+    },
+    findPeriodEpoch: (epochId) => periodEpochs.findOne({ _id: epochId }, options),
+    insertPeriodEpoch: async (epoch) => { await periodEpochs.insertOne(epoch, options); },
+    async compareAndSetPeriodEpoch(current, replacement) {
+      const { _id: _ignored, ...withoutId } = replacement;
+      return periodEpochs.findOneAndReplace({
         _id: current._id,
         revision: current.revision,
         status: current.status,

@@ -415,7 +415,8 @@ queda pendiente y se recupera sin perder esa partida.
 - Para el lanzamiento se permite una sola partida activa simultaneamente por NFT, aunque tenga mas cuota diaria.
 - El limite de concurrencia es una regla backend versionable. Se medira si se asignan Seikus por NFT ocupado pese a quedar cuota antes de aumentarlo.
 
-Partidas disponibles por periodo:
+Partidas disponibles por periodo, tanto con Cukies propios como prestados
+(aclaracion expresa del usuario del 12 de septiembre de 2026):
 
 | Rareza | Original | Segunda generacion |
 | --- | ---: | ---: |
@@ -425,6 +426,15 @@ Partidas disponibles por periodo:
 | Epico | 8 | 4 |
 | Legendario | 10 | 5 |
 | Goat | 12 | 6 |
+
+La capacidad disponible se expresa como el total de partidas que aporta el
+conjunto de Cukies elegibles, descontando los usos consumidos y las reservas
+vigentes. Al jugador se le concede una partida, no un NFT ni toda su capacidad
+diaria. La identidad interna del activo conserva las comprobaciones de
+custodia, la atribucion y la proteccion frente a usos duplicados; no obliga a
+mostrar un contador o selector por Cukie. Por ejemplo, un Goat Original y un
+Comun de Segunda Generacion aportan 13 partidas por periodo antes de consumir
+o reservar ninguna.
 
 ### Formacion y reparto
 
@@ -620,6 +630,21 @@ Uso de creditos:
 
 Uso de Cukies:
 
+- Los Cukies propios usan la misma [matriz diaria del Pool](#cuotas-y-concurrencia).
+  El total propio disponible suma las partidas restantes de todos los Cukies
+  elegibles de la wallet; no es el numero de NFTs ni el saldo de creditos.
+- La capacidad se renueva al comienzo del periodo economico vigente, sin
+  acumular sobrantes: 1800 segundos en staging y un dia economico en produccion.
+  Transferir, vender, recuperar o volver a depositar un NFT no restaura los usos
+  ya consumidos en ese mismo periodo. Las reservas conservan el periodo de
+  origen; un cambio de propietario o custodia no las duplica ni las borra.
+- Antes de jugar se muestra el total de partidas propias restantes, los
+  Cukies elegibles y la proxima renovacion. Un estado no verificable no se
+  presenta como cero. Si solo una parte esta verificada, se muestra su suma
+  como minimo confirmado y el numero de Cukies pendientes de comprobar; los
+  estados ya excluidos no contaminan ese contador por faltar otros datos.
+  Agotar las partidas propias conserva el fallback al
+  Pool/Seiku; no introduce un limite general a partidas con creditos propios.
 - Si el jugador tiene Cukies propios con partidas disponibles, la politica actual los selecciona automaticamente solo cuando el NFT sigue disponible en la wallet y no tiene ningun lock activo.
 - Un Cukie en staking de Cukie Master, en Pool o prestado, listado en Marketplace legacy/V2, en bridge, asignado a otra partida o marcado como unknown no es elegible para una partida nueva. La seleccion vuelve al Pool si no queda otro Cukie propio elegible.
 - Si no tiene Cukies propios disponibles, se asigna un Cukie del pool siguiendo prioridad Original, Segunda Generacion y Seiku.

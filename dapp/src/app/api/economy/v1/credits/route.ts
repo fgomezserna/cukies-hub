@@ -8,10 +8,20 @@ import {
   getCompetitionCreditWalletStatus,
 } from '@/lib/uki-economy/credits';
 import { UkiEconomyError } from '@/lib/uki-economy/errors';
+import {
+  ownCukieService,
+  OWN_CUKIE_DAILY_QUOTA_POLICY_VERSION,
+} from '@/lib/uki-economy/own-cukie';
+import type { OwnCukieAvailability } from '@/lib/uki-economy/own-cukie/types';
+import {
+  getTreasureHuntDailyPeriod,
+} from '@/lib/uki-economy/game-economy/treasure-hunt-policy';
+import { loadEconomyCycleCalendar } from '@/lib/uki-economy/cycle-calendar';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_BODY_BYTES = 16 * 1024;
+const OWN_CUKIE_AVAILABILITY_TIMEOUT_MS = 2_000;
 
 function noStore(response: NextResponse) {
   response.headers.set('Cache-Control', 'private, no-store, max-age=0');
@@ -79,6 +89,62 @@ function mapDomainError(error: UkiEconomyError) {
   }
 }
 
+async function readOwnCukieAvailability(walletAddress: string) {
+  const now = new Date();
+  let period: ReturnType<typeof getTreasureHuntDailyPeriod>;
+  try {
+    period = getTreasureHuntDailyPeriod(now, loadEconomyCycleCalendar());
+  } catch {
+    // A malformed or unavailable calendar must not silently switch to the
+    // production UTC-day period. Keep credits usable and make OWN unknown.
+    return {
+      status: 'unknown' as const,
+      periodId: null,
+      periodStartsAt: null,
+      periodEndsAt: null,
+      totalGamesRemaining: null,
+      eligibleCukies: null,
+      unknownCukies: 0,
+    } satisfies OwnCukieAvailability;
+  }
+  const unknown = (): OwnCukieAvailability => ({
+    status: 'unknown' as const,
+    periodId: period.periodId,
+    periodStartsAt: period.startsAt,
+    periodEndsAt: period.endsAt,
+    totalGamesRemaining: null,
+    eligibleCukies: null,
+    unknownCukies: 0,
+  });
+  try {
+    const availability = ownCukieService.availability({
+      walletAddress,
+      quotaPeriod: {
+        periodId: period.periodId,
+        startsAt: period.startsAt,
+        endsAt: period.endsAt,
+        policyVersion: OWN_CUKIE_DAILY_QUOTA_POLICY_VERSION,
+      },
+      now,
+    });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        availability,
+        new Promise<OwnCukieAvailability>((resolve) => {
+          timeout = setTimeout(() => resolve(unknown()), OWN_CUKIE_AVAILABILITY_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  } catch {
+    // The credit endpoint must stay useful if the optional NFT projection is
+    // unavailable. Unknown is explicit and never represented as zero.
+    return unknown();
+  }
+}
+
 export async function GET(request: NextRequest) {
   const walletAddress = request.nextUrl.searchParams.get('walletAddress')?.trim() ?? null;
   const requestedHistoryPage = historyPage(request);
@@ -86,6 +152,11 @@ export async function GET(request: NextRequest) {
   try {
     await requireWallet(walletAddress);
     const status = await getCompetitionCreditWalletStatus(walletAddress!);
+    // Keep the established credits read path fast for non-Treasure consumers;
+    // the game asks explicitly for the independent OWN resource snapshot.
+    const ownCukie = request.nextUrl.searchParams.get('includeOwnCukie') === '1'
+      ? await readOwnCukieAvailability(walletAddress!)
+      : null;
     const history = await getCompetitionCreditWalletHistory(
       walletAddress!,
       requestedHistoryPage,
@@ -98,7 +169,7 @@ export async function GET(request: NextRequest) {
       nextExpiry: null,
       entries: [],
     }));
-    return noStore(NextResponse.json({ status: 'ok', data: { ...status, history } }));
+    return noStore(NextResponse.json({ status: 'ok', data: { ...status, ownCukie, history } }));
   } catch (error) {
     if (error instanceof Error && error.message === 'INVALID_WALLET') {
       return errorResponse('INVALID_WALLET', 400);

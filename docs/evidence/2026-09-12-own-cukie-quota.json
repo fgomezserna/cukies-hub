@@ -1,0 +1,116 @@
+{
+  "status": "validated-awaiting-deployment",
+  "issue": 412,
+  "pullRequest": 442,
+  "policy": {
+    "version": "own-cukie-daily-v1",
+    "original": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "secondGeneration": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "rarityOrder": [
+      "common",
+      "uncommon",
+      "rare",
+      "epic",
+      "legendary",
+      "goat"
+    ],
+    "aggregate": true,
+    "stagingCycleSeconds": 1800
+  },
+  "validation": {
+    "candidate": "1566c24fc46f9b6e1588ea024528bccea7d934b0",
+    "dappSuites": 272,
+    "dappTests": 2368,
+    "dappTypecheck": "passed",
+    "dappLint": "passed with pre-existing my-cukies-panel dependency warning",
+    "schemaAndIndexTests": 16,
+    "realMongo": "passed on final code; period, ownership, replay, CAS and legacy compatibility verified",
+    "realMongoSourceHashes": [
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/repository.ts",
+        "sha256": "be8f2eafe6c4a899f1acb023f12894b4d4d1c558d757917489d2086d9de290a5",
+        "bytes": 15597
+      },
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/service.ts",
+        "sha256": "cbcf74ecafc3d89fb452485a74710f2a35f3284b4695901eac3784ea0297cb4c",
+        "bytes": 28359
+      },
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/rules.ts",
+        "sha256": "d93279ec4276cf6f5209b69b0f5b106284e6e7e5ede600e844194647699556c5",
+        "bytes": 13399
+      },
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/types.ts",
+        "sha256": "2e35ba19cb5513c38368b119fe7f261b8f5a69b5589126eb88a19c6b7f200e53",
+        "bytes": 3739
+      }
+    ]
+  },
+  "stagePreflight": {
+    "observedAt": "2026-09-12T11:42:44.959Z",
+    "sourceSha": "a7ad71a6d79f8a4d85b5900a3bc853d039aaa40e",
+    "mode": "read-only candidate against staging data; not deployed product",
+    "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "period": {
+      "periodId": "C1800-D:2026-09-12T11:30:00.000Z",
+      "startsAt": "2026-09-12T11:30:00.000Z",
+      "endsAt": "2026-09-12T12:00:00.000Z",
+      "policyVersion": "treasure-hunt-staging-v1"
+    },
+    "observedAvailability": {
+      "status": "unknown",
+      "periodId": "C1800-D:2026-09-12T11:30:00.000Z",
+      "periodStartsAt": "2026-09-12T11:30:00.000Z",
+      "periodEndsAt": "2026-09-12T12:00:00.000Z",
+      "totalGamesRemaining": null,
+      "eligibleCukies": null,
+      "unknownCukies": 7
+    },
+    "confirmedEligibleCukies": 11,
+    "confirmedCapacity": 62,
+    "conclusivelyExcludedRecords": 6,
+    "unverifiedPotentiallyEligibleCukies": 1,
+    "finding": "Unknown metadata on already excluded records hides verified capacity; add truthful partial availability before publishing"
+  },
+  "runtimePreparation": {
+    "at": "2026-09-12T11:39:43.593Z",
+    "database": "cukieshub-new-staging",
+    "createdCollection": "game_owned_cukie_period_epochs",
+    "newIndexes": 3,
+    "historicalRecordsChanged": false
+  },
+  "deployment": null,
+  "correctedStagePreflight": {
+    "observedAt": "2026-09-12T11:57:56.824Z",
+    "sourceSha": "1566c24fc46f9b6e1588ea024528bccea7d934b0",
+    "bundleSha256": "a617d5e9226f25686f1b16549cad6705576ca04f20130ab810b9526017831401",
+    "mode": "read-only candidate against staging data; not deployed product",
+    "availability": {
+      "status": "partial",
+      "periodId": "C1800-D:2026-09-12T11:30:00.000Z",
+      "periodStartsAt": "2026-09-12T11:30:00.000Z",
+      "periodEndsAt": "2026-09-12T12:00:00.000Z",
+      "totalGamesRemaining": 62,
+      "eligibleCukies": 11,
+      "unknownCukies": 1
+    },
+    "database": "cukieshub-new-staging",
+    "calendar": "1800"
+  }
+}

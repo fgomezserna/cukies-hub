@@ -50,6 +50,8 @@ describe('economy indexes', () => {
         'game_economy_resource_bindings:{"reservationIdempotencyKey":1}',
         'game_owned_cukie_epochs:{"epochId":1}',
         'game_owned_cukie_epochs:{"assetId":1,"ownerNormalized":1,"ownershipEventId":1}',
+        'game_owned_cukie_period_epochs:{"epochId":1}',
+        'game_owned_cukie_period_epochs:{"assetId":1,"periodId":1,"quotaPolicyVersion":1}',
         'game_owned_cukie_assignments:{"assignmentId":1}',
         'game_owned_cukie_assignments:{"sessionId":1}',
         'game_owned_cukie_assignments:{"idempotencyKey":1}',
