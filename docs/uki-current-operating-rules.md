@@ -640,7 +640,10 @@ Uso de Cukies:
   origen; un cambio de propietario o custodia no las duplica ni las borra.
 - Antes de jugar se muestra el total de partidas propias restantes, los
   Cukies elegibles y la proxima renovacion. Un estado no verificable no se
-  presenta como cero. Agotar las partidas propias conserva el fallback al
+  presenta como cero. Si solo una parte esta verificada, se muestra su suma
+  como minimo confirmado y el numero de Cukies pendientes de comprobar; los
+  estados ya excluidos no contaminan ese contador por faltar otros datos.
+  Agotar las partidas propias conserva el fallback al
   Pool/Seiku; no introduce un limite general a partidas con creditos propios.
 - Si el jugador tiene Cukies propios con partidas disponibles, la politica actual los selecciona automaticamente solo cuando el NFT sigue disponible en la wallet y no tiene ningun lock activo.
 - Un Cukie en staking de Cukie Master, en Pool o prestado, listado en Marketplace legacy/V2, en bridge, asignado a otra partida o marcado como unknown no es elegible para una partida nueva. La seleccion vuelve al Pool si no queda otro Cukie propio elegible.

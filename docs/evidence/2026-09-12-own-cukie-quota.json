@@ -1,5 +1,5 @@
 {
-  "status": "preflight-correction-in-progress",
+  "status": "validated-awaiting-deployment",
   "issue": 412,
   "pullRequest": 442,
   "policy": {
@@ -32,13 +32,35 @@
     "stagingCycleSeconds": 1800
   },
   "validation": {
-    "candidate": "d4b9653c326853674851356923ad21e0b230006b",
+    "candidate": "1566c24fc46f9b6e1588ea024528bccea7d934b0",
     "dappSuites": 272,
-    "dappTests": 2363,
+    "dappTests": 2368,
     "dappTypecheck": "passed",
     "dappLint": "passed with pre-existing my-cukies-panel dependency warning",
     "schemaAndIndexTests": 16,
-    "realMongo": "passed; file hashes match candidate"
+    "realMongo": "passed on final code; period, ownership, replay, CAS and legacy compatibility verified",
+    "realMongoSourceHashes": [
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/repository.ts",
+        "sha256": "be8f2eafe6c4a899f1acb023f12894b4d4d1c558d757917489d2086d9de290a5",
+        "bytes": 15597
+      },
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/service.ts",
+        "sha256": "cbcf74ecafc3d89fb452485a74710f2a35f3284b4695901eac3784ea0297cb4c",
+        "bytes": 28359
+      },
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/rules.ts",
+        "sha256": "d93279ec4276cf6f5209b69b0f5b106284e6e7e5ede600e844194647699556c5",
+        "bytes": 13399
+      },
+      {
+        "path": "dapp/src/lib/uki-economy/own-cukie/types.ts",
+        "sha256": "2e35ba19cb5513c38368b119fe7f261b8f5a69b5589126eb88a19c6b7f200e53",
+        "bytes": 3739
+      }
+    ]
   },
   "stagePreflight": {
     "observedAt": "2026-09-12T11:42:44.959Z",
@@ -73,5 +95,22 @@
     "newIndexes": 3,
     "historicalRecordsChanged": false
   },
-  "deployment": null
+  "deployment": null,
+  "correctedStagePreflight": {
+    "observedAt": "2026-09-12T11:57:56.824Z",
+    "sourceSha": "1566c24fc46f9b6e1588ea024528bccea7d934b0",
+    "bundleSha256": "a617d5e9226f25686f1b16549cad6705576ca04f20130ab810b9526017831401",
+    "mode": "read-only candidate against staging data; not deployed product",
+    "availability": {
+      "status": "partial",
+      "periodId": "C1800-D:2026-09-12T11:30:00.000Z",
+      "periodStartsAt": "2026-09-12T11:30:00.000Z",
+      "periodEndsAt": "2026-09-12T12:00:00.000Z",
+      "totalGamesRemaining": 62,
+      "eligibleCukies": 11,
+      "unknownCukies": 1
+    },
+    "database": "cukieshub-new-staging",
+    "calendar": "1800"
+  }
 }
