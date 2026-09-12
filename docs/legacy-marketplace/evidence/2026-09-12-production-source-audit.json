@@ -156,9 +156,79 @@
     "thinking": "max",
     "worktree": "/Users/fgomezserna/.codex/worktrees/a3e8/cukies-hub",
     "branch": "codex/stage-legacy-replica",
-    "observedStatus": "active",
-    "nextDeliverable": "Collection manifest, coherent source cut, sanitization allowlist and idempotent dry-run before root-reviewed staging writes.",
+    "observedStatus": "active-correction-after-root-review",
+    "nextDeliverable": "Correct reviewed safety and consumer compatibility failures, then provide a new SHA. Real source export and destination dry-run remain unexecuted.",
     "automationId": "coordinar-r-plica-legacy-staging",
-    "verificationBoundary": "Task created and active scope confirmed; no replica load or functional parity claimed yet. Original document12 coordination deleted independently."
+    "verificationBoundary": "PR454 is draft; validation CI passed but root review rejected applying this candidate. Only local plan/tests and isolated in-memory review reproductions ran. No remote export, data load, projection, merge or deploy claimed.",
+    "updatedAt": "2026-09-12T18:00:50.571889+00:00",
+    "pr": "https://github.com/fgomezserna/cukies-hub/pull/454",
+    "reviewedHead": "c41995eab2bec2ff73d75a0f0c5ac3d67e009666",
+    "codeReview": {
+      "reviewedAt": "2026-09-12T18:00:50.571889+00:00",
+      "decision": "do-not-apply-until-corrected-and-reviewed",
+      "independentReviewer": "Astra Max, isolated Mongo simulation, no remote operations",
+      "reportedChecks": {
+        "replicaTests": "9/9 passed",
+        "stagingGuardTests": "107/107 passed"
+      },
+      "observedCi": {
+        "runId": 34709434732,
+        "validateDelivery": "SUCCESS",
+        "buildPushDeploy": "SKIPPED"
+      },
+      "findings": [
+        {
+          "id": "R1",
+          "priority": "P1",
+          "issue": "Load drops source _id; two identical applies insert duplicates; functional comparison is asymmetric."
+        },
+        {
+          "id": "R2",
+          "priority": "P1",
+          "issue": "Bundle accepts missing chain cuts, invalid manifest digest, false row counts and mixed snapshot IDs; file hashes and snapshot publication are not bound."
+        },
+        {
+          "id": "R3",
+          "priority": "P1",
+          "issue": "Selection is not bound to the reviewed destination fingerprint and updates lack compare-and-set, allowing later staging writes to be overwritten."
+        },
+        {
+          "id": "R4",
+          "priority": "P1",
+          "issue": "BSC chainId97 is accepted as56; existing target identity is not checked before mutation."
+        },
+        {
+          "id": "R5",
+          "priority": "P1",
+          "issue": "URL credentials and signed query parameters survive scalar field sanitization."
+        },
+        {
+          "id": "R6",
+          "priority": "P2",
+          "issue": "ObjectId identity changes on roundtrip and Date is persisted as an extended-JSON object."
+        },
+        {
+          "id": "C1",
+          "priority": "P2",
+          "issue": "Projected TRON NFT chainId undefined is incompatible with breeding identity guard requiring explicit null."
+        },
+        {
+          "id": "C2",
+          "priority": "P2",
+          "issue": "Projected points txId is not read by transactionId/txHash consumer; scalar parent/child references are omitted by object-only allowlist."
+        },
+        {
+          "id": "C3",
+          "priority": "review-required",
+          "issue": "Reconcile canonical NFT identity across old tokenId-based _id and canonical _id before inserting; prove detail, relation and history readers remain compatible without duplicate logical NFTs."
+        }
+      ],
+      "retainedGuards": [
+        "Simulated dry-run made zero writes.",
+        "Imported worker events remain separate from verified chain_events."
+      ],
+      "correctionSentToTask": true,
+      "remoteWrites": false
+    }
   }
 }
