@@ -1,5 +1,5 @@
 {
-  "status": "validated-awaiting-deployment",
+  "status": "deployed-o1; separate-ranking-diagnostic-open",
   "issue": 412,
   "pullRequest": 442,
   "policy": {
@@ -93,9 +93,39 @@
     "database": "cukieshub-new-staging",
     "createdCollection": "game_owned_cukie_period_epochs",
     "newIndexes": 3,
-    "historicalRecordsChanged": false
+    "historicalRecordsChanged": false,
+    "futureEnvironmentPrerequisite": "Before routing new web code in another environment, provision game_owned_cukie_period_epochs and its three canonical indexes from GAME_ECONOMY_INDEX_DEFINITIONS. Preserve old collections; no historical conversion is required."
   },
-  "deployment": null,
+  "deployment": {
+    "releaseSha": "44ff9e7c00a19b0bbb1537404d219bed8bffb52e",
+    "mergedAt": "2026-09-12T12:02:48Z",
+    "ciRunId": 34692607989,
+    "ciUrl": "https://github.com/fgomezserna/cukies-hub/actions/runs/34692607989",
+    "verified": true,
+    "scope": "O1 deployment and read-only availability; not a global economy sign-off",
+    "ciConclusion": "success",
+    "ciCompletedAt": "2026-09-12T12:22:11Z",
+    "observedAt": "2026-09-12T12:24:13.263999+00:00",
+    "healthHttpStatus": 200,
+    "readyHttpStatus": 200,
+    "productSha": "44ff9e7c00a19b0bbb1537404d219bed8bffb52e",
+    "journal": "clean",
+    "productionSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+    "protectedRuntime": {
+      "baselineCount": 82,
+      "changed": []
+    },
+    "components": {
+      "dapp": {
+        "sourceSha": "44ff9e7c00a19b0bbb1537404d219bed8bffb52e",
+        "digest": "sha256:33e3d9cf5406e6ab4205dab7429fa1b2985f45920fc287614cae6c711d35fb0f"
+      },
+      "chain-indexer": {
+        "sourceSha": "44ff9e7c00a19b0bbb1537404d219bed8bffb52e",
+        "digest": "sha256:140f10736177b7eb5b7acfa013531b2eeb4353a4b63d13a59a2251741fd14524"
+      }
+    }
+  },
   "correctedStagePreflight": {
     "observedAt": "2026-09-12T11:57:56.824Z",
     "sourceSha": "1566c24fc46f9b6e1588ea024528bccea7d934b0",
@@ -112,5 +142,120 @@
     },
     "database": "cukieshub-new-staging",
     "calendar": "1800"
+  },
+  "liveAvailability": {
+    "observedAt": "2026-09-12T12:24:10.936Z",
+    "sourceSha": "44ff9e7c00a19b0bbb1537404d219bed8bffb52e",
+    "bundleSha256": "a617d5e9226f25686f1b16549cad6705576ca04f20130ab810b9526017831401",
+    "mode": "read-only deployed-source service against live staging data and web calendar; not an authenticated browser API request",
+    "availability": {
+      "status": "partial",
+      "periodId": "C1800-D:2026-09-12T12:00:00.000Z",
+      "periodStartsAt": "2026-09-12T12:00:00.000Z",
+      "periodEndsAt": "2026-09-12T12:30:00.000Z",
+      "totalGamesRemaining": 62,
+      "eligibleCukies": 11,
+      "unknownCukies": 1
+    },
+    "stagingCycleSeconds": 1800
+  },
+  "visualVerification": {
+    "url": "https://cukieshub.eurekand.com/games/treasure-hunt",
+    "servedSourceSha": "44ff9e7c00a19b0bbb1537404d219bed8bffb52e",
+    "desktop": "Own Cukies metric visible beside credits",
+    "mobile": {
+      "cssWidth": 384,
+      "scrollWidth": 384,
+      "ownMetricVisible": true
+    },
+    "browserViewportRestored": true,
+    "walletState": "disconnected",
+    "authenticatedPositiveDisplay": "covered by component/API/hook tests; not observed in browser",
+    "personalGameOrSignatureExecuted": false
+  },
+  "environmentPostflight": {
+    "ok": false,
+    "observedAt": "2026-09-12T12:24:13.263999+00:00",
+    "failures": [
+      "HEARTBEAT_STATUS_ranking"
+    ],
+    "heartbeats": {
+      "game": {
+        "_id": "scheduler-heartbeat:coolify-staging-primary",
+        "schedulerId": "coolify-staging-primary",
+        "status": "success",
+        "lastAttemptAt": "2026-09-12T12:23:57.003Z",
+        "lastSuccessAt": "2026-09-12T12:23:57.003Z",
+        "updatedAt": "2026-09-12T12:23:57.003Z",
+        "createdAt": "2026-09-11T19:40:25.070Z",
+        "consecutiveFailures": 0
+      },
+      "pool": {
+        "_id": "scheduler-heartbeat:coolify-staging-primary",
+        "schedulerId": "coolify-staging-primary",
+        "status": "success",
+        "lastAttemptAt": "2026-09-12T12:23:57.221Z",
+        "lastSuccessAt": "2026-09-12T12:23:57.496Z",
+        "updatedAt": "2026-09-12T12:23:57.496Z",
+        "createdAt": "2026-09-11T19:40:25.301Z",
+        "consecutiveFailures": 0
+      },
+      "ranking": {
+        "_id": "scheduler-heartbeat:coolify-staging-primary",
+        "schedulerId": "coolify-staging-primary",
+        "status": "error",
+        "lastAttemptAt": "2026-09-12T12:23:56.798Z",
+        "lastSuccessAt": "2026-09-12T10:31:40.183Z",
+        "lastFailureAt": "2026-09-12T12:23:56.798Z",
+        "updatedAt": "2026-09-12T12:23:56.798Z",
+        "createdAt": "2026-09-11T19:40:24.482Z",
+        "consecutiveFailures": 110,
+        "lastErrorCode": "WEEKLY_RANKING_TICK_HTTP_409"
+      },
+      "accounting": {
+        "_id": "scheduler-heartbeat:coolify-staging-primary",
+        "schedulerId": "coolify-staging-primary",
+        "status": "success",
+        "lastAttemptAt": "2026-09-12T12:23:56.648Z",
+        "lastSuccessAt": "2026-09-12T12:23:56.648Z",
+        "updatedAt": "2026-09-12T12:23:56.648Z",
+        "createdAt": "2026-09-11T19:40:24.438Z",
+        "consecutiveFailures": 0
+      },
+      "publisher": {
+        "_id": "scheduler-heartbeat:coolify-staging-primary",
+        "schedulerId": "coolify-staging-primary",
+        "schedulerKind": "reward_batch_publisher",
+        "status": "success",
+        "lastAttemptAt": "2026-09-12T12:24:04.094Z",
+        "lastSuccessAt": "2026-09-12T12:24:04.439Z",
+        "lastFailureAt": "2026-09-11T21:42:34.071Z",
+        "updatedAt": "2026-09-12T12:24:04.439Z",
+        "createdAt": "2026-08-20T20:46:33.107Z",
+        "consecutiveFailures": 0,
+        "result": {
+          "status": "idle",
+          "completedAt": "2026-09-12T12:24:04.094Z"
+        }
+      }
+    },
+    "rankingRun": {
+      "status": "success",
+      "startedAt": "2026-09-12T10:31:40.113Z",
+      "endedAt": "2026-09-12T10:31:40.147Z",
+      "result": {
+        "status": "waiting",
+        "periodId": null,
+        "runId": null,
+        "manifestId": null,
+        "periodsProcessed": 0,
+        "closures": [],
+        "reason": "FORWARD_PERIOD_NOT_READY",
+        "readyAt": "2026-09-12T10:32:30.000Z"
+      }
+    },
+    "followupIssue": 418,
+    "followupThread": "01a09068-e5f9-7a01-838b-82f98da5a5a2",
+    "state": "bounded read-only diagnostic reactivated; no repair applied"
   }
 }
