@@ -594,6 +594,7 @@ export function CukieMasterNftVaultPanel() {
     let registeredProjection = false;
     for (const operation of Object.values(pendingByAsset)) {
       if (operation.phase !== 'syncing_projection' || operation.action === 'approval') continue;
+      if (masterProjectionMatchesPendingOperation(operation, statusResource.data)) continue;
       registerNftExpectation(operation);
       registeredProjection = true;
     }
