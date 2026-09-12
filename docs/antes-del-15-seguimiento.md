@@ -226,7 +226,7 @@ Modelo de las siete: **Luna Max**, con revisión e integración
 de **Astra Max** en la tarea raíz `01a07aec-6bc1-7203-8f43-357ed4b8931c`.
 Último cambio de producto integrado y servido en staging: `52684bb822cf6c7d4cacabe989e94321d3b6c7ff` (PR437);
 verificación live: 2026-09-12T00:08:00.532713+00:00. La entrega documental
-PR438 tiene SHA `59fdb079390ca21c0801a06896a70f040eb4d3d4` y conserva las imágenes;
+PR439 tiene SHA `fcfd73b3f784362ce9f4b16383c710743df370ad` y conserva las imágenes;
 main `d1a71495f83d16f6b22425f52e05ec5a2e8ea191` (PR426).
 Producción: deploy1534 terminado a las14:01:08UTC. Staging: CI34607972412
 correcto y postflight14:16UTC con readiness200, journal limpio, diez workers
@@ -268,6 +268,18 @@ run, audit y contabilidad semanal. Los siete cierres diarios están incluidos.
 El periodo está vacío: cero participantes, ganadores, asignaciones y claims;
 no acredita todavía una recompensa personal o su cobro. [Evidencia y límites](evidence/2026-09-11-doc11-forward-rewards-delivery.json).
 
+**Seguimiento del segundo cierre, 12 de septiembre, 03:34 UTC.** Los ticks
+03:30–03:32 registraron tres `DOMAIN_CONFLICT`; el siguiente cerró el periodo
+`C1800-W:2026-09-12T00:00:00.000Z` a las03:33. La espera introducida en PR435
+solo contempla el primer periodo forward. Se prepara una corrección acotada
+en `codex/doc11-weekly-close-wait` para esperar también el retardo de cada
+candidato posterior, conservando validaciones, frontera y calendario. El
+diagnóstico de solo lectura confirma la coincidencia con el retardo de150s;
+el cuerpo exacto del409 no queda registrado en el scheduler. La regresión y
+el parche están validados: dos suites focales/16tests, 272suites/2358tests de
+DApp, lint y tipos correctos. La raíz acepta el cambio; integración y
+despliegue pendientes. [Diagnóstico y validación](evidence/2026-09-11-doc11-forward-rewards-delivery.json).
+
 ### Estado por observación del documento
 
 Tabla canónica de las18observaciones; se conserva completa en cada feedback.
@@ -277,7 +289,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | --- | --- | --- | --- |
 | R1 | Intentos en Resumen | Desplegado · PR430 | Comprobar con sesión iniciada. |
 | R2 | Avisos en Resumen | Corrección de fuente desplegada · PR432 | Comprobar el resultado visual autenticado. |
-| J1 | Bote en Jugar | PR435 desplegada; primer ranking semanal vacío sellado, íntegro y sin duplicados · 12-Sep00:12UTC | Comprobar bote y recorrido de una partida nueva. |
+| J1 | Bote en Jugar | Espera de cada periodo forward corregida y validada · 272suites/2358tests | Integrar y desplegar; después comprobar bote y partida nueva. |
 | J2 | Alias | Desplegado · PR429 | Guardar y recargar con sesión. |
 | J3 | Reparto | Lector canónico corregido y desplegado · PR43752684bb8 ·21:47UTC | Validación autenticada del reparto de una partida nueva. |
 | M1 | Master tras retirar del Pool | Desplegado · PR425 | Operación posterior al parche y convergencia autenticada. |

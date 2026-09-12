@@ -584,6 +584,7 @@ export class WeeklyRankingService {
       const firstEligibleStart = forwardActivationAt
         ? firstTreasureHuntFullPeriodStartAtOrAfter(forwardActivationAt, "weekly", calendar)
         : null;
+      const forwardReadyDelayMs = calendar ? economyCycleDelayMs(2, calendar) : 14 * 60 * 60_000;
       const firstEligiblePeriod = firstEligibleStart
         ? getIsoWeekPeriod(firstEligibleStart, calendar)
         : null;
@@ -597,8 +598,7 @@ export class WeeklyRankingService {
         }
         assertWeeklyRankingRule(firstEligibleRule, firstEligiblePeriod.start);
         const readyAt = new Date(
-          firstEligiblePeriod.endExclusive.getTime()
-          + (calendar ? economyCycleDelayMs(2, calendar) : 14 * 60 * 60_000),
+          firstEligiblePeriod.endExclusive.getTime() + forwardReadyDelayMs,
         );
         if (readyAt.getTime() > now.getTime()) {
           return {
@@ -620,7 +620,22 @@ export class WeeklyRankingService {
         if (coveringRule) {
           latestCovered = cursor;
           const state = await repository.findPeriodState(cursor.id);
-          if (!state) return cursor;
+          if (!state) {
+            if (firstEligibleStart) {
+              const readyAt = new Date(cursor.endExclusive.getTime() + forwardReadyDelayMs);
+              if (readyAt.getTime() > now.getTime()) {
+                return {
+                  status: "waiting",
+                  reason: "FORWARD_PERIOD_NOT_READY",
+                  periodId: null,
+                  runId: null,
+                  manifestId: null,
+                  readyAt,
+                } satisfies WeeklyRankingForwardWaitingResult;
+              }
+            }
+            return cursor;
+          }
         }
         cursor = getIsoWeekPeriod(new Date(cursor.endExclusive.getTime() + 1), calendar);
       }
