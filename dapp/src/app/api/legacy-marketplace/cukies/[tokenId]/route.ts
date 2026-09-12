@@ -10,9 +10,13 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   const { tokenId } = await context.params;
-  const item = await getLegacyMarketplaceCuki(tokenId);
+  const item = await getLegacyMarketplaceCuki(tokenId, {
+    network: request.nextUrl.searchParams.get('network') ?? undefined,
+    chainId: request.nextUrl.searchParams.get('chainId') ?? undefined,
+    collection: request.nextUrl.searchParams.get('collection') ?? undefined,
+  });
 
   if (!item) {
     return NextResponse.json(

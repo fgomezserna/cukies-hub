@@ -110,6 +110,8 @@ export type LegacyMarketplaceListParams = {
   type?: string;
   generation?: string;
   owner?: string;
+  chainId?: number | string;
+  collection?: string;
   sort?: string;
   marketplaceOnly?: boolean;
   includeFacets?: boolean;
@@ -119,6 +121,8 @@ export type LegacyMarketplaceListParams = {
 export type LegacyBreedingCandidatesParams = {
   owner?: string;
   network?: string;
+  chainId?: number | string;
+  collection?: string;
   maxBreeds?: number;
   limit?: number;
 };
@@ -137,6 +141,8 @@ export type LegacyBreedingReadStatus = 'verified' | 'partial' | 'unknown';
 export type LegacyCompletedBreedsParams = {
   wallets?: string[];
   network?: string;
+  chainId?: number | string;
+  collection?: string;
   limit?: number;
   offset?: number;
 };
@@ -154,6 +160,8 @@ export type LegacyCompletedBreedsResponse = {
 export type LegacyCukiePointsParams = {
   wallets?: string[];
   network?: string;
+  chainId?: number | string;
+  collection?: string;
   type?: string;
   limit?: number;
   offset?: number;

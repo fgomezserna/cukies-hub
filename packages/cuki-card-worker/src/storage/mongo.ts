@@ -11,7 +11,7 @@ import type {
   GenerationResult,
 } from '../types.js';
 import { canonicalAssetIdentity, validateAssetIdentityContext } from '../identity.js';
-import { assertCardWorkerSourceConfig, normalizeCukiSourceDocument, normalizeCukiSourceForRead, sourceCandidateFilter, sourceDocumentFilter, sourceTokenIdFilter } from '../source.js';
+import { assertCardWorkerSourceConfig, legacySourceIdentityFilter, normalizeCukiSourceDocument, normalizeCukiSourceForRead, sourceCandidateFilter, sourceDocumentFilter, sourceTokenIdFilter } from '../source.js';
 
 const validTypeValues = [1, 2, 3, 4, 5, 6, '1', '2', '3', '4', '5', '6'];
 const validGenerationValues = [1, 2, '1', '2'];
@@ -134,6 +134,7 @@ export class CardWorkerStore {
     return {
       ...(tokenId !== undefined ? { _id: tokenId } : {}),
       $and: [
+        ...(this.config.sourceFormat === 'legacy' ? [legacySourceIdentityFilter()] : []),
         ...(metadataFilter.$and ?? []),
         ...revisionFilter,
         {
@@ -272,7 +273,10 @@ export class CardWorkerStore {
   }
 
   private leaseFilter(claimed: ClaimedCuki): Filter<CukiDocument> {
-    return buildCardImageLeaseFilter(claimed._id, claimed.lease);
+    const leaseFilter = buildCardImageLeaseFilter(claimed._id, claimed.lease);
+    return this.config.sourceFormat === 'legacy'
+      ? { $and: [leaseFilter, legacySourceIdentityFilter()] }
+      : leaseFilter;
   }
 
   async markGenerated(claimed: ClaimedCuki, result: GenerationResult) {

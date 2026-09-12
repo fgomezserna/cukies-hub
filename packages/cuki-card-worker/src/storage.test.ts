@@ -18,7 +18,7 @@ const config: CardWorkerConfig = {
 
 const legacyConfig: CardWorkerConfig = {
   ...config,
-  dbName: 'cukies-legacy-staging',
+  dbName: 'cukieshub-new-staging',
   sourceFormat: 'legacy',
   legacyStagingEnabled: true,
 };
@@ -150,7 +150,7 @@ describe('contexto Compose indexed hasta la reclamación real', () => {
     assert.throws(() => getCardWorkerConfig(), /requiere/);
     process.env.CARD_WORKER_SOURCE_FORMAT = 'legacy';
     process.env.CARD_WORKER_LEGACY_STAGING_ENABLED = 'true';
-    process.env.CARD_WORKER_DB_NAME = 'cukies-legacy-staging';
+    process.env.CARD_WORKER_DB_NAME = 'cukieshub-new-staging';
     assert.equal(getCardWorkerConfig().sourceIdentity, null, 'RAWlegacy never inherits indexed context');
     process.env.CARD_WORKER_SOURCE_FORMAT = 'indexed';
     process.env.CARD_WORKER_DB_NAME = 'cukieshub-new';

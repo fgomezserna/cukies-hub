@@ -5,6 +5,8 @@ import {
   assertCardWorkerSourceConfig,
   LEGACY_STAGING_DB_NAME,
   normalizeCukiSourceDocument,
+  legacySourceIdentityFilter,
+  sourceCandidateFilter,
   sourceDocumentFilter,
   sourceTokenIdFilter,
 } from './source.js';
@@ -72,10 +74,45 @@ describe('legacy source adapter', () => {
       /identidad canónica inválida/,
     );
   });
+
+  it('mantiene BSC legacy 56 y TRON, pero nunca reinterpreta una fila indexada BSC 97', () => {
+    assert.doesNotThrow(() => normalizeCukiSourceDocument({
+      ...baseLegacy,
+      chainId: 56,
+      collectionAddressNormalized: '0x0DBDEBCC62F11005BF434ABFad74564E896aC861',
+    }, 'legacy'));
+    assert.doesNotThrow(() => normalizeCukiSourceDocument({
+      ...baseLegacy,
+      _id: 1_000_000_000_001,
+      network: 'TRON',
+      chainId: null,
+      collectionAddressNormalized: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
+    }, 'legacy'));
+    assert.throws(() => normalizeCukiSourceDocument({
+      ...baseLegacy,
+      _id: 98_000_001,
+      chainId: 97,
+      collectionAddressNormalized: '0xd4c7b16db234d7f62ba6a8f30153faf85feabec8',
+    }, 'legacy'), /chainId|collection/);
+    assert.throws(() => normalizeCukiSourceDocument({
+      ...baseLegacy,
+      _id: 98_000_002,
+      chainId: 56,
+      collectionAddressNormalized: '0xd4c7b16db234d7f62ba6a8f30153faf85feabec8',
+    }, 'legacy'), /collection/);
+  });
+
+  it('incluye el predicado de identidad en la selección de candidatos legacy', () => {
+    const filter = sourceCandidateFilter('legacy');
+    assert.ok('$and' in filter);
+    assert.equal(filter.$and?.length, 2);
+    const identity = legacySourceIdentityFilter();
+    assert.equal(identity.$or?.length, 2);
+  });
 });
 
 describe('legacy source guard', () => {
-  it('requires explicit staging mode and the dedicated staging database', () => {
+  it('requires explicit staging mode and the unified staging database', () => {
     assert.throws(
       () => assertCardWorkerSourceConfig({
         sourceFormat: 'legacy',
@@ -88,7 +125,7 @@ describe('legacy source guard', () => {
       () => assertCardWorkerSourceConfig({
         sourceFormat: 'legacy',
         legacyStagingEnabled: true,
-        dbName: 'cukieshub-new-staging',
+        dbName: 'cukies-legacy-staging',
       }),
       /sólo permite/,
     );

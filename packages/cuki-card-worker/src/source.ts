@@ -8,7 +8,7 @@ import type {
 } from './types.js';
 import { canonicalAssetIdentity, validateAssetIdentityContext } from './identity.js';
 
-export const LEGACY_STAGING_DB_NAME = 'cukies-legacy-staging';
+export const LEGACY_STAGING_DB_NAME = 'cukieshub-new-staging';
 
 export const LEGACY_SOURCE_CONTEXTS = {
   BSC: {
@@ -68,6 +68,45 @@ function sameLegacyCollection(network: string, value: unknown) {
     : normalized === LEGACY_SOURCE_CONTEXTS.TRON.collectionAddressNormalized;
 }
 
+function identityFieldClause(field: string, values: Array<unknown>) {
+  return {
+    $or: [
+      { [field]: { $exists: false } },
+      { [field]: null },
+      { [field]: '' },
+      ...values.map((value) => ({ [field]: value })),
+    ],
+  };
+}
+
+function legacyIdentityClause(network: 'BSC' | 'TRON') {
+  const context = LEGACY_SOURCE_CONTEXTS[network];
+  const collection = network === 'BSC'
+    ? new RegExp(`^${context.collectionAddressNormalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+    : context.collectionAddressNormalized;
+  return {
+    network: new RegExp(`^${network}$`, 'i'),
+    $and: [
+      identityFieldClause('chain', [new RegExp(`^${network}$`, 'i')]),
+      identityFieldClause('chainId', network === 'BSC' ? [56, '56'] : []),
+      ...(['collection', 'collectionAddress', 'collectionAddressNormalized'] as const)
+        .map((field) => identityFieldClause(field, [collection])),
+    ],
+  };
+}
+
+/**
+ * Query boundary for the opt-in legacy worker. The unified staging database
+ * also contains indexed BSC/97 documents, so numeric _id alone is not a safe
+ * source selector. Historical legacy rows may omit chainId/collection; any
+ * explicit foreign identity is rejected here and again during normalization.
+ */
+export function legacySourceIdentityFilter(): Filter<CukiDocument> {
+  return {
+    $or: [legacyIdentityClause('BSC'), legacyIdentityClause('TRON')],
+  };
+}
+
 export function normalizeCukiSourceDocument(
   document: CukiDocument,
   sourceFormat: CardWorkerSourceFormat,
@@ -86,6 +125,13 @@ export function normalizeCukiSourceDocument(
     throw new CukiSourceValidationError(`Legacy network no es BSC/TRON para ${tokenId}.`);
   }
 
+  if (document.chain !== undefined && document.chain !== null && document.chain !== '') {
+    const declaredChain = normalizedNetwork(document.chain);
+    if (declaredChain !== network) {
+      throw new CukiSourceValidationError(`Legacy identidad canónica inválida: chain no coincide con network para ${tokenId}.`);
+    }
+  }
+
   const declaredTokenId = document.tokenId === undefined || document.tokenId === null
     ? null
     : decimalTokenId(document.tokenId);
@@ -94,13 +140,15 @@ export function normalizeCukiSourceDocument(
   }
 
   const context = contextForNetwork(network);
-  if (!sameLegacyCollection(network, document.collectionAddressNormalized)) {
-    throw new CukiSourceValidationError(`Legacy collection no coincide con TOKEN ${network} para ${tokenId}.`);
+  for (const collection of [document.collection, document.collectionAddress, document.collectionAddressNormalized]) {
+    if (!sameLegacyCollection(network, collection)) {
+      throw new CukiSourceValidationError(`Legacy collection no coincide con TOKEN ${network} para ${tokenId}.`);
+    }
   }
-  if (network === 'BSC' && document.chainId !== undefined && document.chainId !== 56) {
+  if (network === 'BSC' && document.chainId !== undefined && document.chainId !== null && document.chainId !== 56 && document.chainId !== '56') {
     throw new CukiSourceValidationError(`Legacy chainId no coincide con BSC 56 para ${tokenId}.`);
   }
-  if (network === 'TRON' && document.chainId !== undefined && document.chainId !== null) {
+  if (network === 'TRON' && document.chainId !== undefined && document.chainId !== null && document.chainId !== '') {
     throw new CukiSourceValidationError(`Legacy TRON no admite chainId EVM para ${tokenId}.`);
   }
 
@@ -110,6 +158,7 @@ export function normalizeCukiSourceDocument(
     network,
     ...('chainId' in context ? { chainId: context.chainId } : { chainId: undefined }),
     collectionAddressNormalized: context.collectionAddressNormalized,
+    collectionAddress: context.collectionAddressNormalized,
   };
   if (!canonicalAssetIdentity(identityDocument, context)) {
     throw new CukiSourceValidationError(`Legacy identidad canónica inválida para ${tokenId}.`);
@@ -167,9 +216,14 @@ export function sourceTokenIdFilter(
 export function sourceCandidateFilter(sourceFormat: CardWorkerSourceFormat): Filter<CukiDocument> {
   if (sourceFormat === 'indexed') return {};
   return {
-    $or: [
-      { _id: { $type: 'number' } },
-      { _id: { $type: 'string', $regex: /^(0|[1-9][0-9]*)$/ } },
+    $and: [
+      {
+        $or: [
+          { _id: { $type: 'number' } },
+          { _id: { $type: 'string', $regex: /^(0|[1-9][0-9]*)$/ } },
+        ],
+      },
+      legacySourceIdentityFilter(),
     ],
   } as Filter<CukiDocument>;
 }
