@@ -204,7 +204,7 @@ type BackfillManifestItem = {
   legacyTokenId: string;
   network?: string;
   chain?: string;
-  chainId?: number;
+  chainId?: number | string | null;
   collectionAddressNormalized?: string;
   previousImageHost: string | null;
   previousImageUrl: string | null;

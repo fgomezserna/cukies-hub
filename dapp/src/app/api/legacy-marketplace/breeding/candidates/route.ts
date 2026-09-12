@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
   const response = await listLegacyBreedingCandidates({
     owner: searchParams.get('owner') ?? undefined,
     network: searchParams.get('network') ?? undefined,
+    chainId: searchParams.get('chainId') ?? undefined,
+    collection: searchParams.get('collection') ?? undefined,
     maxBreeds: maxBreeds !== null ? Number(maxBreeds) : undefined,
     limit: Number(searchParams.get('limit') ?? 60),
   });

@@ -1,3 +1,4 @@
+import { buildLegacyMarketplaceIdentityFilter } from './identity';
 import type { LegacyMarketplaceLiveState } from './live-marketplace';
 import type { LegacyMarketplaceCukiItem } from './types';
 
@@ -30,6 +31,7 @@ export function buildLegacyMarketplaceReconciliationCasFilter(
     state: exactSnapshotValue(snapshot.state),
     priceOriginal: exactSnapshotValue(snapshot.priceOriginal),
     marketplaceReconciliationFingerprint: exactSnapshotValue(snapshot.fingerprint),
+    $and: [buildLegacyMarketplaceIdentityFilter(snapshot.network)],
   };
 }
 

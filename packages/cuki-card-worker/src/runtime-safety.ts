@@ -12,7 +12,7 @@ export class StorageCapacityError extends Error {}
 
 export async function assertStorageCapacity(config: CardWorkerConfig) {
   if (!config.capacityFile) {
-    if (['cukieshub-new-staging', 'cukies-legacy-staging'].includes(config.dbName)) {
+    if (config.dbName === 'cukieshub-new-staging') {
       throw new StorageCapacityError('CARD_STORAGE_HEARTBEAT_REQUIRED');
     }
     return;

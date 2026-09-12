@@ -53,7 +53,7 @@ describe('immutable card uploads', () => {
   it('limita el upload legacy al bucket y origen de staging confirmados', () => {
     const legacy = {
       ...config,
-      dbName: 'cukies-legacy-staging',
+      dbName: 'cukieshub-new-staging',
       sourceFormat: 'legacy' as const,
       legacyStagingEnabled: true,
       s3Bucket: 'cukies-cards-staging',

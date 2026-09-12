@@ -282,7 +282,10 @@ export default async function MarketplaceDetailPage({
   const { tokenId } = await params;
   const identity = await searchParams;
   if (identity.source && identity.source !== 'legacy') notFound();
-  const indexedCuki = await getLegacyMarketplaceCuki(tokenId);
+  const indexedCuki = await getLegacyMarketplaceCuki(tokenId, {
+    network: identity.network,
+    collection: identity.collection,
+  });
 
   if (
     !indexedCuki ||

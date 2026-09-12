@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { reconcileLegacyMarketplaceCuki } from '@/lib/legacy-marketplace/data';
-import { getLegacyMarketplaceCollection } from '@/lib/legacy-marketplace/identity';
+import {
+  getLegacyMarketplaceCollection,
+  normalizeLegacyMarketplaceIdentityInput,
+} from '@/lib/legacy-marketplace/identity';
 import type { LegacyCukiNetwork } from '@/lib/legacy-marketplace/types';
 
 export const dynamic = 'force-dynamic';
@@ -31,11 +34,18 @@ export async function POST(request: NextRequest) {
       ? body.network
       : null;
     const collection = typeof body.collection === 'string' ? body.collection : '';
+    const identity = normalizeLegacyMarketplaceIdentityInput({
+      network,
+      chainId: body.chainId,
+      collection,
+    });
     if (
       body.source !== 'legacy'
       || !/^\d{1,78}$/.test(tokenId)
       || !network
       || !isExpectedCollection(network, collection)
+      || !identity
+      || identity.network !== network
     ) {
       return response({ status: 'error', code: 'INVALID_RECONCILIATION_REQUEST' }, 400);
     }

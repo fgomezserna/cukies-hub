@@ -22,10 +22,11 @@ const heartbeat = () => ({checkedAt: Date.now() / 1000, freeBytes: 11 * 1024 ** 
   sourceFreeBytes: 11 * 1024 ** 3, minioPath: 'LXC2011:/opt/minio/data', sourcePath: 'VM1001:/srv'});
 
 describe('guarda permanente de capacidad', () => {
-  it('exige heartbeat en ambas fuentes Stage', async () => {
-    for (const dbName of ['cukieshub-new-staging', 'cukies-legacy-staging']) {
-      await assert.rejects(assertStorageCapacity({...config('/tmp/unused'), dbName}), /HEARTBEAT_REQUIRED/);
-    }
+  it('exige heartbeat en la base unificada de Stage', async () => {
+    await assert.rejects(
+      assertStorageCapacity({...config('/tmp/unused'), dbName: 'cukieshub-new-staging'}),
+      /HEARTBEAT_REQUIRED/,
+    );
   });
 
   it('rechaza ausente, JSON inválido, fecha inválida/futura/caducada, discos erróneos o bajo suelo antes de claim', async () => {

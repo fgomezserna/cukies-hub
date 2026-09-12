@@ -15,7 +15,9 @@ export type CukiDocument = {
   tokenId?: string;
   network?: string;
   chain?: string;
-  chainId?: number;
+  chainId?: number | string | null;
+  collection?: string;
+  collectionAddress?: string;
   collectionAddressNormalized?: string;
   img?: string | null;
   type?: number | string | null;

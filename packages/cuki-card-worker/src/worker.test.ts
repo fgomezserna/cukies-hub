@@ -39,7 +39,7 @@ const config = (manifestPath: string, sourceIdentity: CardWorkerConfig['sourceId
 
 const legacyConfig = (manifestPath: string): CardWorkerConfig => ({
   ...config(manifestPath),
-  dbName: 'cukies-legacy-staging',
+  dbName: 'cukieshub-new-staging',
   sourceFormat: 'legacy',
   legacyStagingEnabled: true,
 });

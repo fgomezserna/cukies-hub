@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
     offset: getNumberParam(searchParams, 'offset'),
     search: searchParams.get('search') ?? undefined,
     network: searchParams.get('network') ?? undefined,
+    chainId: searchParams.get('chainId') ?? undefined,
+    collection: searchParams.get('collection') ?? undefined,
     state: searchParams.get('state') ?? undefined,
     type: searchParams.get('type') ?? undefined,
     generation: searchParams.get('generation') ?? undefined,
