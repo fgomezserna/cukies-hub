@@ -7,6 +7,28 @@ import { stableAmbassadorHash, validAmbassadorWallet } from "./rules";
 import type { AmbassadorEligibility } from "./types";
 
 const ONCHAIN_READ_TIMEOUT_MS = 5_000;
+const ONCHAIN_READ_BUDGET_MS = 8_000;
+const DEFAULT_BSC_RPC_URLS = [
+  "https://bsc-rpc.publicnode.com",
+  "https://bsc-dataseed-public.bnbchain.org",
+  "https://rpc-bnb.blockmachine.io",
+  "https://bsc-dataseed1.binance.org",
+] as const;
+const DEFAULT_BSC_TESTNET_RPC_URLS = [
+  "https://data-seed-prebsc-1-s1.binance.org:8545",
+] as const;
+
+type AmbassadorEnvironment = Record<string, string | undefined>;
+type OnchainRead = {
+  block: {
+    number: bigint;
+    hash: string;
+    timestamp: bigint;
+  };
+  schedule: unknown;
+  staked: unknown;
+};
+type OnchainFailureKind = "timeout" | "chain_mismatch" | "invalid_response" | "provider";
 
 function validObservedAt(value: Date) {
   return value instanceof Date && !Number.isNaN(value.getTime())
@@ -45,6 +67,139 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 
 type UkiRequirement = { route: "uki"; ukiRaw: string };
 
+function splitRpcUrls(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => /^https?:\/\//i.test(entry));
+}
+
+function rpcUrlsForChain(chainId: number, environment: AmbassadorEnvironment = process.env) {
+  const configuredValues = chainId === 56
+    ? [
+        environment.CHAIN_INDEXER_BSC_RPC_URLS,
+        environment.CHAIN_INDEXER_BSC_RPC_URL,
+        environment.BSC_RPC_URL,
+      ]
+    : chainId === 97
+      ? [
+          environment.CHAIN_INDEXER_BSC_TESTNET_RPC_URLS,
+          environment.CHAIN_INDEXER_BSC_TESTNET_RPC_URL,
+          environment.BSC_TESTNET_RPC_URL,
+        ]
+      : [];
+  const configured = [...new Set(configuredValues.flatMap(splitRpcUrls))];
+  if (configured.length > 0) return configured;
+  if (chainId === 56) return [...DEFAULT_BSC_RPC_URLS];
+  if (chainId === 97) return [...DEFAULT_BSC_TESTNET_RPC_URLS];
+  return [];
+}
+
+function failureKind(error: unknown): OnchainFailureKind {
+  if (error instanceof Error) {
+    if (error.message === "ONCHAIN_READ_TIMEOUT") return "timeout";
+    if (error.message === "ONCHAIN_CHAIN_MISMATCH") return "chain_mismatch";
+    if (error.message === "ONCHAIN_INVALID_RESPONSE") return "invalid_response";
+  }
+  return "provider";
+}
+
+async function readOnchainAtRpc(
+  chain: typeof bsc | typeof bscTestnet,
+  rpcUrl: string,
+  ukiStakingAddress: string,
+  vestingVaultAddress: string,
+  walletNormalized: string,
+  timeoutMs: number,
+) {
+  const client = createPublicClient({
+    chain,
+    transport: http(rpcUrl, { timeout: timeoutMs, retryCount: 0 }),
+  });
+  return withTimeout((async (): Promise<OnchainRead> => {
+    const [networkChainId, blockNumber] = await Promise.all([
+      client.getChainId(),
+      client.getBlockNumber(),
+    ]);
+    if (networkChainId !== chain.id) throw new Error("ONCHAIN_CHAIN_MISMATCH");
+    const block = await client.getBlock({ blockNumber });
+    if (
+      block.number !== blockNumber
+      || typeof block.hash !== "string"
+      || block.hash.length === 0
+      || typeof block.timestamp !== "bigint"
+    ) {
+      throw new Error("ONCHAIN_INVALID_RESPONSE");
+    }
+    const [schedule, staked] = await Promise.all([
+      client.readContract({
+        address: vestingVaultAddress as Address,
+        abi: vestingVaultAbi,
+        functionName: "scheduleOf",
+        args: [walletNormalized as Address],
+        blockNumber,
+      }),
+      client.readContract({
+        address: ukiStakingAddress as Address,
+        abi: ukiStakingAbi,
+        functionName: "stakedBalance",
+        args: [walletNormalized as Address],
+        blockNumber,
+      }),
+    ]);
+    return { block, schedule, staked };
+  })(), timeoutMs);
+}
+
+function buildOnchainEligibility(
+  onchainRead: OnchainRead,
+  walletNormalized: string,
+  chainId: number,
+  vestingVaultAddress: string,
+  ukiStakingAddress: string,
+  currentRequirement: UkiRequirement,
+  observedAt: Date,
+) {
+  const { block, schedule, staked } = onchainRead;
+  if (!schedule || staked === undefined) return null;
+  const scheduleRecord = schedule as {
+    totalAmount?: bigint;
+    releasedAmount?: bigint;
+  } | readonly [bigint, bigint];
+  const totalAmount = Array.isArray(scheduleRecord)
+    ? scheduleRecord[0]
+    : (scheduleRecord as { totalAmount?: unknown }).totalAmount;
+  const releasedAmount = Array.isArray(scheduleRecord)
+    ? scheduleRecord[1]
+    : (scheduleRecord as { releasedAmount?: unknown }).releasedAmount;
+  if (typeof totalAmount !== "bigint" || typeof releasedAmount !== "bigint" || typeof staked !== "bigint") {
+    return null;
+  }
+  if (releasedAmount > totalAmount) return null;
+  const locked = totalAmount - releasedAmount;
+  const totalUkiRaw = locked + staked;
+  const isCukieMaster = totalUkiRaw >= BigInt(currentRequirement.ukiRaw);
+  return {
+    isCukieMaster,
+    reason: isCukieMaster ? null : "CUKIE_MASTER_REQUIREMENT_NOT_MET",
+    sourceHash: stableAmbassadorHash({
+      kind: "ambassador-cukie-master-onchain-eligibility-v1",
+      walletNormalized,
+      chainId,
+      vestingVaultAddress,
+      ukiStakingAddress,
+      lockedUkiRaw: locked.toString(),
+      stakedUkiRaw: staked.toString(),
+      ukiRequirementRaw: currentRequirement.ukiRaw,
+      blockNumber: block.number.toString(),
+      blockHash: block.hash,
+      blockTimestamp: block.timestamp.toString(),
+      observedAt,
+    }),
+    observedAt,
+  } satisfies AmbassadorEligibility;
+}
+
 function nftRouteIsApplicable(environment: Record<string, string | undefined> = process.env) {
   // This is the canonical runtime switch for the Cukie Master pipeline. An
   // absent or malformed value is indeterminate and therefore keeps NFT in
@@ -71,92 +226,59 @@ async function readOnchainUkiEligibility(
   const vestingVaultAddress = ukiSaleContracts.vestingVaultAddress?.trim()
     || process.env.CHAIN_INDEXER_VESTING_VAULT_ADDRESS?.trim();
   const config = chainId === 56
-    ? { chain: bsc, rpcUrl: (process.env.CHAIN_INDEXER_BSC_RPC_URL || process.env.BSC_RPC_URL)?.trim() }
+    ? { chain: bsc, rpcUrls: rpcUrlsForChain(chainId) }
     : chainId === 97
-      ? { chain: bscTestnet, rpcUrl: (process.env.CHAIN_INDEXER_BSC_TESTNET_RPC_URL || process.env.BSC_TESTNET_RPC_URL)?.trim() }
+      ? { chain: bscTestnet, rpcUrls: rpcUrlsForChain(chainId) }
       : null;
   if (
-    !config?.rpcUrl
+    !config
+    || config.rpcUrls.length === 0
     || !ukiStakingAddress
     || !vestingVaultAddress
     || !isAddress(walletNormalized)
     || !isAddress(ukiStakingAddress)
     || !isAddress(vestingVaultAddress)
   ) return null;
-  const client = createPublicClient({
-    chain: config.chain,
-    transport: http(config.rpcUrl, { timeout: ONCHAIN_READ_TIMEOUT_MS }),
-  });
-  const onchainRead = await withTimeout((async () => {
-    const [networkChainId, blockNumber] = await Promise.all([
-      client.getChainId(),
-      client.getBlockNumber(),
-    ]);
-    if (networkChainId !== config.chain.id) return null;
-    const block = await client.getBlock({ blockNumber });
-    if (
-      block.number !== blockNumber
-      || typeof block.hash !== "string"
-      || block.hash.length === 0
-      || typeof block.timestamp !== "bigint"
-    ) return null;
-    const [schedule, staked] = await Promise.all([
-      client.readContract({
-        address: vestingVaultAddress as Address,
-        abi: vestingVaultAbi,
-        functionName: "scheduleOf",
-        args: [walletNormalized as Address],
-        blockNumber,
-      }),
-      client.readContract({
-        address: ukiStakingAddress as Address,
-        abi: ukiStakingAbi,
-        functionName: "stakedBalance",
-        args: [walletNormalized as Address],
-        blockNumber,
-      }),
-    ]);
-    return { block, schedule, staked };
-  })(), ONCHAIN_READ_TIMEOUT_MS).catch(() => null);
-  if (!onchainRead) return null;
-  const { block, schedule, staked } = onchainRead;
-  if (!schedule || staked === undefined) return null;
-  const scheduleRecord = schedule as unknown as {
-    totalAmount?: bigint;
-    releasedAmount?: bigint;
-  } | readonly [bigint, bigint];
-  const totalAmount = Array.isArray(scheduleRecord)
-    ? scheduleRecord[0]
-    : (scheduleRecord as { totalAmount?: unknown }).totalAmount;
-  const releasedAmount = Array.isArray(scheduleRecord)
-    ? scheduleRecord[1]
-    : (scheduleRecord as { releasedAmount?: unknown }).releasedAmount;
-  if (typeof totalAmount !== "bigint" || typeof releasedAmount !== "bigint" || typeof staked !== "bigint") {
-    return null;
+  const failures: OnchainFailureKind[] = [];
+  const startedAt = Date.now();
+  for (const rpcUrl of config.rpcUrls) {
+    const remainingMs = ONCHAIN_READ_BUDGET_MS - (Date.now() - startedAt);
+    if (remainingMs <= 0) {
+      failures.push("timeout");
+      break;
+    }
+    try {
+      const onchainRead = await readOnchainAtRpc(
+        config.chain,
+        rpcUrl,
+        ukiStakingAddress,
+        vestingVaultAddress,
+        walletNormalized,
+        Math.min(ONCHAIN_READ_TIMEOUT_MS, remainingMs),
+      );
+      const eligibility = buildOnchainEligibility(
+        onchainRead,
+        walletNormalized,
+        chainId,
+        vestingVaultAddress,
+        ukiStakingAddress,
+        currentRequirement,
+        observedAt,
+      );
+      if (eligibility) return eligibility;
+      failures.push("invalid_response");
+    } catch (error) {
+      failures.push(failureKind(error));
+    }
   }
-  if (releasedAmount > totalAmount) return null;
-  const locked = totalAmount - releasedAmount;
-  const totalUkiRaw = locked + (staked as bigint);
-  const isCukieMaster = totalUkiRaw >= requiredUkiRaw;
-  return {
-    isCukieMaster,
-    reason: isCukieMaster ? null : "CUKIE_MASTER_REQUIREMENT_NOT_MET",
-    sourceHash: stableAmbassadorHash({
-      kind: "ambassador-cukie-master-onchain-eligibility-v1",
-      walletNormalized,
+  if (failures.length > 0) {
+    console.warn("Ambassador eligibility on-chain fallback unavailable", {
       chainId,
-      vestingVaultAddress,
-      ukiStakingAddress,
-      lockedUkiRaw: locked.toString(),
-      stakedUkiRaw: (staked as bigint).toString(),
-      ukiRequirementRaw: currentRequirement.ukiRaw,
-      blockNumber: block.number.toString(),
-      blockHash: block.hash,
-      blockTimestamp: block.timestamp.toString(),
-      observedAt,
-    }),
-    observedAt,
-  } satisfies AmbassadorEligibility;
+      providerCount: config.rpcUrls.length,
+      failureKinds: [...new Set(failures)],
+    });
+  }
+  return null;
 }
 
 /**
