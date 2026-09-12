@@ -2,7 +2,7 @@
 
 Estado del documento: fuente unica del estado vigente; vivo y versionado.
 
-Ultima actualizacion: 2026-09-11; horas de evidencia indicadas en UTC.
+Ultima actualizacion: 2026-09-12; horas de evidencia indicadas en UTC.
 
 Contexto vigente: revisión completa del documento actualizado del 11 de septiembre
 y ejecución coordinada de sus siete lotes, detallados en el programa de este archivo.
@@ -221,7 +221,12 @@ Postflight2026-09-11T20:19:41.182877+00:00: readiness200, cinco heartbeats corre
 ranking waiting con0cierres y readyAt00:02:30UTC del12Sep. Solo DApp cambia;
 diez workers, juego31 y82contenedores protegidos conservados. T permanece20:30UTC. Pool necesita conservar su
 limpieza normal de leases/locks expirados; no recupera premios históricos.
-L6 terminó el diagnóstico sin parche nuevo; A1 permanece abierto. L7 sigue en cola.
+L6 terminó el diagnóstico sin parche nuevo; A1 permanece abierto. L7 se reactiva
+el12-Sep tras la aclaración expresa del usuario: OWN y Pool comparten la matriz
+diaria y la UX muestra el total de partidas del conjunto de Cukies elegibles.
+La definición deja de ser un bloqueo; implementación, revisión y entrega siguen
+pendientes. La automatización de coordinación cada30min está eliminada por
+petición del usuario; esta activación puntual no la recrea.
 Modelo de las siete: **Luna Max**, con revisión e integración
 de **Astra Max** en la tarea raíz `01a07aec-6bc1-7203-8f43-357ed4b8931c`.
 Último cambio de producto integrado y servido en staging: `8bfa143be7c8e7a017d54756d16c518b612f3965` (PR440);
@@ -309,7 +314,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | A1 | Invitación válida intermitente | Diagnóstico abierto | Causa del503 sin demostrar; reproducir con sponsor elegible. |
 | A2 | Aviso tras confirmar embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |
 | A3 | Nombre y wallet del embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |
-| O1 | Cupo con Cukies propios | Definición pendiente | Respuesta a la matriz de usos ya consultada. |
+| O1 | Partidas diarias disponibles con Cukies propios elegibles | Regla confirmada por usuario12-Sep; L7 reactivada en #412 | Implementar total agregado con la misma matriz del Pool, validar y desplegar en staging. No falta decisión sobre los límites. |
 | O2 | Saldo, cupos y avisos | Parcial · PR425 | Comprobación conjunta autenticada. |
 
 | Lote | Cobertura y resultado exigido | Issue y tarea responsable | Estado, rama y destino |
@@ -320,7 +325,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | L4 | J1, W1, W2: reserva del bote, UKI directo y reparto a los prestadores reales en partidas NUEVAS. | [#418](https://github.com/fgomezserna/cukies-hub/issues/418) · **11-Sep · Recompensas y bote semanal**, tarea `01a09068-e5f9-7a01-838b-82f98da5a5a2` | **12-Sep03:57UTC:** ajuste de coordinación PR4408bfa143b servido; espera de cada candidato forward validada con272suites/2358tests y tick posterior al despliegue correcto, sin cambiar retardo ni frontera. **12-Sep00:14UTC:** primer ranking semanal vacío sellado a00:03:28, con un solo manifiesto/run/estado y hashes verificados. El replay reutiliza las mismas identidades; la partida nueva y el reparto a prestadores siguen pendientes. [PR427](https://github.com/fgomezserna/cukies-hub/pull/427) integrada y servida en staging `bf34f17`, CI34611669131SUCCESS, postflight15:08UTC correcto;271suites/2291tests/lint/tipos previos. Recuperación histórica CANCELADA, nunca aplicada. [PR431](https://github.com/fgomezserna/cukies-hub/pull/431),5350b08, revisión raíz aceptada: límite por inicio canónico de sesión exclusivamente staging97; producción conserva su comportamiento.272suites/2312tests/lint/tipos correctos; merge419371f servido, CI34621416333SUCCESS y postflight16:32UTC:readiness200/journal limpio/soloDApp/10workers y82protegidos conservados. GatesOFF; activación, partida nueva, atribución al prestador y reparto siguen pendientes. Lectura on-chain16:23UTC confirma0UKIlibres y7.5UKIreservados en distributor97; preparar financiación exacta del primer lote NUEVO sin consumir reservas anteriores. [Evidencia](evidence/2026-09-11-doc11-alias-credits-delivery.json). No exigir censo histórico, apply ni asignaciones retroactivas. L4 entregó [PR434](https://github.com/fgomezserna/cukies-hub/pull/434),correcciónc56eea10; revisión independiente PASS para periodo canónico, cola sin inanición y reanudación inmutable. Ranking3f419b35 y propagación de la frontera integrados en2e13c72c. Gate conjunto:272suites/2352tests,lint/tipos,31publisher,22schedulers y4Compose PASS. Integrada y servida75d8cc8f; CI34635473631SUCCESS y postflight19:30:47UTC con10workers saludables,81protegidos conservados y gatesOFF. T configurada20:30UTC; web1546/workers1547 terminados. PR435987729bf sirve la corrección de espera; CI34642459565SUCCESS. Cinco procesos verificados; ranking waiting con cero cierres hasta00:02:30UTC del12Sep. Diez workers y82contenedores protegidos conservados; solo DApp cambió. Ocho colecciones financieras sin cambios antes deT. No cambiar esa frontera. [Revisión y validación](evidence/2026-09-11-doc11-forward-rewards-delivery.json). La activación se alinea con un periodo diario y semanal completo, sin recuperar el historial. |
 | L5 | J3, W3: cierre de un periodo NUEVO, publicación, estado del premio y disponibilidad para cobrar. | [#423](https://github.com/fgomezserna/cukies-hub/issues/423) · **11-Sep · Cierre y cobro de premios**, tarea `01a09069-25af-7e12-9a37-7054fdc8dcac` | **12-Sep00:14UTC:** primer accounting semanal sellado a00:05:32 y hash canónico verificado; siete diarios, cero asignaciones/claims y ningún plan semanal. El cobro personal sigue pendiente. **Actualización21:48UTC del11Sep:** [PR437](https://github.com/fgomezserna/cukies-hub/pull/437) servida52684bb8, CI34649628143SUCCESS; publicador y lector verifican ambassadorSnapshots como el writer.272suites/2358tests/lint/tipos y32publisher correctos; cinco procesos success,10workers activos y82protegidos conservados. Primer diario20:30 completado, cierre/hash sellados intactos y tres recibos BSC97 verificados (400k tesorería,50k marketing/desarrollo,50k quema). Sin partidas nuevas ni claims personales; W1/W2/W3 funcionales siguen pendientes en ese alcance. [Evidencia](evidence/2026-09-11-doc11-forward-rewards-delivery.json). [PR433](https://github.com/fgomezserna/cukies-hub/pull/433),d843c74e: P1 multiwallet y P2 del total limitado a100claims corregidos; revisión independiente PASS,12tests focales y reproducciones multiwallet/101claims. Gate conjunto c12ed45f correcto:272suites/2342tests/lint/tipos. Integrada y servida c82498be; CI34630108075SUCCESS y postflight18:09UTC: readiness200, journal limpio, diez workers y82protegidos conservados. [Entrega](evidence/2026-09-11-doc11-rewards-state-delivery.json). Alcance: estados e importes canónicos, no activación del recorrido financiero. Consume allocations canónicas de partidas nuevas de L4; no depende de recuperar partidas o premios antiguos ni de aplicar PR427. Preparar orden de activación/publicación/claim y cálculo canónico del importe necesario para el primer lote NUEVO, pues el distributor tiene0UKIlibres en bloque130438381. La comprobación18:55:52UTC/bloque130458669 acredita493244946.3UKI y0.024154984BNB en el owner: el publicador aporta automáticamente el déficit exacto del lote; saldo libre0 no es por sí solo bloqueo. No se ha transferido nada. Rama `codex/doc11-rewards-publication` → `staging`. |
 | L6 | A1, A2, A3: invitación válida, relación ya confirmada y nombre público del patrocinador. | [#424](https://github.com/fgomezserna/cukies-hub/issues/424) · **11-Sep · Hotfix de embajadores**, tarea `01a09068-3c90-7ff3-b7a5-16dac47d66c1` | [PR426](https://github.com/fgomezserna/cukies-hub/pull/426) publicada en main `d1a7149` y [PR428](https://github.com/fgomezserna/cukies-hub/pull/428) en staging `ecbf7b9`. Gates main173suites/1501tests/build y staging271/2259/lint/tipos correctos. A1:503 histórico y lectura posterior404/no elegible; diagnóstico termina sin RCA probada ni parche nuevo. Rama `codex/doc11-ambassadors-eligibility` limpia. A2/A3 cubiertos por regresiones; relación y nombre de sponsor elegible no acreditados por los sondeos live. |
-| L7 | O1: partidas diarias restantes con Cukies propios elegibles, sin reinicio por transferir. | [#412](https://github.com/fgomezserna/cukies-hub/issues/412) · **11-Sep · Partidas con Cukies propios**, tarea `01a09069-7cdf-71d1-b03d-5d246eacc44e` | En cola; acuse recibido. Matriz diaria y anti-reset pendientes de respuesta; depende de L1/L4. Rama prevista `codex/doc11-own-cukie-quota` → `staging`. |
+| L7 | O1: total de partidas diarias restantes del conjunto de Cukies propios elegibles, con la misma matriz que el Pool. | [#412](https://github.com/fgomezserna/cukies-hub/issues/412) · **11-Sep · Partidas con Cukies propios**, tarea `01a09069-7cdf-71d1-b03d-5d246eacc44e` | Activada12-Sep10:45UTC con LunaMax, desde staging014757a4; L1/L4 ya integradas. La aclaración del usuario elimina el bloqueo de definición; [registro de activación](https://github.com/fgomezserna/cukies-hub/issues/412#issuecomment-5645412557). La matriz vive en las reglas funcionales; la UX muestra capacidad agregada y cada partida consume una unidad. Conservar consumo/reservas durante cambios de propiedad o custodia, fallback Pool/Seiku y1800s. Implementación en `codex/doc11-own-cukie-quota`; raíz revisa e integra a `staging`. Sin PR ni despliegue nuevos todavía. |
 
 ### Dependencias, integración y comprobación
 
@@ -370,8 +375,9 @@ en c82498be; CI34630108075SUCCESS y postflight18:09UTC correctos.
   reescribir el historial del Pool ni financiar reservas anteriores.
   La revisión Astra independiente de433 terminó sin hallazgos pendientes.
   L1 tiene pendiente validar operaciones nuevas en el
-  producto servido. L5 consume los resultados canónicos nuevos de L4. L7 requiere respuesta
-  de producto y coordinar sus archivos de game-economy con L4. Una dependencia
+  producto servido. L5 consume los resultados canónicos nuevos de L4. L7 está
+  activada tras la aclaración de producto del12-Sep y posee los archivos de
+  disponibilidad OWN; L4 ya entregó su alcance. Una dependencia
   no detiene otro lote independiente.
 - Una tarea en cola no es trabajo terminado: la raíz debe activarla con la base
   actual, revisar su PR, resolver hallazgos y llevarla a la entrega autorizada.
