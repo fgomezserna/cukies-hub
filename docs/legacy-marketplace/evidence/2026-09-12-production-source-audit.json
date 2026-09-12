@@ -140,5 +140,25 @@
       "path": "docs/deployment-environments.md",
       "scope": "Environment separation and runtime inventory limitations"
     }
-  ]
+  ],
+  "subsequentStagingReplicaTask": {
+    "recordedAt": "2026-09-12T17:29:55.030762+00:00",
+    "userRequestObservedAt": [
+      "2026-09-12T17:15:19.504Z",
+      "2026-09-12T17:16:07.703Z"
+    ],
+    "authorizationSourceThread": "01a0963d-4b9e-71a3-a9f3-dcc7ad732ebe",
+    "scope": "Exclusive staging replica of functional legacy main data; separate from full database consolidation and writer/traffic/permission cutover.",
+    "threadId": "01a096a5-848d-7292-af74-1e69300dc555",
+    "title": "Réplica legacy de main en staging",
+    "hostId": "local",
+    "model": "gpt-5.6-luna",
+    "thinking": "max",
+    "worktree": "/Users/fgomezserna/.codex/worktrees/a3e8/cukies-hub",
+    "branch": "codex/stage-legacy-replica",
+    "observedStatus": "active",
+    "nextDeliverable": "Collection manifest, coherent source cut, sanitization allowlist and idempotent dry-run before root-reviewed staging writes.",
+    "automationId": "coordinar-r-plica-legacy-staging",
+    "verificationBoundary": "Task created and active scope confirmed; no replica load or functional parity claimed yet. Original document12 coordination deleted independently."
+  }
 }
