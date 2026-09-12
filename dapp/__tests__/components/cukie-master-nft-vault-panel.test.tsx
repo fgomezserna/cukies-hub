@@ -91,6 +91,8 @@ const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const wallet = '0x1111111111111111111111111111111111111111';
 const vault = '0x2222222222222222222222222222222222222222';
 const collection = '0x3333333333333333333333333333333333333333';
+const zeroAddress = '0x0000000000000000000000000000000000000000';
+const emptyMasterPosition = [zeroAddress, BigInt(0), BigInt(0)] as const;
 const approvalHash = `0x${'a'.repeat(64)}` as const;
 const depositHash = `0x${'b'.repeat(64)}` as const;
 const fetchMock = jest.fn();
@@ -478,7 +480,7 @@ describe('CukieMasterNftVaultPanel', () => {
       .mockResolvedValueOnce(wallet)
       .mockResolvedValueOnce(vault)
       .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(null);
+      .mockResolvedValueOnce(emptyMasterPosition);
     writeContractAsync.mockResolvedValueOnce(depositHash);
 
     render(<CukieMasterNftVaultPanel />);
@@ -501,6 +503,7 @@ describe('CukieMasterNftVaultPanel', () => {
         return approved ? vault : '0x0000000000000000000000000000000000000000';
       }
       if (input.functionName === 'isApprovedForAll') return false;
+      if (input.functionName === 'positionOf') return emptyMasterPosition;
       return null;
     });
     writeContractAsync.mockImplementation(async (input: { functionName?: string }) => {
@@ -545,6 +548,7 @@ describe('CukieMasterNftVaultPanel', () => {
       if (input.functionName === 'ownerOf') return wallet;
       if (input.functionName === 'getApproved') return vault;
       if (input.functionName === 'isApprovedForAll') return false;
+      if (input.functionName === 'positionOf') return emptyMasterPosition;
       return null;
     });
     writeContractAsync.mockResolvedValueOnce(depositHash);
@@ -576,6 +580,7 @@ describe('CukieMasterNftVaultPanel', () => {
         return approved ? vault : '0x0000000000000000000000000000000000000000';
       }
       if (input.functionName === 'isApprovedForAll') return false;
+      if (input.functionName === 'positionOf') return emptyMasterPosition;
       return null;
     });
     writeContractAsync.mockImplementation(async (input: { functionName?: string }) => {
@@ -597,7 +602,7 @@ describe('CukieMasterNftVaultPanel', () => {
     expect(writeContractAsync.mock.calls[1][0]).toEqual(expect.objectContaining({ functionName: 'deposit' }));
   });
 
-  it('no ofrece continuar si la fila ya identifica una custodia no elegible', async () => {
+  it('no ofrece continuar si la fila ya identifica una custodia sin retirada disponible', async () => {
     savePendingNftVaultOperation(localStorage, pendingOperation({
       tokenId: '98000003',
       action: 'approval',
@@ -607,7 +612,7 @@ describe('CukieMasterNftVaultPanel', () => {
     fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({
       custody: 'cukie_master_nft_vault',
       state: 'custodied',
-      canWithdraw: true,
+      canWithdraw: false,
     })));
 
     render(<CukieMasterNftVaultPanel />);
@@ -615,6 +620,32 @@ describe('CukieMasterNftVaultPanel', () => {
     expect(screen.queryByRole('button', { name: /Continuar depósito/i })).not.toBeInTheDocument();
     expect(await screen.findByText(/ya no está disponible en tu wallet/i)).toBeInTheDocument();
     expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('libera una aprobación residual cuando la posición ya es retirable', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(status({ deposited: true })));
+    writeContractAsync.mockReset();
+    writeContractAsync.mockResolvedValueOnce(depositHash);
+    waitForTransactionReceipt.mockReset();
+    waitForTransactionReceipt.mockResolvedValue({ status: 'success' });
+
+    render(<CukieMasterNftVaultPanel />);
+
+    expect(screen.queryByRole('button', { name: /Continuar depósito/i })).not.toBeInTheDocument();
+    const withdraw = await screen.findByRole('button', { name: /Retirar inmediatamente/i });
+    await waitFor(() => expect(localStorage.length).toBe(0));
+    fireEvent.click(withdraw);
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(1));
+    expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      address: vault,
+      functionName: 'withdraw',
+    }));
   });
 
   it('conserva el motivo accionable cuando el inventario bloquea el Cukie', async () => {
@@ -679,6 +710,31 @@ describe('CukieMasterNftVaultPanel', () => {
 
     expect(await screen.findByText(/ya tiene una custodia en Cukie Master/i)).toBeInTheDocument();
     await waitFor(() => expect(localStorage.length).toBe(0));
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('conserva la aprobación y bloquea la firma si positionOf devuelve una respuesta inválida', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      tokenId: '98000003',
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({ canDeposit: false })));
+    readContract.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'ownerOf') return wallet;
+      if (input.functionName === 'getApproved') return vault;
+      if (input.functionName === 'isApprovedForAll') return false;
+      if (input.functionName === 'positionOf') return {};
+      return null;
+    });
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Continuar depósito/i }));
+
+    expect(await screen.findByText(/no se pudo verificar la posición actual/i)).toBeInTheDocument();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(`cukies:nft-vault:pending:v1:97:${wallet}:${vault}`) ?? '[]'))
+      .toEqual([expect.objectContaining({ action: 'approval', phase: 'approval_confirmed', txHash: approvalHash })]));
     expect(writeContractAsync).not.toHaveBeenCalled();
   });
 
