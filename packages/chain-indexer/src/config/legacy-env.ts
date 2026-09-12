@@ -33,7 +33,9 @@ const legacyEnvironmentSchema = z.object({
 });
 
 export const LEGACY_DB_NAMES = Object.freeze({
-  staging: 'cukies-legacy-indexer-staging',
+  // Legacy Stage runs against the same logical database as the modern
+  // indexer/economy writers.  Production remains isolated below.
+  staging: 'cukieshub-new-staging',
   production: 'cukies-legacy-indexer',
   test: 'cukies-legacy-worker-test',
 });

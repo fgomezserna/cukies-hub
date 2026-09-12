@@ -87,13 +87,13 @@ for (const serviceName of guardedWorkers) {
   });
 }
 
-test('legacy card worker is opt-in, staging-only and cannot target indexed fixtures', () => {
+test('legacy card worker is opt-in and shares the unified staging database', () => {
   const definition = serviceDefinition('cuki-card-worker-legacy');
 
   assert.match(definition, /    profiles:\n      - legacy-card-worker/);
   assert.ok(definition.includes('CARD_WORKER_SOURCE_FORMAT: legacy'));
   assert.ok(definition.includes('CARD_WORKER_LEGACY_STAGING_ENABLED: ${CARD_WORKER_LEGACY_STAGING_ENABLED:-false}'));
-  assert.ok(definition.includes('CARD_WORKER_DB_NAME: cukies-legacy-staging'));
+  assert.ok(definition.includes('CARD_WORKER_DB_NAME: ${CARD_WORKER_DB_NAME:-cukieshub-new-staging}'));
   assert.ok(definition.includes('CARD_WORKER_MONGO_URL: ${CARD_WORKER_LEGACY_MONGO_URL:-${CUKIES_DATABASE_URL}}'));
   assert.ok(definition.includes('CARD_WORKER_S3_BUCKET: cukies-cards-staging'));
   assert.ok(definition.includes('CARD_WORKER_PUBLIC_BASE_URL: https://assets-staging.cukies.world'));

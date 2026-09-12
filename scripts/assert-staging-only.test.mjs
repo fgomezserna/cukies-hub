@@ -20,9 +20,9 @@ function stagingEnvironment(overrides = {}) {
     NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A',
     NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://testnet.bscscan.com',
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
-    DATABASE_URL: 'mongodb://staging-user:redacted@mongo:27017/cukies-hub-staging?authSource=admin',
+    DATABASE_URL: 'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CUKIES_DATABASE_URL:
-      'mongodb://staging-legacy:redacted@mongo:27017/cukies-legacy-staging?authSource=admin',
+      'mongodb://staging-legacy:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CHAIN_INDEXER_MONGO_URL:
       'mongodb://staging-economy:redacted@mongo:27017/cukieshub-new-staging?authSource=cukieshub-new-staging',
     CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
@@ -41,8 +41,9 @@ test('accepts only the exact staging application, chain and database perimeter',
   assert.equal(result.coolifyApplicationId, '28');
   assert.equal(result.publicChainId, '97');
   assert.equal(result.liquidityPairAddress, '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A');
-  assert.equal(result.databaseName, 'cukies-hub-staging');
-  assert.equal(result.legacyDatabaseName, 'cukies-legacy-staging');
+  assert.equal(result.unifiedDatabaseName, 'cukieshub-new-staging');
+  assert.equal(result.databaseName, 'cukieshub-new-staging');
+  assert.equal(result.legacyDatabaseName, 'cukieshub-new-staging');
   assert.equal(result.indexerDatabaseName, 'cukieshub-new-staging');
   assert.equal(result.indexerMongoDatabaseName, 'cukieshub-new-staging');
 });
@@ -57,8 +58,9 @@ test('accepts the dedicated web staging resource only for the dapp scope', () =>
   assert.equal(result.coolifyApplicationId, '32');
   assert.equal(result.coolifyResourceUuid, 'rwwsc4kkwc0ck84cgk40s8kk');
   assert.equal(result.publicChainId, '97');
-  assert.equal(result.databaseName, 'cukies-hub-staging');
-  assert.equal(result.legacyDatabaseName, 'cukies-legacy-staging');
+  assert.equal(result.unifiedDatabaseName, 'cukieshub-new-staging');
+  assert.equal(result.databaseName, 'cukieshub-new-staging');
+  assert.equal(result.legacyDatabaseName, 'cukieshub-new-staging');
   assert.equal(result.authHost, 'cukieshub.eurekand.com');
 });
 
@@ -103,11 +105,11 @@ for (const [name, override, expectedMessage] of [
     'must target PancakeSwap BSC Testnet',
   ],
   ['BSC mainnet indexer chain', { CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '56' }, 'must equal 97'],
-  ['production hub database', { DATABASE_URL: 'mongodb://mongo:27017/cukies-hub' }, 'cukies-hub-staging'],
+  ['production hub database', { DATABASE_URL: 'mongodb://mongo:27017/cukies-hub' }, 'cukieshub-new-staging'],
   [
     'production legacy database',
     { CUKIES_DATABASE_URL: 'mongodb://mongo:27017/cukies' },
-    'cukies-legacy-staging',
+    'cukieshub-new-staging',
   ],
   ['production indexer database', { CHAIN_INDEXER_DB_NAME: 'cukieshub-new' }, 'cukieshub-new-staging'],
   [
@@ -191,7 +193,7 @@ test('uses service scopes without requiring unrelated credentials', () => {
 
   assert.equal(validateStagingEnvironment({
     ...common,
-    DATABASE_URL: 'mongodb://mongo:27017/cukies-hub-staging',
+    DATABASE_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CHAIN_INDEXER_MONGO_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
@@ -199,14 +201,14 @@ test('uses service scopes without requiring unrelated credentials', () => {
 
   assert.equal(validateStagingEnvironment({
     ...common,
-    DATABASE_URL: 'mongodb://mongo:27017/cukies-hub-staging',
+    DATABASE_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CARD_WORKER_MONGO_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CARD_WORKER_DB_NAME: 'cukieshub-new-staging',
   }, 'cuki-card-worker').scope, 'cuki-card-worker');
 
   assert.equal(validateStagingEnvironment({
     ...common,
-    DATABASE_URL: 'mongodb://mongo:27017/cukies-hub-staging',
+    DATABASE_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CUKIES_BRIDGE_RELAYER_ENABLED: 'true',
     CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM:
       'ENABLE_TRON_NILE_TO_BSC_TESTNET_RELAYER',
@@ -228,7 +230,7 @@ test('uses service scopes without requiring unrelated credentials', () => {
 
   assert.equal(validateStagingEnvironment({
     ...common,
-    DATABASE_URL: 'mongodb://mongo:27017/cukies-hub-staging',
+    DATABASE_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CHAIN_INDEXER_MONGO_URL: 'mongodb://mongo:27017/cukieshub-new-staging',
     CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
@@ -239,8 +241,8 @@ function legacyCardWorkerEnvironment(overrides = {}) {
   return stagingEnvironment({
     CARD_WORKER_SOURCE_FORMAT: 'legacy',
     CARD_WORKER_LEGACY_STAGING_ENABLED: 'true',
-    CARD_WORKER_MONGO_URL: 'mongodb://legacy-worker:redacted@mongo:27017/cukies-legacy-staging?authSource=admin',
-    CARD_WORKER_DB_NAME: 'cukies-legacy-staging',
+    CARD_WORKER_MONGO_URL: 'mongodb://legacy-worker:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
+    CARD_WORKER_DB_NAME: 'cukieshub-new-staging',
     CARD_WORKER_S3_BUCKET: 'cukies-cards-staging',
     CARD_WORKER_PUBLIC_BASE_URL: 'https://assets-staging.cukies.world',
     ...overrides,
@@ -270,7 +272,7 @@ test('el CLI guard real acepta el perfil legacy valido sin exigir credenciales s
   const result = runLegacyGuard(legacyCardWorkerEnvironment());
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /"scope": "cuki-card-worker"/);
-  assert.match(result.stdout, /"cardWorkerDatabaseName": "cukies-legacy-staging"/);
+  assert.match(result.stdout, /"cardWorkerDatabaseName": "cukieshub-new-staging"/);
 });
 
 test('el guard exige credenciales legacy solo al activar upload', () => {
@@ -288,9 +290,9 @@ test('el guard exige credenciales legacy solo al activar upload', () => {
 });
 
 for (const [name, override, expectedMessage] of [
-  ['DB indexed', { CARD_WORKER_DB_NAME: 'cukieshub-new-staging' }, 'cukies-legacy-staging'],
-  ['mode indexed', { CARD_WORKER_SOURCE_FORMAT: 'indexed' }, 'CARD_WORKER_DB_NAME must equal cukieshub-new-staging'],
-  ['wrong legacy URI', { CARD_WORKER_MONGO_URL: 'mongodb://legacy-worker:redacted@mongo:27017/cukieshub-new-staging?authSource=admin' }, 'CARD_WORKER_MONGO_URL must target database cukies-legacy-staging'],
+  ['DB indexed', { CARD_WORKER_DB_NAME: 'other-staging' }, 'cukieshub-new-staging'],
+  ['unknown source format', { CARD_WORKER_SOURCE_FORMAT: 'other' }, 'CARD_WORKER_SOURCE_FORMAT must equal indexed or legacy'],
+  ['wrong legacy URI', { CARD_WORKER_MONGO_URL: 'mongodb://legacy-worker:redacted@mongo:27017/other-staging?authSource=admin' }, 'CARD_WORKER_MONGO_URL must target database cukieshub-new-staging'],
   ['legacy gate disabled', { CARD_WORKER_LEGACY_STAGING_ENABLED: 'false' }, 'CARD_WORKER_LEGACY_STAGING_ENABLED must equal true'],
   ['wrong bucket', { CARD_WORKER_S3_BUCKET: 'other-bucket' }, 'CARD_WORKER_S3_BUCKET must equal cukies-cards-staging'],
   ['wrong origin', { CARD_WORKER_PUBLIC_BASE_URL: 'https://assets.example' }, 'CARD_WORKER_PUBLIC_BASE_URL must equal https://assets-staging.cukies.world'],

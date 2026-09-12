@@ -13,8 +13,12 @@ export const STAGING_TARGET = Object.freeze({
   asmTokenAddress: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
   ukiTokenAddress: '0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
   liquidityPairAddress: '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A',
-  databaseName: 'cukies-hub-staging',
-  legacyDatabaseName: 'cukies-legacy-staging',
+  // Staging has one logical Mongo database.  Keep the historical property
+  // names below as aliases because the guard result is consumed by several
+  // service wrappers, but all of them intentionally resolve to this target.
+  unifiedDatabaseName: 'cukieshub-new-staging',
+  databaseName: 'cukieshub-new-staging',
+  legacyDatabaseName: 'cukieshub-new-staging',
   indexerDatabaseName: 'cukieshub-new-staging',
   authHosts: new Set(['cukieshub.eurekand.com', 'cukies-hub.eurekand.com']),
 });
@@ -374,6 +378,7 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
       ? STAGING_DAPP_APPLICATION_ID
       : STAGING_TARGET.coolifyApplicationId,
     coolifyResourceUuid,
+    unifiedDatabaseName: STAGING_TARGET.unifiedDatabaseName,
     publicChainId,
     indexerChainId,
     databaseName,
