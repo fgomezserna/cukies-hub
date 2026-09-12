@@ -148,19 +148,19 @@
       "2026-09-12T17:16:07.703Z"
     ],
     "authorizationSourceThread": "01a0963d-4b9e-71a3-a9f3-dcc7ad732ebe",
-    "scope": "Exclusive staging replica of functional legacy main data; separate from full database consolidation and writer/traffic/permission cutover.",
+    "scope": "Unify current Hub/auth, legacy and indexer/economy domains in ONE staging database and route staging consumers to it. This user clarification supersedes the earlier replica between three separate staging databases.",
     "threadId": "01a096a5-848d-7292-af74-1e69300dc555",
-    "title": "Réplica legacy de main en staging",
+    "title": "Unificar las bases de datos en staging",
     "hostId": "local",
     "model": "gpt-5.6-luna",
     "thinking": "max",
     "worktree": "/Users/fgomezserna/.codex/worktrees/a3e8/cukies-hub",
     "branch": "codex/stage-legacy-replica",
-    "observedStatus": "active-correction-after-root-review",
-    "nextDeliverable": "Correct reviewed safety and consumer compatibility failures, then provide a new SHA. Real source export and destination dry-run remain unexecuted.",
+    "observedStatus": "scope-corrected-read-only-consolidation-mapping",
+    "nextDeliverable": "Concrete collection/index/source/consumer mapping into one staging database. Present real conflicts and proposed resolution to the user before deciding or applying changes.",
     "automationId": "coordinar-r-plica-legacy-staging",
-    "verificationBoundary": "PR454 is draft; validation CI passed but root review rejected applying this candidate. Only local plan/tests and isolated in-memory review reproductions ran. No remote export, data load, projection, merge or deploy claimed.",
-    "updatedAt": "2026-09-12T18:00:50.571889+00:00",
+    "verificationBoundary": "The old c41995ea replica candidate is superseded, not a prerequisite to the clarified single-database objective. No export, load or cutover has occurred. Staging test data are disposable; no recovery or historical compensation required. Production remains unchanged.",
+    "updatedAt": "2026-09-12T18:33:01.504759+00:00",
     "pr": "https://github.com/fgomezserna/cukies-hub/pull/454",
     "reviewedHead": "c41995eab2bec2ff73d75a0f0c5ac3d67e009666",
     "codeReview": {
@@ -229,6 +229,29 @@
       ],
       "correctionSentToTask": true,
       "remoteWrites": false
+    },
+    "userConsultation": {
+      "requestedAt": "2026-09-12T18:08:04.550289+00:00",
+      "instruction": "Antes de tomar decisiones ante estos problemas consultar primero al usuario.",
+      "taskPauseMessageSent": true,
+      "automationStatus": "PAUSED",
+      "taskPauseAcknowledged": true,
+      "remoteDataLoadReported": false
+    },
+    "scopeClarification": {
+      "recordedAt": "2026-09-12T18:33:01.504759+00:00",
+      "userInstruction": "Pasar los datos de las bases a una de staging y centralizar todas las bases en una; staging contiene pruebas.",
+      "oneStagingDatabase": true,
+      "preserveCurrentStagingTestData": false,
+      "recoverStagingHistory": false,
+      "productionMutationAuthorized": false,
+      "consultBeforeResolvingDetectedProblems": true,
+      "previousReplicaApproachSuperseded": true,
+      "sameTaskReused": true,
+      "automationStatus": "PAUSED",
+      "taskAcknowledgedAt": "2026-09-12T18:34:55.585178+00:00",
+      "taskObservedState": "Active read-only inventory; task explicitly confirmed previous scope stopped and PR454 not touched.",
+      "preservedLocalChange": "scripts/legacy-staging-replica.mjs remains modified and uncommitted on the original task branch; not applied."
     }
   }
 }
