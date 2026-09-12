@@ -95,6 +95,19 @@ test('uses service scopes without requiring unrelated credentials', () => {
     CARD_WORKER_MONGO_URL: 'mongodb://mongo:27017/cukies-hub',
     CARD_WORKER_DB_NAME: 'cukieshub-new',
   }, 'cuki-card-worker').scope, 'cuki-card-worker');
+
+  const dappResult = validateProductionEnvironment({
+    ...common,
+    COOLIFY_RESOURCE_UUID: 'uo8gswsg84c488cowko0kkkg',
+    NEXT_PUBLIC_UKI_CHAIN_ID: '56',
+    CUKIES_DATABASE_URL: 'mongodb://mongo:27017/cukies',
+    CHAIN_INDEXER_DB_NAME: 'cukieshub-new',
+    CHAIN_INDEXER_MONGO_URL: 'mongodb://mongo:27017/cukies-hub',
+    NEXTAUTH_URL: 'https://cukies.world',
+    NEXT_PUBLIC_UKI_STAKING_ADDRESS: '0xad18ff665e99d0033c3bb9d73182c2b03df59696',
+  }, 'dapp');
+  assert.equal(dappResult.scope, 'dapp');
+  assert.equal(dappResult.coolifyApplicationId, '33');
 });
 
 test('rejects unknown service scopes', () => {

@@ -1,0 +1,323 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-bookworm-slim AS base
+
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NX_DAEMON=false \
+    PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable \
+  && corepack prepare pnpm@10.19.0 --activate \
+  && pnpm config set store-dir /pnpm/store
+
+FROM base AS deps
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc nx.json ./
+COPY dapp/package.json dapp/package.json
+COPY dapp/prisma dapp/prisma
+COPY games/hyppie-road/package.json games/hyppie-road/package.json
+COPY games/sybil-slayer/package.json games/sybil-slayer/package.json
+COPY games/tower-builder/package.json games/tower-builder/package.json
+COPY packages/chain-indexer/package.json packages/chain-indexer/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/cuki-card-worker/package.json packages/cuki-card-worker/package.json
+COPY packages/game-bridge/package.json packages/game-bridge/package.json
+
+RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
+  pnpm install --frozen-lockfile
+
+FROM deps AS dapp-build
+
+ARG CUKIES_BUILD_ENV_HASH
+ARG IMAGE_REVISION
+ENV CUKIES_DEPLOYMENT_ID=$IMAGE_REVISION
+ARG NEXT_PUBLIC_APP_ENV
+ARG NEXT_PUBLIC_UKI_CHAIN_ID
+ARG NEXT_PUBLIC_ASM_TOKEN_ADDRESS
+ARG NEXT_PUBLIC_UKI_TOKEN_ADDRESS
+ARG NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS
+ARG NEXT_PUBLIC_UKI_PRESALE_ADDRESS
+ARG NEXT_PUBLIC_UKI_STAKING_ADDRESS
+ARG NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS
+ARG NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS
+ARG NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS
+ARG NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS
+ARG NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS
+ARG NEXT_PUBLIC_UKI_MARKETPLACE_BNB_PATH
+ARG NEXT_PUBLIC_UKI_MARKETPLACE_USDT_PATH
+ARG NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS
+ARG NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS
+ARG NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL
+ARG NEXT_PUBLIC_UKI_SWAP_URL
+ARG NEXT_PUBLIC_CUKIE_MASTER_NFT_VAULT_ADDRESS
+ARG NEXT_PUBLIC_CUKIE_POOL_NFT_VAULT_ADDRESS
+ARG NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS
+ARG NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESSES
+ARG NEXT_PUBLIC_CUKIES_NFT_RECOVERY_COLLECTION_ADDRESSES
+ARG NEXT_PUBLIC_CUKIE_POOL_RECOVERY_VAULT_ADDRESSES
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_MODE
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS
+ARG NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS
+ARG NEXT_PUBLIC_BSCSCAN_BASE_URL
+ARG NEXT_PUBLIC_UKI_PRESALE_START_ISO
+ARG NEXT_PUBLIC_UKI_PRESALE_START_LABEL
+ARG NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL
+ARG NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+ARG NEXT_PUBLIC_AMBASSADORS_VISIBLE
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_GAME_COMMUNICATION_KEY
+ARG NEXT_PUBLIC_GAME_SYBILSLASH
+ARG NEXT_PUBLIC_GAME_HYPPIE_ROAD
+ARG NEXT_PUBLIC_GAME_TOWER_BUILDER
+ARG NEXT_PUBLIC_PUSHER_KEY
+ARG NEXT_PUBLIC_PUSHER_CLUSTER
+ARG NEXT_PUBLIC_TWITTER_PROFILE_URL
+ARG NEXT_PUBLIC_DISCORD_INVITE_URL
+ARG NEXT_PUBLIC_DISCORD_CLIENT_ID
+ARG NEXT_PUBLIC_TWITTER_CLIENT_ID
+ARG DISCORD_CLIENT_ID
+ARG TWITTER_CLIENT_ID
+ARG GAME_SYBILSLASH
+ARG GAME_HYPPIE_ROAD
+ARG GAME_TOWER_BUILDER
+
+ENV CUKIES_STANDALONE=true \
+    CUKIES_BUILD_ENV_HASH=$CUKIES_BUILD_ENV_HASH \
+    NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    NEXT_PUBLIC_UKI_CHAIN_ID=$NEXT_PUBLIC_UKI_CHAIN_ID \
+    NEXT_PUBLIC_ASM_TOKEN_ADDRESS=$NEXT_PUBLIC_ASM_TOKEN_ADDRESS \
+    NEXT_PUBLIC_UKI_TOKEN_ADDRESS=$NEXT_PUBLIC_UKI_TOKEN_ADDRESS \
+    NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS=$NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS \
+    NEXT_PUBLIC_UKI_PRESALE_ADDRESS=$NEXT_PUBLIC_UKI_PRESALE_ADDRESS \
+    NEXT_PUBLIC_UKI_STAKING_ADDRESS=$NEXT_PUBLIC_UKI_STAKING_ADDRESS \
+    NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS=$NEXT_PUBLIC_UKI_REWARDS_DISTRIBUTOR_ADDRESS \
+    NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS=$NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS \
+    NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS=$NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS \
+    NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS=$NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS \
+    NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS=$NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS \
+    NEXT_PUBLIC_UKI_MARKETPLACE_BNB_PATH=$NEXT_PUBLIC_UKI_MARKETPLACE_BNB_PATH \
+    NEXT_PUBLIC_UKI_MARKETPLACE_USDT_PATH=$NEXT_PUBLIC_UKI_MARKETPLACE_USDT_PATH \
+    NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS=$NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS \
+    NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS=$NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS \
+    NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL=$NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL \
+    NEXT_PUBLIC_UKI_SWAP_URL=$NEXT_PUBLIC_UKI_SWAP_URL \
+    NEXT_PUBLIC_CUKIE_MASTER_NFT_VAULT_ADDRESS=$NEXT_PUBLIC_CUKIE_MASTER_NFT_VAULT_ADDRESS \
+    NEXT_PUBLIC_CUKIE_POOL_NFT_VAULT_ADDRESS=$NEXT_PUBLIC_CUKIE_POOL_NFT_VAULT_ADDRESS \
+    NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS=$NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS \
+    NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESSES=$NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESSES \
+    NEXT_PUBLIC_CUKIES_NFT_RECOVERY_COLLECTION_ADDRESSES=$NEXT_PUBLIC_CUKIES_NFT_RECOVERY_COLLECTION_ADDRESSES \
+    NEXT_PUBLIC_CUKIE_POOL_RECOVERY_VAULT_ADDRESSES=$NEXT_PUBLIC_CUKIE_POOL_RECOVERY_VAULT_ADDRESSES \
+    NEXT_PUBLIC_CUKIES_BRIDGE_MODE=$NEXT_PUBLIC_CUKIES_BRIDGE_MODE \
+    NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID=$NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID \
+    NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS=$NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS \
+    NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS=$NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS \
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK=$NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK \
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL=$NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL \
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS=$NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS \
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS=$NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS \
+    NEXT_PUBLIC_BSCSCAN_BASE_URL=$NEXT_PUBLIC_BSCSCAN_BASE_URL \
+    NEXT_PUBLIC_UKI_PRESALE_START_ISO=$NEXT_PUBLIC_UKI_PRESALE_START_ISO \
+    NEXT_PUBLIC_UKI_PRESALE_START_LABEL=$NEXT_PUBLIC_UKI_PRESALE_START_LABEL \
+    NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL=$NEXT_PUBLIC_UKI_PRESALE_START_SHORT_LABEL \
+    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID \
+    NEXT_PUBLIC_AMBASSADORS_VISIBLE=$NEXT_PUBLIC_AMBASSADORS_VISIBLE \
+    NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
+    NEXT_PUBLIC_GAME_COMMUNICATION_KEY=$NEXT_PUBLIC_GAME_COMMUNICATION_KEY \
+    NEXT_PUBLIC_GAME_SYBILSLASH=$NEXT_PUBLIC_GAME_SYBILSLASH \
+    NEXT_PUBLIC_GAME_HYPPIE_ROAD=$NEXT_PUBLIC_GAME_HYPPIE_ROAD \
+    NEXT_PUBLIC_GAME_TOWER_BUILDER=$NEXT_PUBLIC_GAME_TOWER_BUILDER \
+    NEXT_PUBLIC_PUSHER_KEY=$NEXT_PUBLIC_PUSHER_KEY \
+    NEXT_PUBLIC_PUSHER_CLUSTER=$NEXT_PUBLIC_PUSHER_CLUSTER \
+    NEXT_PUBLIC_TWITTER_PROFILE_URL=$NEXT_PUBLIC_TWITTER_PROFILE_URL \
+    NEXT_PUBLIC_DISCORD_INVITE_URL=$NEXT_PUBLIC_DISCORD_INVITE_URL \
+    NEXT_PUBLIC_DISCORD_CLIENT_ID=$NEXT_PUBLIC_DISCORD_CLIENT_ID \
+    NEXT_PUBLIC_TWITTER_CLIENT_ID=$NEXT_PUBLIC_TWITTER_CLIENT_ID \
+    DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID \
+    TWITTER_CLIENT_ID=$TWITTER_CLIENT_ID \
+    GAME_SYBILSLASH=$GAME_SYBILSLASH \
+    GAME_HYPPIE_ROAD=$GAME_HYPPIE_ROAD \
+    GAME_TOWER_BUILDER=$GAME_TOWER_BUILDER
+
+COPY . .
+
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+    --mount=type=cache,id=cukies-next-cache-dapp,target=/app/dapp/.next/cache,sharing=locked \
+    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run dapp:build
+
+FROM deps AS treasure-hunt-build
+
+ARG CUKIES_BUILD_ENV_HASH
+ARG IMAGE_REVISION
+ARG NEXT_PUBLIC_APP_ENV
+ARG NEXT_PUBLIC_GAME_BASE_PATH
+ARG NEXT_PUBLIC_DAPP_ORIGIN
+ARG NEXT_PUBLIC_PARENT_URL
+ARG NEXT_PUBLIC_PUSHER_KEY
+ARG NEXT_PUBLIC_PUSHER_CLUSTER
+ARG NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED
+
+ENV CUKIES_BUILD_ENV_HASH=$CUKIES_BUILD_ENV_HASH \
+    SOURCE_COMMIT=$IMAGE_REVISION \
+    IMAGE_REVISION=$IMAGE_REVISION \
+    NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    NEXT_PUBLIC_GAME_BASE_PATH=$NEXT_PUBLIC_GAME_BASE_PATH \
+    NEXT_PUBLIC_DAPP_ORIGIN=$NEXT_PUBLIC_DAPP_ORIGIN \
+    NEXT_PUBLIC_PARENT_URL=$NEXT_PUBLIC_PARENT_URL \
+    NEXT_PUBLIC_PUSHER_KEY=$NEXT_PUBLIC_PUSHER_KEY \
+    NEXT_PUBLIC_PUSHER_CLUSTER=$NEXT_PUBLIC_PUSHER_CLUSTER \
+    NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED=$NEXT_PUBLIC_TREASURE_HUNT_MULTIPLAYER_ENABLED
+
+COPY . .
+
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+    --mount=type=cache,id=cukies-next-cache-treasure-hunt,target=/app/games/sybil-slayer/.next/cache,sharing=locked \
+    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run sybil-slayer:build
+
+FROM deps AS chain-indexer-build
+
+COPY . .
+
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run chain-indexer:build
+
+RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
+    rm -rf /out && pnpm --filter @cukies/chain-indexer deploy --prod --legacy /out
+
+FROM deps AS cuki-card-worker-build
+
+COPY . .
+
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+    NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run cuki-card-worker:build
+
+RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
+    rm -rf /out && pnpm --filter @cukies/cuki-card-worker deploy --prod --legacy /out
+
+FROM base AS dapp
+
+ARG IMAGE_REVISION
+ARG NEXT_PUBLIC_APP_ENV
+
+ENV NODE_ENV=production \
+    HOSTNAME=0.0.0.0 \
+    NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    CUKIES_IMAGE_REVISION=$IMAGE_REVISION
+
+# Coolify's Docker Image rolling health check runs curl inside the container.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=dapp-build /app/dapp/.next/standalone /app
+COPY --from=dapp-build /app/dapp/.next/static /tmp/cukies-next-static/
+COPY --from=dapp-build /app/dapp/public /tmp/cukies-dapp-public/
+COPY --from=dapp-build /app/dapp/prisma /tmp/cukies-dapp-prisma/
+
+RUN if [ -f /app/dapp/server.js ]; then \
+      mkdir -p /app/dapp/.next; \
+      rm -rf /app/dapp/.next/static /app/dapp/public /app/dapp/prisma; \
+      mv /tmp/cukies-next-static /app/dapp/.next/static; \
+      mv /tmp/cukies-dapp-public /app/dapp/public; \
+      mv /tmp/cukies-dapp-prisma /app/dapp/prisma; \
+    else \
+      mkdir -p /app/.next; \
+      rm -rf /app/.next/static /app/public /app/prisma; \
+      mv /tmp/cukies-next-static /app/.next/static; \
+      mv /tmp/cukies-dapp-public /app/public; \
+      mv /tmp/cukies-dapp-prisma /app/prisma; \
+    fi
+
+COPY --from=dapp-build /app/scripts /app/scripts
+
+LABEL coolify.managed="true" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}"
+
+EXPOSE 3000
+CMD ["sh", "scripts/docker-start-ci.sh"]
+
+FROM base AS chain-indexer
+
+ARG IMAGE_REVISION
+
+ENV NODE_ENV=production
+
+COPY --from=chain-indexer-build /out /app/packages/chain-indexer
+COPY --from=chain-indexer-build /app/packages/chain-indexer/dist /app/packages/chain-indexer/dist
+COPY --from=chain-indexer-build /app/scripts /app/scripts
+
+RUN ln -s /app/packages/chain-indexer/node_modules /app/node_modules
+
+LABEL coolify.managed="true" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}"
+
+CMD ["sh", "scripts/docker-start-ci.sh"]
+
+FROM base AS treasure-hunt
+
+ARG IMAGE_REVISION
+ARG NEXT_PUBLIC_APP_ENV
+
+ENV NODE_ENV=production \
+    HOSTNAME=0.0.0.0 \
+    NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    SOURCE_COMMIT=$IMAGE_REVISION \
+    IMAGE_REVISION=$IMAGE_REVISION \
+    CUKIES_IMAGE_REVISION=$IMAGE_REVISION \
+    CUKIES_SERVICE=treasure-hunt
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=treasure-hunt-build /app/games/sybil-slayer/.next/standalone /app
+COPY --from=treasure-hunt-build /app/games/sybil-slayer/.next/static /tmp/cukies-game-static/
+COPY --from=treasure-hunt-build /app/games/sybil-slayer/public /tmp/cukies-game-public/
+COPY --from=treasure-hunt-build /app/scripts/docker-dapp-server.mjs /app/scripts/docker-dapp-server.mjs
+COPY --from=treasure-hunt-build /app/scripts/docker-start-game-ci.mjs /app/scripts/docker-start-game-ci.mjs
+
+RUN if [ -f /app/games/sybil-slayer/server.js ]; then \
+      mkdir -p /app/games/sybil-slayer/.next; \
+      rm -rf /app/games/sybil-slayer/.next/static /app/games/sybil-slayer/public; \
+      mv /tmp/cukies-game-static /app/games/sybil-slayer/.next/static; \
+      mv /tmp/cukies-game-public /app/games/sybil-slayer/public; \
+    else \
+      mkdir -p /app/.next; \
+      rm -rf /app/.next/static /app/public; \
+      mv /tmp/cukies-game-static /app/.next/static; \
+      mv /tmp/cukies-game-public /app/public; \
+    fi
+
+LABEL coolify.managed="true" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}"
+
+EXPOSE 3000
+CMD ["node", "/app/scripts/docker-start-game-ci.mjs"]
+
+FROM base AS cuki-card-worker
+
+ARG IMAGE_REVISION
+
+ENV NODE_ENV=production
+
+COPY --from=cuki-card-worker-build /out /app/packages/cuki-card-worker
+COPY --from=cuki-card-worker-build /app/packages/cuki-card-worker/dist /app/packages/cuki-card-worker/dist
+COPY --from=cuki-card-worker-build /app/packages/cuki-card-worker/assets /app/packages/cuki-card-worker/assets
+COPY --from=cuki-card-worker-build /app/scripts /app/scripts
+
+RUN ln -s /app/packages/cuki-card-worker/node_modules /app/node_modules
+
+LABEL coolify.managed="true" \
+      org.opencontainers.image.revision="${IMAGE_REVISION}"
+
+CMD ["sh", "scripts/docker-start-ci.sh"]
