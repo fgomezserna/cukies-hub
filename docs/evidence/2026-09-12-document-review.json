@@ -325,6 +325,13 @@
       "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
       "reportedObservation": "Exact invitation API returns ambassadorPublicName:null. Existing reader uses User.username through exact wallet or UserWallet link.",
       "verificationBoundary": "A null result does not prove absence of a public gameplay alias. Root requested canonical public alias source contrast without writing profile data or inferring identity from anonymous rankings. A3 remains open."
+    },
+    {
+      "reportedAt": "2026-09-12T13:30:06.303513+00:00",
+      "lane": "D12-4",
+      "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
+      "reportedObservation": "Root inspected A3 alias-reader proposal and the current staging weekly profile reader from PR429.",
+      "verificationBoundary": "Requested explicit weekly alias precedence, then explicit runtime-campaign alias, then exact public username, with generated aliases excluded. Requested timeout regression preserving a healthy Hub name if optional participant lookup hangs. Implementation not accepted yet."
     }
   ]
 }
