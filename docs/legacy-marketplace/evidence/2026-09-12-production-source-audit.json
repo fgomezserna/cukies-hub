@@ -1,0 +1,144 @@
+{
+  "recordedAt": "2026-09-12T17:00:13.371231+00:00",
+  "auditDateReported": "2026-09-12",
+  "source": {
+    "threadId": "01a0963d-4b9e-71a3-a9f3-dcc7ad732ebe",
+    "title": "Auditoría fuerte de sincronización BD…",
+    "environment": "production",
+    "accessReported": "authenticated read-only from VM1001/Coolify game-hub dapp and chain-indexer to Mongo on192.168.1.221",
+    "verificationBoundary": "Task-reported live observations and explicit follow-up clarifications. Coordinator has not repeated production scans. No database writes or dump reported."
+  },
+  "databasesReported": [
+    {
+      "name": "cukies-hub",
+      "role": "Prisma application identity, authentication, sessions and Hub-owned data"
+    },
+    {
+      "name": "cukies",
+      "role": "active legacy projections and worker history",
+      "collections": 42,
+      "cukiesDocuments": 17464,
+      "processedEvents": 191607,
+      "completedEvents": 119441,
+      "tx_nfts": 25662,
+      "txMarketplace": 9240,
+      "activeConsumers": [
+        "BSC getter",
+        "TRON getter",
+        "setter",
+        "cards",
+        "legacy APIs"
+      ]
+    },
+    {
+      "name": "cukieshub-new",
+      "role": "new indexation and economy projections",
+      "collections": 127,
+      "cukiesDocuments": 17464,
+      "chain_events": 41835,
+      "tx_nfts": 15395,
+      "indexerCoverageReported": {
+        "chains": [
+          "BSC"
+        ],
+        "aliases": [
+          "PRESALE",
+          "UKI_STAKING"
+        ]
+      }
+    }
+  ],
+  "comparisonLimits": {
+    "preliminaryStateDifferenceCount": 2939,
+    "preliminaryKey": "UPPER(network) + \"|\" + String(cukiNumber)",
+    "uniquePreliminaryKeys": 12153,
+    "duplicatePreliminaryKeys": 5311,
+    "interpretation": "Non-unique-key snapshot divergence signal. Not a reconciled count of incorrect NFTs.",
+    "identifierCoverageKey": "UPPER(network) + \"|\" + String(tokenId ?? _id)",
+    "commonIdentifierKeys": 17464,
+    "notCompared": [
+      "collectionAddress",
+      "owner/custody semantics",
+      "same block cutoff"
+    ],
+    "ownershipFields": {
+      "legacy": "user",
+      "new": [
+        "owner",
+        "ownerNormalized"
+      ]
+    }
+  },
+  "stateCountsReported": {
+    "TRON": {
+      "staking": {
+        "legacy": 4952,
+        "new": 1051
+      },
+      "available": {
+        "legacy": 7081,
+        "new": 11414
+      },
+      "onSale": {
+        "legacy": 854,
+        "new": 558
+      },
+      "breeding": {
+        "legacy": 156,
+        "new": 28
+      },
+      "inBridge": {
+        "legacy": 16,
+        "new": 8
+      }
+    },
+    "BSC": {
+      "available": {
+        "legacy": 2939,
+        "new": 2938
+      },
+      "staking": {
+        "legacy": 1279,
+        "new": 1280
+      },
+      "onSale": {
+        "legacy": 127,
+        "new": 127
+      },
+      "breeding": {
+        "legacy": 60,
+        "new": 60
+      }
+    }
+  },
+  "migrationReview": [
+    "Reconcile by chain, collection, tokenId and comparable block cutoff; matching counts/identifiers alone do not prove owner, custody or state equivalence.",
+    "Keep imported legacy snapshots/worker records distinct from verified raw blockchain logs; require provenance, normalization and idempotent keys, with deduplication before any approved replay.",
+    "Migrate writers per domain and reconcile readers before revoking legacy write access. Do not set cukies read-only while existing getters/setter/APIs write there.",
+    "Keep application identity/auth migration separate from blockchain ingestion; no automatic historical credits/rewards/positions from imported records.",
+    "Future implementation and production cutover remain outside this received read-only audit. No new runtime migration is launched by this record."
+  ],
+  "historicalArtifactsSupplied": [
+    {
+      "path": "docs/legacy-marketplace/README.md",
+      "scope": "Producción observada; Modelos y destino de reconciliación"
+    },
+    {
+      "path": "docs/legacy-marketplace/evidence/2026-09-07-databases.json",
+      "scope": "Historical authenticated database/collection inventory, not a12-Sep snapshot"
+    },
+    {
+      "path": "docs/legacy-marketplace/evidence/2026-09-07-runtime.json",
+      "observedAt": "2026-09-07T17:19:02Z",
+      "scope": "Historical staging runtime and effective DB destinations; not current production proof"
+    },
+    {
+      "path": "docs/legacy-marketplace/TRACKERS_AUDIT.md",
+      "scope": "Contracts/indexer/importer and limitations"
+    },
+    {
+      "path": "docs/deployment-environments.md",
+      "scope": "Environment separation and runtime inventory limitations"
+    }
+  ]
+}
