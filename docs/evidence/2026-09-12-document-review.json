@@ -276,7 +276,10 @@
         453
       ],
       "deliveredCommit": "15067005e118865d8fd283a5d4bcfc05d5ed8023",
-      "deliveryStatus": "accepted-awaiting-merge-deploy"
+      "deliveryStatus": "deployed",
+      "stagingMergeCommit": "1fcac2b9c3b207258b77235d4a9ea723eaed1821",
+      "deploymentRun": 34707208089,
+      "servedVerifiedAt": "2026-09-12T17:16:31.980Z"
     },
     {
       "lane": "D12-4",
@@ -302,12 +305,14 @@
       "pullRequest": 452
     }
   ],
-  "taskStatusObservedAt": "2026-09-12T17:04:24.329320+00:00",
+  "taskStatusObservedAt": "2026-09-12T17:17:41.543677+00:00",
   "automation": {
     "id": "coordinar-pruebas-cukies-12-sep",
-    "status": "ACTIVE",
+    "status": "DELETED",
     "intervalMinutes": 30,
-    "stop": "implementation/review/merge/deploy complete, or only human checks remain"
+    "stop": "implementation/review/merge/deploy complete, or only human checks remain",
+    "deletedAt": "2026-09-12T17:17:41.543677+00:00",
+    "reason": "All document12 technical implementation, review, merge and deployment delivered. Remaining authenticated user-wallet/game/reward QA is manual; separate production migration audit is not part of this coordinator."
   },
   "coordinationComments": {
     "418": "https://github.com/fgomezserna/cukies-hub/issues/418#issuecomment-5646070748",
@@ -713,6 +718,93 @@
       "lane": "D12-3",
       "reportedObservation": "Root final candidate92983598 passes275 suites/2418tests, typecheck and lint. The extended identity-reset regression now proves retention and completed joint publication with no new requests after stable rerender. Root closes the bounded review findings. Subsequent staging integration changes docs only; no product code delta from the tested candidate.",
       "verificationBoundary": "Merge/deployment still pending. No user-wallet transactions or new authenticated game/claim QA performed."
+    },
+    {
+      "reportedAt": "2026-09-12T17:10:18.954301+00:00",
+      "lane": "D12-3",
+      "reportedObservation": "PR453 merged staging1fcac2b9c3b207258b77235d4a9ea723eaed1821 at17:06:02UTC; pipeline34707208089 running. New read-only credit observation at17:09:11UTC shows both current17:00-17:30 runs with300NFT+200UKI credits applied; scheduler success at17:07:34UTC and0failures. Both16:30 and17:00 route pairs opened automatically after the source fix.",
+      "verificationBoundary": "O2 served SHA still pending. Run status open is recorded as returned; not relabelled as closed. No historical replay, credit adjustment or user-wallet signature.",
+      "creditGrants": {
+        "observedAt": "2026-09-12T17:09:11.669Z",
+        "runs": [
+          {
+            "route": "uki",
+            "status": "open"
+          },
+          {
+            "route": "nft",
+            "status": "open"
+          }
+        ],
+        "items": [
+          {
+            "_id": {
+              "route": "nft",
+              "status": "applied"
+            },
+            "slots": 3,
+            "grantCredits": 300,
+            "ownCredits": 300,
+            "poolCredits": 0
+          },
+          {
+            "_id": {
+              "route": "uki",
+              "status": "applied"
+            },
+            "slots": 2,
+            "grantCredits": 200,
+            "ownCredits": 200,
+            "poolCredits": 0
+          }
+        ]
+      }
+    },
+    {
+      "reportedAt": "2026-09-12T17:17:41.543677+00:00",
+      "lane": "D12-3",
+      "reportedObservation": "PR453 deployed successfully. Public staging health serves exact1fcac2b9; game remains ready onfb841f84 and production healthy oncf08e813. Automationcoordinar-pruebas-cukies-12-sep deleted after technical delivery completion.",
+      "verificationBoundary": "275suites/2418tests plus typecheck/lint and operational delivery verified. No personal-wallet signing, new authenticated gameplay/claim or historical repair; those remaining human checks are explicitly separated. Production source-normalization audit remains pointD, not a reopened document12 task.",
+      "postflight": {
+        "observedAt": "2026-09-12T17:16:31.980Z",
+        "delivery": {
+          "conclusion": "success",
+          "headSha": "1fcac2b9c3b207258b77235d4a9ea723eaed1821",
+          "status": "completed",
+          "updatedAt": "2026-09-12T17:14:50Z",
+          "url": "https://github.com/fgomezserna/cukies-hub/actions/runs/34707208089"
+        },
+        "staging": {
+          "status": "ok",
+          "app": "cukies-hub",
+          "environment": "staging",
+          "gitSha": "1fcac2b9c3b207258b77235d4a9ea723eaed1821",
+          "gitRef": "staging",
+          "buildTime": null,
+          "coolify": {
+            "resourceUuid": "rwwsc4kkwc0ck84cgk40s8kk",
+            "fqdn": null
+          }
+        },
+        "game": {
+          "status": "ready",
+          "configHash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+          "imageSha": "fb841f84abc5f6908ae991396c3d0a8878bd4e2a",
+          "gitSha": "fb841f84abc5f6908ae991396c3d0a8878bd4e2a"
+        },
+        "production": {
+          "status": "ok",
+          "app": "cukies-hub",
+          "environment": "production",
+          "gitSha": "cf08e81367502d4447024a39f6681a2939d24035",
+          "gitRef": "main",
+          "buildTime": null,
+          "coolify": {
+            "resourceUuid": "jookw8ow8woks088s44404ok",
+            "fqdn": "cukies.world,www.cukies.world"
+          }
+        }
+      }
     }
   ]
 }
