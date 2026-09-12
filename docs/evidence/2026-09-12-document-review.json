@@ -528,6 +528,12 @@
         ]
       },
       "verificationBoundary": "Read-only public endpoints and minimal invitation-code Mongo projection. No public-name values, wallets, credentials or profile mutations recorded. Existing confirmed-attribution behavior is regression-tested, not newly mutated as QA."
+    },
+    {
+      "reportedAt": "2026-09-12T14:43:56.249580+00:00",
+      "lane": "D12-1/D12-3",
+      "reportedObservation": "PR449 deployment34699288472 succeeded. Public web and game health report fb841f84; release state records exact web/game images and live game container is healthy. PR450 merged staging af41cce6 at14:43:08UTC, beginning C2/notice deployment.",
+      "verificationBoundary": "Deployment and game readiness are verified; no personal-wallet gameplay or historical reward repair performed. O2 remains a separate active implementation."
     }
   ]
 }
