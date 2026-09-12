@@ -316,6 +316,25 @@ describe('SybilSlayerPage game-session handshake', () => {
       { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
       GAME_ORIGIN,
     );
+
+    postMessage.mockClear();
+    fireEvent.load(iframe);
+    fireEvent.click(screen.getByTestId('start-single-player'));
+    expect(postMessage).not.toHaveBeenCalledWith(
+      { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
+      GAME_ORIGIN,
+    );
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'GAME_READY' },
+      }));
+    });
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
+      GAME_ORIGIN,
+    );
   });
 
   it('preserves an invite for the first wallet but clears it before another wallet handshakes', async () => {
