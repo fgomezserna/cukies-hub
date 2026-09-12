@@ -488,6 +488,12 @@
       "lane": "D12-1/D12-3/D12-4",
       "reportedObservation": "PR451 backport merged staging2c7a3882 at14:12:45UTC, CI34698620345 in progress. Root accepted game56462244 and merged updated staging into candidate without conflicts. C2 will ship in PR450; O2 remains a separate bounded follow-up within its existing task.",
       "verificationBoundary": "Root full game candidate checks are running; no game settlement claimed live and no historical repair."
+    },
+    {
+      "reportedAt": "2026-09-12T14:23:18.152617+00:00",
+      "lane": "D12-1/D12-3",
+      "reportedObservation": "Root final game candidate:274 suites/2395 tests and typecheck/lint passed. Root credit candidate includes accepted game changes plus removal of invalid O2 test7a2ac426:275 suites/2407 tests,100 focal tests and typecheck/lint passed. Both code candidates accepted; staging451 deployment still running.",
+      "verificationBoundary": "No new code changed by these documentary updates. C2 delivery does not close O2."
     }
   ]
 }
