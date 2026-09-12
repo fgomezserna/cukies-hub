@@ -540,6 +540,12 @@
       "lane": "D12-3",
       "reportedObservation": "O2 root review identified singleton NFT expectation overwrites, stale automatic-query closure publication, and a deposit fixture incorrectly reducing NFT points. Worker requested to fix these bounded cases before acceptance. C2 deployment34700104183 continues separately.",
       "verificationBoundary": "These are implementation/review findings, not a request for human validation. No runtime or accounting mutation."
+    },
+    {
+      "reportedAt": "2026-09-12T14:51:13.639620+00:00",
+      "lane": "D12-3/C2 runtime",
+      "reportedObservation": "Read-only live staging audit found competition-credit scheduler HTTP503 and runtime DOMAIN_CONFLICT,593 consecutive failures,lastSuccess09:47:40UTC. No runs cover current14:48UTC settlement. Master/game/accounting heartbeats remain successful around14:50UTC; gates and secret presence are configured. Root diagnosing before operational closure.",
+      "verificationBoundary": "Only whitelisted metadata/log codes and Mongo projections; no secrets, resets, backfills or gate changes."
     }
   ]
 }
