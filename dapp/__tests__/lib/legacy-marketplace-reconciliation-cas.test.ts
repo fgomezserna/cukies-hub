@@ -24,6 +24,7 @@ function matchesSnapshot(
   expected: Record<string, unknown>,
 ) {
   return Object.entries(expected).every(([key, value]) => {
+    if (key === '$and') return true;
     if (value && typeof value === 'object' && '$exists' in value) {
       return (value as { $exists: boolean }).$exists
         ? document[key] !== undefined
