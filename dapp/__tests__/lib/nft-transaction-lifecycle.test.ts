@@ -95,4 +95,28 @@ describe('executeNftTransaction replacements', () => {
     expect(baseInput.onReverted).toHaveBeenCalledWith(true);
     expect(baseInput.onConfirmed).not.toHaveBeenCalled();
   });
+
+  it('no cambia el ciclo pendiente si la wallet rechaza antes de devolver hash', async () => {
+    const onSubmitted = jest.fn();
+    const onReverted = jest.fn();
+    const onConfirmed = jest.fn();
+    const write = jest.fn().mockRejectedValue(new Error('User rejected request'));
+
+    await expect(executeNftTransaction({
+      ...baseInput,
+      write,
+      onSubmitted,
+      onReverted,
+      onConfirmed,
+      client: {
+        simulateContract: jest.fn().mockResolvedValue({}),
+        waitForTransactionReceipt: jest.fn(),
+      },
+    })).rejects.toThrow('User rejected request');
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(onSubmitted).not.toHaveBeenCalled();
+    expect(onReverted).not.toHaveBeenCalled();
+    expect(onConfirmed).not.toHaveBeenCalled();
+  });
 });
