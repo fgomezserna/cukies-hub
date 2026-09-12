@@ -276,7 +276,7 @@
         453
       ],
       "deliveredCommit": "15067005e118865d8fd283a5d4bcfc05d5ed8023",
-      "deliveryStatus": "root-final-checks"
+      "deliveryStatus": "accepted-awaiting-merge-deploy"
     },
     {
       "lane": "D12-4",
@@ -302,7 +302,7 @@
       "pullRequest": 452
     }
   ],
-  "taskStatusObservedAt": "2026-09-12T17:01:52.695216+00:00",
+  "taskStatusObservedAt": "2026-09-12T17:04:24.329320+00:00",
   "automation": {
     "id": "coordinar-pruebas-cukies-12-sep",
     "status": "ACTIVE",
@@ -707,6 +707,12 @@
       "lane": "D12-3",
       "reportedObservation": "Worker15067005 adds reset-generation dependency as re-registration trigger; acknowledgement remains the sole closure proof. Same regression now resolves new matching pair, asserts Credits1/pending0/idle and no extra requests after stable rerender.64 focal tests and typecheck reported pass. Root reviewed the minimal closure and integrated92983598; final full checks running.",
       "verificationBoundary": "No staging merge/deployment claimed yet. Independent reviewer findings closed by root inspection plus extended regression, not by prior test count alone."
+    },
+    {
+      "reportedAt": "2026-09-12T17:04:24.329320+00:00",
+      "lane": "D12-3",
+      "reportedObservation": "Root final candidate92983598 passes275 suites/2418tests, typecheck and lint. The extended identity-reset regression now proves retention and completed joint publication with no new requests after stable rerender. Root closes the bounded review findings. Subsequent staging integration changes docs only; no product code delta from the tested candidate.",
+      "verificationBoundary": "Merge/deployment still pending. No user-wallet transactions or new authenticated game/claim QA performed."
     }
   ]
 }
