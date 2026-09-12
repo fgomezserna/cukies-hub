@@ -62,7 +62,9 @@ describe('getAmbassadorEligibility on-chain fallback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.CHAIN_INDEXER_CUKIE_MASTER_ENABLED;
+    delete process.env.CHAIN_INDEXER_BSC_RPC_URLS;
     process.env.CHAIN_INDEXER_BSC_RPC_URL = 'https://rpc.example.invalid';
+    delete process.env.BSC_RPC_URL;
     mockGetCukieMasterWalletStatus.mockResolvedValue(status());
     mockCreatePublicClient.mockReturnValue({
       getChainId: jest.fn().mockResolvedValue(56),
@@ -79,7 +81,9 @@ describe('getAmbassadorEligibility on-chain fallback', () => {
   });
 
   afterAll(() => {
+    delete process.env.CHAIN_INDEXER_BSC_RPC_URLS;
     delete process.env.CHAIN_INDEXER_BSC_RPC_URL;
+    delete process.env.BSC_RPC_URL;
     delete process.env.CHAIN_INDEXER_CUKIE_MASTER_ENABLED;
   });
 
@@ -92,6 +96,18 @@ describe('getAmbassadorEligibility on-chain fallback', () => {
     });
     expect(result.sourceHash).toMatch(/^[0-9a-f]{64}$/);
     expect(mockCreatePublicClient).toHaveBeenCalled();
+  });
+
+  it('usa el fallback publico cuando el runtime no expone un RPC server-side', async () => {
+    delete process.env.CHAIN_INDEXER_BSC_RPC_URLS;
+    delete process.env.CHAIN_INDEXER_BSC_RPC_URL;
+    delete process.env.BSC_RPC_URL;
+
+    await expect(getAmbassadorEligibility(wallet, observedAt)).resolves.toMatchObject({
+      isCukieMaster: false,
+      reason: 'CUKIE_MASTER_REQUIREMENT_NOT_MET',
+    });
+    expect(mockCreatePublicClient).toHaveBeenCalledTimes(1);
   });
 
   it('conserva un positivo UKI aunque la fuente NFT este incompleta', async () => {
@@ -153,6 +169,7 @@ describe('getAmbassadorEligibility on-chain fallback', () => {
       getBlock: jest.fn(),
       readContract: jest.fn(),
     });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     await expect(getAmbassadorEligibility(wallet, observedAt)).resolves.toMatchObject({
       isCukieMaster: null,
@@ -160,6 +177,72 @@ describe('getAmbassadorEligibility on-chain fallback', () => {
       sourceHash: null,
     });
     expect(JSON.stringify(await getAmbassadorEligibility(wallet, observedAt))).not.toContain('indexer unavailable');
+    warn.mockRestore();
+  });
+
+  it('reintenta el siguiente RPC configurado sin degradar una respuesta valida', async () => {
+    process.env.CHAIN_INDEXER_BSC_RPC_URLS = 'https://rpc.first.invalid,https://rpc.second.invalid';
+    delete process.env.CHAIN_INDEXER_BSC_RPC_URL;
+    const firstClient = {
+      getChainId: jest.fn().mockRejectedValue(new Error('ECONNRESET')),
+      getBlockNumber: jest.fn(),
+      getBlock: jest.fn(),
+      readContract: jest.fn(),
+    };
+    const secondClient = {
+      getChainId: jest.fn().mockResolvedValue(56),
+      getBlockNumber: jest.fn().mockResolvedValue(BigInt(120879904)),
+      getBlock: jest.fn().mockResolvedValue({
+        number: BigInt(120879904),
+        hash: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        timestamp: BigInt(1_725_000_000),
+      }),
+      readContract: jest.fn()
+        .mockResolvedValueOnce({ totalAmount: BigInt(requirementRaw), releasedAmount: BigInt(0) })
+        .mockResolvedValueOnce(BigInt(0)),
+    };
+    mockCreatePublicClient
+      .mockReset()
+      .mockReturnValueOnce(firstClient)
+      .mockReturnValueOnce(secondClient);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(getAmbassadorEligibility(wallet, observedAt)).resolves.toMatchObject({
+      isCukieMaster: true,
+      reason: null,
+    });
+    expect(mockCreatePublicClient).toHaveBeenCalledTimes(2);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('conserva unknown y registra solo categorias cuando todos los RPC fallan', async () => {
+    process.env.CHAIN_INDEXER_BSC_RPC_URLS = 'https://rpc.first.invalid,https://rpc.second.invalid';
+    delete process.env.CHAIN_INDEXER_BSC_RPC_URL;
+    mockCreatePublicClient.mockReset().mockReturnValue({
+      getChainId: jest.fn().mockRejectedValue(new Error('provider failed with sensitive details')),
+      getBlockNumber: jest.fn(),
+      getBlock: jest.fn(),
+      readContract: jest.fn(),
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(getAmbassadorEligibility(wallet, observedAt)).resolves.toMatchObject({
+      isCukieMaster: null,
+      reason: 'CUKIE_MASTER_SOURCE_UNKNOWN',
+      sourceHash: null,
+    });
+    expect(warn).toHaveBeenCalledWith(
+      'Ambassador eligibility on-chain fallback unavailable',
+      expect.objectContaining({
+        chainId: 56,
+        providerCount: 2,
+        failureKinds: ['provider'],
+      }),
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('rpc.first.invalid');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('sensitive details');
+    warn.mockRestore();
   });
 
   it('no convierte NFT no aplicable en unknown cuando UKI es un negativo confirmado', async () => {
