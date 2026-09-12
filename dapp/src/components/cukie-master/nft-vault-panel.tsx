@@ -585,12 +585,17 @@ export function CukieMasterNftVaultPanel() {
   }, [pendingContext, pendingKey, pendingOperationsForContext]);
 
   useEffect(() => {
-    if (!pendingHydrated || !pendingContext) return;
+    // Let the first identity-scoped inventory response populate the panel
+    // before registering a persisted projection expectation. Registering it
+    // during the initial query would intentionally supersede that in-flight
+    // read and leave the panel without an inventory while the readback pair
+    // is converging.
+    if (!pendingHydrated || !pendingContext || !statusResource.data) return;
     for (const operation of Object.values(pendingByAsset)) {
       if (operation.phase !== 'syncing_projection' || operation.action === 'approval') continue;
       registerNftExpectation(operation);
     }
-  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, registerNftExpectation, runtimeSessionReady]);
+  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, registerNftExpectation, runtimeSessionReady, statusResource.data]);
 
   const persistPending = useCallback((input: {
     asset: PublicNft;
