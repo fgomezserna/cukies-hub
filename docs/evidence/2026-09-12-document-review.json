@@ -283,7 +283,7 @@
       "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
     }
   ],
-  "taskStatusObservedAt": "2026-09-12T13:07:12Z",
+  "taskStatusObservedAt": "2026-09-12T13:20:00Z",
   "automation": {
     "id": "coordinar-pruebas-cukies-12-sep",
     "status": "ACTIVE",
@@ -304,6 +304,27 @@
       "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
       "reportedObservation": "The exact active invitation returned HTTP503 ten times and later HTTP200 without changes. Production health identifies d1a71495.",
       "verificationBoundary": "Reported by implementation task; root requested effective runtime environment presence and server-side RPC evidence before attributing root cause. No fix delivered yet."
+    },
+    {
+      "reportedAt": "2026-09-12T13:20:00Z",
+      "lane": "D12-2",
+      "sourceThreadId": "01a095b2-dbc0-7460-b97b-fcced4dea445",
+      "reportedObservation": "Persisted approval_confirmed conflicts with projected canDeposit; implementation in progress.",
+      "verificationBoundary": "Root requires exact wallet, chain, collection and vault identity plus current ownership/custody/approval before any continuation."
+    },
+    {
+      "reportedAt": "2026-09-12T13:20:00Z",
+      "lane": "D12-3",
+      "sourceThreadId": "01a095b3-7ec0-7280-8d5f-694bf44a18bc",
+      "reportedObservation": "Local commit 3cd9a5436e32140be2889ca55ba00da1cb0d73bc supports multiple current credit runs and operation-specific runtime notices. Task reports 59 focal tests, typecheck and lint passing.",
+      "verificationBoundary": "Root inspected the diff; acceptance remains pending causal evidence, aggregation edge cases and both UKI/NFT sequences in 12-O2. Existing provider tests alone do not close O2."
+    },
+    {
+      "reportedAt": "2026-09-12T13:20:00Z",
+      "lane": "D12-4",
+      "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
+      "reportedObservation": "Exact invitation API returns ambassadorPublicName:null. Existing reader uses User.username through exact wallet or UserWallet link.",
+      "verificationBoundary": "A null result does not prove absence of a public gameplay alias. Root requested canonical public alias source contrast without writing profile data or inferring identity from anonymous rankings. A3 remains open."
     }
   ]
 }
