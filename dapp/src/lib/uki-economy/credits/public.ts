@@ -32,6 +32,15 @@ import type {
 } from './types';
 
 const MAX_PUBLIC_CREDIT_LOTS = 5_000;
+const MAX_PUBLIC_CREDIT_RUNS = 5_000;
+
+const PUBLIC_CREDIT_RUN_STATUSES = [
+  'snapshotted',
+  'processing',
+  'open',
+  'open_with_holds',
+  'blocked',
+] as const satisfies readonly CompetitionCreditRun['status'][];
 
 function exactCredits(value: unknown, label: string) {
   if (typeof value !== 'number') throw new DomainConflictError(`${label} no es numerico.`);
@@ -57,6 +66,22 @@ function sourceWatermarkIsFresh(
 
 function isOpenCreditRun(status: CompetitionCreditRun['status']) {
   return status === 'open' || status === 'open_with_holds';
+}
+
+function isCreditRunStatus(value: unknown): value is CompetitionCreditRun['status'] {
+  return typeof value === 'string'
+    && (PUBLIC_CREDIT_RUN_STATUSES as readonly string[]).includes(value);
+}
+
+function aggregateCurrentRunStatus(
+  runs: readonly Pick<CompetitionCreditRun, 'status'>[],
+) {
+  if (runs.length === 0) return 'missing' as const;
+  if (runs.some((run) => run.status === 'blocked')) return 'blocked' as const;
+  if (runs.some((run) => run.status === 'processing')) return 'processing' as const;
+  if (runs.some((run) => run.status === 'snapshotted')) return 'snapshotted' as const;
+  if (runs.some((run) => run.status === 'open_with_holds')) return 'open_with_holds' as const;
+  return 'open' as const;
 }
 
 type PublicLotMaterialization = {
@@ -273,6 +298,9 @@ export async function getCompetitionCreditWalletStatus(
       status: 'active',
       expiresAt: { $gt: now },
     }, { limit: 1_001 }),
+    // Delayed grants are materialized into the current settlement period, so
+    // more than one run for a route can legitimately be open at once. Keep
+    // every bounded run and aggregate its public status below.
     db.collection<CompetitionCreditRun>('competition_credit_runs').find({
       'settlementPeriod.periodId': period.periodId,
       'settlementPeriod.cutoff': { $lte: now },
@@ -280,7 +308,7 @@ export async function getCompetitionCreditWalletStatus(
       route: { $in: routes },
     }, {
       projection: { _id: 0, runId: 1, route: 1, status: 1 },
-    }).limit(routes.length + 1).toArray(),
+    }).limit(MAX_PUBLIC_CREDIT_RUNS + 1).toArray(),
   ]);
   if (slots.length > 10) {
     throw new DomainConflictError('La wallet excede el maximo canonico de 10 slots.');
@@ -289,25 +317,40 @@ export async function getCompetitionCreditWalletStatus(
     accounts.length > routes.length
     || pools.length > routes.length
     || watermarks.length > routes.length
-    || currentRuns.length > routes.length
   ) {
     throw new DomainConflictError('La proyeccion de creditos contiene rutas duplicadas.', {
       reason: 'CREDIT_PROJECTION_DUPLICATE_ROUTES',
     });
   }
-  const seenCurrentRunRoutes = new Set<CreditRoute>();
-  if (currentRuns.some((run) => {
-    if (seenCurrentRunRoutes.has(run.route)) return true;
-    seenCurrentRunRoutes.add(run.route);
-    return false;
-  })) {
-    throw new DomainConflictError('La proyeccion de runs de creditos contiene rutas duplicadas.', {
-      reason: 'CREDIT_PROJECTION_DUPLICATE_ROUTES',
+  if (currentRuns.length > MAX_PUBLIC_CREDIT_RUNS) {
+    throw new DomainConflictError('La proyeccion de runs de creditos excede el limite publico.', {
+      reason: 'CREDIT_RUN_PROJECTION_TOO_LARGE',
     });
   }
 
+  const seenCurrentRunIds = new Set<string>();
+  const currentRunsByRoute = new Map<CreditRoute, CompetitionCreditRun[]>();
   const openRunIdsByRoute = new Map<CreditRoute, Set<string>>();
   for (const run of currentRuns) {
+    if (
+      !routes.includes(run.route)
+      || typeof run.runId !== 'string'
+      || run.runId.trim().length === 0
+      || !isCreditRunStatus(run.status)
+    ) {
+      throw new DomainConflictError('La proyeccion de runs de creditos contiene datos invalidos.', {
+        reason: 'CREDIT_RUN_PROJECTION_INVALID',
+      });
+    }
+    if (seenCurrentRunIds.has(run.runId)) {
+      throw new DomainConflictError('La proyeccion de runs de creditos contiene IDs duplicados.', {
+        reason: 'CREDIT_RUN_PROJECTION_DUPLICATE_IDS',
+      });
+    }
+    seenCurrentRunIds.add(run.runId);
+    const routeRuns = currentRunsByRoute.get(run.route) ?? [];
+    routeRuns.push(run);
+    currentRunsByRoute.set(run.route, routeRuns);
     if (!isOpenCreditRun(run.status) || typeof run.runId !== 'string') continue;
     const ids = openRunIdsByRoute.get(run.route) ?? new Set<string>();
     ids.add(run.runId);
@@ -579,7 +622,7 @@ export async function getCompetitionCreditWalletStatus(
       periodCutoff: period.cutoff,
       routes: routes.map((route) => ({
         route,
-        status: currentRuns.find((run) => run.route === route)?.status ?? 'missing',
+        status: aggregateCurrentRunStatus(currentRunsByRoute.get(route) ?? []),
       })),
     },
   };

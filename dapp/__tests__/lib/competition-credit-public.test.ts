@@ -155,6 +155,57 @@ describe('competition credit public status conflicts', () => {
     ]);
   });
 
+  it('aggregates delayed and current runs without hiding the last open balance', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [
+        {
+          runId: 'run-delayed-open',
+          route: 'uki',
+          status: 'open',
+          settlementPeriod: period,
+        },
+        {
+          runId: 'run-current-processing',
+          route: 'uki',
+          status: 'processing',
+          settlementPeriod: period,
+        },
+      ],
+      competition_credit_lots: [{
+        _id: 'own-lot-delayed-open',
+        lotId: 'own-lot-delayed-open',
+        bucket: 'own',
+        route: 'uki',
+        walletNormalized: wallet,
+        periodId: period.periodId,
+        runId: 'run-delayed-open',
+        runItemId: 'run-item-delayed-open',
+        sourceSlotId: 'slot-delayed-open',
+        eligibilityEpoch: 1,
+        totalCredits: 40,
+        poolDepositedCredits: 0,
+        availableCredits: 40,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.currentRun.routes).toEqual([
+      { route: 'uki', status: 'processing' },
+      { route: 'nft', status: 'missing' },
+    ]);
+    expect(status.routes.uki.balance.availableCredits).toBe(40);
+    expect(status.balance.availableCredits).toBe(40);
+  });
+
   it('publishes only usable pool lots from an open settlement run', async () => {
     const rule = testCompetitionCreditRule();
     const period = currentCompetitionCreditPeriod(now, rule);
