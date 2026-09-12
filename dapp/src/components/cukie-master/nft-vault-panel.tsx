@@ -671,7 +671,7 @@ export function CukieMasterNftVaultPanel() {
       // than waiting for its periodic retry interval.
       void Promise.resolve(refreshAfterTransaction('master-nft')).catch(() => undefined);
     }
-  }, [address, chainId, isNftProjectionAcknowledged, pendingByAsset, pendingContext, pendingHydrated, refreshAfterTransaction, registerProjectionExpectation, runtime.projectionIdentity, runtime.projectionSync?.state, runtimeSessionReady, statusResource.data]);
+  }, [address, chainId, isNftProjectionAcknowledged, pendingByAsset, pendingContext, pendingHydrated, refreshAfterTransaction, registerProjectionExpectation, runtime.projectionGeneration, runtime.projectionIdentity, runtime.projectionSync?.state, runtimeSessionReady, statusResource.data]);
 
   const persistPending = useCallback((input: {
     asset: PublicNft;
