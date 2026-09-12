@@ -11,7 +11,7 @@ const TARGETS = Object.freeze({
     branch: 'staging',
     guard: 'true',
     uuid: 'u4s804o4wwcckowgk0woo4wg',
-    dbName: 'cukies-legacy-indexer-staging',
+    dbName: 'cukieshub-new-staging',
   },
   production: {
     appEnv: 'production',

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 const TARGETS = Object.freeze({
-  staging: { dbName: 'cukies-legacy-indexer-staging', branch: 'staging', guard: 'true', coolifyResourceUuid: 'u4s804o4wwcckowgk0woo4wg', applicationId: '28' },
+  // The legacy reader/indexer is a staging consumer too.  It must share the
+  // unified staging database; production keeps its dedicated legacy target.
+  staging: { dbName: 'cukieshub-new-staging', branch: 'staging', guard: 'true', coolifyResourceUuid: 'u4s804o4wwcckowgk0woo4wg', applicationId: '28' },
   production: { dbName: 'cukies-legacy-indexer', branch: 'main', guard: 'false', coolifyResourceUuid: 'jookw8ow8woks088s44404ok', applicationId: '12' },
   test: { dbName: 'cukies-legacy-worker-test', branch: null, guard: null },
 });
