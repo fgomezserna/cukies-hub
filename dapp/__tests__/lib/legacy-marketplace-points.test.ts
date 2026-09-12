@@ -100,15 +100,19 @@ describe('historial Legacy de Cukie Points', () => {
   it('mantiene TRON exacto y normaliza la coincidencia EVM por BSC', async () => {
     const { collection: tronCollection } = setupCollection();
     await listLegacyCukiePoints({ wallets: ['TaExacta'], network: 'TRON' });
-    expect(tronCollection.find).toHaveBeenCalledWith({
+    const tronFilter = tronCollection.find.mock.calls[0][0];
+    expect(tronFilter.$and).toHaveLength(2);
+    expect(tronFilter.$and[0]).toHaveProperty('network', /^TRON$/i);
+    expect(tronFilter.$and[1]).toEqual({
       $or: [{ network: 'TRON', address: 'TaExacta' }],
-      network: 'TRON',
     });
 
     const { collection: bscCollection } = setupCollection();
     await listLegacyCukiePoints({ wallets: ['0xAbCd'], network: 'BSC' });
     const bscFilter = bscCollection.find.mock.calls[0][0];
-    expect(bscFilter).toMatchObject({
+    expect(bscFilter.$and).toHaveLength(2);
+    expect(bscFilter.$and[0]).toHaveProperty('network', /^BSC$/i);
+    expect(bscFilter.$and[1]).toMatchObject({
       $or: [{
         network: 'BSC',
         $or: [
@@ -116,15 +120,16 @@ describe('historial Legacy de Cukie Points', () => {
           { addressNormalized: '0xabcd' },
         ],
       }],
-      network: 'BSC',
     });
-    expect(bscFilter.$or[0].$or[0].address.flags).toContain('i');
+    expect(bscFilter.$and[1].$or[0].$or[0].address.flags).toContain('i');
   });
 
   it('no filtra por ALL y devuelve fuente no disponible sin convertirla en cero verificado', async () => {
     const { collection } = setupCollection();
     await listLegacyCukiePoints({ type: 'ALL' });
-    expect(collection.find.mock.calls[0][0]).toEqual({});
+    const allFilter = collection.find.mock.calls[0][0];
+    expect(allFilter.$and).toHaveLength(1);
+    expect(allFilter.$and[0]).toHaveProperty('$or');
 
     pointsCollection.mockRejectedValueOnce(new Error('INTERNAL_DB_CONNECTION_DETAILS'));
     const unavailable = await listLegacyCukiePoints({});

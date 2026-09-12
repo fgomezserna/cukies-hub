@@ -19,10 +19,14 @@ const cuki = {
 
 describe('catálogo e identidad del marketplace Legacy', () => {
   it('publica solo anuncios con estado de venta y precio bruto positivo', () => {
-    expect(buildLegacyMarketplaceMongoFilter({ marketplaceOnly: true })).toEqual({
-      state: 'onSale',
-      priceOriginal: { $type: 'string', $regex: /^[1-9]\d*$/ },
-    });
+    const filter = buildLegacyMarketplaceMongoFilter({ marketplaceOnly: true });
+    expect(filter.$and).toEqual(expect.arrayContaining([
+      {
+        state: 'onSale',
+        priceOriginal: { $type: 'string', $regex: /^[1-9]\d*$/ },
+      },
+    ]));
+    expect(filter.$and?.[0]).toHaveProperty('$or');
   });
 
   it('mantiene red, colección y token en el enlace de detalle', () => {
