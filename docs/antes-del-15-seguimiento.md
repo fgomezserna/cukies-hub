@@ -4,8 +4,10 @@ Estado del documento: fuente unica del estado vigente; vivo y versionado.
 
 Ultima actualizacion: 2026-09-12; horas de evidencia indicadas en UTC.
 
-Contexto vigente: revisión completa del documento actualizado del 11 de septiembre
-y ejecución coordinada de sus siete lotes, detallados en el programa de este archivo.
+Contexto vigente: revisión completa de las nuevas pruebas del 12 de septiembre,
+agrupadas en cuatro lotes de PR. Sus diez puntos numerados se relacionan con
+las observaciones del día 11; los parches anteriores son antecedentes, no prueba
+de que los fallos nuevamente reportados estén resueltos.
 Se conserva la correccion de producto del 2026-09-07 y el contraste focalizado de la evidencia
 disponible. Las decisiones explicitas
 del usuario fijan el alcance; su confirmacion de funcionamiento queda registrada
@@ -139,7 +141,70 @@ activa World ni su escritor; el cambio de tráfico requiere las verificaciones
 operativas de la fila D. La rama original `f4cae5e` y el checkout principal
 siguen intactos.
 
+## Programa vigente de las pruebas del 12 de septiembre
+
+Fuente: `/Users/fgomezserna/Downloads/cambios actualizado (12-Sept).docx`,
+SHA-256 `bfdec23577d1f9fee391bb3e8b72bf4a163bf70f3ba71ae74bf6365ac9ae0193`.
+Revisadas sus cuatro páginas renderizadas y las siete capturas, conservando el
+original sin editar. La [extracción trazable](evidence/2026-09-12-document-review.json)
+relaciona cada punto con página, párrafo, captura y observación anterior.
+
+El usuario solicita una tarea por PR, revisión del coordinador, integración y
+seguimiento hasta el despliegue. Se reutilizan las issues abiertas para conservar
+el contexto; las nuevas tareas sustituyen los encargos terminados del día 11 en
+estos alcances. Los puntos anteriores ausentes de esta revisión mantienen su
+última evidencia: la omisión no demuestra una validación positiva nueva.
+
+### Tabla vigente del documento del 12
+
+Se conserva la numeración del documento, incluidos sus saltos. Jugar 1 contiene
+tres síntomas y Otros 2 contiene los ejemplos UKI y NFT; todos quedan incluidos.
+Los estados de código, despliegue y prueba funcional se actualizan por separado.
+
+| Punto | Trabajo y criterio de cierre | Lote / issue | Estado y próximo paso |
+| --- | --- | --- | --- |
+| 12-J1 · Jugar 1 | Terminar y guardar la partida; resolver el aviso persistente; volver a iniciar 1P sin reconectar. La captura muestra 24 puntos con créditos y Cukie propios. | D12-1 · #418; aviso compartido con D12-3 | Fallo reportado el 12-Sep. Diagnóstico previo demuestra una sesión `validated` con intención de liquidación incompleta que bloquea el cierre semanal; falta contrastar toda la cadena del nuevo caso. |
+| 12-J3 · Jugar 3 | Registrar la puntuación, reservar el bote y permitir el reparto del periodo correcto. | D12-1 · #418 / #423 | Fallo reportado. Verificar partida y periodo nuevos, sin reconstrucción histórica. |
+| 12-M2 · Cukie Master 2 | Tras aprobar el NFT y cancelar el depósito, ofrecer Continuar depósito; conservar la elegibilidad y revalidar antes de firmar. | D12-2 · #419 | Fallo reproducido por el usuario con #98000003. Comparar el flujo Master con la continuación ya existente en Pool. |
+| 12-C2 · Créditos 2 | Finalizar el corte, mostrar créditos vigentes y permitir configurar el reparto siguiente con una fuente actual. | D12-3 · #421 | Fallo reportado a las 10:15 UTC tras el corte de las 10:00. Diagnosticar fuente, concesión, revisión de cuenta y bloqueos del panel. |
+| 12-W1 · Premios 1 | Acreditar los UKI de una partida nueva y mostrar su estado e importe canónicos. | D12-1 · #418 / #423 | Fallo reportado. Un proceso saludable o un cierre sin partidas no prueba este recorrido. |
+| 12-W3 · Premios 3 | Reservar los UKI semanales de las partidas y llevarlos al cierre y reparto correspondientes. | D12-1 · #418 / #423 | Fallo reportado. Resolver la causa de liquidación/cierre sin duplicar reservas ni saltarse validaciones. |
+| 12-A1 · Embajadores 1 | El enlace activo `cw-876fe531558b` funciona estable en producción; distinguir indisponibilidad temporal de invitación inválida. | D12-4 · #424 | Reproducido por D12-4: diez respuestas HTTP503 y después HTTP200 del enlace exacto sin cambios. El origen en la lectura de elegibilidad/RPC sigue bajo contraste; aún no hay hotfix entregado. |
+| 12-A3 · Embajadores 3 | Mostrar el alias público disponible encima de la wallet; fallback a dirección si no existe. | D12-4 · #424 | Reportado de nuevo en mainnet. Contrastar la fuente del alias, la API y el contenido servido pese al parche anterior. |
+| 12-O1 · Otros 1 | Mostrar el total restante del conjunto de Cukies propios elegibles y actualizar el consumo al jugar. | D12-1 · #412, ya cerrada por PR442 | Implementado y desplegado el 12-Sep a las 12:22 UTC. Contrastar el flujo autenticado actual antes de abrir otro parche; los límites están definidos. |
+| 12-O2 · Otros 2 | Tras staking/retirada UKI o NFT confirmados, mostrar saldo, cupos, créditos y avisos coherentes sin recargar; comprobaciones adicionales en segundo plano. | D12-3 · #421 / #419 | Corrección anterior parcial; el nuevo documento confirma el retraso. Resolver los dos ejemplos y probarlos, respetando los estados y periodos vigentes. |
+
+### Lotes de PR y propietarios
+
+| Lote | Tarea | Rama y destino | Límites y entrega |
+| --- | --- | --- | --- |
+| D12-1 | **12-Sep · Partidas, ranking y premios**, tarea `01a095b4-c1c5-7591-979b-82bd2025c076` | `codex/doc12-game-settlement` → `staging` | Guardado/settlement, ranking, reserva y lectura de premios; contraste de O1 existente. #418 coordina y #423 recibe la evidencia de cierre. **En curso**, confirmado por el estado activo de la tarea el 12-Sep. Worktree `17f5`; diagnóstico y reproducción antes del parche, PR aún no abierta. |
+| D12-2 | **12-Sep · Continuar depósito en Master**, tarea `01a095b2-dbc0-7460-b97b-fcced4dea445` | `codex/doc12-master-resume` → `staging` | Aprobación, cancelación y continuación del NFT; conserva custodia, identidad y validación transaccional. **En curso**, confirmado por el estado activo de la tarea el 12-Sep. Worktree `c700`; diagnóstico y reproducción antes del parche, PR aún no abierta. |
+| D12-3 | **12-Sep · Créditos y actualización de cupos**, tarea `01a095b3-7ec0-7280-8d5f-694bf44a18bc` | `codex/doc12-credit-coherence` → `staging` | Créditos/cortes y coordinación compartida de saldo, cupos y avisos. Dueño del refresco global; D12-1/2 consumen su contrato. **En curso**, confirmado por el estado activo de la tarea el 12-Sep. Worktree `54f6`; diagnóstico y reproducción antes del parche, PR aún no abierta. |
+| D12-4 | **12-Sep · Hotfix de embajadores**, tarea `01a095b2-4772-7df0-afb8-db9254e56135` | `codex/doc12-ambassadors-hotfix` desde `main`, después propagación a `staging` | Enlace activo intermitente y alias público. No promociona el conjunto de staging a producción. **En curso**, confirmado por el estado activo de la tarea el 12-Sep. Worktree `2b5e`; diagnóstico y reproducción antes del parche, PR aún no abierta. |
+
+Cada tarea usa Luna Max y entrega una PR con reproducción, cambios y pruebas
+focales. El coordinador conserva la revisión, los checks completos por candidato,
+el orden de integración y la verificación servida. Los cambios en archivos
+compartidos tienen un único propietario; cualquier ampliación de ese límite se
+coordina antes de editar. Las entregas al mismo entorno se serializan.
+
+Seguimiento de esta revisión activo cada 30 minutos mediante
+`coordinar-pruebas-cukies-12-sep`, con avisos de avances materiales. Se elimina
+cuando la entrega técnica esté completada o solo queden comprobaciones humanas;
+no mantiene abiertos los encargos anteriores por una validación indefinida.
+
+Se mantienen los ciclos de 1800 segundos, el umbral de 20000 UKI y la matriz de
+partidas originales 2/4/6/8/10/12, segunda generación 1/2/3/4/5/6. Los ejemplos
+del documento no cambian las reglas de cupos, gracia ni caducidad. Staging no
+requiere recuperar partidas, créditos o premios antiguos. CI/CD, contratos,
+destinos de datos y firmas personales quedan fuera de estos encargos.
+
 ## Programa del documento actualizado del 11 de septiembre
+
+Registro del corte anterior. Para los puntos nuevamente reportados, prevalecen
+la tabla del 12 y sus encargos; este historial conserva los parches y límites de
+verificación previos sin presentarlos como una nueva confirmación de producto.
 
 Fuente recibida: `cambios actualizado (11-Sept).docx`, SHA-256
 `e1132a57a6842f4a00aaf5fd3d52bbddeba4b61f9430c058e52f3c76811d5d8b`.
