@@ -25,7 +25,11 @@ import type { AccountSummary } from '@/lib/account-summary-types';
 import {
   masterProjectionMatchesPendingOperation,
 } from '@/lib/nft-vault/pending-reconciliation';
-import type { NftVaultPendingOperation } from '@/lib/nft-vault/pending-operations';
+import {
+  canonicalNftVaultAssetId,
+  pendingNftVaultOperationAssetKey,
+  type NftVaultPendingOperation,
+} from '@/lib/nft-vault/pending-operations';
 
 export type AppRuntimeResource =
   | 'runtime-status'
@@ -130,6 +134,7 @@ type RuntimeContextValue = {
   projectionIdentity: string;
   isProjectionReadCurrent: (wallet: string, chainId: number | undefined, generation: number, identity?: string) => boolean;
   registerNftExpectation: (expectation: AppRuntimeNftExpectation) => void;
+  unregisterNftExpectation: (expectation: AppRuntimeNftExpectation) => void;
   registerStakingExpectation: (expectation: AppRuntimeStakingExpectation) => void;
   refresh: () => Promise<unknown>;
   refreshAfterTransaction: (resource?: AppRuntimeResource) => Promise<void>;
@@ -260,11 +265,22 @@ function nftExpectationKey(expectation: Pick<AppRuntimeNftExpectation, 'chainId'
     expectation.chainId,
     expectation.walletAddress.toLowerCase(),
     expectation.vaultAddress.toLowerCase(),
-    expectation.assetId,
+    pendingNftVaultOperationAssetKey(expectation),
     expectation.collectionAddress.toLowerCase(),
     expectation.tokenId,
     expectation.action,
     expectation.txHash.toLowerCase(),
+  ].join(':');
+}
+
+function nftExpectationAssetKey(expectation: Pick<AppRuntimeNftExpectation, 'chainId' | 'walletAddress' | 'vaultAddress' | 'assetId' | 'collectionAddress' | 'tokenId'>) {
+  return [
+    expectation.chainId,
+    expectation.walletAddress.toLowerCase(),
+    expectation.vaultAddress.toLowerCase(),
+    pendingNftVaultOperationAssetKey(expectation),
+    expectation.collectionAddress.toLowerCase(),
+    expectation.tokenId,
   ].join(':');
 }
 
@@ -988,6 +1004,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       || currentChainId !== expectation.chainId
       || expectation.phase !== 'syncing_projection'
       || !/^0x[0-9a-f]{64}$/i.test(expectation.txHash)
+      || !canonicalNftVaultAssetId(expectation)
       || (expectation.depositEpoch !== undefined && !canonicalRaw(expectation.depositEpoch))) return;
     const normalizedExpectation = {
       ...expectation,
@@ -999,6 +1016,12 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       normalizedExpectation,
       currentAddress,
     )) return;
+    const expectationAssetKey = nftExpectationAssetKey(normalizedExpectation);
+    for (const [key, current] of nftExpectationsRef.current) {
+      if (nftExpectationAssetKey(current) === expectationAssetKey && key !== expectationKey) {
+        nftExpectationsRef.current.delete(key);
+      }
+    }
     projectionGenerationRef.current += 1;
     projectionIdentityTransitionRef.current = null;
     projectionAbortRef.current?.abort();
@@ -1014,6 +1037,39 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       wallet: currentAddress,
       chainId: expectation.chainId,
       expectedStakedUkiRaw: projectionExpectationRef.current?.stakedUkiRaw ?? null,
+      attempt: 0,
+      error: null,
+    });
+  }, []);
+
+  const unregisterNftExpectation = useCallback((expectation: AppRuntimeNftExpectation) => {
+    const currentAddress = currentAddressRef.current;
+    const currentConnectedAddress = currentConnectedAddressRef.current;
+    const currentChainId = currentChainIdRef.current;
+    if (!currentAddress
+      || !currentSessionReadyRef.current
+      || !currentConnectedAddress
+      || currentConnectedAddress !== currentAddress
+      || expectation.walletAddress.toLowerCase() !== currentAddress
+      || currentChainId !== expectation.chainId) return;
+    const normalizedExpectation = {
+      ...expectation,
+      walletAddress: currentAddress,
+    } satisfies AppRuntimeNftExpectation;
+    const expectationKey = nftExpectationKey(normalizedExpectation);
+    if (!nftExpectationsRef.current.has(expectationKey)) return;
+    projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = null;
+    projectionAbortRef.current?.abort();
+    projectionAbortRef.current = null;
+    projectionRunRef.current = null;
+    nftExpectationsRef.current.delete(expectationKey);
+    if (projectionExpectationRef.current || nftExpectationsRef.current.size > 0) return;
+    setProjectionSync({
+      state: 'idle',
+      wallet: null,
+      chainId: null,
+      expectedStakedUkiRaw: null,
       attempt: 0,
       error: null,
     });
@@ -1136,6 +1192,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     projectionIdentity,
     isProjectionReadCurrent,
     registerNftExpectation,
+    unregisterNftExpectation,
     registerStakingExpectation,
     refresh,
     refreshAfterTransaction,
@@ -1144,7 +1201,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     readiness,
     switchTo,
     queryKey: (resource, wallet = address, targetChainId = expectedChainId('dashboard')) => appRuntimeQueryKey(resource, wallet?.toLowerCase() ?? null, targetChainId ?? null),
-  }), [accountSummaryQuery.data, accountSummaryQuery.error, accountSummaryQuery.isError, accountSummaryQuery.isPending, accountSummaryQuery.isRefetchError, accountSummaryQuery.refetch, accountSummaryRequested, address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, isProjectionReadCurrent, online, projectionIdentity, projectionSync, readiness, refresh, refreshAfterTransaction, registerNftExpectation, registerStakingExpectation, requestAccountSummary, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
+  }), [accountSummaryQuery.data, accountSummaryQuery.error, accountSummaryQuery.isError, accountSummaryQuery.isPending, accountSummaryQuery.isRefetchError, accountSummaryQuery.refetch, accountSummaryRequested, address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, isProjectionReadCurrent, online, projectionIdentity, projectionSync, readiness, refresh, refreshAfterTransaction, registerNftExpectation, registerStakingExpectation, requestAccountSummary, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, unregisterNftExpectation, user, walletType]);
 
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
 }

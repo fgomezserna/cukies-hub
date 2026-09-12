@@ -112,6 +112,10 @@ function sameAddressSet(left: readonly string[], right: readonly string[]) {
     === [...right].map((item) => item.toLowerCase()).sort().join(',');
 }
 
+function pendingProjectionKey(operation: Pick<NftVaultPendingOperation, 'assetId' | 'chainId' | 'collectionAddress' | 'tokenId' | 'depositEpoch' | 'action' | 'txHash'>) {
+  return `${pendingNftVaultOperationAssetKey(operation)}:${operation.action}:${operation.txHash.toLowerCase()}:${operation.depositEpoch ?? ''}`;
+}
+
 type MasterPositionState = 'empty' | 'occupied' | 'unknown';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -325,6 +329,7 @@ export function CukieMasterNftVaultPanel() {
   const runtime = useAppRuntime();
   const {
     registerNftExpectation,
+    unregisterNftExpectation,
     refreshAfterTransaction,
     sessionReady: runtimeSessionReady,
   } = runtime;
@@ -360,6 +365,7 @@ export function CukieMasterNftVaultPanel() {
   const [onChainByAsset, setOnChainByAsset] = useState<Record<string, MasterOnChainConfirmation>>({});
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const operationLocksRef = useRef(new Set<string>());
+  const projectionRegistrationRef = useRef(new Map<string, { generation: number; identity: string }>());
   const statusResource = useAppRuntimeResource<PublicStatus>('master-nft', {
     enabled: Boolean(user?.walletAddress) && !authLoading,
     validate: (value): value is PublicStatus => Boolean(
@@ -371,6 +377,37 @@ export function CukieMasterNftVaultPanel() {
       && value.walletNormalized.toLowerCase() === runtime.address.toLowerCase(),
     ),
   });
+  const registerProjectionExpectation = useCallback((operation: NftVaultPendingOperation) => {
+    const key = pendingProjectionKey(operation);
+    if (!projectionRegistrationRef.current.has(key)) {
+      projectionRegistrationRef.current.set(key, {
+        generation: runtime.projectionGeneration,
+        identity: runtime.projectionIdentity,
+      });
+    }
+    registerNftExpectation(operation);
+  }, [registerNftExpectation, runtime.projectionGeneration, runtime.projectionIdentity]);
+  const unregisterProjectionExpectation = useCallback((operation: NftVaultPendingOperation) => {
+    projectionRegistrationRef.current.delete(pendingProjectionKey(operation));
+    unregisterNftExpectation?.(operation);
+  }, [unregisterNftExpectation]);
+  const projectionReadbackComplete = useCallback((operation: NftVaultPendingOperation, candidateStatus: PublicStatus | null | undefined) => {
+    if (!masterProjectionMatchesPendingOperation(operation, candidateStatus)) return false;
+    const registration = projectionRegistrationRef.current.get(pendingProjectionKey(operation));
+    // Partial runtime mocks used by isolated UI tests predate the generation
+    // contract. Production providers always expose both fields, so only the
+    // compatibility path can fall back to the Master proof alone.
+    const coordinatorAvailable = typeof runtime.projectionGeneration === 'number'
+      && runtime.projectionSync?.state !== undefined
+      && typeof runtime.projectionIdentity === 'string';
+    if (!coordinatorAvailable) return true;
+    return Boolean(
+      registration
+      && runtime.projectionIdentity === registration.identity
+      && runtime.projectionGeneration > registration.generation
+      && runtime.projectionSync.state === 'idle',
+    );
+  }, [runtime.projectionGeneration, runtime.projectionIdentity, runtime.projectionSync?.state]);
   const status = statusResource.data ?? null;
   const loading = statusResource.state === 'loading';
   const refreshStatus = statusResource.refresh;
@@ -549,10 +586,12 @@ export function CukieMasterNftVaultPanel() {
     setError(null);
     setNotice(null);
     setOnChainByAsset({});
-  }, [address, chainId]);
+    projectionRegistrationRef.current.clear();
+  }, [address, chainId, runtime.projectionIdentity]);
 
   useEffect(() => {
     operationLocksRef.current.clear();
+    projectionRegistrationRef.current.clear();
     setHydratedPendingKey(null);
     if (!pendingContext || !pendingKey) {
       setPendingByAsset({});
@@ -575,14 +614,21 @@ export function CukieMasterNftVaultPanel() {
       // value, including an explicit clear (newValue === null).
       pendingEphemeralByContextRef.current.delete(pendingKey);
       const operations = pendingOperationsForContext(pendingContext);
-      setPendingByAsset(Object.fromEntries(operations.map((operation) => [
+      const nextByAsset = Object.fromEntries(operations.map((operation) => [
         pendingNftVaultOperationAssetKey(operation),
         operation,
-      ])));
+      ]));
+      for (const operation of Object.values(pendingByAssetRef.current)) {
+        const replacement = nextByAsset[pendingNftVaultOperationAssetKey(operation)];
+        if (!replacement || !pendingNftVaultOperationMatches(replacement, operation)) {
+          unregisterProjectionExpectation(operation);
+        }
+      }
+      setPendingByAsset(nextByAsset);
     };
     window.addEventListener('storage', syncPendingFromStorage);
     return () => window.removeEventListener('storage', syncPendingFromStorage);
-  }, [pendingContext, pendingKey, pendingOperationsForContext]);
+  }, [pendingContext, pendingKey, pendingOperationsForContext, unregisterProjectionExpectation]);
 
   useEffect(() => {
     // Let the first identity-scoped inventory response populate the panel
@@ -591,11 +637,23 @@ export function CukieMasterNftVaultPanel() {
     // read and leave the panel without an inventory while the readback pair
     // is converging.
     if (!pendingHydrated || !pendingContext || !statusResource.data) return;
+    const activeProjectionKeys = new Set(
+      Object.values(pendingByAsset)
+        .filter((operation) => operation.phase === 'syncing_projection' && operation.action !== 'approval')
+        .map((operation) => pendingProjectionKey(operation)),
+    );
+    for (const key of projectionRegistrationRef.current.keys()) {
+      if (!activeProjectionKeys.has(key)) projectionRegistrationRef.current.delete(key);
+    }
     let registeredProjection = false;
     for (const operation of Object.values(pendingByAsset)) {
       if (operation.phase !== 'syncing_projection' || operation.action === 'approval') continue;
-      if (masterProjectionMatchesPendingOperation(operation, statusResource.data)) continue;
-      registerNftExpectation(operation);
+      const key = pendingProjectionKey(operation);
+      if (projectionRegistrationRef.current.has(key)) continue;
+      // A persisted syncing operation is not complete merely because the
+      // Master inventory has caught up. Register it anyway so the provider
+      // proves the matching Master+Credits pair before clearing the lock.
+      registerProjectionExpectation(operation);
       registeredProjection = true;
     }
     if (registeredProjection) {
@@ -604,7 +662,7 @@ export function CukieMasterNftVaultPanel() {
       // than waiting for its periodic retry interval.
       void Promise.resolve(refreshAfterTransaction('master-nft')).catch(() => undefined);
     }
-  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, refreshAfterTransaction, registerNftExpectation, runtimeSessionReady, statusResource.data]);
+  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, refreshAfterTransaction, registerProjectionExpectation, runtimeSessionReady, statusResource.data]);
 
   const persistPending = useCallback((input: {
     asset: PublicNft;
@@ -713,6 +771,7 @@ export function CukieMasterNftVaultPanel() {
         const storedOperation = pendingOperationsForContext(storageContext)
           .find((operation) => pendingNftVaultOperationAssetKey(operation) === pendingNftVaultOperationAssetKey(input.expectedOperation!));
         if (storedOperation && !pendingNftVaultOperationMatches(storedOperation, input.expectedOperation)) return;
+        unregisterProjectionExpectation(input.expectedOperation);
       }
       clearPendingNftVaultOperation(storage, storageContext, assetId, input.expectedOperation);
       if (input.expectedOperation) {
@@ -744,7 +803,7 @@ export function CukieMasterNftVaultPanel() {
       }
       return next;
     });
-  }, [pendingContext, pendingOperationsForContext]);
+  }, [pendingContext, pendingOperationsForContext, unregisterProjectionExpectation]);
 
   useEffect(() => {
     if (!status) return;
@@ -787,7 +846,7 @@ export function CukieMasterNftVaultPanel() {
         }
         continue;
       }
-      if (!masterProjectionMatchesPendingOperation(operation, status)) continue;
+      if (!projectionReadbackComplete(operation, status)) continue;
       const storedOperation = pendingContext
         ? pendingOperationsForContext(pendingContext)
           .find((item) => pendingNftVaultOperationAssetKey(item) === pendingNftVaultOperationAssetKey(operation))
@@ -816,7 +875,7 @@ export function CukieMasterNftVaultPanel() {
           : current);
       }
     }
-  }, [clearPending, pendingByAsset, pendingContext, pendingOperationsForContext, status]);
+  }, [clearPending, pendingByAsset, pendingContext, pendingOperationsForContext, projectionReadbackComplete, status]);
 
   useEffect(() => {
     if (!pendingHydrated || !pendingContext || !publicClient || !user?.walletAddress) return;
@@ -948,7 +1007,7 @@ export function CukieMasterNftVaultPanel() {
           });
           if (!updated) return;
           operation = updated;
-          registerNftExpectation(operation);
+          registerProjectionExpectation(operation);
         }
         if (!operation.depositEpoch || !isReconciliationCurrent()) return;
         const rawPosition = await publicClient.readContract({
@@ -1027,7 +1086,7 @@ export function CukieMasterNftVaultPanel() {
               if (!transitioned) continue;
               operation = transitioned;
               if (operation.action === 'approval') continue;
-              registerNftExpectation(operation);
+              registerProjectionExpectation(operation);
               transitionedToSyncing = true;
               await inspectConfirmedOperation(operation, receipt);
               if (!isReconciliationCurrent()) return;
@@ -1058,7 +1117,7 @@ export function CukieMasterNftVaultPanel() {
       disposed = true;
       window.clearInterval(interval);
     };
-  }, [address, chainId, clearPending, pendingByAsset, pendingContext, pendingHydrated, pendingKey, pendingOperationsForContext, persistPending, publicClient, refresh, registerNftExpectation, runtimeSessionReady, user?.walletAddress]);
+  }, [address, chainId, clearPending, pendingByAsset, pendingContext, pendingHydrated, pendingKey, pendingOperationsForContext, persistPending, publicClient, refresh, registerProjectionExpectation, runtimeSessionReady, user?.walletAddress]);
 
   async function writeAndConfirm(
     input: Parameters<typeof writeContractAsync>[0],
@@ -1179,7 +1238,7 @@ export function CukieMasterNftVaultPanel() {
           updateUi: isCurrentContext(isCurrent),
         });
         if (isCurrent && submittedOperation && action !== 'approval') {
-          registerNftExpectation(submittedOperation);
+          registerProjectionExpectation(submittedOperation);
         }
       },
     });

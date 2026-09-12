@@ -5,7 +5,7 @@ import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from 'w
 
 import { CukieMasterNftVaultPanel } from '@/components/cukie-master/nft-vault-panel';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
-import { useAppRuntime } from '@/providers/app-runtime-provider';
+import { useAppRuntime, useAppRuntimeResource } from '@/providers/app-runtime-provider';
 import {
   savePendingNftVaultOperation,
   type NftVaultPendingOperation,
@@ -172,7 +172,7 @@ function statusWithPendingApprovalAsset(input: {
   return data;
 }
 
-function response(data: ReturnType<typeof status>) {
+function response<T = unknown>(data: T) {
   return { ok: true, json: async () => ({ status: 'ok', data }) };
 }
 
@@ -231,6 +231,23 @@ function masterDepositedReceipt(input: {
     status: 'success' as const,
     logs: [{ address: vault, topics, data }],
   };
+}
+
+function ProjectionCacheProbe() {
+  const runtime = useAppRuntime();
+  const master = useAppRuntimeResource<Record<string, unknown>>('master');
+  const credits = useAppRuntimeResource<Record<string, unknown>>('credits', { targetChainId: 97 });
+  const routes = master.data?.routes as Record<string, unknown> | undefined;
+  const nftRoute = routes?.nft as Record<string, unknown> | undefined;
+  const slots = Array.isArray(nftRoute?.slots) ? nftRoute.slots : [];
+  const configurations = Array.isArray(credits.data?.configurations) ? credits.data.configurations : [];
+  return (
+    <>
+      <span data-testid="projection-state">{runtime.projectionSync.state}</span>
+      <span data-testid="projection-master-slots">{slots.length}</span>
+      <span data-testid="projection-credits-slots">{configurations.length}</span>
+    </>
+  );
 }
 
 describe('CukieMasterNftVaultPanel', () => {
@@ -392,6 +409,143 @@ describe('CukieMasterNftVaultPanel', () => {
     await act(async () => resolveProjection(response(status({ deposited: true }))));
     expect(await screen.findByRole('button', { name: /Retirar inmediatamente/i })).toBeEnabled();
     await waitFor(() => expect(localStorage.length).toBe(0));
+  });
+
+  it('rehidrata la expectativa aunque Master ya refleje el NFT para probar el par de créditos', async () => {
+    const registerNftExpectation = jest.fn();
+    const refreshAfterTransaction = jest.fn();
+    mockUseAppRuntime.mockReturnValue({
+      address: wallet,
+      refreshAfterTransaction,
+      registerNftExpectation,
+    } as never);
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      action: 'deposit',
+      phase: 'syncing_projection',
+      txHash: depositHash,
+      depositEpoch: '2',
+    }));
+    fetchMock.mockResolvedValue(response(status({ deposited: true, depositEpoch: '2' })));
+    getTransactionReceipt.mockResolvedValue(masterDepositedReceipt());
+    readContract.mockResolvedValue({
+      beneficialOwner: wallet,
+      depositEpoch: BigInt(2),
+      depositedAt: BigInt(100),
+    });
+
+    render(<CukieMasterNftVaultPanel />);
+
+    await waitFor(() => expect(registerNftExpectation).toHaveBeenCalledWith(expect.objectContaining({
+      phase: 'syncing_projection',
+      txHash: depositHash,
+    })));
+    expect(refreshAfterTransaction).toHaveBeenCalledWith('master-nft');
+  });
+
+  it('mantiene el pending rehidratado hasta publicar el par Master+Credits', async () => {
+    mockUseAppRuntime.mockImplementation(jest.requireActual('@/providers/app-runtime-provider').useAppRuntime);
+    mockUseAuth.mockReturnValue({
+      user: { walletAddress: wallet, username: 'alice' },
+      isLoading: false,
+      isWaitingForApproval: false,
+      walletType: 'evm',
+      fetchUser: jest.fn(),
+    } as never);
+    mockUseAccount.mockReturnValue({ address: wallet, chainId: 97, isConnected: true } as never);
+    mockUsePathname.mockReturnValue('/dashboard');
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      action: 'deposit',
+      phase: 'syncing_projection',
+      txHash: depositHash,
+      depositEpoch: '2',
+    }));
+    const masterData = {
+      ...status({ deposited: true, depositEpoch: '2' }),
+      chainId: 97,
+      routes: {
+        uki: {
+          source: { complete: true, stakedUkiRaw: '0' },
+          projectionFresh: true,
+          slots: [],
+        },
+        nft: {
+          source: { complete: true },
+          projectionFresh: true,
+          slots: [{ route: 'nft', ordinal: 1, eligibilityEpoch: 1, status: 'active' }],
+        },
+      },
+    };
+    const staleCredits = {
+      walletNormalized: wallet,
+      chainId: 97,
+      configurations: [],
+    };
+    const convergedCredits = {
+      walletNormalized: wallet,
+      chainId: 97,
+      configurations: [{ route: 'nft', ordinal: 1, eligibilityEpoch: 1, status: 'active' }],
+    };
+    let masterCalls = 0;
+    let creditsCalls = 0;
+    const resolveReadbackMasters: Array<(value: ReturnType<typeof response>) => void> = [];
+    let resolveReadbackCredits: ((value: ReturnType<typeof response>) => void) | undefined;
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/api/economy/v1/runtime-status')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'ok',
+            data: {
+              checkedAt: '2026-09-09T00:00:00.000Z',
+              services: {
+                indexer: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+                master: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+                credits: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+              },
+            },
+          }),
+        } as Response);
+      }
+      if (url.includes('/api/economy/v1/cukie-master')) {
+        masterCalls += 1;
+        if (masterCalls === 1) return Promise.resolve(response(masterData));
+        return new Promise((resolve) => { resolveReadbackMasters.push(resolve); });
+      }
+      if (url.includes('/api/economy/v1/credits')) {
+        creditsCalls += 1;
+        if (creditsCalls === 1) return Promise.resolve(response(staleCredits));
+        return new Promise((resolve) => { resolveReadbackCredits = resolve; });
+      }
+      if (url.includes('/api/dashboard/v1/summary')) {
+        return Promise.resolve(response({ identity: { walletNormalized: wallet }, network: { chainId: 97 } }));
+      }
+      return Promise.resolve(response({}));
+    });
+    getTransactionReceipt.mockRejectedValue(new Error('receipt not available yet'));
+
+    render(<><CukieMasterNftVaultPanel /><ProjectionCacheProbe /></>);
+    await waitFor(() => {
+      expect(screen.getByTestId('projection-master-slots')).toHaveTextContent('1');
+      expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('0');
+      expect(masterCalls).toBe(2);
+      expect(creditsCalls).toBe(2);
+    });
+    expect(screen.getByTestId('projection-state')).toHaveTextContent('syncing');
+    expect(localStorage.length).toBe(1);
+
+    await act(async () => resolveReadbackMasters.splice(0).forEach((resolve) => resolve(response(masterData))));
+    expect(screen.getByTestId('projection-master-slots')).toHaveTextContent('1');
+    expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('0');
+    expect(localStorage.length).toBe(1);
+
+    await act(async () => resolveReadbackCredits?.(response(convergedCredits)));
+    await waitFor(() => {
+      expect(screen.getByTestId('projection-state')).toHaveTextContent('idle');
+      expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('1');
+      expect(localStorage.length).toBe(0);
+    });
   });
 
   it('muestra el depósito confirmado por RPC antes de que termine la proyección API y mantiene el lock', async () => {

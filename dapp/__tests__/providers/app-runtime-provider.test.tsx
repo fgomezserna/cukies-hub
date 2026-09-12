@@ -183,6 +183,12 @@ const NFT_EXPECTATION_2 = {
   tokenId: '2',
   txHash: NFT_TX_HASH_2,
 } satisfies AppRuntimeNftExpectation;
+const NFT_DEPOSIT_EXPECTATION = {
+  ...NFT_EXPECTATION,
+  assetId: 'legacy-nft-label',
+  action: 'deposit',
+  txHash: NFT_TX_HASH,
+} satisfies AppRuntimeNftExpectation;
 
 function o2ReadbackPayload(input: {
   stakedUkiRaw: string;
@@ -337,6 +343,30 @@ function O2ReadbackProbe() {
         runtime.registerNftExpectation(NFT_EXPECTATION_2);
         void runtime.refreshAfterTransaction('master-nft');
       }}>read NFT O2</button>
+    </>
+  );
+}
+
+function NftExpectationLifecycleProbe() {
+  const runtime = useAppRuntime();
+  const master = useAppRuntimeResource<Record<string, unknown>>('master');
+  useAppRuntimeResource<Record<string, unknown>>('credits');
+  const nftInventory = Array.isArray(master.data?.nftInventory) ? master.data.nftInventory : [];
+  const firstNft = nftInventory[0];
+  const custody = firstNft && typeof firstNft === 'object'
+    ? String((firstNft as Record<string, unknown>).custody ?? 'unknown')
+    : master.state;
+  return (
+    <>
+      <span data-testid="nft-projection-state">{runtime.projectionSync.state}</span>
+      <span data-testid="nft-custody">{custody}</span>
+      <button type="button" onClick={() => {
+        runtime.registerNftExpectation(NFT_DEPOSIT_EXPECTATION);
+        runtime.registerNftExpectation(NFT_EXPECTATION);
+        void runtime.refreshAfterTransaction('master-nft');
+      }}>replace NFT expectation</button>
+      <button type="button" onClick={() => runtime.registerNftExpectation(NFT_EXPECTATION)}>register NFT expectation</button>
+      <button type="button" onClick={() => runtime.unregisterNftExpectation(NFT_EXPECTATION)}>unregister NFT expectation</button>
     </>
   );
 }
@@ -914,6 +944,98 @@ describe('AppRuntimeProvider shared resource contract', () => {
       expect(screen.getByTestId('o2-granted')).toHaveTextContent('400');
       expect(screen.getByTestId('o2-grace-count')).toHaveTextContent('5');
     });
+  });
+
+  it('reemplaza la expectativa anterior del mismo NFT antes de publicar el par', async () => {
+    const initial = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_25K_RAW,
+      originalCukiePoints: 12,
+      desiredSlots: 4,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'active',
+      nftInventoryMode: 'vault',
+      includeSecondNft: true,
+    });
+    const target = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_25K_RAW,
+      originalCukiePoints: 10,
+      desiredSlots: 3,
+      allocatedSlots: 3,
+      protectedSlots: 3,
+      slotStatus: 'grace',
+      nftInventoryMode: 'wallet',
+      includeSecondNft: true,
+    });
+    mockUseAuth.mockReturnValue({ user: { walletAddress: O2_WALLET, username: 'alice' }, walletType: 'evm', isLoading: false } as never);
+    mockUseAccount.mockReturnValue({ address: O2_WALLET, isConnected: true, chainId: O2_CHAIN_ID } as never);
+    mockUsePathname.mockReturnValue('/dashboard');
+    let masterCalls = 0;
+    let creditsCalls = 0;
+    let resolveTargetMaster: ((value: Response) => void) | undefined;
+    let resolveTargetCredits: ((value: Response) => void) | undefined;
+    mockFetch.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      if (url.includes('cukie-master')) {
+        masterCalls += 1;
+        if (masterCalls === 1) return Promise.resolve(response({ status: 'ok', data: initial.master }));
+        return new Promise((resolve) => { resolveTargetMaster = resolve; });
+      }
+      if (url.includes('/credits')) {
+        creditsCalls += 1;
+        if (creditsCalls === 1) return Promise.resolve(response({ status: 'ok', data: initial.credits }));
+        return new Promise((resolve) => { resolveTargetCredits = resolve; });
+      }
+      return Promise.resolve(response({ status: 'ok', data: initial.dashboard }));
+    });
+
+    render(<Shell><NftExpectationLifecycleProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('nft-custody')).toHaveTextContent('cukie_master_nft_vault'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'replace NFT expectation' }));
+    await waitFor(() => {
+      expect(masterCalls).toBe(2);
+      expect(creditsCalls).toBe(2);
+      expect(screen.getByTestId('nft-projection-state')).toHaveTextContent('syncing');
+    });
+    await act(async () => resolveTargetCredits?.(response({ status: 'ok', data: target.credits })));
+    expect(screen.getByTestId('nft-custody')).toHaveTextContent('cukie_master_nft_vault');
+    await act(async () => resolveTargetMaster?.(response({ status: 'ok', data: target.master })));
+    await waitFor(() => {
+      expect(screen.getByTestId('nft-projection-state')).toHaveTextContent('idle');
+      expect(screen.getByTestId('nft-custody')).toHaveTextContent('wallet');
+    });
+  });
+
+  it('retira una expectativa NFT terminal y deja la sincronización en idle', async () => {
+    mockUseAuth.mockReturnValue({ user: { walletAddress: O2_WALLET, username: 'alice' }, walletType: 'evm', isLoading: false } as never);
+    mockUseAccount.mockReturnValue({ address: O2_WALLET, isConnected: true, chainId: O2_CHAIN_ID } as never);
+    mockUsePathname.mockReturnValue('/dashboard');
+    const payloads = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_25K_RAW,
+      originalCukiePoints: 12,
+      desiredSlots: 4,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'active',
+      nftInventoryMode: 'vault',
+      includeSecondNft: true,
+    });
+    mockFetch.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      if (url.includes('cukie-master')) return Promise.resolve(response({ status: 'ok', data: payloads.master }));
+      if (url.includes('/credits')) return Promise.resolve(response({ status: 'ok', data: payloads.credits }));
+      return Promise.resolve(response({ status: 'ok', data: payloads.dashboard }));
+    });
+
+    render(<Shell><NftExpectationLifecycleProbe /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('nft-custody')).toHaveTextContent('cukie_master_nft_vault'));
+    fireEvent.click(screen.getByRole('button', { name: 'register NFT expectation' }));
+    await waitFor(() => expect(screen.getByTestId('nft-projection-state')).toHaveTextContent('syncing'));
+    fireEvent.click(screen.getByRole('button', { name: 'unregister NFT expectation' }));
+    await waitFor(() => expect(screen.getByTestId('nft-projection-state')).toHaveTextContent('idle'));
   });
 
   it('ignora una lectura Master iniciada en idle cuando el recibo abre otra generación', async () => {
