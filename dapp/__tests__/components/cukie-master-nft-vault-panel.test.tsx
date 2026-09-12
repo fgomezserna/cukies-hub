@@ -146,6 +146,30 @@ function statusWithSecondAsset(input: Parameters<typeof status>[0] = {}) {
   return data;
 }
 
+function statusWithPendingApprovalAsset(input: {
+  canDeposit?: boolean;
+  custody?: 'wallet' | 'cukie_master_nft_vault';
+  state?: string;
+  blockers?: string[];
+  canWithdraw?: boolean;
+} = {}) {
+  const data = status();
+  const tokenId = '98000003';
+  data.nftInventory[0] = {
+    ...data.nftInventory[0],
+    assetId: `97:${collection}:${tokenId}`,
+    canonicalAssetId: `97:${collection}:${tokenId}`,
+    tokenId,
+    state: input.state ?? 'available',
+    custody: input.custody ?? 'wallet',
+    blockers: input.blockers ?? [],
+    canDeposit: input.canDeposit ?? false,
+    canWithdraw: input.canWithdraw ?? false,
+    depositEpoch: null,
+  };
+  return data;
+}
+
 function response(data: ReturnType<typeof status>) {
   return { ok: true, json: async () => ({ status: 'ok', data }) };
 }
@@ -153,14 +177,16 @@ function response(data: ReturnType<typeof status>) {
 function pendingOperation(
   overrides: Partial<NftVaultPendingOperation> = {},
 ): NftVaultPendingOperation {
+  const tokenId = overrides.tokenId ?? '98000001';
+  const collectionAddress = overrides.collectionAddress ?? collection;
   return {
     version: 1,
     chainId: 97,
     walletAddress: wallet,
     vaultAddress: vault,
-    assetId: `97:${collection}:98000001`,
-    collectionAddress: collection,
-    tokenId: '98000001',
+    assetId: overrides.assetId ?? `97:${collectionAddress}:${tokenId}`,
+    collectionAddress,
+    tokenId,
     action: 'deposit',
     phase: 'awaiting_receipt',
     txHash: depositHash,
@@ -451,17 +477,209 @@ describe('CukieMasterNftVaultPanel', () => {
     readContract
       .mockResolvedValueOnce(wallet)
       .mockResolvedValueOnce(vault)
-      .mockResolvedValueOnce(false);
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(null);
     writeContractAsync.mockResolvedValueOnce(depositHash);
 
     render(<CukieMasterNftVaultPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: /Continuar staking/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Continuar depósito/i }));
 
     await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(1));
     expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
       address: vault,
       functionName: 'deposit',
     }));
+  });
+
+  it('conserva la aprobación al cancelar la segunda firma y reanuda sin repetirla', async () => {
+    let approved = false;
+    let rejectDeposit = true;
+    fetchMock.mockResolvedValue(response(status()));
+    readContract.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'ownerOf') return wallet;
+      if (input.functionName === 'getApproved') {
+        return approved ? vault : '0x0000000000000000000000000000000000000000';
+      }
+      if (input.functionName === 'isApprovedForAll') return false;
+      return null;
+    });
+    writeContractAsync.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'approve') {
+        approved = true;
+        return approvalHash;
+      }
+      if (rejectDeposit) throw new Error('User rejected request');
+      return depositHash;
+    });
+    waitForTransactionReceipt.mockImplementation(async ({ hash }: { hash: typeof approvalHash | typeof depositHash }) => (
+      hash === approvalHash ? { status: 'success', transactionHash: hash } : masterDepositedReceipt()
+    ));
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Hacer staking/i }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(2));
+    expect(writeContractAsync.mock.calls[0][0]).toEqual(expect.objectContaining({ functionName: 'approve' }));
+    expect(writeContractAsync.mock.calls[1][0]).toEqual(expect.objectContaining({ functionName: 'deposit' }));
+    const resume = await screen.findByRole('button', { name: /Continuar depósito/i });
+    expect(resume).toBeEnabled();
+    expect(JSON.parse(localStorage.getItem(`cukies:nft-vault:pending:v1:97:${wallet}:${vault}`) ?? '[]'))
+      .toEqual([expect.objectContaining({ action: 'approval', phase: 'approval_confirmed', txHash: approvalHash })]);
+
+    rejectDeposit = false;
+    fireEvent.click(resume);
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(3));
+    expect(writeContractAsync.mock.calls[2][0]).toEqual(expect.objectContaining({ functionName: 'deposit' }));
+    expect(writeContractAsync.mock.calls.filter(([input]) => input.functionName === 'approve')).toHaveLength(1);
+  });
+
+  it('ofrece continuar tras recargar aunque el inventario no marque canDeposit', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      tokenId: '98000003',
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({ canDeposit: false, state: 'unknown' })));
+    readContract.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'ownerOf') return wallet;
+      if (input.functionName === 'getApproved') return vault;
+      if (input.functionName === 'isApprovedForAll') return false;
+      return null;
+    });
+    writeContractAsync.mockResolvedValueOnce(depositHash);
+
+    render(<CukieMasterNftVaultPanel />);
+    const resume = await screen.findByRole('button', { name: /Continuar depósito/i });
+    expect(screen.queryByText(/no es apto para la ruta Cukie Master/i)).not.toBeInTheDocument();
+    fireEvent.click(resume);
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(1));
+    expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      address: vault,
+      functionName: 'deposit',
+    }));
+  });
+
+  it('vuelve a pedir aprobación si la aprobación pendiente fue revocada', async () => {
+    let approved = false;
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      tokenId: '98000003',
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({ canDeposit: false })));
+    readContract.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'ownerOf') return wallet;
+      if (input.functionName === 'getApproved') {
+        return approved ? vault : '0x0000000000000000000000000000000000000000';
+      }
+      if (input.functionName === 'isApprovedForAll') return false;
+      return null;
+    });
+    writeContractAsync.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'approve') {
+        approved = true;
+        return approvalHash;
+      }
+      return depositHash;
+    });
+    waitForTransactionReceipt.mockImplementation(async ({ hash }: { hash: typeof approvalHash | typeof depositHash }) => (
+      hash === approvalHash ? { status: 'success', transactionHash: hash } : masterDepositedReceipt()
+    ));
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Continuar depósito/i }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledTimes(2));
+    expect(writeContractAsync.mock.calls[0][0]).toEqual(expect.objectContaining({ functionName: 'approve' }));
+    expect(writeContractAsync.mock.calls[1][0]).toEqual(expect.objectContaining({ functionName: 'deposit' }));
+  });
+
+  it('no ofrece continuar si la fila ya identifica una custodia no elegible', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      tokenId: '98000003',
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({
+      custody: 'cukie_master_nft_vault',
+      state: 'custodied',
+      canWithdraw: true,
+    })));
+
+    render(<CukieMasterNftVaultPanel />);
+
+    expect(screen.queryByRole('button', { name: /Continuar depósito/i })).not.toBeInTheDocument();
+    expect(await screen.findByText(/ya no está disponible en tu wallet/i)).toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('conserva el motivo accionable cuando el inventario bloquea el Cukie', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      tokenId: '98000003',
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({ blockers: ['listed'] })));
+
+    render(<CukieMasterNftVaultPanel />);
+
+    expect(screen.queryByRole('button', { name: /Continuar depósito/i })).not.toBeInTheDocument();
+    expect(await screen.findByText(/retíralo del marketplace/i)).toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('retira el pending de aprobación si ownerOf confirma que la wallet ya no es propietaria', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      tokenId: '98000003',
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({ canDeposit: false })));
+    readContract.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'ownerOf') return '0x4444444444444444444444444444444444444444';
+      if (input.functionName === 'getApproved') return vault;
+      if (input.functionName === 'isApprovedForAll') return false;
+      return null;
+    });
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Continuar depósito/i }));
+
+    expect(await screen.findByText(/ya no aparece en tu wallet/i)).toBeInTheDocument();
+    await waitFor(() => expect(localStorage.length).toBe(0));
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('no deposita si positionOf ya confirma una custodia Master para el NFT', async () => {
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      tokenId: '98000003',
+      action: 'approval',
+      phase: 'approval_confirmed',
+      txHash: approvalHash,
+    }));
+    fetchMock.mockResolvedValue(response(statusWithPendingApprovalAsset({ canDeposit: false })));
+    readContract.mockImplementation(async (input: { functionName?: string }) => {
+      if (input.functionName === 'ownerOf') return wallet;
+      if (input.functionName === 'getApproved') return vault;
+      if (input.functionName === 'isApprovedForAll') return false;
+      if (input.functionName === 'positionOf') {
+        return { beneficialOwner: wallet, depositEpoch: BigInt(2), depositedAt: BigInt(100) };
+      }
+      return null;
+    });
+
+    render(<CukieMasterNftVaultPanel />);
+    fireEvent.click(await screen.findByRole('button', { name: /Continuar depósito/i }));
+
+    expect(await screen.findByText(/ya tiene una custodia en Cukie Master/i)).toBeInTheDocument();
+    await waitFor(() => expect(localStorage.length).toBe(0));
+    expect(writeContractAsync).not.toHaveBeenCalled();
   });
 
   it('no persiste una operación si la firma se rechaza antes de devolver hash', async () => {

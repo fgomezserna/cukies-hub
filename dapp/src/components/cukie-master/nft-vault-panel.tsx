@@ -111,6 +111,26 @@ function sameAddressSet(left: readonly string[], right: readonly string[]) {
     === [...right].map((item) => item.toLowerCase()).sort().join(',');
 }
 
+function masterPositionHasCustody(value: unknown) {
+  if (!value || (typeof value !== 'object' && !Array.isArray(value))) return false;
+  const tuple = Array.isArray(value) ? value : null;
+  const record = !tuple ? value as Record<string, unknown> : null;
+  const beneficialOwner = tuple?.[0] ?? record?.beneficialOwner;
+  if (typeof beneficialOwner === 'string' && !sameAddress(beneficialOwner, '0x0000000000000000000000000000000000000000')) {
+    return true;
+  }
+  for (const field of [tuple?.[1] ?? record?.depositEpoch, tuple?.[2] ?? record?.depositedAt]) {
+    try {
+      if ((typeof field === 'bigint' || typeof field === 'number' || typeof field === 'string') && BigInt(field) > BigInt(0)) {
+        return true;
+      }
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
 function rarityLabel(rarity: string) {
   return ({
     common: 'Común',
@@ -135,6 +155,7 @@ function blockerLabel(blocker?: string) {
     invalidated: 'Requiere revisión del inventario',
     owner_mismatch: 'El Cukie no aparece en esta wallet',
     unknown_owner: 'Propietario pendiente de verificar',
+    unknown_state: 'Estado de custodia pendiente de verificar; actualiza el inventario antes de depositar',
   } as Record<string, string>)[blocker ?? ''] ?? 'Este Cukie no es apto para la ruta Cukie Master';
 }
 
@@ -144,8 +165,53 @@ function isVisibleCukieMasterAsset(asset: PublicNft) {
     || asset.canWithdraw;
 }
 
+/**
+ * An approval receipt only unlocks the next step. It must not turn a stale or
+ * otherwise blocked inventory row into a deposit candidate. The final owner
+ * and allowance reads in `mutate` remain authoritative immediately before the
+ * deposit simulation/write.
+ */
+function canResumeApprovedDeposit(
+  asset: PublicNft,
+  operation: NftVaultPendingOperation | undefined,
+) {
+  const canonicalAssetId = asset.collectionAddress && asset.tokenId && ukiNftVaults.chainId
+    ? canonicalNftVaultAssetId({
+      chainId: ukiNftVaults.chainId,
+      collectionAddress: asset.collectionAddress,
+      tokenId: asset.tokenId,
+    })
+    : null;
+  return operation?.action === 'approval'
+    && operation.phase === 'approval_confirmed'
+    && asset.custody === 'wallet'
+    // The projection may transiently report `unknown` after an approval
+    // receipt. With no explicit blocker, ownerOf + allowance + simulation
+    // below still provide the final custody/eligibility checks.
+    && (asset.state === 'available' || asset.state === 'unknown')
+    && asset.blockers.length === 0
+    && !asset.canWithdraw
+    && asset.depositEpoch == null
+    && Boolean(
+      asset.collectionAddress
+      && isAddress(asset.collectionAddress)
+      && asset.tokenId
+      && /^\d+$/.test(asset.tokenId)
+      && asset.canonicalAssetId === canonicalAssetId
+      && ukiNftVaults.collectionAddresses.some((collection) => sameAddress(collection, asset.collectionAddress)),
+    );
+}
+
+function approvalContinuationBlockerLabel(asset: PublicNft) {
+  if (asset.blockers.length > 0) return blockerLabel(asset.blockers[0]);
+  if (asset.custody !== 'wallet' || asset.canWithdraw) {
+    return 'Este Cukie ya no está disponible en tu wallet para continuar el depósito';
+  }
+  return 'El estado de este Cukie ha cambiado; actualiza el inventario antes de continuar el depósito';
+}
+
 function pendingLabel(operation: NftVaultPendingOperation, confirmedOnChain = false) {
-  if (operation.phase === 'approval_confirmed') return 'Continuar staking';
+  if (operation.phase === 'approval_confirmed') return 'Continuar depósito';
   if (operation.phase === 'syncing_projection') {
     if (confirmedOnChain) {
       return operation.action === 'withdraw'
@@ -179,6 +245,12 @@ function nftTransactionError(reason: unknown) {
   }
   if (message.includes('transaction_cancelled') || message.includes('transaction_replaced')) {
     return 'La transacción fue sustituida o cancelada. No se ha confirmado ningún cambio; revisa la wallet antes de volver a intentarlo.';
+  }
+  if (message.includes('wallet_is_not_owner') || message.includes('not token owner')) {
+    return 'Este Cukie ya no aparece en tu wallet. Actualiza el inventario antes de volver a iniciar el depósito.';
+  }
+  if (message.includes('master_position_not_available')) {
+    return 'Este Cukie ya tiene una custodia en Cukie Master. Actualiza el inventario antes de volver a intentarlo.';
   }
   return 'No se pudo completar la operación. Actualiza el estado y vuelve a intentarlo.';
 }
@@ -325,8 +397,12 @@ export function CukieMasterNftVaultPanel() {
     };
   }), [address, apiAssets, assetPendingKey, chainId, onChainByAsset, pendingByAsset, pendingContext]);
   const eligibleAssetCount = useMemo(
-    () => assets.filter((asset) => asset.canDeposit || asset.canWithdraw).length,
-    [assets],
+    () => assets.filter((asset) => (
+      asset.canDeposit
+      || asset.canWithdraw
+      || canResumeApprovedDeposit(asset, pendingByAsset[assetPendingKey(asset)])
+    )).length,
+    [assetPendingKey, assets, pendingByAsset],
   );
   const pendingWithoutInventory = useMemo(
     () => Object.values(pendingByAsset).filter((operation) => (
@@ -716,7 +792,9 @@ export function CukieMasterNftVaultPanel() {
       receipt?: NftTransactionReceipt,
     ) => {
       let operation = currentOperation(snapshot);
-      if (!operation || !publicClient.getTransactionReceipt || !publicClient.readContract) return;
+      // An approval receipt is already the terminal state for that sub-step;
+      // only the following deposit needs custody/position reconciliation.
+      if (operation?.action === 'approval' || !operation || !publicClient.getTransactionReceipt || !publicClient.readContract) return;
       const resolvedReceipt: NftTransactionReceipt = receipt ?? await publicClient.getTransactionReceipt({ hash: operation.txHash });
       if (!isReconciliationCurrent()) return;
       if (!receipt) {
@@ -991,6 +1069,15 @@ export function CukieMasterNftVaultPanel() {
   async function mutate(asset: PublicNft, operation: Operation) {
     const assetKey = assetPendingKey(asset);
     const existingPending = pendingOperationForAsset(asset);
+    const resumeApprovedDeposit = operation === 'deposit'
+      && canResumeApprovedDeposit(asset, existingPending);
+    const approvalContinuationBlocked = operation === 'deposit'
+      && existingPending?.phase === 'approval_confirmed'
+      && !resumeApprovedDeposit;
+    if (approvalContinuationBlocked) {
+      setError(approvalContinuationBlockerLabel(asset));
+      return;
+    }
     if (
       !user?.walletAddress
       || !address
@@ -1032,7 +1119,9 @@ export function CukieMasterNftVaultPanel() {
     let pendingForNext = existingPending;
     try {
       if (operation === 'deposit') {
-        if (!asset.canDeposit || !publicClient) throw new Error('DEPOSIT_NOT_ALLOWED');
+        if ((!asset.canDeposit && !resumeApprovedDeposit) || !publicClient) {
+          throw new Error('DEPOSIT_NOT_ALLOWED');
+        }
         const [owner, approved, approvedForAll] = await Promise.all([
           publicClient.readContract({ address: collection, abi: erc721CustodyAbi, functionName: 'ownerOf', args: [tokenId] }),
           publicClient.readContract({ address: collection, abi: erc721CustodyAbi, functionName: 'getApproved', args: [tokenId] }),
@@ -1040,6 +1129,18 @@ export function CukieMasterNftVaultPanel() {
         ]);
         if (!operationReady()) throw new Error('NFT_OPERATION_CONTEXT_CHANGED');
         if (!sameAddress(owner, address)) throw new Error('WALLET_IS_NOT_OWNER');
+        if (resumeApprovedDeposit) {
+          const rawPosition = await publicClient.readContract({
+            address: vaultAddress,
+            abi: cukieMasterNftVaultAbi,
+            functionName: 'positionOf',
+            args: [collection, tokenId],
+          });
+          if (!operationReady()) throw new Error('NFT_OPERATION_CONTEXT_CHANGED');
+          if (masterPositionHasCustody(rawPosition)) {
+            throw new Error('MASTER_POSITION_NOT_AVAILABLE');
+          }
+        }
         if (!sameAddress(approved, vaultAddress) && approvedForAll !== true) {
           setPhase('approving');
           await writeAndConfirm({
@@ -1088,9 +1189,18 @@ export function CukieMasterNftVaultPanel() {
         ? pendingOperationsForContext(pendingContext)
           .find((item) => pendingNftVaultOperationAssetKey(item) === assetKey)
         : null;
-      if (persisted) {
+      const ownerMismatch = reason instanceof Error && reason.message === 'WALLET_IS_NOT_OWNER';
+      const positionOccupied = reason instanceof Error && reason.message === 'MASTER_POSITION_NOT_AVAILABLE';
+      if ((ownerMismatch || positionOccupied) && persisted?.action === 'approval') {
+        clearPending(asset.assetId, {
+          context: operationContext,
+          expectedOperation: persisted,
+          isCurrent: identityMatches,
+        });
+        setError(nftTransactionError(reason));
+      } else if (persisted) {
         setNotice(persisted.phase === 'approval_confirmed'
-          ? 'La aprobación quedó confirmada. Pulsa «Continuar staking» cuando quieras reanudar el depósito.'
+          ? 'La aprobación quedó confirmada. Pulsa «Continuar depósito» cuando quieras reanudar.'
           : 'La operación ya tiene transacción. Seguiremos comprobándola automáticamente; no la repitas.');
       } else {
         setError(nftTransactionError(reason));
@@ -1176,6 +1286,12 @@ export function CukieMasterNftVaultPanel() {
             const pending = pendingOperationForAsset(asset);
             const onChainConfirmation = onChainConfirmationForAsset(asset);
             const pendingLocked = Boolean(pending && pending.phase !== 'approval_confirmed');
+            const resumeApprovedDeposit = canResumeApprovedDeposit(asset, pending);
+            const approvalContinuationBlocked = Boolean(
+              pending?.action === 'approval'
+              && pending.phase === 'approval_confirmed'
+              && !resumeApprovedDeposit,
+            );
             return (
               <article id={`cukie-master-cukie-${asset.tokenId ?? ''}`} key={asset.assetId} className="scroll-mt-24 overflow-hidden rounded-[10px] border border-white/10 bg-[#07131d]">
                 <div className="relative aspect-[4/3] bg-black/25">
@@ -1194,6 +1310,15 @@ export function CukieMasterNftVaultPanel() {
                       {onChainConfirmation ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                       {pendingLabel(pending, Boolean(onChainConfirmation))}
                     </button>
+                  ) : resumeApprovedDeposit ? (
+                    <button type="button" disabled={!depositsReady || !pendingHydrated || Boolean(activeAssetId)} onClick={() => void mutate(asset, 'deposit')} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-lilac-border)] px-3 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-50">
+                      {working ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <LockKeyhole className="h-4 w-4" aria-hidden="true" />}
+                      {working ? 'Depositando' : pendingLabel(pending!)}
+                    </button>
+                  ) : approvalContinuationBlocked ? (
+                    <p className="mt-4 flex min-h-11 w-full items-center justify-center rounded-[7px] border border-white/10 px-3 text-center text-xs font-black text-[var(--uki-muted)]">
+                      {approvalContinuationBlockerLabel(asset)}
+                    </p>
                   ) : asset.canDeposit ? (
                     <button type="button" disabled={!depositsReady || !pendingHydrated || Boolean(activeAssetId)} onClick={() => void mutate(asset, 'deposit')} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-lilac-border)] px-3 text-xs font-black uppercase text-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-50">
                       {working ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <LockKeyhole className="h-4 w-4" aria-hidden="true" />}
