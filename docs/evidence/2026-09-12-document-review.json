@@ -270,7 +270,11 @@
       "thinking": "max",
       "statusObserved": "active",
       "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c",
-      "branch": "codex/o2-readback-coherence"
+      "branch": "codex/o2-readback-coherence",
+      "pullRequests": [
+        450,
+        453
+      ]
     },
     {
       "lane": "D12-4",
@@ -291,11 +295,12 @@
       "worktree": "/Users/fgomezserna/.codex/worktrees/acfe/cukies-hub",
       "model": "gpt-5.6-luna",
       "thinking": "max",
-      "statusObserved": "active",
-      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
+      "statusObserved": "completed",
+      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c",
+      "pullRequest": 452
     }
   ],
-  "taskStatusObservedAt": "2026-09-12T15:51:28.229747+00:00",
+  "taskStatusObservedAt": "2026-09-12T16:04:24.484035+00:00",
   "automation": {
     "id": "coordinar-pruebas-cukies-12-sep",
     "status": "ACTIVE",
@@ -596,6 +601,80 @@
       "lane": "D12-5",
       "reportedObservation": "Root integration b14dff86 passed all275 suites/2410 tests, typecheck and lint. Existing my-cukies-panel.tsx:513 lint warning remains. No product code changes after tests.",
       "verificationBoundary": "Merge/deploy and exact live false-incident resolution remain pending."
+    },
+    {
+      "reportedAt": "2026-09-12T16:04:24.484035+00:00",
+      "lane": "D12-5",
+      "reportedObservation": "PR452 merged staging00e95ecd77e17d2eda5ba9cc83d653a449760dee at15:55:25UTC; delivery34703683490 running. Root read-only preflight additionally verifies ownerOf at safe BSC97 block130626859 and matching canonical hash; owner matches current catalog/lock.",
+      "verificationBoundary": "No mutation yet. False incident will be resolved by exact compare-and-set only after fixed code is served; invalidated game_assignment lock and three historical Transfer dead letters remain unchanged."
+    },
+    {
+      "reportedAt": "2026-09-12T16:04:24.484035+00:00",
+      "lane": "D12-3",
+      "reportedObservation": "Root created draftPR453 for O2 branch codex/o2-readback-coherence at8d291425, explicitly recording two unresolved review findings. Original task is implementing focused joint regressions.",
+      "verificationBoundary": "Not accepted or deployed; no second parallel owner for provider/panel."
+    },
+    {
+      "reportedAt": "2026-09-12T16:11:17.000495+00:00",
+      "lane": "D12-5",
+      "reportedObservation": "PR452 deployed staging00e95ecd; delivery34703683490 success and exact servedSHA verified. Root resolved one false NFT identity incident at16:05:37UTC after fresh canonical-safe block/ownerOf validation; CAS matched1/modified1. Both current16:00–16:30 creditruns now open, NFT300 and UKI200 credits applied, scheduler failures0 and fresh sourcewatermarks.",
+      "verificationBoundary": "Only incident status/audited resolution changed. Lock remains invalidated, three historical Transfer deadletters retained. No replay/backfill or oldgame/reward repair. Authenticated UI/newgame QA remains separate; O2 still technical work in PR453.",
+      "operationalEvidence": {
+        "resolution": {
+          "observedAt": "2026-09-12T16:05:37.333Z",
+          "database": "cukieshub-new-staging",
+          "incidentId": "nft-lock-ownership:nft_lock_asset_identity_invalid:27a084fb-fc41-4999-9ead-3000f9f35c52:1",
+          "statusBefore": "open",
+          "lockStatus": "invalidated",
+          "fencingToken": 2,
+          "assetIdentity": "97:0xd4c7b16db234d7f62ba6a8f30153faf85feabec8:98000002",
+          "safeBlockNumber": 130627853,
+          "safeBlockHash": "0xe1973276da6593a926a3023b94015e82b9006efb5fc2621c5d2f294ab19710af",
+          "checkpointCheckedAt": "2026-09-12T16:05:24.136Z",
+          "chainId": 97,
+          "onchainOwnerMatchesCatalogAndLock": true,
+          "mutation": {
+            "mode": "apply",
+            "matched": 1,
+            "modified": 1
+          }
+        },
+        "currentGrants": {
+          "observedAt": "2026-09-12T16:09:16.266Z",
+          "runs": [
+            {
+              "route": "uki",
+              "status": "open"
+            },
+            {
+              "route": "nft",
+              "status": "open"
+            }
+          ],
+          "items": [
+            {
+              "_id": {
+                "route": "nft",
+                "status": "applied"
+              },
+              "slots": 3,
+              "grantCredits": 300,
+              "ownCredits": 300,
+              "poolCredits": 0
+            },
+            {
+              "_id": {
+                "route": "uki",
+                "status": "applied"
+              },
+              "slots": 2,
+              "grantCredits": 200,
+              "ownCredits": 200,
+              "poolCredits": 0
+            }
+          ]
+        }
+      }
     }
   ]
 }
