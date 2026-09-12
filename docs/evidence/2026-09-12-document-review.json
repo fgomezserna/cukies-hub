@@ -332,6 +332,13 @@
       "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
       "reportedObservation": "Root inspected A3 alias-reader proposal and the current staging weekly profile reader from PR429.",
       "verificationBoundary": "Requested explicit weekly alias precedence, then explicit runtime-campaign alias, then exact public username, with generated aliases excluded. Requested timeout regression preserving a healthy Hub name if optional participant lookup hangs. Implementation not accepted yet."
+    },
+    {
+      "reportedAt": "2026-09-12T13:32:34.227435+00:00",
+      "lane": "D12-1",
+      "sourceThreadId": "01a095b4-c1c5-7591-979b-82bd2025c076",
+      "reportedObservation": "Root reviewed first diff changing finish retries, persistence retryability and iframe 1P handshake.",
+      "verificationBoundary": "Requested backend regressions for concurrent identical finish, exactly-once rewards/reservations, transient vs permanent errors and conflicting identity/payload. Also requested resetting GAME_READY for navigation of the same iframe element. Existing passing tests alone do not validate the monetary change."
     }
   ]
 }
