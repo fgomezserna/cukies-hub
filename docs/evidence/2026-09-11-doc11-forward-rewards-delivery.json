@@ -842,7 +842,7 @@
         }
       },
       "correction": {
-        "state": "validated_pending_delivery",
+        "state": "deployed_verified",
         "branch": "codex/doc11-weekly-close-wait",
         "scope": "Wait for each forward candidate until its existing settlement delay expires; retain closePeriod guards and non-forward behavior",
         "historicalRecovery": false,
@@ -866,7 +866,74 @@
           "lint": "pass with existing warnings",
           "typecheck": "pass"
         },
-        "baselineArtifact": "/tmp/doc11-second-weekly-release-baseline.json"
+        "baselineArtifact": "/tmp/doc11-second-weekly-release-baseline.json",
+        "pr": 440,
+        "mergeSha": "8bfa143be7c8e7a017d54756d16c518b612f3965",
+        "candidateSha": "36c7eadf07aca8e4b58bcb2407be4e2556713804",
+        "deliveryRun": 34671318138,
+        "deliveryRunConclusion": "success",
+        "delivery": {
+          "observedAt": "2026-09-12T03:57:45.882443+00:00",
+          "ok": true,
+          "release": "8bfa143be7c8e7a017d54756d16c518b612f3965",
+          "productSourceSha": "8bfa143be7c8e7a017d54756d16c518b612f3965",
+          "healthHttpStatus": 200,
+          "readyHttpStatus": 200,
+          "productionGitSha": "d1a71495f83d16f6b22425f52e05ec5a2e8ea191",
+          "containersBefore": 93,
+          "containersAfter": 93,
+          "containersPreserved": 92,
+          "removedContainers": [
+            "rwwsc4kkwc0ck84cgk40s8kk-214105328705"
+          ],
+          "addedContainers": [
+            "rwwsc4kkwc0ck84cgk40s8kk-035603167702"
+          ],
+          "changedExistingContainers": [],
+          "componentsChanged": [
+            "dapp"
+          ],
+          "componentsUnchanged": 7,
+          "protected": {
+            "baselineCount": 82,
+            "changed": []
+          },
+          "journal": "clean",
+          "rankingRunStartedAt": "2026-09-12T03:57:19.765Z",
+          "webStartedAt": "2026-09-12T03:56:25.356465137Z",
+          "rankingTickAfterNewWeb": true,
+          "heartbeats": {
+            "game": {
+              "status": "success",
+              "lastSuccessAt": "2026-09-12T03:57:27.037Z",
+              "consecutiveFailures": 0
+            },
+            "pool": {
+              "status": "success",
+              "lastSuccessAt": "2026-09-12T03:57:40.482Z",
+              "consecutiveFailures": 0
+            },
+            "ranking": {
+              "status": "success",
+              "lastSuccessAt": "2026-09-12T03:57:19.851Z",
+              "consecutiveFailures": 0
+            },
+            "accounting": {
+              "status": "success",
+              "lastSuccessAt": "2026-09-12T03:57:19.661Z",
+              "consecutiveFailures": 0
+            },
+            "publisher": {
+              "status": "success",
+              "lastSuccessAt": "2026-09-12T03:57:08.088Z",
+              "consecutiveFailures": 0
+            }
+          }
+        },
+        "postflightArtifact": "/tmp/doc11-pr440-runtime-postflight.json",
+        "verificationArtifact": "/tmp/doc11-pr440-delivery-verification.json",
+        "nextNaturalWaitingWindowObserved": false,
+        "personalGameplayOrClaimVerified": false
       }
     }
   },
