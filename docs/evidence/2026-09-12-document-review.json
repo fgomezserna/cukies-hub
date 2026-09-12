@@ -482,6 +482,12 @@
       "lane": "D12-4",
       "reportedObservation": "Backport7fd0a92a preserves staging weekly alias constant; only comment conflict resolved. Root ran complete staging suite:272 suites/2387 tests passed; typecheck/lint passed with existing my-cukies-panel warning.",
       "verificationBoundary": "Candidate prepared for staging PR; not yet deployed there."
+    },
+    {
+      "reportedAt": "2026-09-12T14:15:33.779207+00:00",
+      "lane": "D12-1/D12-3/D12-4",
+      "reportedObservation": "PR451 backport merged staging2c7a3882 at14:12:45UTC, CI34698620345 in progress. Root accepted game56462244 and merged updated staging into candidate without conflicts. C2 will ship in PR450; O2 remains a separate bounded follow-up within its existing task.",
+      "verificationBoundary": "Root full game candidate checks are running; no game settlement claimed live and no historical repair."
     }
   ]
 }
