@@ -428,7 +428,8 @@ export function createGameEconomyService(
         current.operation.leaseExpiresAt.getTime() > input.now.getTime()
       ) {
         throw new DomainConflictError(
-          `La sesion tiene ${current.operation.kind} en curso.`
+          `La sesion tiene ${current.operation.kind} en curso.`,
+          { retryable: true },
         );
       }
       const fenceToken = current.fenceToken + 1;

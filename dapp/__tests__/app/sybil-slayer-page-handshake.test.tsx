@@ -51,15 +51,18 @@ jest.mock('@/components/layout/GameLayout', () => ({
     gameConfig,
     children,
     desktopBanner,
+    desktopSidebar,
   }: {
     iframeRef: React.RefObject<HTMLIFrameElement>;
     gameConfig: { gameUrl: string };
     children?: React.ReactNode;
     desktopBanner?: React.ReactNode;
+    desktopSidebar?: React.ReactNode;
   }) => <>
     <iframe ref={iframeRef} src={gameConfig.gameUrl} title="mock-game-frame" />
     {children}
     <div data-testid="desktop-banner-slot">{desktopBanner}</div>
+    <div data-testid="desktop-sidebar-slot">{desktopSidebar}</div>
   </>,
 }));
 
@@ -72,6 +75,15 @@ jest.mock('@/components/games/treasure-hunt-competition-banner', () => ({
   __esModule: true,
   default: () => (
     <div data-testid="competition-banner">Competición oficial · Preventa UKI</div>
+  ),
+}));
+
+jest.mock('@/components/games/treasure-hunt-play-sidebar', () => ({
+  __esModule: true,
+  default: ({ onStartSinglePlayer }: { onStartSinglePlayer: () => void }) => (
+    <button type="button" data-testid="start-single-player" onClick={onStartSinglePlayer}>
+      Jugar 1P
+    </button>
   ),
 }));
 
@@ -261,6 +273,49 @@ describe('SybilSlayerPage game-session handshake', () => {
       ),
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues Jugar 1P until the iframe is ready instead of losing the click', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      sessionId: 'single-player-session',
+      sessionToken: 'single-player-token',
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock as typeof fetch;
+
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('single-player-session'));
+
+    fireEvent.click(screen.getByTestId('start-single-player'));
+    expect(postMessage).not.toHaveBeenCalledWith(
+      { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
+      GAME_ORIGIN,
+    );
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'GAME_READY' },
+      }));
+    });
+
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'GAME_SESSION_START',
+        payload: expect.objectContaining({ sessionId: 'single-player-session' }),
+      }),
+      GAME_ORIGIN,
+    );
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
+      GAME_ORIGIN,
+    );
   });
 
   it('preserves an invite for the first wallet but clears it before another wallet handshakes', async () => {

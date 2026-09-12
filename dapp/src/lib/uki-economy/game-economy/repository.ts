@@ -243,6 +243,7 @@ export function createMongoGameEconomyRepository(
           if (duplicateKey(error)) {
             throw new DomainConflictError(
               `El periodo rewards ${periodId} cambio durante el settlement.`,
+              { retryable: true },
             );
           }
           throw error;
@@ -256,6 +257,7 @@ export function createMongoGameEconomyRepository(
       if (result.matchedCount !== 1) {
         throw new DomainConflictError(
           `El periodo rewards ${periodId} cambio durante el settlement.`,
+          { retryable: true },
         );
       }
     },
@@ -276,7 +278,11 @@ export function mapGameEconomyPersistenceError(error: unknown) {
   if (duplicateKey(error)) {
     return new DomainConflictError(
       "Conflicto de idempotencia o unicidad en una sesion de juego.",
-      { persistenceFailure: "DUPLICATE_KEY", mongoCode: 11000 }
+      {
+        persistenceFailure: "DUPLICATE_KEY",
+        mongoCode: 11000,
+        retryable: true,
+      }
     );
   }
   return error;

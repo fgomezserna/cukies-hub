@@ -85,6 +85,22 @@ type FinishAuthority = {
   authorityReference: string;
 };
 
+type FinishTreasureHuntEconomyRunInput = {
+  userId: string;
+  walletAddress: string;
+  runId: string;
+  resultId: string;
+  scoreRaw: string;
+  gameTimeMs: number;
+  outcome: "completed" | "voluntary_forfeit";
+  authoritySource: "competition" | "economy";
+  authorityReference?: string;
+  now?: Date;
+};
+
+const FINISH_MAX_ATTEMPTS = 5;
+const FINISH_RETRY_DELAYS_MS = [25, 50, 100, 200] as const;
+
 function quotaUsageId(walletNormalized: string, dailyPeriodId: string) {
   return `treasure-usage-${stableGameEconomyHash({ walletNormalized, dailyPeriodId })}`;
 }
@@ -98,6 +114,25 @@ function runIdFor(input: {
   walletNormalized: string;
 }) {
   return `treasure-run-${stableGameEconomyHash(input)}`;
+}
+
+function duplicateKey(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === 11000
+  );
+}
+
+function isRetryableFinishError(error: unknown) {
+  return error instanceof StaleFenceError ||
+    duplicateKey(error) ||
+    (error instanceof UkiEconomyError && error.details?.retryable === true);
+}
+
+function waitForFinishRetry(delayMs: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, delayMs));
 }
 
 export function treasureHuntEconomyOpenIdempotencyKey(runId: string) {
@@ -1003,18 +1038,9 @@ async function finalizeTreasureHuntRun(input: {
   });
 }
 
-export async function finishTreasureHuntEconomyRun(input: {
-  userId: string;
-  walletAddress: string;
-  runId: string;
-  resultId: string;
-  scoreRaw: string;
-  gameTimeMs: number;
-  outcome: "completed" | "voluntary_forfeit";
-  authoritySource: "competition" | "economy";
-  authorityReference?: string;
-  now?: Date;
-}) {
+async function finishTreasureHuntEconomyRunAttempt(
+  input: FinishTreasureHuntEconomyRunInput,
+) {
   const now = input.now ?? new Date();
   const walletNormalized = validGameWallet(input.walletAddress);
   const runId = validGameText(input.runId, "runId");
@@ -1114,6 +1140,27 @@ export async function finishTreasureHuntEconomyRun(input: {
   }
   const terminal = await finalizeTreasureHuntRun({ claimed, terminalStatus, now });
   return resultResponse(terminal);
+}
+
+export async function finishTreasureHuntEconomyRun(
+  input: FinishTreasureHuntEconomyRunInput,
+) {
+  // Pusher y el recovery del iframe pueden presentar exactamente el mismo
+  // resultado al mismo tiempo. El intento perdedor debe volver a leer los
+  // intents/recursos y continuar la saga idempotente, no convertir una carrera
+  // de fence o una colision unique-key en un resultado terminal pendiente.
+  const now = input.now ?? new Date();
+  for (let attempt = 0; attempt < FINISH_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await finishTreasureHuntEconomyRunAttempt({ ...input, now });
+    } catch (error) {
+      if (!isRetryableFinishError(error) || attempt === FINISH_MAX_ATTEMPTS - 1) {
+        throw error;
+      }
+      await waitForFinishRetry(FINISH_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+  throw new DomainConflictError("finish_treasure_hunt agotó sus reintentos transitorios.");
 }
 
 export async function releaseUnstartedTreasureHuntEconomyRun(input: {

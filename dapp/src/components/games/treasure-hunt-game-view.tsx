@@ -105,6 +105,9 @@ export default function TreasureHuntGameView() {
   const { gameConfig, gameStats, leaderboardData, loading, error, refetch } =
     useGameData(GAME_ID);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const gameReadyRef = useRef(false);
+  const gameReadyFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const pendingSinglePlayerStartRef = useRef(false);
   const sessionStarterRef = useRef<
     ReturnType<typeof createReloadSafeGameSessionStarter> | null
   >(null);
@@ -286,6 +289,7 @@ export default function TreasureHuntGameView() {
     recoveredCompetitionResultsRef.current.clear();
     recoveringParentSessionsRef.current.clear();
     notifiedGameEndIdsRef.current.clear();
+    pendingSinglePlayerStartRef.current = false;
     // Keep opaque resume ids per owner. The server rechecks the signed wallet,
     // and switching back can still recover that wallet's pending result.
     sessionStarterRef.current?.reset();
@@ -476,6 +480,26 @@ export default function TreasureHuntGameView() {
     }
   }, [activeParentGameSession, gameOrigin, roomId, sendSessionClear, user]);
 
+  const dispatchSinglePlayerStart = useCallback(() => {
+    const frameWindow = iframeRef.current?.contentWindow;
+    if (
+      !gameReadyRef.current ||
+      gameReadyFrameRef.current !== iframeRef.current ||
+      !frameWindow ||
+      !gameOrigin ||
+      !activeParentGameSession
+    ) {
+      return false;
+    }
+    frameWindow.postMessage(
+      { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
+      gameOrigin,
+    );
+    pendingSinglePlayerStartRef.current = false;
+    iframeRef.current?.focus();
+    return true;
+  }, [activeParentGameSession, gameOrigin]);
+
   const handleRoomJoined = useCallback((roomCode: string) => {
     setRoomId(roomCode);
   }, []);
@@ -512,7 +536,10 @@ export default function TreasureHuntGameView() {
         return;
       }
       if (event.data?.type === 'GAME_READY') {
+        gameReadyRef.current = true;
+        gameReadyFrameRef.current = iframeRef.current;
         sendSessionHandshake();
+        if (pendingSinglePlayerStartRef.current) dispatchSinglePlayerStart();
         return;
       }
       if (event.data?.type === 'TREASURE_HUNT_GAME_SESSION_CLEAR_CONFIRMED') {
@@ -914,6 +941,7 @@ export default function TreasureHuntGameView() {
     onSessionEnd,
     recoverParentSession,
     rotateParentSession,
+    dispatchSinglePlayerStart,
     sendSessionHandshake,
   ]);
 
@@ -965,6 +993,10 @@ export default function TreasureHuntGameView() {
   }, [sendSessionHandshake]);
 
   useEffect(() => {
+    if (pendingSinglePlayerStartRef.current) dispatchSinglePlayerStart();
+  }, [activeParentGameSession, dispatchSinglePlayerStart]);
+
+  useEffect(() => {
     if (!activeParentGameSession) return undefined;
     const pendingClear = readPendingSessionClears().find((candidate) => (
       candidate.ownerUserId === activeParentGameSession.ownerUserId &&
@@ -984,14 +1016,13 @@ export default function TreasureHuntGameView() {
   );
 
   const startSinglePlayerFromHub = useCallback(() => {
-    const frameWindow = iframeRef.current?.contentWindow;
-    if (!frameWindow || !gameOrigin) return;
-    frameWindow.postMessage(
-      { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
-      gameOrigin,
-    );
-    iframeRef.current?.focus();
-  }, [gameOrigin]);
+    pendingSinglePlayerStartRef.current = true;
+    if (dispatchSinglePlayerStart()) return;
+    toast({
+      title: 'Preparando la partida',
+      description: 'El juego está conectando la sesión. Se abrirá en cuanto esté listo.',
+    });
+  }, [dispatchSinglePlayerStart, toast]);
 
   if (loading || !gameConfig) {
     return <GameLoadingSkeleton message="Cargando Treasure Hunt..." />;
