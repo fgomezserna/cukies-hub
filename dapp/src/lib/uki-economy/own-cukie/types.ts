@@ -127,11 +127,13 @@ export type OwnCukieQuotaPeriod = {
 };
 
 export type OwnCukieAvailability = {
-  status: "ready" | "unknown";
+  /** `partial` exposes confirmed capacity while some assets remain unresolved. */
+  status: "ready" | "partial" | "unknown";
   /** Null when the calendar itself could not be resolved safely. */
   periodId: string | null;
   periodStartsAt: Date | null;
   periodEndsAt: Date | null;
+  /** On `partial`, these are confirmed lower-bound totals only. */
   totalGamesRemaining: number | null;
   eligibleCukies: number | null;
   unknownCukies: number;

@@ -104,9 +104,13 @@ function clone<T>(value: T): T {
   return value;
 }
 
-function ownServiceHarness(initialAsset: OwnCukieAssetSnapshot) {
+function ownServiceHarness(
+  initialAsset: OwnCukieAssetSnapshot,
+  additionalAssets: OwnCukieAssetSnapshot[] = [],
+) {
   const state = {
     asset: clone(initialAsset),
+    additionalAssets: additionalAssets.map((item) => clone(item)),
     epochs: new Map<string, OwnCukieEpoch>(),
     assignments: new Map<string, OwnCukieAssignment>(),
     events: new Map<string, OwnCukieEvent>(),
@@ -143,36 +147,29 @@ function ownServiceHarness(initialAsset: OwnCukieAssetSnapshot) {
     },
     enqueueRecalculation: async () => {},
   } as unknown as NftAssetLockRepository;
+  const allAssets = () => [state.asset, ...state.additionalAssets];
+  const snapshotWithLocks = (source: OwnCukieAssetSnapshot) => ({
+    ...clone(source),
+    activeLocks: [...state.locks.values()]
+      .filter((lock) => lock.assetId === source.assetId && lock.status === 'active')
+      .map((lock) => ({
+        lockId: lock.lockId,
+        assetId: lock.assetId,
+        ownerNormalized: lock.ownerNormalized,
+        reason: lock.reason,
+        state: lock.reason === 'game_assignment' ? 'assigned_to_game' as const : 'unknown' as const,
+      })),
+  });
   const repository = {
     listWalletAssets: async (ownerNormalized: string) => {
-      if (state.asset.ownerNormalized !== ownerNormalized) return [];
-      return [{
-        ...clone(state.asset),
-        activeLocks: [...state.locks.values()]
-          .filter((lock) => lock.assetId === state.asset.assetId && lock.status === 'active')
-          .map((lock) => ({
-            lockId: lock.lockId,
-            assetId: lock.assetId,
-            ownerNormalized: lock.ownerNormalized,
-            reason: lock.reason,
-            state: lock.reason === 'game_assignment' ? 'assigned_to_game' as const : 'unknown' as const,
-          })),
-      }];
+      return allAssets()
+        .filter((source) => source.ownerNormalized === ownerNormalized)
+        .map(snapshotWithLocks);
     },
-    findAsset: async (assetId: string) => assetId === state.asset.assetId
-      ? {
-          ...clone(state.asset),
-          activeLocks: [...state.locks.values()]
-            .filter((lock) => lock.assetId === assetId && lock.status === 'active')
-            .map((lock) => ({
-              lockId: lock.lockId,
-              assetId: lock.assetId,
-              ownerNormalized: lock.ownerNormalized,
-              reason: lock.reason,
-              state: lock.reason === 'game_assignment' ? 'assigned_to_game' as const : 'unknown' as const,
-            })),
-        }
-      : null,
+    findAsset: async (assetId: string) => {
+      const source = allAssets().find((item) => item.assetId === assetId);
+      return source ? snapshotWithLocks(source) : null;
+    },
     findEpoch: async (epochId: string) => clone(state.epochs.get(epochId) ?? null),
     insertEpoch: async (epoch: OwnCukieEpoch) => { state.epochs.set(epoch.epochId, clone(epoch)); },
     compareAndSetEpoch: async (current: OwnCukieEpoch, replacement: OwnCukieEpoch) => {
@@ -640,6 +637,56 @@ describe('own Cukie canonical selection', () => {
       status: 'unknown',
       totalGamesRemaining: null,
       eligibleCukies: null,
+    });
+  });
+
+  it('no deja que un estado incompatible con ownership incompleto contamine el saldo', async () => {
+    const period = {
+      periodId: 'C1800-D:2026-09-10T12:00:00.000Z',
+      startsAt: new Date('2026-09-10T12:00:00.000Z'),
+      endsAt: new Date('2026-09-10T12:30:00.000Z'),
+      policyVersion: OWN_CUKIE_DAILY_QUOTA_POLICY_VERSION,
+    };
+    const harness = ownServiceHarness(asset({
+      canonicalState: 'soft_staked',
+      ownershipEventId: '',
+    }));
+    await expect(harness.service.availability({
+      walletAddress: OWNER,
+      quotaPeriod: period,
+      now: period.startsAt,
+    })).resolves.toMatchObject({
+      status: 'ready',
+      totalGamesRemaining: 0,
+      eligibleCukies: 0,
+      unknownCukies: 0,
+    });
+  });
+
+  it('expone capacidad confirmada como parcial cuando otro Cukie sigue pendiente', async () => {
+    const period = {
+      periodId: 'C1800-D:2026-09-10T12:00:00.000Z',
+      startsAt: new Date('2026-09-10T12:00:00.000Z'),
+      endsAt: new Date('2026-09-10T12:30:00.000Z'),
+      policyVersion: OWN_CUKIE_DAILY_QUOTA_POLICY_VERSION,
+    };
+    const harness = ownServiceHarness(
+      asset({ rarity: 'rare' }),
+      [asset({
+        assetId: 'cukies:97:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:8',
+        tokenId: '8',
+        ownershipEventId: '',
+      })],
+    );
+    await expect(harness.service.availability({
+      walletAddress: OWNER,
+      quotaPeriod: period,
+      now: period.startsAt,
+    })).resolves.toMatchObject({
+      status: 'partial',
+      totalGamesRemaining: ownCukieQuota('original', 'rare'),
+      eligibleCukies: 1,
+      unknownCukies: 1,
     });
   });
 });

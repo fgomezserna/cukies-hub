@@ -59,8 +59,9 @@ function ownCukieCopy(access: ReturnType<typeof useTreasureHuntCreditAccess>) {
   }
   if (
     !availability
-    || availability.status !== 'ready'
+    || (availability.status !== 'ready' && availability.status !== 'partial')
     || availability.totalGamesRemaining === null
+    || availability.eligibleCukies === null
     || !availability.periodId
     || !availability.periodStartsAt
     || !availability.periodEndsAt
@@ -90,6 +91,13 @@ function ownCukieCopy(access: ReturnType<typeof useTreasureHuntCreditAccess>) {
     minute: '2-digit',
     timeZone: 'UTC',
   }).format(periodEndsAt);
+  if (availability.status === 'partial') {
+    const pending = availability.unknownCukies;
+    return {
+      value: `Al menos ${availability.totalGamesRemaining} partida${availability.totalGamesRemaining === 1 ? '' : 's'}`,
+      detail: `${availability.eligibleCukies} Cukie${availability.eligibleCukies === 1 ? '' : 's'} disponibles · ${pending} pendiente${pending === 1 ? '' : 's'} de comprobar · renueva ${renewal} UTC`,
+    };
+  }
   return {
     value: `${availability.totalGamesRemaining} partida${availability.totalGamesRemaining === 1 ? '' : 's'}`,
     detail: `${eligible} Cukie${eligible === 1 ? '' : 's'} elegible${eligible === 1 ? '' : 's'} · renueva ${renewal} UTC`,

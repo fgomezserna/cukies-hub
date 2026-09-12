@@ -250,6 +250,7 @@ describe('vistas UX de Treasure Hunt', () => {
       canPlay: true,
       missingCredits: 0,
       availabilityReason: null,
+      ownCukieAvailability: null,
     });
   });
 
@@ -429,6 +430,26 @@ describe('vistas UX de Treasure Hunt', () => {
     expect(screen.getByText('Pendiente de comprobar')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Te faltan/ })).not.toBeInTheDocument();
     expect(onStartSinglePlayer).not.toHaveBeenCalled();
+  });
+
+  it('muestra capacidad OWN parcial sin presentar el saldo confirmado como total', () => {
+    mockPhase = 'closed';
+    Object.assign(mockCreditAccess, {
+      ownCukieAvailability: {
+        status: 'partial',
+        periodId: 'th-day:2026-09-12T14:00:00.000Z',
+        periodStartsAt: '2026-09-12T14:00:00.000Z',
+        periodEndsAt: '2026-09-13T14:00:00.000Z',
+        totalGamesRemaining: 62,
+        eligibleCukies: 11,
+        unknownCukies: 1,
+      },
+    });
+    render(<TreasureHuntPlaySidebar onStartSinglePlayer={jest.fn()} />);
+
+    expect(screen.getAllByText('Al menos 62 partidas').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/11 Cukies disponibles · 1 pendiente de comprobar/).length)
+      .toBeGreaterThan(0);
   });
 
   it('muestra intentos disponibles y bloquea el juego de una wallet descalificada', () => {

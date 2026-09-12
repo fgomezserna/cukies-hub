@@ -27,6 +27,7 @@ import {
   cloneOwnCukieAssignment,
   cloneOwnCukieEpoch,
   normalizeOwnCukieWallet,
+  ownCukieAssetHasKnownIneligibilitySignals,
   ownCukieAssetHasUnknownEligibilitySignals,
   ownCukieAssignmentId,
   ownCukieEpochId,
@@ -533,6 +534,12 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
         let eligibleCukies = 0;
         let unknownCukies = 0;
         for (const candidate of assets) {
+          // State/custody/network exclusions are conclusive even if a stale
+          // row also lacks ownership metadata. Only unresolved eligibility
+          // signals should contribute to the pending/unknown count.
+          if (ownCukieAssetHasKnownIneligibilitySignals(candidate, walletNormalized)) {
+            continue;
+          }
           if (ownCukieAssetHasUnknownEligibilitySignals(candidate)) {
             unknownCukies += 1;
             continue;
@@ -575,7 +582,7 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
           // period balance is still visible and can be reserved by the owner.
           totalGamesRemaining += epoch.gamesRemaining;
         }
-        if (unknownCukies > 0) {
+        if (unknownCukies > 0 && totalGamesRemaining === 0) {
           return {
             status: "unknown",
             periodId: quotaPeriod.periodId,
@@ -583,6 +590,17 @@ export function createOwnCukieService(runner: OwnCukieTransactionRunner) {
             periodEndsAt: quotaPeriod.endsAt,
             totalGamesRemaining: null,
             eligibleCukies: null,
+            unknownCukies,
+          } satisfies OwnCukieAvailability;
+        }
+        if (unknownCukies > 0) {
+          return {
+            status: "partial",
+            periodId: quotaPeriod.periodId,
+            periodStartsAt: quotaPeriod.startsAt,
+            periodEndsAt: quotaPeriod.endsAt,
+            totalGamesRemaining,
+            eligibleCukies,
             unknownCukies,
           } satisfies OwnCukieAvailability;
         }

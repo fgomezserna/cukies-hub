@@ -140,14 +140,98 @@ export function assertOwnCukieAssetEligible(
   };
 }
 
+const KNOWN_INELIGIBLE_STATES = new Set([
+  "listed",
+  "bridging",
+  "soft_staked",
+  "in_pool",
+  "assigned_to_game",
+  "invalidated",
+]);
+
+const KNOWN_INELIGIBLE_BLOCKERS = new Set([
+  "owner_mismatch",
+  "unsupported_network",
+  "listed",
+  "bridging",
+  "already_locked",
+  "in_pool",
+  "assigned_to_game",
+  "invalidated",
+  "soft_stake_required",
+]);
+
+const KNOWN_ACTIVE_LOCK_STATES = new Set([
+  "listed",
+  "bridging",
+  "soft_staked",
+  "in_pool",
+  "assigned_to_game",
+  "invalidated",
+]);
+
+function isEvmWallet(value: unknown): value is string {
+  return typeof value === "string"
+    && /^0x[0-9a-f]{40}$/i.test(value)
+    && !/^0x0{40}$/i.test(value);
+}
+
+/**
+ * Known custody/state exclusions must win over unrelated missing metadata.
+ * For example, a soft-staked row without an ownership event is still known
+ * unavailable for a game and must not make the whole wallet `unknown`.
+ */
+export function ownCukieAssetHasKnownIneligibilitySignals(
+  asset: OwnCukieAssetSnapshot,
+  walletNormalized?: string,
+) {
+  const ownerNormalized = typeof asset.ownerNormalized === "string"
+    ? asset.ownerNormalized.trim().toLowerCase()
+    : "";
+  const requestedWallet = typeof walletNormalized === "string"
+    ? walletNormalized.trim().toLowerCase()
+    : "";
+  const ownerMismatch = isEvmWallet(ownerNormalized)
+    && isEvmWallet(requestedWallet)
+    && ownerNormalized !== requestedWallet;
+  return (
+    asset.network === "tron"
+    || KNOWN_INELIGIBLE_STATES.has(asset.canonicalState)
+    || asset.blockers.some((blocker) => KNOWN_INELIGIBLE_BLOCKERS.has(blocker))
+    || ownerMismatch
+    || asset.activeLocks.some((lock) => (
+      typeof lock.lockId === "string"
+      && lock.lockId.trim().length > 0
+      && typeof lock.reason === "string"
+      && lock.reason.trim().length > 0
+      && KNOWN_ACTIVE_LOCK_STATES.has(lock.state)
+    ))
+  );
+}
+
 /** Unknown inventory/ownership facts must not be silently counted as zero. */
 export function ownCukieAssetHasUnknownEligibilitySignals(asset: OwnCukieAssetSnapshot) {
   const ownerNormalized = typeof asset.ownerNormalized === "string"
     ? asset.ownerNormalized.trim().toLowerCase()
     : "";
+  const knownNetwork = asset.network === "bsc"
+    || asset.network === "tron"
+    || asset.network === "unknown";
+  const knownState = [
+    "available",
+    "listed",
+    "bridging",
+    "soft_staked",
+    "in_pool",
+    "assigned_to_game",
+    "invalidated",
+    "unknown",
+  ].includes(asset.canonicalState);
   return (
     typeof asset.network !== "string"
+    || !knownNetwork
     || asset.network === "unknown"
+    || !knownState
     || asset.canonicalState === "unknown"
     || !/^0x[0-9a-f]{40}$/.test(ownerNormalized)
     || /^0x0{40}$/.test(ownerNormalized)
@@ -159,6 +243,7 @@ export function ownCukieAssetHasUnknownEligibilitySignals(asset: OwnCukieAssetSn
     || asset.ownershipEventId.trim().length === 0
     || asset.activeLocks.some((lock) => (
       lock.state === "unknown"
+      || !KNOWN_ACTIVE_LOCK_STATES.has(lock.state)
       || typeof lock.lockId !== "string"
       || lock.lockId.trim().length === 0
       || typeof lock.reason !== "string"

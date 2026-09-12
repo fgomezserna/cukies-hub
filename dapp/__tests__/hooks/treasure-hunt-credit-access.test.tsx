@@ -22,6 +22,15 @@ function statusResponse(
     balanceAvailableCredits: number;
     poolAvailableCredits: number;
   }> = {},
+  ownCukie?: {
+    status: 'ready' | 'partial' | 'unknown';
+    periodId: string | null;
+    periodStartsAt: string | null;
+    periodEndsAt: string | null;
+    totalGamesRemaining: number | null;
+    eligibleCukies: number | null;
+    unknownCukies: number;
+  },
 ) {
   return new Response(JSON.stringify({
     data: {
@@ -48,6 +57,7 @@ function statusResponse(
           { status: 'open' },
         ],
       },
+      ...(ownCukie ? { ownCukie } : {}),
     },
   }), {
     status: 200,
@@ -153,5 +163,42 @@ describe('useTreasureHuntCreditAccess', () => {
     expect(result.current.creditSource).toBeNull();
     expect(result.current.canPlay).toBe(false);
     expect(result.current.isError).toBe(false);
+  });
+
+  it('acepta y conserva la disponibilidad OWN parcial del endpoint', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(statusResponse(
+      { balance: 'ready', pool: 'ready' },
+      {},
+      {
+        status: 'partial',
+        periodId: 'th-day:2026-09-12T14:00:00.000Z',
+        periodStartsAt: '2026-09-12T14:00:00.000Z',
+        periodEndsAt: '2026-09-13T14:00:00.000Z',
+        totalGamesRemaining: 62,
+        eligibleCukies: 11,
+        unknownCukies: 1,
+      },
+    ));
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+      },
+    });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useTreasureHuntCreditAccess(), { wrapper });
+
+    await waitFor(() => expect(result.current.ownCukieAvailability?.status).toBe('partial'));
+    expect(result.current.ownCukieAvailability).toMatchObject({
+      totalGamesRemaining: 62,
+      eligibleCukies: 11,
+      unknownCukies: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('includeOwnCukie=1'),
+      expect.any(Object),
+    );
   });
 });

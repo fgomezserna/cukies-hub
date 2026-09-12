@@ -40,7 +40,7 @@ type CreditStatus = {
     }>;
   };
   ownCukie?: {
-    status: 'ready' | 'unknown';
+    status: 'ready' | 'partial' | 'unknown';
     periodId: string | null;
     periodStartsAt: string | null;
     periodEndsAt: string | null;
@@ -110,7 +110,9 @@ function isCreditStatus(value: unknown): value is CreditStatus {
       ))
     ))
     && (!candidate.ownCukie || (
-      (candidate.ownCukie.status === 'ready' || candidate.ownCukie.status === 'unknown')
+      (candidate.ownCukie.status === 'ready'
+        || candidate.ownCukie.status === 'partial'
+        || candidate.ownCukie.status === 'unknown')
       && (candidate.ownCukie.periodId === null || typeof candidate.ownCukie.periodId === 'string')
       && (candidate.ownCukie.periodStartsAt === null || typeof candidate.ownCukie.periodStartsAt === 'string')
       && (candidate.ownCukie.periodEndsAt === null || typeof candidate.ownCukie.periodEndsAt === 'string')

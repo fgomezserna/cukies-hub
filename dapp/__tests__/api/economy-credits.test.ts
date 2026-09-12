@@ -141,6 +141,34 @@ describe('/api/economy/v1/credits', () => {
     });
   });
 
+  it('propaga una disponibilidad OWN parcial sin convertirla en saldo completo', async () => {
+    (ownCukieService.availability as jest.Mock).mockResolvedValueOnce({
+      status: 'partial',
+      periodId: 'th-day:2026-09-12T14:00:00.000Z',
+      periodStartsAt: new Date('2026-09-12T14:00:00.000Z'),
+      periodEndsAt: new Date('2026-09-13T14:00:00.000Z'),
+      totalGamesRemaining: 62,
+      eligibleCukies: 11,
+      unknownCukies: 1,
+    });
+    const response = await GET(new NextRequest(
+      `http://localhost/api/economy/v1/credits?walletAddress=${wallet}&includeOwnCukie=1`,
+    ));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: 'ok',
+      data: {
+        ownCukie: {
+          status: 'partial',
+          totalGamesRemaining: 62,
+          eligibleCukies: 11,
+          unknownCukies: 1,
+        },
+      },
+    });
+  });
+
   it('no inventa un periodo diario si el calendario acelerado es invalido', async () => {
     const environmentKeys = [
       'APP_ENV',
