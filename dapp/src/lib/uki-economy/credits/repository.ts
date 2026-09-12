@@ -28,6 +28,7 @@ import {
   buildCreditSourceHealthEvidenceHash,
   classifyCreditSourceHealth,
   creditSourceBlockingEventFilter,
+  creditSourceChainIntegrityIncidentFilter,
   creditSourceCursorIsHealthy,
 } from "./source-health";
 import {
@@ -797,20 +798,7 @@ export function createMongoCompetitionCreditRepository(
             isBlockingCreditIncident(incident, route, cutoff)
           ).length),
         db.collection("chain_integrity_incidents").countDocuments(
-          {
-            status: "open",
-            $or: [
-              { route },
-              { scope: route },
-              { contractAlias: { $in: routeAliases } },
-              {
-                route: { $exists: false },
-                scope: { $exists: false },
-                contractAlias: { $exists: false },
-                type: { $regex: /economy|canonical|cukie|credit/i },
-              },
-            ],
-          },
+          creditSourceChainIntegrityIncidentFilter({ route, aliases: routeAliases }),
           options
         ),
         collections.slots.countDocuments(
@@ -1103,21 +1091,7 @@ export function createMongoCompetitionCreditRepository(
           options
         ),
         db.collection("chain_integrity_incidents").countDocuments(
-          {
-            status: "open",
-            $or: [
-              { contractAlias: { $in: aliases } },
-              { route },
-              { scope: route },
-              {
-                chain: "BSC",
-                route: { $exists: false },
-                scope: { $exists: false },
-                contractAlias: { $exists: false },
-                type: { $regex: /canonical|economy|vesting|staking|nft/i },
-              },
-            ],
-          },
+          creditSourceChainIntegrityIncidentFilter({ route, aliases }),
           options
         ),
         db
