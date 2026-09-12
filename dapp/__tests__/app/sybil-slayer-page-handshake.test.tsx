@@ -291,7 +291,13 @@ describe('SybilSlayerPage game-session handshake', () => {
     const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
     await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('single-player-session'));
 
+    postMessage.mockClear();
+    fireEvent.load(iframe);
     fireEvent.click(screen.getByTestId('start-single-player'));
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'GAME_READY_REQUEST' },
+      GAME_ORIGIN,
+    );
     expect(postMessage).not.toHaveBeenCalledWith(
       { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
       GAME_ORIGIN,
@@ -316,14 +322,44 @@ describe('SybilSlayerPage game-session handshake', () => {
       { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
       GAME_ORIGIN,
     );
+  });
 
+  it('re-requests readiness when an early GAME_READY precedes a reload of the same iframe', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      sessionId: 'reload-session',
+      sessionToken: 'reload-token',
+      gameId: 'sybil-slayer',
+      gameVersion: '1.0.0',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock as typeof fetch;
+
+    render(<SybilSlayerPage />);
+    const iframe = screen.getByTitle('mock-game-frame') as HTMLIFrameElement;
+    const frameWindow = iframe.contentWindow as Window;
+    const postMessage = jest.spyOn(frameWindow, 'postMessage').mockImplementation(() => undefined);
+    await waitFor(() => expect(latestBridgeOptions().currentSessionId).toBe('reload-session'));
+
+    act(() => {
+      window.dispatchEvent(new MessageEvent('message', {
+        source: frameWindow,
+        origin: GAME_ORIGIN,
+        data: { type: 'GAME_READY' },
+      }));
+    });
     postMessage.mockClear();
+
     fireEvent.load(iframe);
     fireEvent.click(screen.getByTestId('start-single-player'));
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: 'GAME_READY_REQUEST' },
+      GAME_ORIGIN,
+    );
     expect(postMessage).not.toHaveBeenCalledWith(
       { type: 'TREASURE_HUNT_START_MODE', mode: 'single' },
       GAME_ORIGIN,
     );
+
     act(() => {
       window.dispatchEvent(new MessageEvent('message', {
         source: frameWindow,

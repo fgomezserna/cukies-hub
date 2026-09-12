@@ -482,9 +482,27 @@ export function usePusherConnection() {
   // This is the initial handshake - after this, everything uses Pusher
   useEffect(() => {
     const parentOrigin = getParentOrigin();
+    const sendReadySignal = () => {
+      if (!parentOrigin) return;
+      console.log('📡 [GAME-PUSHER] Sending ready signal to parent');
+      window.parent?.postMessage({
+        type: 'GAME_READY',
+        gameId: 'sybil-slayer',
+        timestamp: Date.now()
+      }, parentOrigin);
+    };
+
     const handleMessage = (event: MessageEvent) => {
       // Only accept messages from parent window
       if (!parentOrigin || event.source !== window.parent || event.origin !== parentOrigin) return;
+
+      if (event.data?.type === 'GAME_READY_REQUEST') {
+        // The parent sends this after every iframe load. A load can race the
+        // initial GAME_READY, so answer the request for the current document
+        // instead of relying on a timing-based retry.
+        sendReadySignal();
+        return;
+      }
 
       if (event.data?.type === 'SESSION_START' || event.data?.type === 'GAME_SESSION_START') {
         const sessionInfo = event.data.payload || event.data;
@@ -559,29 +577,9 @@ export function usePusherConnection() {
       }
     };
 
-    // Send ready signal to parent
-    const sendReadySignal = () => {
-      if (!parentOrigin) return;
-      console.log('📡 [GAME-PUSHER] Sending ready signal to parent');
-      window.parent?.postMessage({
-        type: 'GAME_READY',
-        gameId: 'sybil-slayer',
-        timestamp: Date.now()
-      }, parentOrigin);
-    };
-
-    // Send ready signal after component mounts (only once with retry)
-    let readySent = false;
-    const sendOnce = () => {
-      if (!readySent) {
-        sendReadySignal();
-        readySent = true;
-      }
-    };
-
-    sendOnce();
-    // Single retry after delay if needed
-    setTimeout(sendOnce, 1000);
+    // Identify the initial document once. Subsequent documents are requested
+    // explicitly by the parent after their iframe `load` event.
+    sendReadySignal();
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);

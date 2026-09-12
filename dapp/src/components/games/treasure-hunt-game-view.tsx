@@ -262,19 +262,31 @@ export default function TreasureHuntGameView() {
     }
   }, []);
 
+  const requestGameReady = useCallback(() => {
+    const frameWindow = iframeRef.current?.contentWindow;
+    if (!frameWindow || !gameOrigin) return;
+    frameWindow.postMessage({ type: 'GAME_READY_REQUEST' }, gameOrigin);
+  }, [gameOrigin]);
+
   useEffect(() => {
     const frame = iframeRef.current;
     if (!frame) return undefined;
+    gameReadyRef.current = false;
+    gameReadyFrameRef.current = null;
     const invalidateReadyDocument = () => {
       // A navigation can keep the same iframe element and WindowProxy while
       // replacing the document. Require that document's GAME_READY again so a
       // queued Jugar 1P click cannot be sent into a page that is still loading.
       gameReadyRef.current = false;
       gameReadyFrameRef.current = null;
+      requestGameReady();
     };
     frame.addEventListener('load', invalidateReadyDocument);
+    // Request the current document as well. This covers a GAME_READY that was
+    // emitted before the parent's message listener observed the iframe load.
+    requestGameReady();
     return () => frame.removeEventListener('load', invalidateReadyDocument);
-  }, [gameConfig?.gameUrl]);
+  }, [gameConfig?.gameUrl, requestGameReady]);
 
   useEffect(() => {
     const roomParam = new URLSearchParams(window.location.search).get('room');
