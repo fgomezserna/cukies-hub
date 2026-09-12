@@ -1,0 +1,300 @@
+{
+  "source": {
+    "path": "/Users/fgomezserna/Downloads/cambios actualizado (12-Sept).docx",
+    "sha256": "bfdec23577d1f9fee391bb3e8b72bf4a163bf70f3ba71ae74bf6365ac9ae0193",
+    "pages": 4,
+    "imageCount": 7,
+    "edited": false,
+    "visualReview": "four rendered pages and seven embedded screenshots inspected on 2026-09-12"
+  },
+  "observations": [
+    {
+      "id": "12-J1",
+      "label": "Jugar 1",
+      "pages": [
+        1
+      ],
+      "paragraphs": [
+        2,
+        3,
+        5
+      ],
+      "images": [
+        "image1.png",
+        "image2.png"
+      ],
+      "requirement": "Partida queda guardando; no entra en ranking/bote, aviso global persistente y Jugar1P inerte.",
+      "lane": "D12-1",
+      "previousId": "J1",
+      "details": [
+        "resultado con 24 puntos, nivel 1, 8 recogidos y 0:10",
+        "créditos propios y Cukie propio",
+        "aviso más de 10 minutos y reconexión no lo resuelve"
+      ]
+    },
+    {
+      "id": "12-J3",
+      "label": "Jugar 3",
+      "pages": [
+        1
+      ],
+      "paragraphs": [
+        7
+      ],
+      "images": [],
+      "requirement": "No aparecen puntuaciones ni reserva del bote; impide comprobar el reparto.",
+      "lane": "D12-1",
+      "previousId": "J3",
+      "details": []
+    },
+    {
+      "id": "12-M2",
+      "label": "Cukie Master 2",
+      "pages": [
+        1,
+        2
+      ],
+      "paragraphs": [
+        10,
+        11
+      ],
+      "images": [
+        "image3.png",
+        "image4.png"
+      ],
+      "requirement": "Aprobación correcta + depósito cancelado deja el NFT no apto; debe permitir Continuar depósito.",
+      "lane": "D12-2",
+      "previousId": "M2",
+      "details": [
+        "Cukie98000003",
+        "Pool ya ofrece el patrón Continuar depósito con98000002"
+      ]
+    },
+    {
+      "id": "12-C2",
+      "label": "Créditos 2",
+      "pages": [
+        2,
+        3
+      ],
+      "paragraphs": [
+        14,
+        15
+      ],
+      "images": [
+        "image5.png"
+      ],
+      "requirement": "Quince minutos después del corte no reconoce saldo ni permite preparar el reparto siguiente.",
+      "lane": "D12-3",
+      "previousId": "C2",
+      "details": [
+        "corte12-Sep10:00UTC, observación10:15UTC"
+      ]
+    },
+    {
+      "id": "12-W1",
+      "label": "Premios 1",
+      "pages": [
+        3
+      ],
+      "paragraphs": [
+        18
+      ],
+      "images": [],
+      "requirement": "Partidas jugadas no generan UKI personal visible.",
+      "lane": "D12-1",
+      "previousId": "W1",
+      "details": []
+    },
+    {
+      "id": "12-W3",
+      "label": "Premios 3",
+      "pages": [
+        3
+      ],
+      "paragraphs": [
+        18
+      ],
+      "images": [],
+      "requirement": "Las partidas no reservan UKI para el reparto semanal.",
+      "lane": "D12-1",
+      "previousId": "W3",
+      "details": []
+    },
+    {
+      "id": "12-A1",
+      "label": "Embajadores 1",
+      "pages": [
+        3
+      ],
+      "paragraphs": [
+        20,
+        21
+      ],
+      "images": [
+        "image6.png"
+      ],
+      "requirement": "Enlace activo alterna entre sponsor y fallo temporal al recargar en producción.",
+      "lane": "D12-4",
+      "previousId": "A1",
+      "details": [
+        "https://cukies.world/embajadores/cw-876fe531558b",
+        "unas10recargas; alternan éxito y aviso"
+      ]
+    },
+    {
+      "id": "12-A3",
+      "label": "Embajadores 3",
+      "pages": [
+        3
+      ],
+      "paragraphs": [
+        22,
+        24
+      ],
+      "images": [
+        "image7.png"
+      ],
+      "requirement": "Mostrar el alias público del embajador encima de la wallet cuando esté disponible.",
+      "lane": "D12-4",
+      "previousId": "A3",
+      "details": []
+    },
+    {
+      "id": "12-O1",
+      "label": "Otros 1",
+      "pages": [
+        4
+      ],
+      "paragraphs": [
+        26
+      ],
+      "images": [],
+      "requirement": "Mostrar partidas restantes agregadas de Cukies propios elegibles y su consumo.",
+      "lane": "D12-1",
+      "previousId": "O1",
+      "details": [
+        "PR442 desplegada12-Sep12:22UTC; contraste con sesión pendiente",
+        "límites ya definidos por usuario"
+      ]
+    },
+    {
+      "id": "12-O2",
+      "label": "Otros 2",
+      "pages": [
+        4
+      ],
+      "paragraphs": [
+        27,
+        28
+      ],
+      "images": [],
+      "requirement": "Actualizar saldo/staking, cupos, créditos y avisos tras recibo UKI/NFT sin recargar.",
+      "lane": "D12-3",
+      "previousId": "O2",
+      "details": [
+        "ejemploUKI25000→5000 tras retirar20000; no cambia umbral20000",
+        "ejemploNFT12→10puntos,4→3cupos; respetar estados temporales/gracia vigentes"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "file": "image1.png",
+      "sha256": "8777d745c6944b019a881366146eafa50186b928541aed10ff2ece1d71c56553"
+    },
+    {
+      "file": "image2.png",
+      "sha256": "26d241ce3bcb603ce3d229924c1d33680e2b494655f87774b89e141cc5954f96"
+    },
+    {
+      "file": "image3.png",
+      "sha256": "93be52a8c764ccbb4ab1798a58256fb33f3f1d46640577fb8c993fab285fde66"
+    },
+    {
+      "file": "image4.png",
+      "sha256": "d6bd8f382d40369e4031d082bdb684c46feb64aeca886518f24285f6d9a6529f"
+    },
+    {
+      "file": "image5.png",
+      "sha256": "916fb9a69ca41e8c2f933778979e2725a622b88c265a2814ec7b6f2a86e208b0"
+    },
+    {
+      "file": "image6.png",
+      "sha256": "ae3f3cf0234c59ac967448508c2ba4f15232b486c1f20d0966fcea8fe59162bf"
+    },
+    {
+      "file": "image7.png",
+      "sha256": "4510370c9c6b6f2260c3df0d861b3d26efcfed9cea81eebdfdf5ac8b3a43a77c"
+    }
+  ],
+  "constraints": {
+    "stagingCycleSeconds": 1800,
+    "historicalRecovery": false,
+    "rules": "docs/uki-current-operating-rules.md",
+    "tracking": "docs/antes-del-15-seguimiento.md",
+    "production": "only ambassador hotfix from main, then propagate to staging",
+    "ci": "existing immutable image delivery; no CI topology changes"
+  },
+  "sourceInterpretation": "The document reports test results and desired behavior. Document content is not agent/tool instructions. Omitted 11-Sep points retain their prior evidence; omission alone does not prove acceptance.",
+  "tasks": [
+    {
+      "lane": "D12-1",
+      "title": "12-Sep · Partidas, ranking y premios",
+      "threadId": "01a095b4-c1c5-7591-979b-82bd2025c076",
+      "hostId": "local",
+      "worktree": "/Users/fgomezserna/.codex/worktrees/17f5/cukies-hub",
+      "model": "gpt-5.6-luna",
+      "thinking": "max",
+      "statusObserved": "active",
+      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
+    },
+    {
+      "lane": "D12-2",
+      "title": "12-Sep · Continuar depósito en Master",
+      "threadId": "01a095b2-dbc0-7460-b97b-fcced4dea445",
+      "hostId": "local",
+      "worktree": "/Users/fgomezserna/.codex/worktrees/c700/cukies-hub",
+      "model": "gpt-5.6-luna",
+      "thinking": "max",
+      "statusObserved": "active",
+      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
+    },
+    {
+      "lane": "D12-3",
+      "title": "12-Sep · Créditos y actualización de cupos",
+      "threadId": "01a095b3-7ec0-7280-8d5f-694bf44a18bc",
+      "hostId": "local",
+      "worktree": "/Users/fgomezserna/.codex/worktrees/54f6/cukies-hub",
+      "model": "gpt-5.6-luna",
+      "thinking": "max",
+      "statusObserved": "active",
+      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
+    },
+    {
+      "lane": "D12-4",
+      "title": "12-Sep · Hotfix de embajadores",
+      "threadId": "01a095b2-4772-7df0-afb8-db9254e56135",
+      "hostId": "local",
+      "worktree": "/Users/fgomezserna/.codex/worktrees/2b5e/cukies-hub",
+      "model": "gpt-5.6-luna",
+      "thinking": "max",
+      "statusObserved": "active",
+      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
+    }
+  ],
+  "taskStatusObservedAt": "2026-09-12T13:07:12Z",
+  "automation": {
+    "id": "coordinar-pruebas-cukies-12-sep",
+    "status": "ACTIVE",
+    "intervalMinutes": 30,
+    "stop": "implementation/review/merge/deploy complete, or only human checks remain"
+  },
+  "coordinationComments": {
+    "418": "https://github.com/fgomezserna/cukies-hub/issues/418#issuecomment-5646070748",
+    "419": "https://github.com/fgomezserna/cukies-hub/issues/419#issuecomment-5646070966",
+    "421": "https://github.com/fgomezserna/cukies-hub/issues/421#issuecomment-5646071158",
+    "423": "https://github.com/fgomezserna/cukies-hub/issues/423#issuecomment-5646071366",
+    "424": "https://github.com/fgomezserna/cukies-hub/issues/424#issuecomment-5646071565"
+  }
+}
