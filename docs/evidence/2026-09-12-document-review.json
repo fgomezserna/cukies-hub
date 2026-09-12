@@ -494,6 +494,12 @@
       "lane": "D12-1/D12-3",
       "reportedObservation": "Root final game candidate:274 suites/2395 tests and typecheck/lint passed. Root credit candidate includes accepted game changes plus removal of invalid O2 test7a2ac426:275 suites/2407 tests,100 focal tests and typecheck/lint passed. Both code candidates accepted; staging451 deployment still running.",
       "verificationBoundary": "No new code changed by these documentary updates. C2 delivery does not close O2."
+    },
+    {
+      "reportedAt": "2026-09-12T14:29:17.985690+00:00",
+      "lane": "D12-1/D12-4",
+      "reportedObservation": "PR451 deployed successfully; public staging health confirms2c7a3882. Production invitation code returns legitimate INVITATION_NOT_FOUND in the separate staging database. PR449 merged stagingfb841f84 at14:26:25UTC; CI34699288472 deploying web and treasure-hunt.",
+      "verificationBoundary": "Stage404 is not presented as a regression or as positive active-invitation QA. No private wallet signatures."
     }
   ]
 }
