@@ -360,6 +360,128 @@
       "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
       "reportedObservation": "PR448 merged to main cf08e81367502d4447024a39f6681a2939d24035 at2026-09-12T13:47:15Z. Root final173 suites/1510 tests passed on7509735d. Coolify deployment1554/u444csgk8gcwsw80844ogocc running the exact merged commit.",
       "verificationBoundary": "Merge and active deployment do not yet prove served invitation stability; staging propagation still required."
+    },
+    {
+      "reportedAt": "2026-09-12T14:05:46.661402+00:00",
+      "lane": "D12-1/D12-2/D12-3/D12-4",
+      "reportedObservation": "PR447 merged staging4d997fc8, CI34697774329 in progress. Production deployment1554 finished, health cf08e813. PR449 same-iframe GAME_READY-before-load race returned for correction. PR450 credit aggregation reviewed; O2 string-only inconsistent fixture rejected and real projection contract requested.",
+      "verificationBoundary": "No personal wallet signatures or historical staging repairs. Deployment is distinguished from authenticated functional verification."
+    },
+    {
+      "reportedAt": "2026-09-12T14:08:32.089100+00:00",
+      "lane": "D12-4",
+      "reportedObservation": "Production cf08e813 exact invitation succeeded ten consecutive uncached curl requests; invitation page HTTP200. The example still legitimately uses wallet fallback because no chosen public alias exists.",
+      "apiProbe": {
+        "at": "2026-09-12T14:05:52.982270+00:00",
+        "sourceSha": "cf08e81367502d4447024a39f6681a2939d24035",
+        "route": "/api/economy/v1/ambassadors/invitations/cw-876fe531558b",
+        "method": "curl, unique query, no-cache; prior urllib 403 was request-client specific",
+        "attempts": [
+          {
+            "attempt": 1,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 946
+          },
+          {
+            "attempt": 2,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 759
+          },
+          {
+            "attempt": 3,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 747
+          },
+          {
+            "attempt": 4,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 762
+          },
+          {
+            "attempt": 5,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 800
+          },
+          {
+            "attempt": 6,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 746
+          },
+          {
+            "attempt": 7,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 729
+          },
+          {
+            "attempt": 8,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 733
+          },
+          {
+            "attempt": 9,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 760
+          },
+          {
+            "attempt": 10,
+            "http": 200,
+            "status": "ok",
+            "code": null,
+            "invitationPresent": true,
+            "publicNamePresent": false,
+            "ms": 723
+          }
+        ]
+      },
+      "verificationBoundary": "Read-only public API/page; no signature or attribution mutation. This bounded observation verifies the reported intermittent endpoint after deployment, not indefinite availability."
+    },
+    {
+      "reportedAt": "2026-09-12T14:08:32.089100+00:00",
+      "lane": "D12-2",
+      "reportedObservation": "PR447 staging4d997fc8 deployed by CI34697774329, completed14:03:59UTC. Public /api/health returns the exact SHA from web resource rwwsc4kkwc0ck84cgk40s8kk.",
+      "verificationBoundary": "Receipt cancellation/resume branches verified by automated component and full-suite tests; no transaction signed using personal wallet."
+    },
+    {
+      "reportedAt": "2026-09-12T14:10:46.679182+00:00",
+      "lane": "D12-4",
+      "reportedObservation": "Backport7fd0a92a preserves staging weekly alias constant; only comment conflict resolved. Root ran complete staging suite:272 suites/2387 tests passed; typecheck/lint passed with existing my-cukies-panel warning.",
+      "verificationBoundary": "Candidate prepared for staging PR; not yet deployed there."
     }
   ]
 }
