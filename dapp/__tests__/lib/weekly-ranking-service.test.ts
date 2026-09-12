@@ -217,7 +217,7 @@ function service(repository: MemoryRankingRepository) {
 }
 
 describe("weekly ranking sealed producer", () => {
-  it("espera hasta que termina el primer periodo forward y su retardo de liquidacion", async () => {
+  it("espera cada periodo forward hasta su retardo de liquidacion", async () => {
     const calendar: EconomyCycleCalendar = {
       version: "cycle-v1",
       chainId: 97,
@@ -279,6 +279,56 @@ describe("weekly ranking sealed producer", () => {
       pageSize: 5,
       forwardActivationAt: activationAt,
     })).resolves.toMatchObject({ periodId: firstPeriod.id, replayed: false, sourceCount: 0 });
+
+    const secondPeriod = getIsoWeekPeriod(firstPeriod.endExclusive, calendar);
+    const secondRow = fixture(903, "pool", new Date(secondPeriod.endExclusive.getTime() + 1_000));
+    secondRow.game.createdAt = new Date(secondPeriod.start.getTime() + 1_000);
+    secondRow.game.rule.calendar = calendar;
+    repository.sessions.push(secondRow.game);
+    repository.credits.push(secondRow.credit);
+    const writesAfterFirstClose = {
+      sources: repository.sources.length,
+      snapshots: repository.snapshots.length,
+      manifests: repository.manifests.length,
+      runs: repository.runs.length,
+      states: repository.states.length,
+      events: repository.events.length,
+    };
+    const secondReadyAt = new Date(secondPeriod.endExclusive.getTime() + 150_000);
+
+    await expect(ranking.closeCompletedPeriod({
+      now: new Date(secondReadyAt.getTime() - 1),
+      pageSize: 5,
+      forwardActivationAt: activationAt,
+    })).resolves.toEqual({
+      status: "waiting",
+      reason: "FORWARD_PERIOD_NOT_READY",
+      periodId: null,
+      runId: null,
+      manifestId: null,
+      readyAt: secondReadyAt,
+    });
+    expect({
+      sources: repository.sources.length,
+      snapshots: repository.snapshots.length,
+      manifests: repository.manifests.length,
+      runs: repository.runs.length,
+      states: repository.states.length,
+      events: repository.events.length,
+    }).toEqual(writesAfterFirstClose);
+
+    await expect(ranking.closeCompletedPeriod({
+      now: secondReadyAt,
+      pageSize: 5,
+      forwardActivationAt: activationAt,
+    })).resolves.toMatchObject({ periodId: secondPeriod.id, replayed: false, sourceCount: 1 });
+    await expect(ranking.closeCompletedPeriod({
+      now: new Date(secondReadyAt.getTime() + 1),
+      pageSize: 5,
+      forwardActivationAt: activationAt,
+    })).resolves.toMatchObject({ periodId: secondPeriod.id, replayed: true, sourceCount: 1 });
+    expect(repository.manifests).toHaveLength(2);
+    expect(repository.states).toHaveLength(2);
   });
 
   it("salta el backlog de una regla jubilada y abre el primer periodo acelerado completo", async () => {

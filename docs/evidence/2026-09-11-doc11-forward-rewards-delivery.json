@@ -673,6 +673,201 @@
         "/tmp/doc11-heartbeat-0005-operations.json",
         "/tmp/doc11-weekly-release-baseline.json"
       ]
+    },
+    "subsequentWeeklyWaiting": {
+      "diagnostic": {
+        "observedAt": "2026-09-12T03:38:03.593Z",
+        "boundary": "2026-09-11T20:30:00.000Z",
+        "targetPeriod": "C1800-W:2026-09-12T00:00:00.000Z",
+        "db": "cukieshub-new-staging",
+        "readOnly": true,
+        "errorRuns": [
+          {
+            "id": "8b022d351d9a",
+            "status": "error",
+            "errorCode": "DOMAIN_CONFLICT",
+            "startedAt": "2026-09-12T03:30:14.591Z",
+            "endedAt": "2026-09-12T03:30:14.627Z"
+          },
+          {
+            "id": "4518366701dc",
+            "status": "error",
+            "errorCode": "DOMAIN_CONFLICT",
+            "startedAt": "2026-09-12T03:31:14.776Z",
+            "endedAt": "2026-09-12T03:31:14.811Z"
+          },
+          {
+            "id": "c007fe2dcd73",
+            "status": "error",
+            "errorCode": "DOMAIN_CONFLICT",
+            "startedAt": "2026-09-12T03:32:14.962Z",
+            "endedAt": "2026-09-12T03:32:14.994Z"
+          }
+        ],
+        "successRuns": [
+          {
+            "id": "640ee1a3b45e",
+            "status": "success",
+            "startedAt": "2026-09-12T03:33:15.140Z",
+            "endedAt": "2026-09-12T03:33:15.196Z",
+            "periodId": "C1800-W:2026-09-12T00:00:00.000Z",
+            "runId": "6dfe2e591b5a",
+            "manifestId": "2760a475e554",
+            "periodsProcessed": 2,
+            "replayed": true,
+            "closures": [
+              {
+                "periodId": "C1800-W:2026-09-12T00:00:00.000Z",
+                "runId": "6dfe2e591b5a",
+                "manifestId": "2760a475e554",
+                "sourceCount": 0,
+                "participantCount": 0,
+                "replayed": false
+              },
+              {
+                "periodId": "C1800-W:2026-09-12T00:00:00.000Z",
+                "runId": "6dfe2e591b5a",
+                "manifestId": "2760a475e554",
+                "sourceCount": 0,
+                "participantCount": 0,
+                "replayed": true
+              }
+            ]
+          }
+        ],
+        "targetCollections": {
+          "manifests": [
+            {
+              "id": "2760a475e554",
+              "periodId": "C1800-W:2026-09-12T00:00:00.000Z",
+              "status": "sealed",
+              "runId": "6dfe2e591b5a",
+              "manifestId": "2760a475e554",
+              "revision": null,
+              "sourceCount": 0,
+              "participantCount": 0,
+              "sealedAt": "2026-09-12T03:33:15.140Z",
+              "createdAt": "2026-09-12T03:33:15.140Z",
+              "startedAt": null
+            }
+          ],
+          "runs": [
+            {
+              "id": "6dfe2e591b5a",
+              "periodId": "C1800-W:2026-09-12T00:00:00.000Z",
+              "status": "sealed",
+              "runId": "6dfe2e591b5a",
+              "manifestId": "2760a475e554",
+              "revision": null,
+              "sourceCount": 0,
+              "participantCount": 0,
+              "sealedAt": "2026-09-12T03:33:15.140Z",
+              "createdAt": null,
+              "startedAt": "2026-09-12T03:33:15.140Z"
+            }
+          ],
+          "states": [
+            {
+              "id": "34d0eb5a18e1",
+              "periodId": "C1800-W:2026-09-12T00:00:00.000Z",
+              "status": "sealed",
+              "runId": "6dfe2e591b5a",
+              "manifestId": "2760a475e554",
+              "revision": 1,
+              "sourceCount": null,
+              "participantCount": null,
+              "sealedAt": "2026-09-12T03:33:15.140Z",
+              "createdAt": null,
+              "startedAt": null
+            }
+          ],
+          "audits": [
+            {
+              "id": "3bcce0e6b76e",
+              "periodId": "C1800-W:2026-09-12T00:00:00.000Z",
+              "status": null,
+              "runId": "6dfe2e591b5a",
+              "manifestId": "2760a475e554",
+              "revision": null,
+              "sourceCount": null,
+              "participantCount": null,
+              "sealedAt": null,
+              "createdAt": "2026-09-12T03:33:15.140Z",
+              "startedAt": null
+            }
+          ]
+        },
+        "heartbeat": [
+          {
+            "id": "0420b38f99bd",
+            "status": "success",
+            "lastAttemptAt": "2026-09-12T03:37:16.005Z",
+            "lastSuccessAt": "2026-09-12T03:37:16.005Z",
+            "lastFailureAt": "2026-09-12T03:32:15.030Z",
+            "updatedAt": "2026-09-12T03:37:16.005Z",
+            "consecutiveFailures": 0,
+            "lastErrorCode": null
+          }
+        ],
+        "timing": {
+          "targetPeriodStart": "2026-09-12T00:00:00.000Z",
+          "targetPeriodEndExclusive": "2026-09-12T03:30:00.000Z",
+          "forwardDelaySeconds": 150,
+          "readyAt": "2026-09-12T03:32:30.000Z",
+          "firstErrorAt": "2026-09-12T03:30:14.591Z",
+          "lastErrorAt": "2026-09-12T03:32:14.962Z",
+          "targetSealedAt": "2026-09-12T03:33:15.140Z"
+        },
+        "schedulerLogs": [
+          "2026-09-12T03:30:14.668Z WEEKLY_RANKING_TICK_HTTP_409",
+          "2026-09-12T03:31:14.856Z WEEKLY_RANKING_TICK_HTTP_409",
+          "2026-09-12T03:32:15.035Z WEEKLY_RANKING_TICK_HTTP_409"
+        ],
+        "codeEvidence": {
+          "servedSourceSha": "52684bb822cf6c7d4cacabe989e94321d3b6c7ff",
+          "fixPr435": "987729bf9497ce716171999bc47eece4d6a0fc80",
+          "selectionWaitPath": "dapp/src/lib/uki-economy/ranking/service.ts:584-612",
+          "catchUpPath": "dapp/src/lib/uki-economy/ranking/service.ts:614-625",
+          "closePeriodDelayGuard": "dapp/src/lib/uki-economy/ranking/service.ts:647-653",
+          "delaySecondsAtCycle1800": 150,
+          "sanitizedConflictMessage": "El periodo C1800-W:2026-09-12T00:00:00.000Z de Treasure Hunt no termina hasta las 14:00 UTC.",
+          "messageSource": "deterministic current-source branch; scheduler stderr exposes only HTTP_409"
+        },
+        "assessment": {
+          "cause": "DOMAIN_CONFLICT from closePeriod delay guard for the second accelerated weekly period before readyAt 03:32:30Z",
+          "causeClassification": "demostrada por run timing, target sealedAt and current source path; exact text is source-derived because remote scheduler logs omit body",
+          "waitingAlreadyResolved": true,
+          "failureSustained": false,
+          "minimalPatchRecommendation": "En closeCompletedPeriod, cuando firstEligibleStart existe, aplicar el mismo readyAt wait/fence a cada cursor candidato antes de devolverlo al closePeriod; conservar closePeriod guard, calendar, rules y production intactos."
+        }
+      },
+      "correction": {
+        "state": "validated_pending_delivery",
+        "branch": "codex/doc11-weekly-close-wait",
+        "scope": "Wait for each forward candidate until its existing settlement delay expires; retain closePeriod guards and non-forward behavior",
+        "historicalRecovery": false,
+        "cycleSeconds": 1800,
+        "review": {
+          "reviewer": "root Astra",
+          "result": "accepted",
+          "scope": "Candidate wait only inside forward mode; closePeriod and other rule errors unchanged"
+        },
+        "checks": {
+          "focal": {
+            "suites": 2,
+            "tests": 16,
+            "result": "pass"
+          },
+          "dapp": {
+            "suites": 272,
+            "tests": 2358,
+            "result": "pass"
+          },
+          "lint": "pass with existing warnings",
+          "typecheck": "pass"
+        },
+        "baselineArtifact": "/tmp/doc11-second-weekly-release-baseline.json"
+      }
     }
   },
   "limits": [
