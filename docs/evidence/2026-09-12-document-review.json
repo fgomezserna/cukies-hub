@@ -546,6 +546,12 @@
       "lane": "D12-3/C2 runtime",
       "reportedObservation": "Read-only live staging audit found competition-credit scheduler HTTP503 and runtime DOMAIN_CONFLICT,593 consecutive failures,lastSuccess09:47:40UTC. No runs cover current14:48UTC settlement. Master/game/accounting heartbeats remain successful around14:50UTC; gates and secret presence are configured. Root diagnosing before operational closure.",
       "verificationBoundary": "Only whitelisted metadata/log codes and Mongo projections; no secrets, resets, backfills or gate changes."
+    },
+    {
+      "reportedAt": "2026-09-12T14:56:39.042020+00:00",
+      "lane": "D12-3/C2 runtime",
+      "reportedObservation": "PR450 af41cce6 deployment34700104183 completed successfully and exact SHA served. Runtime source failure predates it: one open nft_lock_asset_identity_invalid at09:47:47UTC for canonical cukies:97:<collection>:98000002, which parseCukiesAssetLookup rejects because identity contains colons. Three TOKEN_V2 Transfer dead letters11-Sep for98000001/3/4 retain canonical-owner mismatch. These remain separate implementation/operational work before credit-source closure.",
+      "verificationBoundary": "Canonical asset identity and sanitized error codes only; no profile/secret reads and no removal or reconstruction of historical records."
     }
   ]
 }
