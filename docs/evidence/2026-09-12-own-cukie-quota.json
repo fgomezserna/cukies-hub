@@ -1,0 +1,77 @@
+{
+  "status": "preflight-correction-in-progress",
+  "issue": 412,
+  "pullRequest": 442,
+  "policy": {
+    "version": "own-cukie-daily-v1",
+    "original": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "secondGeneration": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "rarityOrder": [
+      "common",
+      "uncommon",
+      "rare",
+      "epic",
+      "legendary",
+      "goat"
+    ],
+    "aggregate": true,
+    "stagingCycleSeconds": 1800
+  },
+  "validation": {
+    "candidate": "d4b9653c326853674851356923ad21e0b230006b",
+    "dappSuites": 272,
+    "dappTests": 2363,
+    "dappTypecheck": "passed",
+    "dappLint": "passed with pre-existing my-cukies-panel dependency warning",
+    "schemaAndIndexTests": 16,
+    "realMongo": "passed; file hashes match candidate"
+  },
+  "stagePreflight": {
+    "observedAt": "2026-09-12T11:42:44.959Z",
+    "sourceSha": "a7ad71a6d79f8a4d85b5900a3bc853d039aaa40e",
+    "mode": "read-only candidate against staging data; not deployed product",
+    "wallet": "0x26789b9743d187174c3e3a87729730824a4d0c13",
+    "period": {
+      "periodId": "C1800-D:2026-09-12T11:30:00.000Z",
+      "startsAt": "2026-09-12T11:30:00.000Z",
+      "endsAt": "2026-09-12T12:00:00.000Z",
+      "policyVersion": "treasure-hunt-staging-v1"
+    },
+    "observedAvailability": {
+      "status": "unknown",
+      "periodId": "C1800-D:2026-09-12T11:30:00.000Z",
+      "periodStartsAt": "2026-09-12T11:30:00.000Z",
+      "periodEndsAt": "2026-09-12T12:00:00.000Z",
+      "totalGamesRemaining": null,
+      "eligibleCukies": null,
+      "unknownCukies": 7
+    },
+    "confirmedEligibleCukies": 11,
+    "confirmedCapacity": 62,
+    "conclusivelyExcludedRecords": 6,
+    "unverifiedPotentiallyEligibleCukies": 1,
+    "finding": "Unknown metadata on already excluded records hides verified capacity; add truthful partial availability before publishing"
+  },
+  "runtimePreparation": {
+    "at": "2026-09-12T11:39:43.593Z",
+    "database": "cukieshub-new-staging",
+    "createdCollection": "game_owned_cukie_period_epochs",
+    "newIndexes": 3,
+    "historicalRecordsChanged": false
+  },
+  "deployment": null
+}

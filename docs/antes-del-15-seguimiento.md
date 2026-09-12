@@ -314,7 +314,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | A1 | Invitación válida intermitente | Diagnóstico abierto | Causa del503 sin demostrar; reproducir con sponsor elegible. |
 | A2 | Aviso tras confirmar embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |
 | A3 | Nombre y wallet del embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |
-| O1 | Partidas diarias disponibles con Cukies propios elegibles | Regla confirmada; [PR442](https://github.com/fgomezserna/cukies-hub/pull/442) en revisión final | Candidato d4b9653c: 68 tests focales y Mongo real correctos, con hashes coincidentes. Falta completar checks, merge y despliegue en staging; no falta decisión sobre límites. |
+| O1 | Partidas diarias disponibles con Cukies propios elegibles | Regla confirmada; [PR442](https://github.com/fgomezserna/cukies-hub/pull/442) en revisión final | Candidato d4b9653c: 2363 tests, tipos, lint y Mongo correctos. La comprobación con datos de stage detecta 62 partidas verificables ocultadas por datos desconocidos; corrección acotada de disponibilidad parcial antes del merge y despliegue. [Evidencia](evidence/2026-09-12-own-cukie-quota.json). No falta decisión sobre límites. |
 | O2 | Saldo, cupos y avisos | Parcial · PR425 | Comprobación conjunta autenticada. |
 
 | Lote | Cobertura y resultado exigido | Issue y tarea responsable | Estado, rama y destino |
