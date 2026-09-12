@@ -3,6 +3,16 @@ import { createHash, createHmac } from 'node:crypto';
 const ALIAS_PATTERN = /^[A-Za-z0-9_-]{3,20}$/;
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const LEGACY_GENERATED_ALIAS_PATTERN = /^Hunter-[A-Z0-9]{6,13}$/i;
+
+/**
+ * Stable participant scope for the continuous weekly leaderboard.
+ *
+ * Historical campaigns retain their own participant rows; the weekly game
+ * must read a separate row so an explicit current alias does not rewrite a
+ * closed campaign's public identity.
+ */
+export const TREASURE_HUNT_WEEKLY_ALIAS_SCOPE = 'treasure-hunt-weekly' as const;
+
 const ALIAS_ADJECTIVES = [
   'Aero', 'Amber', 'Aqua', 'Astro', 'Bold', 'Brave', 'Coral', 'Cuki',
   'Dusk', 'Ember', 'Epic', 'Frost', 'Gold', 'Lunar', 'Mint', 'Neon',

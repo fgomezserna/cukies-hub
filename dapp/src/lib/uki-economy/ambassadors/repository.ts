@@ -1,5 +1,11 @@
 import type { ClientSession, Db } from "mongodb";
 
+import {
+  displayCompetitionAlias,
+  TREASURE_HUNT_WEEKLY_ALIAS_SCOPE,
+  validateCompetitionAlias,
+} from "@/lib/treasure-hunt-competition/alias";
+
 import { DomainConflictError } from "../errors";
 import {
   ambassadorInvitationCode,
@@ -44,12 +50,113 @@ type HubUserWalletIdentity = {
   normalizedAddress?: unknown;
 };
 
+type CompetitionParticipantPublicIdentity = {
+  campaignId?: unknown;
+  walletAddress?: unknown;
+  alias?: unknown;
+  aliasChangedAt?: unknown;
+};
+
 const PUBLIC_NAME_LOOKUP_TIMEOUT_MS = 1_500;
+const PUBLIC_NAME_COMPETITION_TIMEOUT_MS = 700;
+const PUBLIC_NAME_USER_TIMEOUT_MS = 1_200;
 
 function publicUsername(row: HubUserPublicIdentity | null, walletNormalized: string) {
   const username = typeof row?.username === "string" ? row.username.trim() : "";
   if (!username || username.toLowerCase() === walletNormalized.toLowerCase()) return null;
   return username;
+}
+
+function validPublicAliasChangedAt(value: unknown) {
+  if (value instanceof Date) return !Number.isNaN(value.getTime());
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function publicCompetitionAlias(
+  row: CompetitionParticipantPublicIdentity | null,
+  campaignId: string,
+  walletNormalized: string,
+) {
+  if (
+    !row
+    || row.campaignId !== campaignId
+    || typeof row.walletAddress !== "string"
+    || row.walletAddress.trim().toLowerCase() !== walletNormalized
+    || !validPublicAliasChangedAt(row.aliasChangedAt)
+    || typeof row.alias !== "string"
+  ) return null;
+  const validation = validateCompetitionAlias(row.alias);
+  return validation.valid ? displayCompetitionAlias(validation.alias) : null;
+}
+
+async function readMongoCompetitionPublicAlias(walletNormalized: string, campaignId: string) {
+  const { getIndexerDb } = await import("@/lib/indexer-db/mongodb");
+  const db = await getIndexerDb();
+  const row = await db
+    .collection<CompetitionParticipantPublicIdentity>("presale_game_participants")
+    .findOne(
+      { campaignId, walletAddress: walletNormalized },
+      { projection: { _id: 0, campaignId: 1, walletAddress: 1, alias: 1, aliasChangedAt: 1 } },
+    );
+  return publicCompetitionAlias(row, campaignId, walletNormalized);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => {
+      timeoutId = setTimeout(() => resolve(null), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
+async function readMongoCompetitionPublicName(
+  walletNormalized: string,
+  campaignId: string | null,
+) {
+  const campaignIds = campaignId && campaignId !== TREASURE_HUNT_WEEKLY_ALIAS_SCOPE
+    ? [TREASURE_HUNT_WEEKLY_ALIAS_SCOPE, campaignId]
+    : [TREASURE_HUNT_WEEKLY_ALIAS_SCOPE];
+  const aliases = await Promise.all(
+    campaignIds.map((scope) => withTimeout(
+      readMongoCompetitionPublicAlias(walletNormalized, scope).catch(() => null),
+      PUBLIC_NAME_COMPETITION_TIMEOUT_MS,
+    )),
+  );
+  return aliases.find((alias): alias is string => Boolean(alias)) ?? null;
+}
+
+async function readMongoUserPublicName(walletNormalized: string) {
+  if (!process.env.DATABASE_URL?.trim()) return null;
+  const { getHubDb } = await import("@/lib/mongodb-hub");
+  const db = await getHubDb();
+  const users = db.collection<HubUserPublicIdentity>("User");
+  const projection = { projection: { _id: 1, walletAddress: 1, username: 1 } };
+  const primary = await users.findOne({ walletAddress: walletNormalized }, projection);
+  const primaryName = publicUsername(primary, walletNormalized);
+  if (primary) return primaryName;
+
+  // Una cuenta puede conservar la wallet como UserWallet tras importar otra
+  // wallet. El vínculo por userId sigue siendo exacto y no expone el resto
+  // del perfil.
+  const linkedWallet = await db
+    .collection<HubUserWalletIdentity>("UserWallet")
+    .findOne(
+      { normalizedAddress: walletNormalized },
+      { projection: { _id: 0, userId: 1, normalizedAddress: 1 } },
+    );
+  if (linkedWallet?.userId === undefined || linkedWallet.userId === null) return null;
+
+  return publicUsername(
+    await users.findOne(
+      { _id: linkedWallet.userId },
+      projection,
+    ),
+    walletNormalized,
+  );
 }
 
 function duplicateKey(error: unknown) {
@@ -427,8 +534,9 @@ export async function findMongoAmbassadorByInvitationCode(
 
 /**
  * Lee solo la identidad pública asociada a la wallet exacta del patrocinador.
- * El perfil de competición y User.username son fuentes distintas: no se
- * resuelve un alias de otra campaña ni se elige una wallet arbitraria.
+ * Si la campaña vigente tiene un alias elegido explícitamente, esa identidad
+ * de juego precede a User.username; nunca se resuelve otra campaña ni una
+ * fila de alias generado automáticamente.
  *
  * El nombre es opcional para el flujo de embajadores. Si la base de usuarios
  * no está disponible o no existe una identidad pública, el llamador conserva
@@ -436,50 +544,23 @@ export async function findMongoAmbassadorByInvitationCode(
  */
 export async function findMongoAmbassadorPublicName(wallet: string) {
   const walletNormalized = validAmbassadorWallet(wallet);
-  if (!process.env.DATABASE_URL?.trim()) return null;
-
+  const campaignId = process.env.TREASURE_HUNT_COMPETITION_ID?.trim() || null;
   const read = async () => {
-    const { getHubDb } = await import("@/lib/mongodb-hub");
-    const db = await getHubDb();
-    const users = db.collection<HubUserPublicIdentity>("User");
-    const projection = { projection: { _id: 1, walletAddress: 1, username: 1 } };
-    const primary = await users.findOne({ walletAddress: walletNormalized }, projection);
-    const primaryName = publicUsername(primary, walletNormalized);
-    if (primary) return primaryName;
-
-    // Una cuenta puede conservar la wallet como UserWallet tras importar otra
-    // wallet. El vínculo por userId sigue siendo exacto y no expone el resto
-    // del perfil.
-    const linkedWallet = await db
-      .collection<HubUserWalletIdentity>("UserWallet")
-      .findOne(
-        { normalizedAddress: walletNormalized },
-        { projection: { _id: 0, userId: 1, normalizedAddress: 1 } },
-      );
-    if (linkedWallet?.userId === undefined || linkedWallet.userId === null) return null;
-
-    return publicUsername(
-      await users.findOne(
-        { _id: linkedWallet.userId },
-        projection,
-      ),
-      walletNormalized,
-    );
-  };
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      read(),
-      new Promise<null>((resolve) => {
-        timeoutId = setTimeout(() => resolve(null), PUBLIC_NAME_LOOKUP_TIMEOUT_MS);
-      }),
+    // El alias semanal estable precede a la campaña configurada. Cada lectura
+    // exige wallet/campaign exactos y aliasChangedAt; las filas sin esa marca
+    // son alias generados automáticamente y no deben cruzarse al patrocinador.
+    const [competitionName, userName] = await Promise.all([
+      readMongoCompetitionPublicName(walletNormalized, campaignId).catch(() => null),
+      withTimeout(readMongoUserPublicName(walletNormalized).catch(() => null), PUBLIC_NAME_USER_TIMEOUT_MS),
     ]);
+    return competitionName ?? userName;
+  };
+  try {
+    return await withTimeout(read(), PUBLIC_NAME_LOOKUP_TIMEOUT_MS);
   } catch {
     // La identidad es una mejora de presentación; nunca debe convertir una
     // invitación válida o una relación confirmada en un error de servicio.
     return null;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
