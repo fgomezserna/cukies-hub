@@ -325,6 +325,41 @@
       "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
       "reportedObservation": "Exact invitation API returns ambassadorPublicName:null. Existing reader uses User.username through exact wallet or UserWallet link.",
       "verificationBoundary": "A null result does not prove absence of a public gameplay alias. Root requested canonical public alias source contrast without writing profile data or inferring identity from anonymous rankings. A3 remains open."
+    },
+    {
+      "reportedAt": "2026-09-12T13:30:06.303513+00:00",
+      "lane": "D12-4",
+      "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
+      "reportedObservation": "Root inspected A3 alias-reader proposal and the current staging weekly profile reader from PR429.",
+      "verificationBoundary": "Requested explicit weekly alias precedence, then explicit runtime-campaign alias, then exact public username, with generated aliases excluded. Requested timeout regression preserving a healthy Hub name if optional participant lookup hangs. Implementation not accepted yet."
+    },
+    {
+      "reportedAt": "2026-09-12T13:32:34.227435+00:00",
+      "lane": "D12-1",
+      "sourceThreadId": "01a095b4-c1c5-7591-979b-82bd2025c076",
+      "reportedObservation": "Root reviewed first diff changing finish retries, persistence retryability and iframe 1P handshake.",
+      "verificationBoundary": "Requested backend regressions for concurrent identical finish, exactly-once rewards/reservations, transient vs permanent errors and conflicting identity/payload. Also requested resetting GAME_READY for navigation of the same iframe element. Existing passing tests alone do not validate the monetary change."
+    },
+    {
+      "reportedAt": "2026-09-12T13:51:33.407299+00:00",
+      "lane": "D12-2",
+      "sourceThreadId": "01a095b2-dbc0-7460-b97b-fcced4dea445",
+      "reportedObservation": "Root accepted b882fe46 after residual-approval withdrawal and malformed-position corrections. Root full final suite:272 suites/2378 tests passed. PR447 pending staging merge/deploy.",
+      "verificationBoundary": "No personal wallet transaction performed; functional browser deployment verification remains pending."
+    },
+    {
+      "reportedAt": "2026-09-12T13:51:33.407299+00:00",
+      "lane": "D12-4",
+      "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
+      "reportedObservation": "Root production app12 metadata probe confirmed four configured BSC RPC providers. Singular RPC equals provider0 and returns403 from the production container; providers1/2/3 return200 and chainId0x38. Root alias-presence query for exact invitation found no chosen weekly alias, a runtime alias without aliasChangedAt and no public Hub username.",
+      "verificationBoundary": "Read-only queries; no URLs, secrets, raw wallet/profile data or alias values recorded."
+    },
+    {
+      "reportedAt": "2026-09-12T13:51:33.407299+00:00",
+      "lane": "D12-4",
+      "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
+      "reportedObservation": "PR448 merged to main cf08e81367502d4447024a39f6681a2939d24035 at2026-09-12T13:47:15Z. Root final173 suites/1510 tests passed on7509735d. Coolify deployment1554/u444csgk8gcwsw80844ogocc running the exact merged commit.",
+      "verificationBoundary": "Merge and active deployment do not yet prove served invitation stability; staging propagation still required."
     }
   ]
 }
