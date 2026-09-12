@@ -537,6 +537,7 @@ async function openOwnershipIncident(
       $set: {
         status: 'open',
         chain: 'BSC',
+        route: 'nft',
         component: 'cukie-master-runtime',
         type,
         lockId,
@@ -618,7 +619,14 @@ async function reconcileNftLockOwnership(
     }
     const assets = await db.collection<StringIdDocument>('cukies')
       .find(cukiesAssetFilter(lookup) as Filter<StringIdDocument>, {
-        projection: { _id: 1, tokenId: 1, network: 1, ownerNormalized: 1 },
+        projection: {
+          _id: 1,
+          chainId: 1,
+          collectionAddressNormalized: 1,
+          tokenId: 1,
+          network: 1,
+          ownerNormalized: 1,
+        },
         maxTimeMS: 2_000,
       })
       .limit(2)

@@ -48,7 +48,27 @@ export function sameRuntimeRouteBinding(
 
 export type CukiesAssetLookup =
   | { kind: 'document'; documentId: string }
+  | {
+      kind: 'canonical';
+      documentId: string;
+      chainId: 56 | 97;
+      collectionAddressNormalized: string;
+      tokenId: string;
+    }
   | { kind: 'token'; network: 'BSC'; tokenId: string };
+
+const CANONICAL_BSC_ASSET_ID = /^(56|97):(0x[0-9a-f]{40}):(\d+)$/i;
+
+function canonicalTokenIdValues(tokenId: string) {
+  const numeric = Number(tokenId);
+  return Number.isSafeInteger(numeric) && String(numeric) === tokenId
+    ? [tokenId, numeric]
+    : [tokenId];
+}
+
+function escapedRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export function parseCukiesAssetLookup(assetId: string): CukiesAssetLookup | null {
   if (!assetId.startsWith('cukies:')) return null;
@@ -59,12 +79,36 @@ export function parseCukiesAssetLookup(assetId: string): CukiesAssetLookup | nul
     const tokenId = networkToken[2].trim();
     return tokenId ? { kind: 'token', network: 'BSC', tokenId } : null;
   }
+  const canonical = CANONICAL_BSC_ASSET_ID.exec(identity);
+  if (canonical) {
+    const chainId = Number(canonical[1]) as 56 | 97;
+    const collectionAddressNormalized = canonical[2].toLowerCase();
+    const tokenId = canonical[3];
+    return {
+      kind: 'canonical',
+      documentId: `${chainId}:${collectionAddressNormalized}:${tokenId}`,
+      chainId,
+      collectionAddressNormalized,
+      tokenId,
+    };
+  }
   if (identity.includes(':')) return null;
   return { kind: 'document', documentId: identity };
 }
 
 export function cukiesAssetFilter(lookup: CukiesAssetLookup): Record<string, unknown> {
   if (lookup.kind === 'document') return { _id: lookup.documentId };
+  if (lookup.kind === 'canonical') {
+    return {
+      _id: lookup.documentId,
+      chainId: { $in: [lookup.chainId, String(lookup.chainId)] },
+      collectionAddressNormalized: {
+        $regex: `^${escapedRegex(lookup.collectionAddressNormalized)}$`,
+        $options: 'i',
+      },
+      tokenId: { $in: canonicalTokenIdValues(lookup.tokenId) },
+    };
+  }
   return {
     network: { $in: ['BSC', 'bsc'] },
     tokenId: lookup.tokenId,
@@ -76,10 +120,24 @@ export function canonicalCukiesAssetMatches(
   lookup: CukiesAssetLookup,
 ) {
   const network = typeof asset.network === 'string' ? asset.network.toLowerCase() : null;
-  const tokenId = typeof asset.tokenId === 'string' ? asset.tokenId : null;
+  const tokenId = typeof asset.tokenId === 'string'
+    ? asset.tokenId
+    : typeof asset.tokenId === 'number' && Number.isSafeInteger(asset.tokenId)
+      ? String(asset.tokenId)
+      : null;
   if (network !== 'bsc') return false;
   if (lookup.kind === 'document') {
     return String(asset._id) === lookup.documentId;
+  }
+  if (lookup.kind === 'canonical') {
+    const chainId = Number(asset.chainId);
+    const collectionAddress = typeof asset.collectionAddressNormalized === 'string'
+      ? asset.collectionAddressNormalized.toLowerCase()
+      : null;
+    return String(asset._id) === lookup.documentId
+      && (chainId === lookup.chainId)
+      && collectionAddress === lookup.collectionAddressNormalized
+      && tokenId === lookup.tokenId;
   }
   return tokenId === lookup.tokenId;
 }
@@ -115,6 +173,9 @@ export function evaluateNftOwnership(input: {
   }
   const owner = asset.ownerNormalized;
   if (typeof owner !== 'string' || !/^0x[0-9a-f]{40}$/i.test(owner)) {
+    return { action: 'invalidate_integrity', reason: 'nft_lock_owner_missing' };
+  }
+  if (!/^0x[0-9a-f]{40}$/i.test(input.lockOwnerNormalized)) {
     return { action: 'invalidate_integrity', reason: 'nft_lock_owner_missing' };
   }
   return owner.toLowerCase() === input.lockOwnerNormalized.toLowerCase()
