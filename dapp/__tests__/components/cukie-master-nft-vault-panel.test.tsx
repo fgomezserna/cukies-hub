@@ -327,7 +327,14 @@ describe('CukieMasterNftVaultPanel', () => {
   it('libera las demás tarjetas cuando el receipt llega aunque el refresh global quede pendiente', async () => {
     let masterConverged = false;
     const refreshAfterTransaction = jest.fn(() => new Promise<void>(() => undefined));
-    mockUseAppRuntime.mockReturnValue({ address: wallet, refreshAfterTransaction, registerNftExpectation: jest.fn() } as never);
+    mockUseAppRuntime.mockReturnValue({
+      address: wallet,
+      refreshAfterTransaction,
+      registerNftExpectation: jest.fn(),
+      unregisterNftExpectation: jest.fn(),
+      isNftProjectionAcknowledged: jest.fn(() => true),
+      projectionIdentity: 'test',
+    } as never);
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
       if (String(input).includes('/api/economy/v1/cukie-master')) {
         return response(statusWithSecondAsset({ deposited: masterConverged }));
@@ -391,6 +398,9 @@ describe('CukieMasterNftVaultPanel', () => {
       address: wallet,
       refreshAfterTransaction: jest.fn(),
       registerNftExpectation: jest.fn(),
+      unregisterNftExpectation: jest.fn(),
+      isNftProjectionAcknowledged: jest.fn(() => true),
+      projectionIdentity: 'test',
     } as never);
     let resolveProjection!: (value: ReturnType<typeof response>) => void;
     fetchMock
@@ -418,6 +428,9 @@ describe('CukieMasterNftVaultPanel', () => {
       address: wallet,
       refreshAfterTransaction,
       registerNftExpectation,
+      unregisterNftExpectation: jest.fn(),
+      isNftProjectionAcknowledged: jest.fn(() => false),
+      projectionIdentity: 'test',
     } as never);
     savePendingNftVaultOperation(localStorage, pendingOperation({
       action: 'deposit',
@@ -488,7 +501,7 @@ describe('CukieMasterNftVaultPanel', () => {
     let masterCalls = 0;
     let creditsCalls = 0;
     const resolveReadbackMasters: Array<(value: ReturnType<typeof response>) => void> = [];
-    let resolveReadbackCredits: ((value: ReturnType<typeof response>) => void) | undefined;
+    const resolveReadbackCredits: Array<(value: ReturnType<typeof response>) => void> = [];
     fetchMock.mockImplementation((input) => {
       const url = String(input);
       if (url.includes('/api/economy/v1/runtime-status')) {
@@ -516,7 +529,7 @@ describe('CukieMasterNftVaultPanel', () => {
       if (url.includes('/api/economy/v1/credits')) {
         creditsCalls += 1;
         if (creditsCalls === 1) return Promise.resolve(response(staleCredits));
-        return new Promise((resolve) => { resolveReadbackCredits = resolve; });
+        return new Promise((resolve) => { resolveReadbackCredits.push(resolve); });
       }
       if (url.includes('/api/dashboard/v1/summary')) {
         return Promise.resolve(response({ identity: { walletNormalized: wallet }, network: { chainId: 97 } }));
@@ -540,12 +553,121 @@ describe('CukieMasterNftVaultPanel', () => {
     expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('0');
     expect(localStorage.length).toBe(1);
 
-    await act(async () => resolveReadbackCredits?.(response(convergedCredits)));
+    await act(async () => resolveReadbackCredits.splice(0).forEach((resolve) => resolve(response(convergedCredits))));
     await waitFor(() => {
       expect(screen.getByTestId('projection-state')).toHaveTextContent('idle');
       expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('1');
       expect(localStorage.length).toBe(0);
     });
+  });
+
+  it('no acredita el pending tras un reset 97→56→97 mientras Credits sigue antiguo', async () => {
+    mockUseAppRuntime.mockImplementation(jest.requireActual('@/providers/app-runtime-provider').useAppRuntime);
+    mockUseAuth.mockReturnValue({
+      user: { walletAddress: wallet, username: 'alice' },
+      isLoading: false,
+      isWaitingForApproval: false,
+      walletType: 'evm',
+      fetchUser: jest.fn(),
+    } as never);
+    mockUseAccount.mockReturnValue({ address: wallet, chainId: 97, isConnected: true } as never);
+    mockUsePathname.mockReturnValue('/dashboard');
+    savePendingNftVaultOperation(localStorage, pendingOperation({
+      action: 'deposit',
+      phase: 'syncing_projection',
+      txHash: depositHash,
+      depositEpoch: '2',
+    }));
+    const masterData = {
+      ...status({ deposited: true, depositEpoch: '2' }),
+      chainId: 97,
+      routes: {
+        uki: {
+          source: { complete: true, stakedUkiRaw: '0' },
+          projectionFresh: true,
+          slots: [],
+        },
+        nft: {
+          source: { complete: true },
+          projectionFresh: true,
+          slots: [{ route: 'nft', ordinal: 1, eligibilityEpoch: 1, status: 'active' }],
+        },
+      },
+    };
+    const staleCredits = {
+      walletNormalized: wallet,
+      chainId: 97,
+      configurations: [],
+    };
+    let masterCalls = 0;
+    let creditsCalls = 0;
+    const resolveReadbackMasters: Array<(value: ReturnType<typeof response>) => void> = [];
+    const resolveReadbackCredits: Array<(value: ReturnType<typeof response>) => void> = [];
+    fetchMock.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('/api/economy/v1/runtime-status')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'ok',
+            data: {
+              checkedAt: '2026-09-09T00:00:00.000Z',
+              services: {
+                indexer: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+                master: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+                credits: { status: 'ready', checkedAt: '2026-09-09T00:00:00.000Z', lastSuccessAt: null, code: null },
+              },
+            },
+          }),
+        } as Response);
+      }
+      if (url.includes('/api/economy/v1/cukie-master')) {
+        masterCalls += 1;
+        if (masterCalls === 1) return Promise.resolve(response(masterData));
+        return new Promise((resolve) => { resolveReadbackMasters.push(resolve); });
+      }
+      if (url.includes('/api/economy/v1/credits')) {
+        creditsCalls += 1;
+        if (creditsCalls === 1) return Promise.resolve(response(staleCredits));
+        return new Promise((resolve) => { resolveReadbackCredits.push(resolve); });
+      }
+      if (url.includes('/api/dashboard/v1/summary')) {
+        return Promise.resolve(response({ identity: { walletNormalized: wallet }, network: { chainId: 97 } }));
+      }
+      return Promise.resolve(response({}));
+    });
+    getTransactionReceipt.mockRejectedValue(new Error('receipt not available yet'));
+
+    const view = render(<><CukieMasterNftVaultPanel /><ProjectionCacheProbe /></>);
+    await waitFor(() => {
+      expect(screen.getByTestId('projection-master-slots')).toHaveTextContent('1');
+      expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('0');
+      expect(masterCalls).toBe(2);
+      expect(creditsCalls).toBe(2);
+    });
+    expect(localStorage.length).toBe(1);
+
+    await act(async () => {
+      mockUseAccount.mockReturnValue({ address: wallet, chainId: 56, isConnected: true } as never);
+      view.rerender(<><CukieMasterNftVaultPanel /><ProjectionCacheProbe /></>);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('projection-state')).toHaveTextContent('idle');
+      expect(localStorage.length).toBe(1);
+    });
+    await act(async () => {
+      mockUseAccount.mockReturnValue({ address: wallet, chainId: 97, isConnected: true } as never);
+      view.rerender(<><CukieMasterNftVaultPanel /><ProjectionCacheProbe /></>);
+    });
+    await waitFor(() => {
+      expect(masterCalls).toBeGreaterThanOrEqual(3);
+      expect(creditsCalls).toBeGreaterThanOrEqual(3);
+      expect(localStorage.length).toBe(1);
+    });
+
+    expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('0');
+    expect(localStorage.length).toBe(1);
   });
 
   it('muestra el depósito confirmado por RPC antes de que termine la proyección API y mantiene el lock', async () => {
@@ -557,6 +679,9 @@ describe('CukieMasterNftVaultPanel', () => {
       address: wallet,
       refreshAfterTransaction: jest.fn(),
       registerNftExpectation: jest.fn(),
+      unregisterNftExpectation: jest.fn(),
+      isNftProjectionAcknowledged: jest.fn(() => true),
+      projectionIdentity: 'test',
     } as never);
     let resolveProjection!: (value: ReturnType<typeof response>) => void;
     fetchMock
