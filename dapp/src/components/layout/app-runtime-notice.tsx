@@ -35,9 +35,6 @@ export function AppRuntimeNotice() {
     && writeReadiness?.reason === 'wrong_chain'
     && writeReadiness.targetChainId,
   );
-  const healthNeedsAttention = runtime.statusState === 'stale'
-    || runtime.statusState === 'syncing'
-    || runtime.statusState === 'unavailable';
   const projectionSync = runtime.projectionSync;
   const projectionNeedsAttention = projectionSync.state !== 'idle'
     && projectionSync.wallet === runtime.address;
@@ -76,10 +73,10 @@ export function AppRuntimeNotice() {
       </aside>
     );
   }
-  if (!operation || !readiness || runtime.authLoading || runtime.walletType === 'tron' || (readiness.ready && !showingWriteNetwork && !healthNeedsAttention)) return null;
+  if (!operation || !readiness || runtime.authLoading || runtime.walletType === 'tron' || (readiness.ready && !showingWriteNetwork)) return null;
   const effectiveReadiness = showingWriteNetwork ? writeReadiness! : readiness;
 
-  const serviceUnavailable = effectiveReadiness.reason === 'service_unavailable' || healthNeedsAttention;
+  const serviceUnavailable = effectiveReadiness.reason === 'service_unavailable';
   const title = showingWriteNetwork
     ? 'Cambia de red cuando vayas a firmar'
     : effectiveReadiness.reason === 'offline'
@@ -90,10 +87,8 @@ export function AppRuntimeNotice() {
           ? 'Firma para consultar tus datos'
         : readiness.reason === 'wrong_chain'
           ? 'Cambia de red para continuar'
-          : runtime.statusState === 'syncing'
+          : effectiveReadiness.service?.status === 'syncing'
             ? 'Estamos recuperando el estado'
-            : runtime.statusState === 'stale'
-              ? 'El estado puede estar desactualizado'
             : serviceUnavailable
               ? 'Este servicio está actualizando datos'
               : 'No hemos podido actualizar tus datos';
@@ -103,7 +98,7 @@ export function AppRuntimeNotice() {
     ? 'Recuperaremos el estado cuando vuelva la conexión.'
     : readiness.reason === 'wrong_chain'
       ? `Esta sección necesita ${readiness.targetChainId === 97 ? 'BNB Smart Chain Testnet' : 'BNB Smart Chain'}.`
-      : healthNeedsAttention || readiness.reason === 'service_unavailable'
+      : serviceUnavailable
         ? 'La sección sigue disponible con el último estado confirmado cuando exista.'
         : 'Puedes reintentarlo cuando quieras.';
 

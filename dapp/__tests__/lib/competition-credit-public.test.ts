@@ -51,6 +51,44 @@ function freshWatermarks() {
   ];
 }
 
+function currentRun(
+  period: ReturnType<typeof currentCompetitionCreditPeriod>,
+  runId: string,
+  status: 'snapshotted' | 'processing' | 'open' | 'open_with_holds' | 'blocked',
+  route: 'uki' | 'nft' = 'uki',
+) {
+  return { runId, route, status, settlementPeriod: period };
+}
+
+function ownLot(
+  period: ReturnType<typeof currentCompetitionCreditPeriod>,
+  runId: string,
+  availableCredits: number,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    _id: `own-lot-${runId}`,
+    lotId: `own-lot-${runId}`,
+    bucket: 'own',
+    route: 'uki',
+    walletNormalized: wallet,
+    periodId: period.periodId,
+    runId,
+    runItemId: `run-item-${runId}`,
+    sourceSlotId: `slot-${runId}`,
+    eligibilityEpoch: 1,
+    totalCredits: availableCredits,
+    poolDepositedCredits: 0,
+    availableCredits,
+    reservedCredits: 0,
+    spentCredits: 0,
+    expiredCredits: 0,
+    blocked: false,
+    expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 function mockCollections(rows: Record<string, unknown[]>) {
   const collections: Record<string, {
     find: jest.Mock;
@@ -153,6 +191,152 @@ describe('competition credit public status conflicts', () => {
       { route: 'uki', status: 'processing' },
       { route: 'nft', status: 'missing' },
     ]);
+  });
+
+  it('aggregates delayed and current runs without hiding the last open balance', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [
+        {
+          runId: 'run-delayed-open',
+          route: 'uki',
+          status: 'open',
+          settlementPeriod: period,
+        },
+        {
+          runId: 'run-current-processing',
+          route: 'uki',
+          status: 'processing',
+          settlementPeriod: period,
+        },
+      ],
+      competition_credit_lots: [{
+        _id: 'own-lot-delayed-open',
+        lotId: 'own-lot-delayed-open',
+        bucket: 'own',
+        route: 'uki',
+        walletNormalized: wallet,
+        periodId: period.periodId,
+        runId: 'run-delayed-open',
+        runItemId: 'run-item-delayed-open',
+        sourceSlotId: 'slot-delayed-open',
+        eligibilityEpoch: 1,
+        totalCredits: 40,
+        poolDepositedCredits: 0,
+        availableCredits: 40,
+        reservedCredits: 0,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        expiresAt: new Date('2026-09-07T09:00:00.000Z'),
+      }],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.currentRun.routes).toEqual([
+      { route: 'uki', status: 'processing' },
+      { route: 'nft', status: 'missing' },
+    ]);
+    expect(status.routes.uki.balance.availableCredits).toBe(40);
+    expect(status.balance.availableCredits).toBe(40);
+  });
+
+  it.each([
+    ['snapshotted', 'snapshotted'],
+    ['processing', 'processing'],
+    ['open', 'open'],
+    ['open_with_holds', 'open_with_holds'],
+    ['blocked', 'blocked'],
+  ] as const)('publishes the allowed current run state %s', async (runStatus, expectedStatus) => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [currentRun(period, `run-${runStatus}`, runStatus)],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.currentRun.routes).toEqual([
+      { route: 'uki', status: expectedStatus },
+      { route: 'nft', status: 'missing' },
+    ]);
+  });
+
+  it('sums lots from two open runs in one route without duplicating either lot', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [
+        currentRun(period, 'run-open-1', 'open'),
+        currentRun(period, 'run-open-2', 'open'),
+      ],
+      competition_credit_lots: [
+        ownLot(period, 'run-open-1', 20),
+        ownLot(period, 'run-open-2', 30),
+      ],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.routes.uki.balance.availableCredits).toBe(50);
+    expect(status.balance.availableCredits).toBe(50);
+    expect(status.currentRun.routes[0]).toEqual({ route: 'uki', status: 'open' });
+  });
+
+  it('keeps open lots usable while a blocked run shares the current route period', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [
+        currentRun(period, 'run-open-confirmed', 'open'),
+        currentRun(period, 'run-blocked-new', 'blocked'),
+      ],
+      competition_credit_lots: [ownLot(period, 'run-open-confirmed', 12)],
+    });
+
+    const status = await getCompetitionCreditWalletStatus(wallet, now);
+
+    expect(status.currentRun.routes[0]).toEqual({ route: 'uki', status: 'blocked' });
+    expect(status.routes.uki.balance.availableCredits).toBe(12);
+    expect(status.balance.availableCredits).toBe(12);
+  });
+
+  it('fails closed on duplicate current run IDs instead of double-counting lots', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: [
+        currentRun(period, 'run-duplicate', 'open'),
+        currentRun(period, 'run-duplicate', 'open'),
+      ],
+    });
+
+    await expect(getCompetitionCreditWalletStatus(wallet, now)).rejects.toMatchObject({
+      code: 'CONFLICT', details: { reason: 'CREDIT_RUN_PROJECTION_DUPLICATE_IDS' },
+    });
+  });
+
+  it('fails closed when current runs exceed the public reconciliation limit', async () => {
+    const rule = testCompetitionCreditRule();
+    const period = currentCompetitionCreditPeriod(now, rule);
+    const runs = Array.from({ length: 5_001 }, (_, index) => (
+      currentRun(period, `run-too-many-${index}`, 'open')
+    ));
+    mockCollections({
+      economy_rule_versions: [rule],
+      competition_credit_runs: runs,
+    });
+
+    await expect(getCompetitionCreditWalletStatus(wallet, now)).rejects.toMatchObject({
+      code: 'CONFLICT', details: { reason: 'CREDIT_RUN_PROJECTION_TOO_LARGE' },
+    });
   });
 
   it('publishes only usable pool lots from an open settlement run', async () => {
