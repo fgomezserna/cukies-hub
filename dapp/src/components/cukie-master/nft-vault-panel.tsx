@@ -330,6 +330,7 @@ export function CukieMasterNftVaultPanel() {
   const {
     registerNftExpectation,
     unregisterNftExpectation,
+    isNftProjectionAcknowledged,
     refreshAfterTransaction,
     sessionReady: runtimeSessionReady,
   } = runtime;
@@ -365,7 +366,7 @@ export function CukieMasterNftVaultPanel() {
   const [onChainByAsset, setOnChainByAsset] = useState<Record<string, MasterOnChainConfirmation>>({});
   const [hydratedPendingKey, setHydratedPendingKey] = useState<string | null>(null);
   const operationLocksRef = useRef(new Set<string>());
-  const projectionRegistrationRef = useRef(new Map<string, { generation: number; identity: string }>());
+  const projectionRegistrationRef = useRef(new Map<string, { identity: string }>());
   const statusResource = useAppRuntimeResource<PublicStatus>('master-nft', {
     enabled: Boolean(user?.walletAddress) && !authLoading,
     validate: (value): value is PublicStatus => Boolean(
@@ -381,12 +382,11 @@ export function CukieMasterNftVaultPanel() {
     const key = pendingProjectionKey(operation);
     if (!projectionRegistrationRef.current.has(key)) {
       projectionRegistrationRef.current.set(key, {
-        generation: runtime.projectionGeneration,
         identity: runtime.projectionIdentity,
       });
     }
     registerNftExpectation(operation);
-  }, [registerNftExpectation, runtime.projectionGeneration, runtime.projectionIdentity]);
+  }, [registerNftExpectation, runtime.projectionIdentity]);
   const unregisterProjectionExpectation = useCallback((operation: NftVaultPendingOperation) => {
     projectionRegistrationRef.current.delete(pendingProjectionKey(operation));
     unregisterNftExpectation?.(operation);
@@ -394,20 +394,13 @@ export function CukieMasterNftVaultPanel() {
   const projectionReadbackComplete = useCallback((operation: NftVaultPendingOperation, candidateStatus: PublicStatus | null | undefined) => {
     if (!masterProjectionMatchesPendingOperation(operation, candidateStatus)) return false;
     const registration = projectionRegistrationRef.current.get(pendingProjectionKey(operation));
-    // Partial runtime mocks used by isolated UI tests predate the generation
-    // contract. Production providers always expose both fields, so only the
-    // compatibility path can fall back to the Master proof alone.
-    const coordinatorAvailable = typeof runtime.projectionGeneration === 'number'
-      && runtime.projectionSync?.state !== undefined
-      && typeof runtime.projectionIdentity === 'string';
-    if (!coordinatorAvailable) return true;
-    return Boolean(
-      registration
-      && runtime.projectionIdentity === registration.identity
-      && runtime.projectionGeneration > registration.generation
-      && runtime.projectionSync.state === 'idle',
-    );
-  }, [runtime.projectionGeneration, runtime.projectionIdentity, runtime.projectionSync?.state]);
+    if (!registration || runtime.projectionIdentity !== registration.identity) return false;
+    if (runtime.projectionSync?.state !== undefined && runtime.projectionSync.state !== 'idle') return false;
+    // A matching Master row is not sufficient: only the provider's
+    // operation-scoped acknowledgement proves that the matching Credits
+    // snapshot was published in the same readback generation.
+    return isNftProjectionAcknowledged(operation);
+  }, [isNftProjectionAcknowledged, runtime.projectionIdentity, runtime.projectionSync?.state]);
   const status = statusResource.data ?? null;
   const loading = statusResource.state === 'loading';
   const refreshStatus = statusResource.refresh;
@@ -649,7 +642,23 @@ export function CukieMasterNftVaultPanel() {
     for (const operation of Object.values(pendingByAsset)) {
       if (operation.phase !== 'syncing_projection' || operation.action === 'approval') continue;
       const key = pendingProjectionKey(operation);
-      if (projectionRegistrationRef.current.has(key)) continue;
+      const registration = projectionRegistrationRef.current.get(key);
+      const coordinatorAvailable = typeof isNftProjectionAcknowledged === 'function'
+        && typeof runtime.projectionIdentity === 'string';
+      const acknowledged = coordinatorAvailable
+        ? isNftProjectionAcknowledged(operation)
+        : false;
+      const identityChanged = Boolean(registration && registration.identity !== runtime.projectionIdentity);
+      const resetToIdle = coordinatorAvailable
+        && runtime.projectionSync?.state === 'idle'
+        && !acknowledged;
+      if (acknowledged) {
+        if (!registration || identityChanged) {
+          projectionRegistrationRef.current.set(key, { identity: runtime.projectionIdentity });
+        }
+        continue;
+      }
+      if (registration && !identityChanged && !resetToIdle) continue;
       // A persisted syncing operation is not complete merely because the
       // Master inventory has caught up. Register it anyway so the provider
       // proves the matching Master+Credits pair before clearing the lock.
@@ -662,7 +671,7 @@ export function CukieMasterNftVaultPanel() {
       // than waiting for its periodic retry interval.
       void Promise.resolve(refreshAfterTransaction('master-nft')).catch(() => undefined);
     }
-  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, refreshAfterTransaction, registerProjectionExpectation, runtimeSessionReady, statusResource.data]);
+  }, [address, chainId, isNftProjectionAcknowledged, pendingByAsset, pendingContext, pendingHydrated, refreshAfterTransaction, registerProjectionExpectation, runtime.projectionIdentity, runtime.projectionSync?.state, runtimeSessionReady, statusResource.data]);
 
   const persistPending = useCallback((input: {
     asset: PublicNft;
