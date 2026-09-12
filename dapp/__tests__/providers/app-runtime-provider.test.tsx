@@ -8,6 +8,7 @@ import {
   appRuntimeProjectionMatches,
   appRuntimeQueryKey,
   AppRuntimeProvider,
+  type AppRuntimeNftExpectation,
   useAppRuntime,
   useAppRuntimeResource,
   useGuardedOperation,
@@ -149,6 +150,154 @@ function projectionPayloads(stakedUkiRaw: string, slotStatus: 'qualifying' | 'ac
   };
 }
 
+const STAKED_25K_RAW = (BigInt(25_000) * BigInt(10) ** BigInt(18)).toString();
+const STAKED_5K_RAW = (BigInt(5_000) * BigInt(10) ** BigInt(18)).toString();
+const O2_WALLET = '0x0000000000000000000000000000000000000aaa';
+const O2_CHAIN_ID = 56;
+const NFT_COLLECTION = '0x00000000000000000000000000000000000000c1';
+const NFT_COLLECTION_2 = '0x00000000000000000000000000000000000000c2';
+const NFT_VAULT = '0x00000000000000000000000000000000000000b1';
+const NFT_ASSET_ID = `${O2_CHAIN_ID}:${NFT_COLLECTION.toLowerCase()}:1`;
+const NFT_ASSET_ID_2 = `${O2_CHAIN_ID}:${NFT_COLLECTION_2.toLowerCase()}:2`;
+const NFT_TX_HASH = `0x${'1'.repeat(64)}` as `0x${string}`;
+const NFT_TX_HASH_2 = `0x${'2'.repeat(64)}` as `0x${string}`;
+const NFT_EXPECTATION = {
+  version: 1,
+  chainId: O2_CHAIN_ID,
+  walletAddress: O2_WALLET,
+  vaultAddress: NFT_VAULT,
+  assetId: NFT_ASSET_ID,
+  collectionAddress: NFT_COLLECTION,
+  tokenId: '1',
+  depositEpoch: '7',
+  action: 'withdraw',
+  phase: 'syncing_projection',
+  txHash: NFT_TX_HASH,
+  createdAt: 1,
+  updatedAt: 1,
+} satisfies AppRuntimeNftExpectation;
+const NFT_EXPECTATION_2 = {
+  ...NFT_EXPECTATION,
+  assetId: NFT_ASSET_ID_2,
+  collectionAddress: NFT_COLLECTION_2,
+  tokenId: '2',
+  txHash: NFT_TX_HASH_2,
+} satisfies AppRuntimeNftExpectation;
+
+function o2ReadbackPayload(input: {
+  stakedUkiRaw: string;
+  originalCukiePoints: number;
+  desiredSlots: number;
+  allocatedSlots: number;
+  protectedSlots: number;
+  slotStatus: 'active' | 'grace';
+  nftInventoryMode: 'vault' | 'wallet' | 'none';
+  includeSecondNft?: boolean;
+}) {
+  const nftSlots = Array.from({ length: input.allocatedSlots }, (_, index) => ({
+    route: 'nft',
+    ordinal: index + 1,
+    eligibilityEpoch: 4,
+    status: input.slotStatus,
+  }));
+  const slots = [
+    {
+      route: 'uki',
+      ordinal: 1,
+      eligibilityEpoch: 2,
+      status: input.slotStatus,
+    },
+    ...nftSlots,
+  ];
+  const custody = input.nftInventoryMode === 'vault'
+    ? 'cukie_master_nft_vault'
+    : input.nftInventoryMode === 'wallet'
+      ? 'wallet'
+      : null;
+  const nftInventory = custody
+    ? [
+      {
+        assetId: NFT_ASSET_ID,
+        collectionAddress: NFT_COLLECTION,
+        tokenId: '1',
+        custody,
+        depositEpoch: '7',
+      },
+      ...(input.includeSecondNft ? [{
+        assetId: NFT_ASSET_ID_2,
+        collectionAddress: NFT_COLLECTION_2,
+        tokenId: '2',
+        custody,
+        depositEpoch: '7',
+      }] : []),
+    ]
+    : [];
+  const master = {
+    walletNormalized: O2_WALLET,
+    chainId: O2_CHAIN_ID,
+    nftCustody: {
+      mode: 'custodial',
+      chainId: O2_CHAIN_ID,
+      vaultAddress: NFT_VAULT,
+      collectionAddresses: [NFT_COLLECTION, ...(input.includeSecondNft ? [NFT_COLLECTION_2] : [])],
+    },
+    nftInventory,
+    routes: {
+      uki: {
+        source: {
+          complete: true,
+          stakedUkiRaw: input.stakedUkiRaw,
+        },
+        projectionFresh: true,
+        slots: [slots[0]],
+      },
+      nft: {
+        source: {
+          complete: true,
+          originalCukiePoints: input.originalCukiePoints,
+          desiredSlots: input.desiredSlots,
+          allocatedSlots: input.allocatedSlots,
+          protectedSlots: input.protectedSlots,
+        },
+        position: {
+          status: input.slotStatus,
+          desiredSlots: input.desiredSlots,
+          allocatedSlots: input.allocatedSlots,
+          protectedSlots: input.protectedSlots,
+        },
+        projectionFresh: true,
+        slots: nftSlots,
+      },
+    },
+  };
+  return {
+    master,
+    credits: {
+      walletNormalized: O2_WALLET,
+      chainId: O2_CHAIN_ID,
+      balance: {
+        grantedCredits: 400,
+        availableCredits: 240,
+        reservedCredits: 160,
+        spentCredits: 0,
+        expiredCredits: 0,
+        blocked: false,
+        materialization: 'ready',
+      },
+      configurations: slots.map((slot) => ({
+        route: slot.route,
+        ordinal: slot.ordinal,
+        eligibilityEpoch: slot.eligibilityEpoch,
+        status: slot.status,
+      })),
+    },
+    dashboard: {
+      identity: { walletNormalized: O2_WALLET },
+      network: { chainId: O2_CHAIN_ID },
+    },
+  };
+}
+
 function TransactionRefreshProbe() {
   const runtime = useAppRuntime();
   const query = useAppRuntimeResource<{ value: string }>('master');
@@ -158,14 +307,50 @@ function TransactionRefreshProbe() {
 
 function O2ReadbackProbe() {
   const runtime = useAppRuntime();
-  const master = useAppRuntimeResource<{ value: string }>('master');
-  const credits = useAppRuntimeResource<{ value: string }>('credits');
+  const master = useAppRuntimeResource<Record<string, unknown>>('master');
+  const credits = useAppRuntimeResource<Record<string, unknown>>('credits');
+  const masterRoutes = master.data?.routes as Record<string, unknown> | undefined;
+  const nftRoute = masterRoutes?.nft as Record<string, unknown> | undefined;
+  const nftSource = nftRoute?.source as Record<string, unknown> | undefined;
+  const ukiRoute = masterRoutes?.uki as Record<string, unknown> | undefined;
+  const ukiSource = ukiRoute?.source as Record<string, unknown> | undefined;
+  const creditBalance = credits.data?.balance as Record<string, unknown> | undefined;
+  const configurations = Array.isArray(credits.data?.configurations) ? credits.data.configurations : [];
+  const graceCount = configurations.filter((configuration) => (
+    Boolean(configuration)
+    && typeof configuration === 'object'
+    && (configuration as Record<string, unknown>).status === 'grace'
+  )).length;
   return (
     <>
-      <span data-testid="o2-master">{master.data?.value ?? master.state}</span>
-      <span data-testid="o2-credits">{credits.data?.value ?? credits.state}</span>
-      <button type="button" onClick={() => void runtime.refreshAfterTransaction('master')}>read UKI O2</button>
-      <button type="button" onClick={() => void runtime.refreshAfterTransaction('master-nft')}>read NFT O2</button>
+      <span data-testid="o2-staked">{String(ukiSource?.stakedUkiRaw ?? master.state)}</span>
+      <span data-testid="o2-points">{String(nftSource?.originalCukiePoints ?? master.state)}</span>
+      <span data-testid="o2-desired">{String(nftSource?.desiredSlots ?? master.state)}</span>
+      <span data-testid="o2-granted">{String(creditBalance?.grantedCredits ?? credits.state)}</span>
+      <span data-testid="o2-grace-count">{String(graceCount)}</span>
+      <button type="button" onClick={() => {
+        runtime.registerStakingExpectation({ wallet: O2_WALLET, chainId: O2_CHAIN_ID, stakedUkiRaw: STAKED_5K_RAW });
+        void runtime.refreshAfterTransaction('master');
+      }}>read UKI O2</button>
+      <button type="button" onClick={() => {
+        runtime.registerNftExpectation(NFT_EXPECTATION);
+        runtime.registerNftExpectation(NFT_EXPECTATION_2);
+        void runtime.refreshAfterTransaction('master-nft');
+      }}>read NFT O2</button>
+    </>
+  );
+}
+
+function OnlyResourceProbe({ resource }: { resource: 'master' | 'credits' }) {
+  const runtime = useAppRuntime();
+  const query = useAppRuntimeResource<Record<string, unknown>>(resource);
+  return (
+    <>
+      <span data-testid="only-resource">{query.data ? JSON.stringify(query.data) : query.state}</span>
+      <button type="button" onClick={() => {
+        runtime.registerStakingExpectation({ wallet: O2_WALLET, chainId: O2_CHAIN_ID, stakedUkiRaw: STAKED_5K_RAW });
+        void runtime.refreshAfterTransaction(resource);
+      }}>trigger {resource} readback</button>
     </>
   );
 }
@@ -599,7 +784,47 @@ describe('AppRuntimeProvider shared resource contract', () => {
     expect(masterCalls).toBe(2);
   });
 
-  it('keeps UKI and NFT O2 readbacks coherent while responses arrive out of order', async () => {
+  it('publica un único par Master+Credits al converger UKI y NFT aunque las respuestas lleguen desordenadas', async () => {
+    const initial = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_25K_RAW,
+      originalCukiePoints: 12,
+      desiredSlots: 4,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'active',
+      nftInventoryMode: 'vault',
+      includeSecondNft: true,
+    });
+    const ukiTarget = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_5K_RAW,
+      originalCukiePoints: 12,
+      desiredSlots: 4,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'active',
+      nftInventoryMode: 'vault',
+      includeSecondNft: true,
+    });
+    const nftTarget = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_5K_RAW,
+      originalCukiePoints: 10,
+      desiredSlots: 3,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'grace',
+      nftInventoryMode: 'wallet',
+      includeSecondNft: true,
+    });
+    const nftPartial = {
+      ...nftTarget,
+      master: {
+        ...nftTarget.master,
+        nftInventory: nftTarget.master.nftInventory.slice(0, 1),
+      },
+    };
+    mockUseAuth.mockReturnValue({ user: { walletAddress: O2_WALLET, username: 'alice' }, walletType: 'evm', isLoading: false } as never);
+    mockUseAccount.mockReturnValue({ address: O2_WALLET, isConnected: true, chainId: O2_CHAIN_ID } as never);
+    mockUsePathname.mockReturnValue('/dashboard');
     let masterCalls = 0;
     let creditsCalls = 0;
     let resolveUkiMaster: ((value: Response) => void) | undefined;
@@ -609,29 +834,29 @@ describe('AppRuntimeProvider shared resource contract', () => {
     mockFetch.mockImplementation((input) => {
       const url = String(input);
       if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
-      if (url.includes('cukie-master')) {
-        masterCalls += 1;
-        if (masterCalls === 1) return Promise.resolve(response({ status: 'ok', data: { value: 'confirmado' } }));
-        if (masterCalls === 2) {
-          return new Promise((resolve) => { resolveUkiMaster = resolve; });
-        }
-        return new Promise((resolve) => { resolveNftMaster = resolve; });
+        if (url.includes('cukie-master')) {
+          masterCalls += 1;
+          if (masterCalls === 1) return Promise.resolve(response({ status: 'ok', data: initial.master }));
+          if (masterCalls === 2) return new Promise((resolve) => { resolveUkiMaster = resolve; });
+          if (masterCalls === 3) return new Promise((resolve) => { resolveNftMaster = resolve; });
+          return new Promise((resolve) => { resolveNftMaster = resolve; });
       }
-      if (url.includes('/credits')) {
-        creditsCalls += 1;
-        if (creditsCalls === 1) return Promise.resolve(response({ status: 'ok', data: { value: 'confirmado' } }));
-        if (creditsCalls === 2) {
-          return new Promise((resolve) => { resolveUkiCredits = resolve; });
-        }
-        return new Promise((resolve) => { resolveNftCredits = resolve; });
+        if (url.includes('/credits')) {
+          creditsCalls += 1;
+          if (creditsCalls === 1) return Promise.resolve(response({ status: 'ok', data: initial.credits }));
+          if (creditsCalls === 2) return new Promise((resolve) => { resolveUkiCredits = resolve; });
+          if (creditsCalls === 3) return new Promise((resolve) => { resolveNftCredits = resolve; });
+          return new Promise((resolve) => { resolveNftCredits = resolve; });
       }
-      return Promise.resolve(response({ status: 'ok', data: { value: 'other' } }));
+      return Promise.resolve(response({ status: 'ok', data: initial.dashboard }));
     });
 
     render(<Shell><O2ReadbackProbe /></Shell>);
     await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('confirmado');
+      expect(screen.getByTestId('o2-staked')).toHaveTextContent(STAKED_25K_RAW);
+      expect(screen.getByTestId('o2-points')).toHaveTextContent('12');
+      expect(screen.getByTestId('o2-granted')).toHaveTextContent('400');
+      expect(screen.getByTestId('o2-grace-count')).toHaveTextContent('0');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'read UKI O2' }));
@@ -639,15 +864,16 @@ describe('AppRuntimeProvider shared resource contract', () => {
       expect(masterCalls).toBe(2);
       expect(creditsCalls).toBe(2);
     });
-    await act(async () => resolveUkiCredits?.(response({ status: 'ok', data: { value: 'uki:5k-slots-pendientes' } })));
+    await act(async () => resolveUkiCredits?.(response({ status: 'ok', data: ukiTarget.credits })));
     await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('uki:5k-slots-pendientes');
+      expect(screen.getByTestId('o2-staked')).toHaveTextContent(STAKED_25K_RAW);
+      expect(screen.getByTestId('o2-points')).toHaveTextContent('12');
     });
-    await act(async () => resolveUkiMaster?.(response({ status: 'ok', data: { value: 'uki:5k-confirmado' } })));
+    await act(async () => resolveUkiMaster?.(response({ status: 'ok', data: ukiTarget.master })));
     await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('uki:5k-confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('uki:5k-slots-pendientes');
+      expect(screen.getByTestId('o2-staked')).toHaveTextContent(STAKED_5K_RAW);
+      expect(screen.getByTestId('o2-points')).toHaveTextContent('12');
+      expect(screen.getByTestId('o2-granted')).toHaveTextContent('400');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'read NFT O2' }));
@@ -655,16 +881,144 @@ describe('AppRuntimeProvider shared resource contract', () => {
       expect(masterCalls).toBe(3);
       expect(creditsCalls).toBe(3);
     });
-    await act(async () => resolveNftMaster?.(response({ status: 'ok', data: { value: 'nft:3-puntos-confirmado' } })));
+    await act(async () => resolveNftMaster?.(response({ status: 'ok', data: nftPartial.master })));
     await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('nft:3-puntos-confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('uki:5k-slots-pendientes');
+      expect(screen.getByTestId('o2-staked')).toHaveTextContent(STAKED_5K_RAW);
+      expect(screen.getByTestId('o2-points')).toHaveTextContent('12');
+      expect(screen.getByTestId('o2-desired')).toHaveTextContent('4');
+      expect(screen.getByTestId('o2-grace-count')).toHaveTextContent('0');
     });
-    await act(async () => resolveNftCredits?.(response({ status: 'ok', data: { value: 'nft:3-slots-pendientes' } })));
+    await act(async () => resolveNftCredits?.(response({ status: 'ok', data: nftTarget.credits })));
     await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('nft:3-puntos-confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('nft:3-slots-pendientes');
+      expect(screen.getByTestId('o2-points')).toHaveTextContent('12');
+      expect(screen.getByTestId('o2-desired')).toHaveTextContent('4');
+      expect(screen.getByTestId('o2-grace-count')).toHaveTextContent('0');
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'read NFT O2' }));
+    await waitFor(() => {
+      expect(masterCalls).toBe(4);
+      expect(creditsCalls).toBe(4);
+    });
+    await act(async () => resolveNftCredits?.(response({ status: 'ok', data: nftTarget.credits })));
+    await waitFor(() => {
+      expect(screen.getByTestId('o2-points')).toHaveTextContent('12');
+      expect(screen.getByTestId('o2-desired')).toHaveTextContent('4');
+      expect(screen.getByTestId('o2-grace-count')).toHaveTextContent('0');
+    });
+    await act(async () => resolveNftMaster?.(response({ status: 'ok', data: nftTarget.master })));
+    await waitFor(() => {
+      expect(screen.getByTestId('o2-staked')).toHaveTextContent(STAKED_5K_RAW);
+      expect(screen.getByTestId('o2-points')).toHaveTextContent('10');
+      expect(screen.getByTestId('o2-desired')).toHaveTextContent('3');
+      expect(screen.getByTestId('o2-granted')).toHaveTextContent('400');
+      expect(screen.getByTestId('o2-grace-count')).toHaveTextContent('5');
+    });
+  });
+
+  it('ignora una lectura Master iniciada en idle cuando el recibo abre otra generación', async () => {
+    const initial = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_25K_RAW,
+      originalCukiePoints: 12,
+      desiredSlots: 4,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'active',
+      nftInventoryMode: 'vault',
+      includeSecondNft: true,
+    });
+    const target = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_5K_RAW,
+      originalCukiePoints: 12,
+      desiredSlots: 4,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'active',
+      nftInventoryMode: 'vault',
+      includeSecondNft: true,
+    });
+    mockUseAuth.mockReturnValue({ user: { walletAddress: O2_WALLET, username: 'alice' }, walletType: 'evm', isLoading: false } as never);
+    mockUseAccount.mockReturnValue({ address: O2_WALLET, isConnected: true, chainId: O2_CHAIN_ID } as never);
+    mockUsePathname.mockReturnValue('/dashboard');
+    let masterCalls = 0;
+    let resolveInitialMaster: ((value: Response) => void) | undefined;
+    let resolveTargetMaster: ((value: Response) => void) | undefined;
+    let resolveTargetCredits: ((value: Response) => void) | undefined;
+    mockFetch.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      if (url.includes('cukie-master')) {
+        masterCalls += 1;
+        if (masterCalls === 1) return new Promise((resolve) => { resolveInitialMaster = resolve; });
+        return new Promise((resolve) => { resolveTargetMaster = resolve; });
+      }
+      if (url.includes('/credits')) return new Promise((resolve) => { resolveTargetCredits = resolve; });
+      return Promise.resolve(response({ status: 'ok', data: target.dashboard }));
+    });
+
+    render(<Shell><OnlyResourceProbe resource="master" /></Shell>);
+    await waitFor(() => expect(masterCalls).toBe(1));
+    fireEvent.click(screen.getByRole('button', { name: 'trigger master readback' }));
+    await waitFor(() => expect(masterCalls).toBe(2));
+
+    await act(async () => resolveInitialMaster?.(response({ status: 'ok', data: initial.master })));
+    expect(screen.getByTestId('only-resource')).not.toHaveTextContent(STAKED_25K_RAW);
+    await act(async () => resolveTargetCredits?.(response({ status: 'ok', data: target.credits })));
+    await act(async () => resolveTargetMaster?.(response({ status: 'ok', data: target.master })));
+    await waitFor(() => expect(screen.getByTestId('only-resource')).toHaveTextContent(STAKED_5K_RAW));
+  });
+
+  it('lee el readback completo aunque solo Credits esté montado', async () => {
+    const initial = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_25K_RAW,
+      originalCukiePoints: 12,
+      desiredSlots: 4,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'active',
+      nftInventoryMode: 'vault',
+      includeSecondNft: true,
+    });
+    const target = o2ReadbackPayload({
+      stakedUkiRaw: STAKED_5K_RAW,
+      originalCukiePoints: 10,
+      desiredSlots: 3,
+      allocatedSlots: 4,
+      protectedSlots: 4,
+      slotStatus: 'grace',
+      nftInventoryMode: 'wallet',
+      includeSecondNft: true,
+    });
+    mockUseAuth.mockReturnValue({ user: { walletAddress: O2_WALLET, username: 'alice' }, walletType: 'evm', isLoading: false } as never);
+    mockUseAccount.mockReturnValue({ address: O2_WALLET, isConnected: true, chainId: O2_CHAIN_ID } as never);
+    mockUsePathname.mockReturnValue('/dashboard');
+    let creditsCalls = 0;
+    let resolveTargetMaster: ((value: Response) => void) | undefined;
+    let resolveTargetCredits: ((value: Response) => void) | undefined;
+    mockFetch.mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
+      if (url.includes('cukie-master')) return new Promise((resolve) => { resolveTargetMaster = resolve; });
+      if (url.includes('/credits')) {
+        creditsCalls += 1;
+        if (creditsCalls === 1) return Promise.resolve(response({ status: 'ok', data: initial.credits }));
+        return new Promise((resolve) => { resolveTargetCredits = resolve; });
+      }
+      return Promise.resolve(response({ status: 'ok', data: target.dashboard }));
+    });
+
+    render(<Shell><OnlyResourceProbe resource="credits" /></Shell>);
+    await waitFor(() => expect(screen.getByTestId('only-resource')).toHaveTextContent('active'));
+    fireEvent.click(screen.getByRole('button', { name: 'trigger credits readback' }));
+    await waitFor(() => {
+      expect(creditsCalls).toBe(2);
+      expect(resolveTargetMaster).toBeDefined();
+      expect(resolveTargetCredits).toBeDefined();
+    });
+    await act(async () => resolveTargetMaster?.(response({ status: 'ok', data: target.master })));
+    expect(screen.getByTestId('only-resource')).not.toHaveTextContent('grace');
+    await act(async () => resolveTargetCredits?.(response({ status: 'ok', data: target.credits })));
+    await waitFor(() => expect(screen.getByTestId('only-resource')).toHaveTextContent('grace'));
   });
 
   it('reports a rejected contextual switch and never signs the transaction', async () => {

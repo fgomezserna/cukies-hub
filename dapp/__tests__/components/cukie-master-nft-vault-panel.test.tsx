@@ -310,7 +310,7 @@ describe('CukieMasterNftVaultPanel', () => {
   it('libera las demás tarjetas cuando el receipt llega aunque el refresh global quede pendiente', async () => {
     let masterConverged = false;
     const refreshAfterTransaction = jest.fn(() => new Promise<void>(() => undefined));
-    mockUseAppRuntime.mockReturnValue({ address: wallet, refreshAfterTransaction } as never);
+    mockUseAppRuntime.mockReturnValue({ address: wallet, refreshAfterTransaction, registerNftExpectation: jest.fn() } as never);
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
       if (String(input).includes('/api/economy/v1/cukie-master')) {
         return response(statusWithSecondAsset({ deposited: masterConverged }));
@@ -370,6 +370,11 @@ describe('CukieMasterNftVaultPanel', () => {
       phase: 'awaiting_receipt',
       txHash: depositHash,
     }));
+    mockUseAppRuntime.mockReturnValue({
+      address: wallet,
+      refreshAfterTransaction: jest.fn(),
+      registerNftExpectation: jest.fn(),
+    } as never);
     let resolveProjection!: (value: ReturnType<typeof response>) => void;
     fetchMock
       .mockResolvedValueOnce(response(status()))
@@ -394,6 +399,11 @@ describe('CukieMasterNftVaultPanel', () => {
       phase: 'awaiting_receipt',
       txHash: depositHash,
     }));
+    mockUseAppRuntime.mockReturnValue({
+      address: wallet,
+      refreshAfterTransaction: jest.fn(),
+      registerNftExpectation: jest.fn(),
+    } as never);
     let resolveProjection!: (value: ReturnType<typeof response>) => void;
     fetchMock
       .mockResolvedValueOnce(response(status()))

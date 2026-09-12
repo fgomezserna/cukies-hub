@@ -316,7 +316,10 @@ export function clearPendingNftVaultOperation(
 }
 
 export function projectionMatchesPendingOperation(
-  operation: NftVaultPendingOperation,
+  operation: Pick<
+    NftVaultPendingOperation,
+    'chainId' | 'collectionAddress' | 'tokenId' | 'depositEpoch' | 'action' | 'phase'
+  >,
   asset: {
     assetId: string;
     custody: string;

@@ -323,6 +323,11 @@ function nftTransactionError(reason: unknown) {
 export function CukieMasterNftVaultPanel() {
   const { user, isLoading: authLoading, walletType } = useAuth();
   const runtime = useAppRuntime();
+  const {
+    registerNftExpectation,
+    refreshAfterTransaction,
+    sessionReady: runtimeSessionReady,
+  } = runtime;
   const { address, chainId, isConnected } = useAccount();
   const publicClient = usePublicClient({ chainId: ukiNftVaults.chainId ?? undefined });
   const { writeContractAsync } = useWriteContract();
@@ -578,6 +583,14 @@ export function CukieMasterNftVaultPanel() {
     window.addEventListener('storage', syncPendingFromStorage);
     return () => window.removeEventListener('storage', syncPendingFromStorage);
   }, [pendingContext, pendingKey, pendingOperationsForContext]);
+
+  useEffect(() => {
+    if (!pendingHydrated || !pendingContext) return;
+    for (const operation of Object.values(pendingByAsset)) {
+      if (operation.phase !== 'syncing_projection' || operation.action === 'approval') continue;
+      registerNftExpectation(operation);
+    }
+  }, [address, chainId, pendingByAsset, pendingContext, pendingHydrated, registerNftExpectation, runtimeSessionReady]);
 
   const persistPending = useCallback((input: {
     asset: PublicNft;
@@ -921,6 +934,7 @@ export function CukieMasterNftVaultPanel() {
           });
           if (!updated) return;
           operation = updated;
+          registerNftExpectation(operation);
         }
         if (!operation.depositEpoch || !isReconciliationCurrent()) return;
         const rawPosition = await publicClient.readContract({
@@ -999,6 +1013,7 @@ export function CukieMasterNftVaultPanel() {
               if (!transitioned) continue;
               operation = transitioned;
               if (operation.action === 'approval') continue;
+              registerNftExpectation(operation);
               transitionedToSyncing = true;
               await inspectConfirmedOperation(operation, receipt);
               if (!isReconciliationCurrent()) return;
@@ -1029,7 +1044,7 @@ export function CukieMasterNftVaultPanel() {
       disposed = true;
       window.clearInterval(interval);
     };
-  }, [clearPending, pendingByAsset, pendingContext, pendingHydrated, pendingKey, pendingOperationsForContext, persistPending, publicClient, refresh, user?.walletAddress]);
+  }, [address, chainId, clearPending, pendingByAsset, pendingContext, pendingHydrated, pendingKey, pendingOperationsForContext, persistPending, publicClient, refresh, registerNftExpectation, runtimeSessionReady, user?.walletAddress]);
 
   async function writeAndConfirm(
     input: Parameters<typeof writeContractAsync>[0],
@@ -1133,18 +1148,25 @@ export function CukieMasterNftVaultPanel() {
           updateUi: isCurrentContext(isCurrent),
         });
       },
-      onConfirmed: (hash, isCurrent) => {
+      onConfirmed: (hash, isCurrent, receipt) => {
         const operation = operationForSubmittedHash();
         if (!operation) return;
+        const depositEpoch = action === 'deposit'
+          ? depositedEpochFromMasterReceipt(receipt, operation) ?? undefined
+          : undefined;
         submittedOperation = persistPending({
           asset,
           action,
           phase: action === 'approval' ? 'approval_confirmed' : 'syncing_projection',
           txHash: hash,
+          ...(depositEpoch ? { depositEpoch } : {}),
           context: expectedContext,
           expectedOperation: operation,
           updateUi: isCurrentContext(isCurrent),
         });
+        if (isCurrent && submittedOperation && action !== 'approval') {
+          registerNftExpectation(submittedOperation);
+        }
       },
     });
   }
@@ -1272,7 +1294,7 @@ export function CukieMasterNftVaultPanel() {
       setPhase('idle');
       setActiveAssetId(null);
       setNotice('Transacción confirmada. Estamos actualizando el inventario; no repitas la operación.');
-      void runtime.refreshAfterTransaction('master-nft').catch(() => undefined);
+      void refreshAfterTransaction('master-nft').catch(() => undefined);
     } catch (reason) {
       if (!identityMatches()) return;
       const persisted = pendingContext
