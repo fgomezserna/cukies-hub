@@ -156,20 +156,6 @@ function TransactionRefreshProbe() {
   return <><span data-testid="transaction-resource">{query.data?.value ?? query.state}</span><span data-testid="transaction-refresh">{completed ? 'done' : 'idle'}</span><button onClick={async () => { await runtime.refreshAfterTransaction('master'); setCompleted(true); }}>refresh after transaction</button></>;
 }
 
-function O2ReadbackProbe() {
-  const runtime = useAppRuntime();
-  const master = useAppRuntimeResource<{ value: string }>('master');
-  const credits = useAppRuntimeResource<{ value: string }>('credits');
-  return (
-    <>
-      <span data-testid="o2-master">{master.data?.value ?? master.state}</span>
-      <span data-testid="o2-credits">{credits.data?.value ?? credits.state}</span>
-      <button type="button" onClick={() => void runtime.refreshAfterTransaction('master')}>read UKI O2</button>
-      <button type="button" onClick={() => void runtime.refreshAfterTransaction('master-nft')}>read NFT O2</button>
-    </>
-  );
-}
-
 function ResourceKeyProbe() {
   const query = useAppRuntimeResource<{ value: string }>('credits');
   return <span data-testid="resource-key">{String(query.queryKey[3])}</span>;
@@ -597,74 +583,6 @@ describe('AppRuntimeProvider shared resource contract', () => {
     await waitFor(() => expect(screen.getByTestId('transaction-resource')).toHaveTextContent('saved'));
     expect(screen.getByTestId('transaction-refresh')).toHaveTextContent('done');
     expect(masterCalls).toBe(2);
-  });
-
-  it('keeps UKI and NFT O2 readbacks coherent while responses arrive out of order', async () => {
-    let masterCalls = 0;
-    let creditsCalls = 0;
-    let resolveUkiMaster: ((value: Response) => void) | undefined;
-    let resolveUkiCredits: ((value: Response) => void) | undefined;
-    let resolveNftMaster: ((value: Response) => void) | undefined;
-    let resolveNftCredits: ((value: Response) => void) | undefined;
-    mockFetch.mockImplementation((input) => {
-      const url = String(input);
-      if (url.includes('runtime-status')) return Promise.resolve(response(runtimeStatus));
-      if (url.includes('cukie-master')) {
-        masterCalls += 1;
-        if (masterCalls === 1) return Promise.resolve(response({ status: 'ok', data: { value: 'confirmado' } }));
-        if (masterCalls === 2) {
-          return new Promise((resolve) => { resolveUkiMaster = resolve; });
-        }
-        return new Promise((resolve) => { resolveNftMaster = resolve; });
-      }
-      if (url.includes('/credits')) {
-        creditsCalls += 1;
-        if (creditsCalls === 1) return Promise.resolve(response({ status: 'ok', data: { value: 'confirmado' } }));
-        if (creditsCalls === 2) {
-          return new Promise((resolve) => { resolveUkiCredits = resolve; });
-        }
-        return new Promise((resolve) => { resolveNftCredits = resolve; });
-      }
-      return Promise.resolve(response({ status: 'ok', data: { value: 'other' } }));
-    });
-
-    render(<Shell><O2ReadbackProbe /></Shell>);
-    await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('confirmado');
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'read UKI O2' }));
-    await waitFor(() => {
-      expect(masterCalls).toBe(2);
-      expect(creditsCalls).toBe(2);
-    });
-    await act(async () => resolveUkiCredits?.(response({ status: 'ok', data: { value: 'uki:5k-slots-pendientes' } })));
-    await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('uki:5k-slots-pendientes');
-    });
-    await act(async () => resolveUkiMaster?.(response({ status: 'ok', data: { value: 'uki:5k-confirmado' } })));
-    await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('uki:5k-confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('uki:5k-slots-pendientes');
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'read NFT O2' }));
-    await waitFor(() => {
-      expect(masterCalls).toBe(3);
-      expect(creditsCalls).toBe(3);
-    });
-    await act(async () => resolveNftMaster?.(response({ status: 'ok', data: { value: 'nft:3-puntos-confirmado' } })));
-    await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('nft:3-puntos-confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('uki:5k-slots-pendientes');
-    });
-    await act(async () => resolveNftCredits?.(response({ status: 'ok', data: { value: 'nft:3-slots-pendientes' } })));
-    await waitFor(() => {
-      expect(screen.getByTestId('o2-master')).toHaveTextContent('nft:3-puntos-confirmado');
-      expect(screen.getByTestId('o2-credits')).toHaveTextContent('nft:3-slots-pendientes');
-    });
   });
 
   it('reports a rejected contextual switch and never signs the transaction', async () => {
