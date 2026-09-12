@@ -315,7 +315,7 @@ La evidencia detallada y las tareas propietarias se enlazan en los lotes siguien
 | A2 | Aviso tras confirmar embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |
 | A3 | Nombre y wallet del embajador | Desplegado main426/staging428 | Comprobación positiva autenticada. |
 | O1 | Partidas diarias disponibles con Cukies propios elegibles | Desplegado · [PR442](https://github.com/fgomezserna/cukies-hub/pull/442) `44ff9e7c` · 12-Sep 12:24 UTC | 2368 tests, tipos, lint y Mongo real correctos. Web e indexador servidos, health/ready 200; consulta real: al menos 62 partidas de 11 Cukies y 1 pendiente. Contador visible en desktop y móvil; falta observar una partida personal y su consumo. [Evidencia](evidence/2026-09-12-own-cukie-quota.json). |
-| O2 | Saldo, cupos y avisos | Parcial · PR425 | Comprobación conjunta autenticada. |
+| O2 | Actualización de saldo UKI, cupos y avisos tras staking o retirada | Corrección parcial desplegada · PR425; alcance aclarado el 12-Sep | Comprobar que una operación nueva confirmada actualiza saldo, estado de cupos y aviso coherentemente, sin recargar. PR425 evita mostrar cupos/umbrales obsoletos durante el recálculo; no acredita el recorrido completo. La prueba del 11-Sep carecía de sesión (API 401). Verificación técnica a cargo de L1/coordinador; no falta una decisión del usuario ni puede darse por resuelto. |
 
 | Lote | Cobertura y resultado exigido | Issue y tarea responsable | Estado, rama y destino |
 | --- | --- | --- | --- |
