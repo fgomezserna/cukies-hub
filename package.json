@@ -23,6 +23,8 @@
     "guard:staging": "node scripts/assert-staging-only.mjs",
     "guard:staging:deploy": "node scripts/staging-deploy-guard.mjs",
     "guard:staging:test": "node --test scripts/assert-staging-only.test.mjs scripts/assert-legacy-indexer.test.mjs scripts/docker-compose-coolify.test.mjs scripts/staging-deploy-guard.test.mjs",
+    "legacy:replica": "node scripts/legacy-staging-replica.mjs",
+    "legacy:replica:test": "node --test scripts/legacy-staging-replica.test.mjs",
     "test:ux-contract": "node --test scripts/verify-customer-ux-contract.test.mjs",
     "staging:bridge:verify-local": "node scripts/verify-staging-bridge-local.mjs",
     "staging:cukie-master:verify-local": "node scripts/verify-staging-cukie-master-local.mjs",
