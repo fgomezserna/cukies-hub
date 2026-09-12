@@ -296,5 +296,14 @@
     "421": "https://github.com/fgomezserna/cukies-hub/issues/421#issuecomment-5646071158",
     "423": "https://github.com/fgomezserna/cukies-hub/issues/423#issuecomment-5646071366",
     "424": "https://github.com/fgomezserna/cukies-hub/issues/424#issuecomment-5646071565"
-  }
+  },
+  "progress": [
+    {
+      "reportedAt": "2026-09-12T13:10:19.245334+00:00",
+      "lane": "D12-4",
+      "sourceThreadId": "01a095b2-4772-7df0-afb8-db9254e56135",
+      "reportedObservation": "The exact active invitation returned HTTP503 ten times and later HTTP200 without changes. Production health identifies d1a71495.",
+      "verificationBoundary": "Reported by implementation task; root requested effective runtime environment presence and server-side RPC evidence before attributing root cause. No fix delivered yet."
+    }
+  ]
 }
