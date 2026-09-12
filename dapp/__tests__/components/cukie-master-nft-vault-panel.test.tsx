@@ -599,6 +599,11 @@ describe('CukieMasterNftVaultPanel', () => {
       chainId: 97,
       configurations: [],
     };
+    const convergedCredits = {
+      walletNormalized: wallet,
+      chainId: 97,
+      configurations: [{ route: 'nft', ordinal: 1, eligibilityEpoch: 1, status: 'active' }],
+    };
     let masterCalls = 0;
     let creditsCalls = 0;
     const resolveReadbackMasters: Array<(value: ReturnType<typeof response>) => void> = [];
@@ -668,6 +673,31 @@ describe('CukieMasterNftVaultPanel', () => {
 
     expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('0');
     expect(localStorage.length).toBe(1);
+
+    const pendingMasterReadbacks = resolveReadbackMasters.splice(0);
+    const pendingCreditsReadbacks = resolveReadbackCredits.splice(0);
+    expect(pendingMasterReadbacks.length).toBeGreaterThan(0);
+    expect(pendingCreditsReadbacks.length).toBeGreaterThan(0);
+    await act(async () => {
+      pendingMasterReadbacks.forEach((resolve) => resolve(response(masterData)));
+      pendingCreditsReadbacks.forEach((resolve) => resolve(response(convergedCredits)));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('projection-state')).toHaveTextContent('idle');
+      expect(screen.getByTestId('projection-credits-slots')).toHaveTextContent('1');
+      expect(localStorage.length).toBe(0);
+    });
+
+    const settledMasterCalls = masterCalls;
+    const settledCreditsCalls = creditsCalls;
+    await act(async () => {
+      view.rerender(<><CukieMasterNftVaultPanel /><ProjectionCacheProbe /></>);
+    });
+    await waitFor(() => {
+      expect(masterCalls).toBe(settledMasterCalls);
+      expect(creditsCalls).toBe(settledCreditsCalls);
+      expect(localStorage.length).toBe(0);
+    });
   });
 
   it('muestra el depósito confirmado por RPC antes de que termine la proyección API y mantiene el lock', async () => {
