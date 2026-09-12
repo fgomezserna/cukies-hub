@@ -246,7 +246,7 @@
       "worktree": "/Users/fgomezserna/.codex/worktrees/17f5/cukies-hub",
       "model": "gpt-5.6-luna",
       "thinking": "max",
-      "statusObserved": "active",
+      "statusObserved": "completed",
       "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
     },
     {
@@ -257,7 +257,7 @@
       "worktree": "/Users/fgomezserna/.codex/worktrees/c700/cukies-hub",
       "model": "gpt-5.6-luna",
       "thinking": "max",
-      "statusObserved": "active",
+      "statusObserved": "completed",
       "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
     },
     {
@@ -269,7 +269,8 @@
       "model": "gpt-5.6-luna",
       "thinking": "max",
       "statusObserved": "active",
-      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
+      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c",
+      "branch": "codex/o2-readback-coherence"
     },
     {
       "lane": "D12-4",
@@ -279,11 +280,22 @@
       "worktree": "/Users/fgomezserna/.codex/worktrees/2b5e/cukies-hub",
       "model": "gpt-5.6-luna",
       "thinking": "max",
+      "statusObserved": "completed",
+      "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
+    },
+    {
+      "lane": "D12-5",
+      "title": "12-Sep · Desbloquear cortes por identidad…",
+      "threadId": "01a09621-6fb0-75c1-bce1-2d3caa5d8296",
+      "hostId": "local",
+      "worktree": "/Users/fgomezserna/.codex/worktrees/acfe/cukies-hub",
+      "model": "gpt-5.6-luna",
+      "thinking": "max",
       "statusObserved": "active",
       "reviewAndDeployOwner": "01a07aec-6bc1-7203-8f43-357ed4b8931c"
     }
   ],
-  "taskStatusObservedAt": "2026-09-12T13:20:00Z",
+  "taskStatusObservedAt": "2026-09-12T15:51:28.229747+00:00",
   "automation": {
     "id": "coordinar-pruebas-cukies-12-sep",
     "status": "ACTIVE",
@@ -528,6 +540,62 @@
         ]
       },
       "verificationBoundary": "Read-only public endpoints and minimal invitation-code Mongo projection. No public-name values, wallets, credentials or profile mutations recorded. Existing confirmed-attribution behavior is regression-tested, not newly mutated as QA."
+    },
+    {
+      "reportedAt": "2026-09-12T14:43:56.249580+00:00",
+      "lane": "D12-1/D12-3",
+      "reportedObservation": "PR449 deployment34699288472 succeeded. Public web and game health report fb841f84; release state records exact web/game images and live game container is healthy. PR450 merged staging af41cce6 at14:43:08UTC, beginning C2/notice deployment.",
+      "verificationBoundary": "Deployment and game readiness are verified; no personal-wallet gameplay or historical reward repair performed. O2 remains a separate active implementation."
+    },
+    {
+      "reportedAt": "2026-09-12T14:47:36.473863+00:00",
+      "lane": "D12-3",
+      "reportedObservation": "O2 root review identified singleton NFT expectation overwrites, stale automatic-query closure publication, and a deposit fixture incorrectly reducing NFT points. Worker requested to fix these bounded cases before acceptance. C2 deployment34700104183 continues separately.",
+      "verificationBoundary": "These are implementation/review findings, not a request for human validation. No runtime or accounting mutation."
+    },
+    {
+      "reportedAt": "2026-09-12T14:51:13.639620+00:00",
+      "lane": "D12-3/C2 runtime",
+      "reportedObservation": "Read-only live staging audit found competition-credit scheduler HTTP503 and runtime DOMAIN_CONFLICT,593 consecutive failures,lastSuccess09:47:40UTC. No runs cover current14:48UTC settlement. Master/game/accounting heartbeats remain successful around14:50UTC; gates and secret presence are configured. Root diagnosing before operational closure.",
+      "verificationBoundary": "Only whitelisted metadata/log codes and Mongo projections; no secrets, resets, backfills or gate changes."
+    },
+    {
+      "reportedAt": "2026-09-12T14:56:39.042020+00:00",
+      "lane": "D12-3/C2 runtime",
+      "reportedObservation": "PR450 af41cce6 deployment34700104183 completed successfully and exact SHA served. Runtime source failure predates it: one open nft_lock_asset_identity_invalid at09:47:47UTC for canonical cukies:97:<collection>:98000002, which parseCukiesAssetLookup rejects because identity contains colons. Three TOKEN_V2 Transfer dead letters11-Sep for98000001/3/4 retain canonical-owner mismatch. These remain separate implementation/operational work before credit-source closure.",
+      "verificationBoundary": "Canonical asset identity and sanitized error codes only; no profile/secret reads and no removal or reconstruction of historical records."
+    },
+    {
+      "reportedAt": "2026-09-12T15:02:51.620699+00:00",
+      "lane": "D12-5",
+      "reportedObservation": "Created native Luna Max task01a09621-6fb0-75c1-bce1-2d3caa5d8296 in isolatedacfe worktree for canonical NFT identity/source-integrity blocker of C2. O2 worker remains sole owner of provider/panel. D12-1 code remains frozen; authenticated new-game QA lacks an established controlled wallet and is also blocked by credit-source health.",
+      "verificationBoundary": "No confirmed new-game or claim evidence. No historical repair or secret exposure."
+    },
+    {
+      "reportedAt": "2026-09-12T15:07:21.113211+00:00",
+      "lane": "D12-1/D12-3",
+      "reportedObservation": "Read-only aggregate found zero new game_economy_sessions since deployment14:41:05UTC; operational game/reward QA not claimed. O2 candidatebe726839 is based on stagingaf41cce6 and worker is finishing focal tests before PR/root final checks.",
+      "verificationBoundary": "No user-wallet operations or historical repair; O2 candidate is not yet reviewed/merged/deployed."
+    },
+    {
+      "reportedAt": "2026-09-12T15:51:28.229747+00:00",
+      "lane": "D12-5",
+      "sourceThreadId": "01a09621-6fb0-75c1-bce1-2d3caa5d8296",
+      "reportedObservation": "PR452 candidate07255a28 accepted by root code review. Canonical NFT identity matches chain/collection/token/document/owner and fencing remains. Route-scoped NFT incidents no longer block UKI.139 focal tests reported passing.",
+      "verificationBoundary": "Root final checks, merge and deployment pending. Existing false incident still open; exact-selector read-only operational dry-run in preparation. No replay, lock revival, historical credit/game recovery or remote mutation performed."
+    },
+    {
+      "reportedAt": "2026-09-12T15:51:28.229747+00:00",
+      "lane": "D12-3",
+      "sourceThreadId": "01a095b3-7ec0-7280-8d5f-694bf44a18bc",
+      "reportedObservation": "Independent Astra review of O2 8d291425 found two issues: hydration can skip joint Master/Credits proof, and superseded operation expectations can block convergence indefinitely. Root sent bounded corrections and integration regression requirements to original task.",
+      "verificationBoundary": "Code-path findings; no real transaction reproduction. Reviewer interrupted after completion. O2 remains technical work, not human-validation-only."
+    },
+    {
+      "reportedAt": "2026-09-12T15:54:07.581039+00:00",
+      "lane": "D12-5",
+      "reportedObservation": "Root integration b14dff86 passed all275 suites/2410 tests, typecheck and lint. Existing my-cukies-panel.tsx:513 lint warning remains. No product code changes after tests.",
+      "verificationBoundary": "Merge/deploy and exact live false-incident resolution remain pending."
     }
   ]
 }

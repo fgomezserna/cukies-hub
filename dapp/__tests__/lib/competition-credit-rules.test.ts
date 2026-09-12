@@ -11,6 +11,7 @@ import {
   buildCreditSourceHealthEvidenceHash,
   classifyCreditSourceHealth,
   creditSourceBlockingEventFilter,
+  creditSourceChainIntegrityIncidentFilter,
   creditSourceCursorIsHealthy,
   isAncillaryNftCreditEvent,
 } from "@/lib/uki-economy/credits/source-health";
@@ -348,6 +349,51 @@ describe("competition credit rules", () => {
       $or: [
         { contractAlias: 'CUKIE_MASTER_NFT_VAULT' },
         { contractAlias: 'TOKEN_V2', eventName: { $ne: 'Transfer' } },
+      ],
+    });
+  });
+
+  it('scopes NFT lock incidents away from UKI while retaining global NFT blocks', () => {
+    const ukiFilter = creditSourceChainIntegrityIncidentFilter({
+      route: 'uki',
+      aliases: ['UKI_STAKING', 'VESTING_VAULT'],
+    });
+    const nftFilter = creditSourceChainIntegrityIncidentFilter({
+      route: 'nft',
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+    });
+
+    expect(ukiFilter).toEqual({
+      status: 'open',
+      $or: [
+        { route: 'uki' },
+        { scope: 'uki' },
+        { contractAlias: { $in: ['UKI_STAKING', 'VESTING_VAULT'] } },
+        {
+          chain: 'BSC',
+          route: { $exists: false },
+          scope: { $exists: false },
+          contractAlias: { $exists: false },
+          $and: [
+            { type: { $regex: /canonical|economy|vesting|staking|nft|cukie|credit/i } },
+            { type: { $not: /^nft_lock_/i } },
+          ],
+        },
+      ],
+    });
+    expect(nftFilter).toEqual({
+      status: 'open',
+      $or: [
+        { route: 'nft' },
+        { scope: 'nft' },
+        { contractAlias: { $in: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'] } },
+        {
+          chain: 'BSC',
+          route: { $exists: false },
+          scope: { $exists: false },
+          contractAlias: { $exists: false },
+          type: { $regex: /canonical|economy|vesting|staking|nft|cukie|credit/i },
+        },
       ],
     });
   });
