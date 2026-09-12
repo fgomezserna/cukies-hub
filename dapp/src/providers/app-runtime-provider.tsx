@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { notifyManager, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { usePathname } from 'next/navigation';
 
@@ -22,6 +22,14 @@ import type { AppRuntimeServiceStatus, AppRuntimeStatus } from '@/lib/app-runtim
 import { UKI_PRESALE_CHAIN_ID } from '@/components/landing/sale-config';
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 import type { AccountSummary } from '@/lib/account-summary-types';
+import {
+  masterProjectionMatchesPendingOperation,
+} from '@/lib/nft-vault/pending-reconciliation';
+import {
+  canonicalNftVaultAssetId,
+  pendingNftVaultOperationAssetKey,
+  type NftVaultPendingOperation,
+} from '@/lib/nft-vault/pending-operations';
 
 export type AppRuntimeResource =
   | 'runtime-status'
@@ -62,6 +70,23 @@ export type AppRuntimeStakingExpectation = {
   stakedUkiRaw: string;
 };
 
+export type AppRuntimeNftExpectation = Pick<
+  NftVaultPendingOperation,
+  | 'version'
+  | 'chainId'
+  | 'walletAddress'
+  | 'vaultAddress'
+  | 'assetId'
+  | 'collectionAddress'
+  | 'tokenId'
+  | 'depositEpoch'
+  | 'action'
+  | 'phase'
+  | 'txHash'
+  | 'createdAt'
+  | 'updatedAt'
+>;
+
 export type AppRuntimeProjectionSync = {
   state: 'idle' | 'syncing' | 'delayed';
   wallet: string | null;
@@ -70,6 +95,19 @@ export type AppRuntimeProjectionSync = {
   attempt: number;
   error: 'offline' | 'request_failed' | 'not_converged' | null;
 };
+
+const MAX_NFT_PROJECTION_EXPECTATIONS = 16;
+
+class ProjectionReadSupersededError extends Error {
+  constructor() {
+    super('PROJECTION_READ_SUPERSEDED');
+    this.name = 'ProjectionReadSupersededError';
+  }
+}
+
+function isProjectionReadSupersededError(error: unknown): error is ProjectionReadSupersededError {
+  return error instanceof ProjectionReadSupersededError;
+}
 
 type RuntimeContextValue = {
   address: string | null;
@@ -92,6 +130,11 @@ type RuntimeContextValue = {
   };
   requestAccountSummary: () => void;
   projectionSync: AppRuntimeProjectionSync;
+  projectionGeneration: number;
+  projectionIdentity: string;
+  isProjectionReadCurrent: (wallet: string, chainId: number | undefined, generation: number, identity?: string) => boolean;
+  registerNftExpectation: (expectation: AppRuntimeNftExpectation) => void;
+  unregisterNftExpectation: (expectation: AppRuntimeNftExpectation) => void;
   registerStakingExpectation: (expectation: AppRuntimeStakingExpectation) => void;
   refresh: () => Promise<unknown>;
   refreshAfterTransaction: (resource?: AppRuntimeResource) => Promise<void>;
@@ -217,6 +260,50 @@ function canonicalRaw(value: unknown): value is string {
   return typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value);
 }
 
+function nftExpectationKey(expectation: Pick<AppRuntimeNftExpectation, 'chainId' | 'walletAddress' | 'vaultAddress' | 'assetId' | 'collectionAddress' | 'tokenId' | 'action' | 'txHash'>) {
+  return [
+    expectation.chainId,
+    expectation.walletAddress.toLowerCase(),
+    expectation.vaultAddress.toLowerCase(),
+    pendingNftVaultOperationAssetKey(expectation),
+    expectation.collectionAddress.toLowerCase(),
+    expectation.tokenId,
+    expectation.action,
+    expectation.txHash.toLowerCase(),
+  ].join(':');
+}
+
+function nftExpectationAssetKey(expectation: Pick<AppRuntimeNftExpectation, 'chainId' | 'walletAddress' | 'vaultAddress' | 'assetId' | 'collectionAddress' | 'tokenId'>) {
+  return [
+    expectation.chainId,
+    expectation.walletAddress.toLowerCase(),
+    expectation.vaultAddress.toLowerCase(),
+    pendingNftVaultOperationAssetKey(expectation),
+    expectation.collectionAddress.toLowerCase(),
+    expectation.tokenId,
+  ].join(':');
+}
+
+function nftExpectationsEqual(
+  left: AppRuntimeNftExpectation | null,
+  right: AppRuntimeNftExpectation,
+  wallet: string,
+) {
+  return Boolean(
+    left
+    && left.walletAddress.toLowerCase() === wallet
+    && left.chainId === right.chainId
+    && left.vaultAddress.toLowerCase() === right.vaultAddress.toLowerCase()
+    && left.assetId === right.assetId
+    && left.collectionAddress.toLowerCase() === right.collectionAddress.toLowerCase()
+    && left.tokenId === right.tokenId
+    && left.depositEpoch === right.depositEpoch
+    && left.action === right.action
+    && left.phase === right.phase
+    && left.txHash.toLowerCase() === right.txHash.toLowerCase(),
+  );
+}
+
 function payloadMatchesIdentity(resource: string, payload: unknown, wallet: string, chainId: number) {
   if (!isRecord(payload)) return false;
   if (resource === 'dashboard') {
@@ -233,14 +320,15 @@ function payloadMatchesIdentity(resource: string, payload: unknown, wallet: stri
 function projectionMatches(
   master: unknown,
   credits: unknown,
-  expectedStakedUkiRaw: string,
+  expectedStakedUkiRaw?: string,
 ) {
   if (!isRecord(master) || !isRecord(credits)) return false;
   const routes = master.routes;
   if (!isRecord(routes) || !isRecord(routes.uki) || !isRecord(routes.nft)) return false;
   const uki = routes.uki;
   const ukiSource = isRecord(uki.source) ? uki.source : null;
-  if (!ukiSource || ukiSource.complete !== true || ukiSource.stakedUkiRaw !== expectedStakedUkiRaw) return false;
+  if (!ukiSource || ukiSource.complete !== true) return false;
+  if (expectedStakedUkiRaw !== undefined && ukiSource.stakedUkiRaw !== expectedStakedUkiRaw) return false;
   const masterRouteEntries = [routes.uki, routes.nft];
   if (!masterRouteEntries.every((route) => isRecord(route)
     && isRecord(route.source)
@@ -271,6 +359,10 @@ export function appRuntimeProjectionMatches(
   expectedStakedUkiRaw: string,
 ) {
   return canonicalRaw(expectedStakedUkiRaw) && projectionMatches(master, credits, expectedStakedUkiRaw);
+}
+
+export function appRuntimeReadbackMatches(master: unknown, credits: unknown) {
+  return projectionMatches(master, credits);
 }
 
 export function appRuntimeEndpoint(resource: AppRuntimeResource, wallet: string | null) {
@@ -343,11 +435,16 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     || pathname.startsWith('/cukie-master')
     || pathname.startsWith('/cukie-hodler')
     || pathname.startsWith('/cukies');
+  const projectionIdentity = `${address ?? ''}:${connectedAddressNormalized ?? ''}:${chainId ?? ''}:${sessionReady ? 'ready' : 'unready'}`;
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
   const projectionExpectationRef = useRef<AppRuntimeStakingExpectation | null>(null);
+  const nftExpectationsRef = useRef(new Map<string, AppRuntimeNftExpectation>());
   const projectionAbortRef = useRef<AbortController | null>(null);
   const projectionRunRef = useRef<Promise<void> | null>(null);
   const projectionIdentityRef = useRef<string | null>(null);
+  const currentProjectionIdentityRef = useRef(projectionIdentity);
+  const projectionGenerationRef = useRef(0);
+  const projectionIdentityTransitionRef = useRef<{ identity: string; previousGeneration: number } | null>(null);
   const currentAddressRef = useRef(address);
   const currentConnectedAddressRef = useRef(connectedAddressNormalized);
   const currentChainIdRef = useRef(chainId);
@@ -356,6 +453,24 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
   currentConnectedAddressRef.current = connectedAddressNormalized;
   currentChainIdRef.current = chainId;
   currentSessionReadyRef.current = sessionReady;
+  currentProjectionIdentityRef.current = projectionIdentity;
+  const isProjectionReadCurrent = useCallback((wallet: string, readChainId: number | undefined, generation: number, readIdentity?: string) => {
+    const normalizedWallet = wallet.toLowerCase();
+    const identityMatches = readIdentity === undefined || readIdentity === currentProjectionIdentityRef.current;
+    const generationMatches = projectionGenerationRef.current === generation
+      || Boolean(
+        readIdentity
+        && readIdentity === currentProjectionIdentityRef.current
+        && projectionIdentityTransitionRef.current?.identity === readIdentity
+        && projectionIdentityTransitionRef.current.previousGeneration === generation,
+      );
+    return identityMatches
+      && generationMatches
+      && currentAddressRef.current === normalizedWallet
+      && currentConnectedAddressRef.current === normalizedWallet
+      && currentSessionReadyRef.current
+      && (readChainId === undefined || currentChainIdRef.current === readChainId);
+  }, []);
   const [projectionSync, setProjectionSync] = useState<AppRuntimeProjectionSync>({
     state: 'idle',
     wallet: null,
@@ -431,14 +546,12 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   useEffect(() => {
-    if (online || !projectionExpectationRef.current) return;
+    if (online || (!projectionExpectationRef.current && nftExpectationsRef.current.size === 0)) return;
     projectionAbortRef.current?.abort();
     setProjectionSync((current) => current.state === 'idle'
       ? current
       : { ...current, state: 'delayed', error: 'offline' });
   }, [online]);
-
-  const projectionIdentity = `${address ?? ''}:${connectedAddressNormalized ?? ''}:${chainId ?? ''}:${sessionReady ? 'ready' : 'unready'}`;
 
   useEffect(() => {
     if (projectionIdentityRef.current === null) {
@@ -447,9 +560,13 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     }
     if (projectionIdentityRef.current === projectionIdentity) return;
     projectionIdentityRef.current = projectionIdentity;
+    const previousGeneration = projectionGenerationRef.current;
+    projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = { identity: projectionIdentity, previousGeneration };
     projectionAbortRef.current?.abort();
     projectionAbortRef.current = null;
     projectionExpectationRef.current = null;
+    nftExpectationsRef.current.clear();
     setProjectionSync({
       state: 'idle',
       wallet: null,
@@ -631,37 +748,63 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     targetChainId: number | null,
     syncSignal: AbortSignal,
     payloadChainId = targetChainId ?? configuredBscChain() ?? 0,
+    options: { publish?: boolean; generation?: number } = {},
   ) => {
     const canonical = canonicalResource(resource);
     const endpoint = appRuntimeEndpoint(canonical, wallet);
     const queryKey = [...appRuntimeQueryKey(canonical, wallet, targetChainId), endpoint, ''] as const;
-    return queryClient.fetchQuery({
-      queryKey,
-      queryFn: async ({ signal }) => {
-        const controller = new AbortController();
-        const abort = () => controller.abort();
-        signal.addEventListener('abort', abort, { once: true });
-        syncSignal.addEventListener('abort', abort, { once: true });
-        try {
-          const { response, body } = await fetchRuntime<{ status?: string; data?: unknown }>(endpoint, controller.signal);
-          if (!response.ok || (body.status !== undefined && body.status !== 'ok') || body.data === undefined || !payloadMatchesIdentity(canonical, body.data, wallet, payloadChainId)) {
-            throw new Error(`${canonical.toUpperCase()}_UNAVAILABLE`);
-          }
-          return body.data;
-        } finally {
-          signal.removeEventListener('abort', abort);
-          syncSignal.removeEventListener('abort', abort);
+    const fetchData = async (signal: AbortSignal) => {
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      signal.addEventListener('abort', abort, { once: true });
+      syncSignal.addEventListener('abort', abort, { once: true });
+      try {
+        const { response, body } = await fetchRuntime<{ status?: string; data?: unknown }>(endpoint, controller.signal);
+        if (!response.ok || (body.status !== undefined && body.status !== 'ok') || body.data === undefined || !payloadMatchesIdentity(canonical, body.data, wallet, payloadChainId)) {
+          throw new Error(`${canonical.toUpperCase()}_UNAVAILABLE`);
         }
-      },
-      staleTime: 0,
-      retry: false,
-    });
+        return body.data;
+      } finally {
+        signal.removeEventListener('abort', abort);
+        syncSignal.removeEventListener('abort', abort);
+      }
+    };
+    if (options.publish !== false) {
+      return queryClient.fetchQuery({
+        queryKey,
+        queryFn: ({ signal }) => fetchData(signal),
+        staleTime: 0,
+        retry: false,
+      });
+    }
+    if (options.generation !== undefined && projectionGenerationRef.current !== options.generation) {
+      throw new Error('PROJECTION_READBACK_SUPERSEDED');
+    }
+    return fetchData(syncSignal);
   }, [queryClient]);
 
-  const coordinateProjectionSync = useCallback(async () => {
+  const coordinateProjectionSync = useCallback(async (requestedGeneration = projectionGenerationRef.current) => {
     if (projectionRunRef.current) return projectionRunRef.current;
-    const expectation = projectionExpectationRef.current;
-    if (!expectation || !address || !sessionReady || address !== expectation.wallet || !runtimeRouteActive) return;
+    const stakingExpectation = projectionExpectationRef.current;
+    const nftExpectations = [...nftExpectationsRef.current.values()];
+    const expectationWallet = stakingExpectation?.wallet ?? nftExpectations[0]?.walletAddress.toLowerCase();
+    const expectationChainId = stakingExpectation?.chainId ?? nftExpectations[0]?.chainId;
+    const nftExpectationsCurrent = () => (
+      nftExpectations.length === nftExpectationsRef.current.size
+      && nftExpectations.every((expectation) => (
+        nftExpectationsRef.current.get(nftExpectationKey(expectation)) === expectation
+      ))
+    );
+    if (
+      (!stakingExpectation && nftExpectations.length === 0)
+      || !expectationWallet
+      || expectationChainId === undefined
+      || !address
+      || !sessionReady
+      || address !== expectationWallet
+      || !runtimeRouteActive
+      || requestedGeneration !== projectionGenerationRef.current
+    ) return;
     const controller = new AbortController();
     projectionAbortRef.current?.abort();
     projectionAbortRef.current = controller;
@@ -675,7 +818,11 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       }, PROJECTION_SYNC_DEADLINE_MS);
       try {
         for (let attempt = 1; attempt <= PROJECTION_SYNC_BACKOFF_MS.length + 1; attempt += 1) {
-          if (projectionExpectationRef.current !== expectation) return;
+          if (requestedGeneration !== projectionGenerationRef.current) return;
+          if (
+            projectionExpectationRef.current !== stakingExpectation
+            || !nftExpectationsCurrent()
+          ) return;
           if (controller.signal.aborted && !deadlineReached) return;
           if (Date.now() - startedAt >= PROJECTION_SYNC_DEADLINE_MS) {
             deadlineReached = true;
@@ -686,23 +833,87 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
             lastError = 'offline';
             break;
           }
-          setProjectionSync((current) => current.wallet === expectation.wallet
-            ? { ...current, state: 'syncing', attempt, error: null }
+          setProjectionSync((current) => current.wallet === expectationWallet
+            ? {
+              ...current,
+              state: 'syncing',
+              attempt,
+              error: null,
+              expectedStakedUkiRaw: stakingExpectation?.stakedUkiRaw ?? null,
+            }
             : current);
           try {
-            const [masterResult, creditsResult] = await Promise.allSettled([
-              fetchCanonicalResource('master', expectation.wallet, expectation.chainId, controller.signal),
-              fetchCanonicalResource('credits', expectation.wallet, expectation.chainId, controller.signal),
-              // Dashboard is refreshed with the group, but an unavailable or
-              // partial module must not mask fundamental Master+Credits proof.
-              fetchCanonicalResource('dashboard', expectation.wallet, null, controller.signal, expectation.chainId),
-            ]).then(([master, credits]) => [master, credits] as const);
-            if (projectionExpectationRef.current !== expectation || (controller.signal.aborted && !deadlineReached)) return;
+            const [masterResult, creditsResult, dashboardResult] = await Promise.allSettled([
+              fetchCanonicalResource(
+                'master',
+                expectationWallet,
+                expectationChainId,
+                controller.signal,
+                expectationChainId,
+                { publish: false, generation: requestedGeneration },
+              ),
+              fetchCanonicalResource(
+                'credits',
+                expectationWallet,
+                expectationChainId,
+                controller.signal,
+                expectationChainId,
+                { publish: false, generation: requestedGeneration },
+              ),
+              // Dashboard is part of the transaction readback group, but it
+              // must not prevent the Master+Credits proof from committing.
+              fetchCanonicalResource(
+                'dashboard',
+                expectationWallet,
+                null,
+                controller.signal,
+                expectationChainId,
+                { publish: false, generation: requestedGeneration },
+              ),
+            ]);
+            if (
+              requestedGeneration !== projectionGenerationRef.current
+              || projectionExpectationRef.current !== stakingExpectation
+              || !nftExpectationsCurrent()
+              || (controller.signal.aborted && !deadlineReached)
+            ) return;
             if (masterResult.status !== 'fulfilled' || creditsResult.status !== 'fulfilled') {
               throw new Error('PROJECTION_RESOURCE_UNAVAILABLE');
             }
-            if (appRuntimeProjectionMatches(masterResult.value, creditsResult.value, expectation.stakedUkiRaw)) {
-              projectionExpectationRef.current = null;
+            const slotsMatch = stakingExpectation
+              ? appRuntimeProjectionMatches(masterResult.value, creditsResult.value, stakingExpectation.stakedUkiRaw)
+              : appRuntimeReadbackMatches(masterResult.value, creditsResult.value);
+            const nftMatch = nftExpectations.every((expectation) => (
+              masterProjectionMatchesPendingOperation(expectation, masterResult.value)
+            ));
+            if (slotsMatch && nftMatch) {
+              const masterQueryKey = [
+                ...appRuntimeQueryKey('master', expectationWallet, expectationChainId),
+                appRuntimeEndpoint('master', expectationWallet),
+                '',
+              ] as const;
+              const creditsQueryKey = [
+                ...appRuntimeQueryKey('credits', expectationWallet, expectationChainId),
+                appRuntimeEndpoint('credits', expectationWallet),
+                '',
+              ] as const;
+              const dashboardQueryKey = [
+                ...appRuntimeQueryKey('dashboard', expectationWallet, null),
+                appRuntimeEndpoint('dashboard', expectationWallet),
+                '',
+              ] as const;
+              notifyManager.batch(() => {
+                queryClient.setQueryData(masterQueryKey, masterResult.value);
+                queryClient.setQueryData(creditsQueryKey, creditsResult.value);
+                if (dashboardResult.status === 'fulfilled') {
+                  queryClient.setQueryData(dashboardQueryKey, dashboardResult.value);
+                }
+              });
+              if (projectionExpectationRef.current === stakingExpectation) projectionExpectationRef.current = null;
+              for (const expectation of nftExpectations) {
+                const key = nftExpectationKey(expectation);
+                if (nftExpectationsRef.current.get(key) === expectation) nftExpectationsRef.current.delete(key);
+              }
               setProjectionSync({
                 state: 'idle',
                 wallet: null,
@@ -715,7 +926,12 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
             }
             lastError = 'not_converged';
           } catch {
-            if (controller.signal.aborted && !deadlineReached || projectionExpectationRef.current !== expectation) return;
+            if (
+              (controller.signal.aborted && !deadlineReached)
+              || requestedGeneration !== projectionGenerationRef.current
+              || projectionExpectationRef.current !== stakingExpectation
+              || !nftExpectationsCurrent()
+            ) return;
             lastError = 'request_failed';
           }
           if (deadlineReached) break;
@@ -727,8 +943,13 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       } finally {
         window.clearTimeout(deadlineTimer);
       }
-      if (projectionExpectationRef.current !== expectation || (controller.signal.aborted && !deadlineReached)) return;
-      setProjectionSync((current) => current.wallet === expectation.wallet
+      if (
+        requestedGeneration !== projectionGenerationRef.current
+        || projectionExpectationRef.current !== stakingExpectation
+        || !nftExpectationsCurrent()
+        || (controller.signal.aborted && !deadlineReached)
+      ) return;
+      setProjectionSync((current) => current.wallet === expectationWallet
         ? { ...current, state: 'delayed', attempt: PROJECTION_SYNC_BACKOFF_MS.length + 1, error: lastError ?? 'not_converged' }
         : current);
     })();
@@ -738,7 +959,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     });
     projectionRunRef.current = runPromise;
     return runPromise;
-  }, [address, fetchCanonicalResource, online, runtimeRouteActive, sessionReady]);
+  }, [address, fetchCanonicalResource, online, queryClient, runtimeRouteActive, sessionReady]);
 
   const registerStakingExpectation = useCallback((expectation: AppRuntimeStakingExpectation) => {
     const currentAddress = currentAddressRef.current;
@@ -751,6 +972,8 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       || expectation.wallet.toLowerCase() !== currentAddress
       || currentChainId !== expectation.chainId
       || !canonicalRaw(expectation.stakedUkiRaw)) return;
+    projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = null;
     projectionAbortRef.current?.abort();
     projectionRunRef.current = null;
     const nextExpectation = {
@@ -769,6 +992,89 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     });
   }, []);
 
+  const registerNftExpectation = useCallback((expectation: AppRuntimeNftExpectation) => {
+    const currentAddress = currentAddressRef.current;
+    const currentConnectedAddress = currentConnectedAddressRef.current;
+    const currentChainId = currentChainIdRef.current;
+    if (!currentAddress
+      || !currentSessionReadyRef.current
+      || !currentConnectedAddress
+      || currentConnectedAddress !== currentAddress
+      || expectation.walletAddress.toLowerCase() !== currentAddress
+      || currentChainId !== expectation.chainId
+      || expectation.phase !== 'syncing_projection'
+      || !/^0x[0-9a-f]{64}$/i.test(expectation.txHash)
+      || !canonicalNftVaultAssetId(expectation)
+      || (expectation.depositEpoch !== undefined && !canonicalRaw(expectation.depositEpoch))) return;
+    const normalizedExpectation = {
+      ...expectation,
+      walletAddress: currentAddress,
+    } satisfies AppRuntimeNftExpectation;
+    const expectationKey = nftExpectationKey(normalizedExpectation);
+    if (nftExpectationsEqual(
+      nftExpectationsRef.current.get(expectationKey) ?? null,
+      normalizedExpectation,
+      currentAddress,
+    )) return;
+    const expectationAssetKey = nftExpectationAssetKey(normalizedExpectation);
+    for (const [key, current] of nftExpectationsRef.current) {
+      if (nftExpectationAssetKey(current) === expectationAssetKey && key !== expectationKey) {
+        nftExpectationsRef.current.delete(key);
+      }
+    }
+    projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = null;
+    projectionAbortRef.current?.abort();
+    projectionRunRef.current = null;
+    nftExpectationsRef.current.set(expectationKey, normalizedExpectation);
+    while (nftExpectationsRef.current.size > MAX_NFT_PROJECTION_EXPECTATIONS) {
+      const oldestKey = nftExpectationsRef.current.keys().next().value;
+      if (oldestKey === undefined) break;
+      nftExpectationsRef.current.delete(oldestKey);
+    }
+    setProjectionSync({
+      state: 'syncing',
+      wallet: currentAddress,
+      chainId: expectation.chainId,
+      expectedStakedUkiRaw: projectionExpectationRef.current?.stakedUkiRaw ?? null,
+      attempt: 0,
+      error: null,
+    });
+  }, []);
+
+  const unregisterNftExpectation = useCallback((expectation: AppRuntimeNftExpectation) => {
+    const currentAddress = currentAddressRef.current;
+    const currentConnectedAddress = currentConnectedAddressRef.current;
+    const currentChainId = currentChainIdRef.current;
+    if (!currentAddress
+      || !currentSessionReadyRef.current
+      || !currentConnectedAddress
+      || currentConnectedAddress !== currentAddress
+      || expectation.walletAddress.toLowerCase() !== currentAddress
+      || currentChainId !== expectation.chainId) return;
+    const normalizedExpectation = {
+      ...expectation,
+      walletAddress: currentAddress,
+    } satisfies AppRuntimeNftExpectation;
+    const expectationKey = nftExpectationKey(normalizedExpectation);
+    if (!nftExpectationsRef.current.has(expectationKey)) return;
+    projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = null;
+    projectionAbortRef.current?.abort();
+    projectionAbortRef.current = null;
+    projectionRunRef.current = null;
+    nftExpectationsRef.current.delete(expectationKey);
+    if (projectionExpectationRef.current || nftExpectationsRef.current.size > 0) return;
+    setProjectionSync({
+      state: 'idle',
+      wallet: null,
+      chainId: null,
+      expectedStakedUkiRaw: null,
+      attempt: 0,
+      error: null,
+    });
+  }, []);
+
   const refresh = useCallback(() => runRefresh(), [runRefresh]);
   const invalidate = useCallback((resource?: AppRuntimeResource) => {
     const resources = resource ? new Set([canonicalResource(resource)]) : undefined;
@@ -776,16 +1082,46 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
   }, [runRefresh]);
 
   const refreshAfterTransaction = useCallback(async (resource?: AppRuntimeResource) => {
-    const resourceRefresh = runRefresh(transactionResources(resource), true, true);
-    if (projectionExpectationRef.current) {
-      await Promise.allSettled([coordinateProjectionSync(), resourceRefresh]);
+    const requestedResources = transactionResources(resource);
+    const canonical = resource ? canonicalResource(resource) : null;
+    const projectionExpectationActive = Boolean(projectionExpectationRef.current || nftExpectationsRef.current.size > 0);
+    const coordinatedReadback = projectionExpectationActive && (
+      !resource || canonical === 'master' || canonical === 'credits'
+    );
+    if (!coordinatedReadback) {
+      const backgroundResources = projectionExpectationActive
+        ? new Set([...requestedResources].filter((item) => item !== 'master' && item !== 'credits'))
+        : requestedResources;
+      await runRefresh(backgroundResources, true, true);
       return;
     }
-    await resourceRefresh;
-  }, [coordinateProjectionSync, runRefresh]);
+
+    const generation = ++projectionGenerationRef.current;
+    projectionIdentityTransitionRef.current = null;
+    projectionAbortRef.current?.abort();
+    projectionRunRef.current = null;
+    const currentAddress = currentAddressRef.current;
+    const isPairQuery = ({ queryKey }: { queryKey: readonly unknown[] }) => (
+      isRuntimeResourceQuery(queryKey)
+      && queryKey[2] === currentAddress
+      && (queryKey[4] === 'master' || queryKey[4] === 'credits')
+    );
+    // A query started before the receipt belongs to the previous generation.
+    // Cancel/revert it immediately and mark it stale without waiting for its
+    // transport promise; the live guard in useAppRuntimeResource handles RPCs
+    // that ignore AbortSignal.
+    void queryClient.cancelQueries({ predicate: isPairQuery });
+    void queryClient.invalidateQueries({ predicate: isPairQuery, refetchType: 'none' });
+    if (generation !== projectionGenerationRef.current) return;
+
+    const backgroundResources = new Set([...requestedResources]
+      .filter((item) => item !== 'master' && item !== 'credits'));
+    const resourceRefresh = runRefresh(backgroundResources, true, true);
+    await Promise.allSettled([coordinateProjectionSync(generation), resourceRefresh]);
+  }, [coordinateProjectionSync, queryClient, runRefresh]);
 
   useEffect(() => {
-    if (!projectionExpectationRef.current || projectionSync.state === 'idle' || !runtimeRouteActive) return;
+    if ((!projectionExpectationRef.current && nftExpectationsRef.current.size === 0) || projectionSync.state === 'idle' || !runtimeRouteActive) return;
     const timer = window.setInterval(() => { void coordinateProjectionSync(); }, 30_000);
     return () => window.clearInterval(timer);
   }, [coordinateProjectionSync, projectionSync.state, runtimeRouteActive]);
@@ -852,6 +1188,11 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     },
     requestAccountSummary,
     projectionSync,
+    projectionGeneration: projectionGenerationRef.current,
+    projectionIdentity,
+    isProjectionReadCurrent,
+    registerNftExpectation,
+    unregisterNftExpectation,
     registerStakingExpectation,
     refresh,
     refreshAfterTransaction,
@@ -860,7 +1201,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     readiness,
     switchTo,
     queryKey: (resource, wallet = address, targetChainId = expectedChainId('dashboard')) => appRuntimeQueryKey(resource, wallet?.toLowerCase() ?? null, targetChainId ?? null),
-  }), [accountSummaryQuery.data, accountSummaryQuery.error, accountSummaryQuery.isError, accountSummaryQuery.isPending, accountSummaryQuery.isRefetchError, accountSummaryQuery.refetch, accountSummaryRequested, address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, online, projectionSync, readiness, refresh, refreshAfterTransaction, registerStakingExpectation, requestAccountSummary, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
+  }), [accountSummaryQuery.data, accountSummaryQuery.error, accountSummaryQuery.isError, accountSummaryQuery.isPending, accountSummaryQuery.isRefetchError, accountSummaryQuery.refetch, accountSummaryRequested, address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, isProjectionReadCurrent, online, projectionIdentity, projectionSync, readiness, refresh, refreshAfterTransaction, registerNftExpectation, registerStakingExpectation, requestAccountSummary, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, unregisterNftExpectation, user, walletType]);
 
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
 }
@@ -888,6 +1229,7 @@ export function useAppRuntimeResource<T>(resource: AppRuntimeResource, options: 
   const context = useContext(RuntimeContext);
   if (!context) throw new Error('useAppRuntimeResource must be used within AppRuntimeProvider');
   const runtime = context;
+  const queryClient = useQueryClient();
   const wallet = options.walletAddress === undefined ? runtime.address : options.walletAddress?.toLowerCase() ?? null;
   const sessionWalletMatches = Boolean(wallet && runtime.sessionReady && runtime.address === wallet);
   const targetChainId = options.targetChainId === undefined
@@ -895,6 +1237,9 @@ export function useAppRuntimeResource<T>(resource: AppRuntimeResource, options: 
     : options.targetChainId;
   const endpoint = options.endpoint ?? appRuntimeEndpoint(resource, wallet);
   const resourceQueryKey = [...appRuntimeQueryKey(resource, wallet, targetChainId), endpoint, options.cacheKeySuffix ?? ''] as const;
+  const requestGeneration = runtime.projectionGeneration;
+  const requestChainId = runtime.chainId;
+  const requestIdentity = runtime.projectionIdentity;
   const queryOptions = {
     queryKey: resourceQueryKey,
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
@@ -902,11 +1247,23 @@ export function useAppRuntimeResource<T>(resource: AppRuntimeResource, options: 
       if (!response.ok || (body.status !== undefined && body.status !== 'ok') || body.data === undefined || (options.validate && !options.validate(body.data))) {
         throw new Error(`${resource.toUpperCase()}_UNAVAILABLE`);
       }
+      const canonical = canonicalResource(resource);
+      const pairResource = canonical === 'master' || canonical === 'credits';
+      if (pairResource && (!wallet || !runtime.isProjectionReadCurrent(wallet, requestChainId, requestGeneration, requestIdentity))) {
+        const previous = queryClient.getQueryData<T>(resourceQueryKey);
+        if (previous !== undefined) return previous;
+        throw new ProjectionReadSupersededError();
+      }
+      if (pairResource && runtime.projectionSync?.state !== 'idle') {
+        const previous = queryClient.getQueryData<T>(resourceQueryKey);
+        if (previous !== undefined) return previous;
+        throw new ProjectionReadSupersededError();
+      }
       return body.data;
     },
     enabled: runtime.runtimeRouteActive && sessionWalletMatches && !runtime.authLoading && runtime.online && options.enabled !== false,
     staleTime: options.staleTime ?? 15_000,
-    retry: (failureCount: number) => failureCount < 2,
+    retry: (failureCount: number, error: unknown) => !isProjectionReadSupersededError(error) && failureCount < 2,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     refetchOnMount: 'always',

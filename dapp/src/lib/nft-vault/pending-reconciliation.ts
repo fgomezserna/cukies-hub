@@ -287,6 +287,19 @@ type MasterProjectionStatus = {
   nftInventory?: unknown;
 };
 
+export type NftVaultProjectionExpectation = Pick<
+  NftVaultPendingOperation,
+  | 'chainId'
+  | 'walletAddress'
+  | 'vaultAddress'
+  | 'assetId'
+  | 'collectionAddress'
+  | 'tokenId'
+  | 'depositEpoch'
+  | 'action'
+  | 'phase'
+>;
+
 /**
  * Clears a Master pending operation only when the API response belongs to the
  * same wallet/chain/vault and carries the exact canonical asset and epoch.
@@ -294,7 +307,7 @@ type MasterProjectionStatus = {
  * snapshot can be returned while a newer transaction is still pending.
  */
 export function masterProjectionMatchesPendingOperation(
-  operation: NftVaultPendingOperation,
+  operation: NftVaultProjectionExpectation,
   status: MasterProjectionStatus | null | undefined,
 ) {
   if (
