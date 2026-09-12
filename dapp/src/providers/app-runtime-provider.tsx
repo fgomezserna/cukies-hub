@@ -127,7 +127,8 @@ type RuntimeContextValue = {
   requestAccountSummary: () => void;
   projectionSync: AppRuntimeProjectionSync;
   projectionGeneration: number;
-  isProjectionReadCurrent: (wallet: string, chainId: number | undefined, generation: number) => boolean;
+  projectionIdentity: string;
+  isProjectionReadCurrent: (wallet: string, chainId: number | undefined, generation: number, identity?: string) => boolean;
   registerNftExpectation: (expectation: AppRuntimeNftExpectation) => void;
   registerStakingExpectation: (expectation: AppRuntimeStakingExpectation) => void;
   refresh: () => Promise<unknown>;
@@ -418,13 +419,16 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     || pathname.startsWith('/cukie-master')
     || pathname.startsWith('/cukie-hodler')
     || pathname.startsWith('/cukies');
+  const projectionIdentity = `${address ?? ''}:${connectedAddressNormalized ?? ''}:${chainId ?? ''}:${sessionReady ? 'ready' : 'unready'}`;
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine);
   const projectionExpectationRef = useRef<AppRuntimeStakingExpectation | null>(null);
   const nftExpectationsRef = useRef(new Map<string, AppRuntimeNftExpectation>());
   const projectionAbortRef = useRef<AbortController | null>(null);
   const projectionRunRef = useRef<Promise<void> | null>(null);
   const projectionIdentityRef = useRef<string | null>(null);
+  const currentProjectionIdentityRef = useRef(projectionIdentity);
   const projectionGenerationRef = useRef(0);
+  const projectionIdentityTransitionRef = useRef<{ identity: string; previousGeneration: number } | null>(null);
   const currentAddressRef = useRef(address);
   const currentConnectedAddressRef = useRef(connectedAddressNormalized);
   const currentChainIdRef = useRef(chainId);
@@ -433,9 +437,19 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
   currentConnectedAddressRef.current = connectedAddressNormalized;
   currentChainIdRef.current = chainId;
   currentSessionReadyRef.current = sessionReady;
-  const isProjectionReadCurrent = useCallback((wallet: string, readChainId: number | undefined, generation: number) => {
+  currentProjectionIdentityRef.current = projectionIdentity;
+  const isProjectionReadCurrent = useCallback((wallet: string, readChainId: number | undefined, generation: number, readIdentity?: string) => {
     const normalizedWallet = wallet.toLowerCase();
-    return projectionGenerationRef.current === generation
+    const identityMatches = readIdentity === undefined || readIdentity === currentProjectionIdentityRef.current;
+    const generationMatches = projectionGenerationRef.current === generation
+      || Boolean(
+        readIdentity
+        && readIdentity === currentProjectionIdentityRef.current
+        && projectionIdentityTransitionRef.current?.identity === readIdentity
+        && projectionIdentityTransitionRef.current.previousGeneration === generation,
+      );
+    return identityMatches
+      && generationMatches
       && currentAddressRef.current === normalizedWallet
       && currentConnectedAddressRef.current === normalizedWallet
       && currentSessionReadyRef.current
@@ -523,8 +537,6 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       : { ...current, state: 'delayed', error: 'offline' });
   }, [online]);
 
-  const projectionIdentity = `${address ?? ''}:${connectedAddressNormalized ?? ''}:${chainId ?? ''}:${sessionReady ? 'ready' : 'unready'}`;
-
   useEffect(() => {
     if (projectionIdentityRef.current === null) {
       projectionIdentityRef.current = projectionIdentity;
@@ -532,7 +544,9 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     }
     if (projectionIdentityRef.current === projectionIdentity) return;
     projectionIdentityRef.current = projectionIdentity;
+    const previousGeneration = projectionGenerationRef.current;
     projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = { identity: projectionIdentity, previousGeneration };
     projectionAbortRef.current?.abort();
     projectionAbortRef.current = null;
     projectionExpectationRef.current = null;
@@ -943,6 +957,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       || currentChainId !== expectation.chainId
       || !canonicalRaw(expectation.stakedUkiRaw)) return;
     projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = null;
     projectionAbortRef.current?.abort();
     projectionRunRef.current = null;
     const nextExpectation = {
@@ -985,6 +1000,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
       currentAddress,
     )) return;
     projectionGenerationRef.current += 1;
+    projectionIdentityTransitionRef.current = null;
     projectionAbortRef.current?.abort();
     projectionRunRef.current = null;
     nftExpectationsRef.current.set(expectationKey, normalizedExpectation);
@@ -1025,6 +1041,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     }
 
     const generation = ++projectionGenerationRef.current;
+    projectionIdentityTransitionRef.current = null;
     projectionAbortRef.current?.abort();
     projectionRunRef.current = null;
     const currentAddress = currentAddressRef.current;
@@ -1116,6 +1133,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     requestAccountSummary,
     projectionSync,
     projectionGeneration: projectionGenerationRef.current,
+    projectionIdentity,
     isProjectionReadCurrent,
     registerNftExpectation,
     registerStakingExpectation,
@@ -1126,7 +1144,7 @@ export function AppRuntimeProvider({ children }: { children: React.ReactNode }) 
     readiness,
     switchTo,
     queryKey: (resource, wallet = address, targetChainId = expectedChainId('dashboard')) => appRuntimeQueryKey(resource, wallet?.toLowerCase() ?? null, targetChainId ?? null),
-  }), [accountSummaryQuery.data, accountSummaryQuery.error, accountSummaryQuery.isError, accountSummaryQuery.isPending, accountSummaryQuery.isRefetchError, accountSummaryQuery.refetch, accountSummaryRequested, address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, isProjectionReadCurrent, online, projectionSync, readiness, refresh, refreshAfterTransaction, registerNftExpectation, registerStakingExpectation, requestAccountSummary, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
+  }), [accountSummaryQuery.data, accountSummaryQuery.error, accountSummaryQuery.isError, accountSummaryQuery.isPending, accountSummaryQuery.isRefetchError, accountSummaryQuery.refetch, accountSummaryRequested, address, authLoading, chainId, connectedAddress, expectedChainId, invalidate, isConnected, isProjectionReadCurrent, online, projectionIdentity, projectionSync, readiness, refresh, refreshAfterTransaction, registerNftExpectation, registerStakingExpectation, requestAccountSummary, runtimeQuery.data, runtimeQuery.error, runtimeQuery.isError, runtimeQuery.isFetching, runtimeQuery.isPending, runtimeQuery.isRefetchError, runtimeRouteActive, sessionReady, switchTo, user, walletType]);
 
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
 }
@@ -1164,6 +1182,7 @@ export function useAppRuntimeResource<T>(resource: AppRuntimeResource, options: 
   const resourceQueryKey = [...appRuntimeQueryKey(resource, wallet, targetChainId), endpoint, options.cacheKeySuffix ?? ''] as const;
   const requestGeneration = runtime.projectionGeneration;
   const requestChainId = runtime.chainId;
+  const requestIdentity = runtime.projectionIdentity;
   const queryOptions = {
     queryKey: resourceQueryKey,
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
@@ -1173,7 +1192,7 @@ export function useAppRuntimeResource<T>(resource: AppRuntimeResource, options: 
       }
       const canonical = canonicalResource(resource);
       const pairResource = canonical === 'master' || canonical === 'credits';
-      if (pairResource && (!wallet || !runtime.isProjectionReadCurrent(wallet, requestChainId, requestGeneration))) {
+      if (pairResource && (!wallet || !runtime.isProjectionReadCurrent(wallet, requestChainId, requestGeneration, requestIdentity))) {
         const previous = queryClient.getQueryData<T>(resourceQueryKey);
         if (previous !== undefined) return previous;
         throw new ProjectionReadSupersededError();
