@@ -169,7 +169,7 @@ describe('marketplace publico', () => {
     });
 
     render(<MarketplaceClient />);
-    await screen.findByRole('option', { name: 'Tipo 3' });
+    await screen.findByRole('option', { name: 'Raro' });
     expect(screen.getByText(/al elegir uno se mostrará solo ese catálogo/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Tipo de Cukie' }), {

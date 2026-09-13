@@ -43,18 +43,26 @@ export function formatLegacyPrice(cuki: LegacyMarketplaceCukiItem) {
 }
 
 export function getTypeLabel(type: LegacyMarketplaceCukiItem['type']) {
-  switch (String(type)) {
+  const normalized = String(type).trim().toLowerCase();
+
+  switch (normalized) {
     case '1':
+    case 'common':
       return 'Común';
     case '2':
+    case 'uncommon':
       return 'No común';
     case '3':
+    case 'rare':
       return 'Raro';
     case '4':
+    case 'epic':
       return 'Épico';
     case '5':
+    case 'legendary':
       return 'Legendario';
     case '6':
+    case 'goat':
       return 'Goat';
     default:
       return type === null ? '-' : `Tipo ${type}`;
