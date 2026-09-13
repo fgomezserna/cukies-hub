@@ -41,4 +41,5 @@ export type {
   UkiMarketplaceInventoryItem,
   UkiMarketplaceInventoryResponse,
   UkiMarketplaceRuntime,
+  UkiMarketplaceSort,
 } from './types';

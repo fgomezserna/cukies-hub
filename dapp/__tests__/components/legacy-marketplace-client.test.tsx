@@ -149,7 +149,7 @@ describe('marketplace publico', () => {
     expect(screen.queryByRole('button', { name: 'Comprar' })).not.toBeInTheDocument();
   });
 
-  it('cambia a Solo Legacy antes de aplicar tipo y generación sin metadatos V2', async () => {
+  it('aplica tipo y generación al catálogo conjunto sin forzar Legacy', async () => {
     fetchMock.mockResolvedValue({
       json: async () => ({
         status: 'ok',
@@ -170,22 +170,21 @@ describe('marketplace publico', () => {
 
     render(<MarketplaceClient />);
     await screen.findByRole('option', { name: 'Raro' });
-    expect(screen.getByText(/al elegir uno se mostrará solo ese catálogo/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Tipo de Cukie' }), {
-      target: { value: '3' },
+      target: { value: 'rare' },
     });
     fireEvent.change(screen.getByRole('combobox', { name: 'Generación' }), {
-      target: { value: '2' },
+      target: { value: 'second_generation' },
     });
 
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(2));
     const requestUrl = String(fetchMock.mock.calls[fetchMock.mock.calls.length - 1][0]);
     const query = new URL(requestUrl, 'https://stage.local').searchParams;
-    expect(query.get('scope')).toBe('legacy');
-    expect(query.get('type')).toBe('3');
-    expect(query.get('generation')).toBe('2');
-    expect(screen.getByRole('combobox', { name: 'Origen del anuncio' })).toHaveValue('legacy');
+    expect(query.get('scope')).toBe('all');
+    expect(query.get('type')).toBe('rare');
+    expect(query.get('generation')).toBe('second_generation');
+    expect(screen.getByRole('combobox', { name: 'Origen del anuncio' })).toHaveValue('all');
   });
 
   it('evita combinar la red TRON con el catálogo V2 · UKI', async () => {
@@ -213,8 +212,8 @@ describe('marketplace publico', () => {
 
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Red' })).toHaveValue('all'));
     expect(screen.queryByRole('option', { name: 'TRON' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Tipo de Cukie' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Generación' })).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Tipo de Cukie' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Generación' })).toBeInTheDocument();
   });
 
   it('distingue catálogo no disponible de catálogo vacío', async () => {

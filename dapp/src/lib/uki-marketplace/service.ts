@@ -27,6 +27,7 @@ import type {
   UkiMarketplaceLiveInspection,
   UkiMarketplaceOrderView,
   UkiMarketplaceRuntime,
+  UkiMarketplaceSort,
 } from './types';
 
 export type UkiMarketplaceServiceDependencies = {
@@ -55,11 +56,21 @@ function validatedLimit(limit: number | undefined) {
   return candidate;
 }
 
-export type UkiMarketplaceCursor = { listedAt: Date; id: string };
+export type UkiMarketplaceCursor = {
+  listedAt: Date;
+  id: string;
+  /** Clave numérica de precio para continuar una página ordenada por precio. */
+  priceRaw?: string;
+};
 
 function encodeCursor(value: UkiMarketplaceCursor) {
+  const payload = {
+    listedAt: value.listedAt.toISOString(),
+    id: value.id,
+    ...(value.priceRaw ? { priceRaw: value.priceRaw } : {}),
+  };
   return Buffer.from(
-    JSON.stringify({ listedAt: value.listedAt.toISOString(), id: value.id }),
+    JSON.stringify(payload),
   ).toString('base64url');
 }
 
@@ -73,11 +84,22 @@ function decodeCursor(
     ) as {
       listedAt?: string;
       id?: string;
+      priceRaw?: string;
     };
     const listedAt = parsed.listedAt ? new Date(parsed.listedAt) : null;
-    if (!listedAt || Number.isNaN(listedAt.getTime()) || !parsed.id)
+    if (
+      !listedAt
+      || Number.isNaN(listedAt.getTime())
+      || !parsed.id
+      || (parsed.priceRaw !== undefined && !/^\d+$/.test(parsed.priceRaw))
+    ) {
       throw new Error('invalid cursor');
-    return { listedAt, id: parsed.id };
+    }
+    return {
+      listedAt,
+      id: parsed.id,
+      ...(parsed.priceRaw !== undefined ? { priceRaw: parsed.priceRaw } : {}),
+    };
   } catch {
     throw new UkiMarketplaceValidationError('cursor is invalid');
   }
@@ -146,6 +168,69 @@ function assetIdentity(input: {
 
 function assetIdentityKey(input: UkiMarketplaceAssetIdentity) {
   return `${input.chainId}:${input.collectionAddress.toLowerCase()}:${input.tokenId}`;
+}
+
+const marketplaceRarityAliases: Record<string, string> = {
+  '1': 'common',
+  common: 'common',
+  '2': 'uncommon',
+  uncommon: 'uncommon',
+  'no-comun': 'uncommon',
+  'no común': 'uncommon',
+  '3': 'rare',
+  rare: 'rare',
+  raro: 'rare',
+  '4': 'epic',
+  epic: 'epic',
+  épico: 'epic',
+  '5': 'legendary',
+  legendary: 'legendary',
+  legendario: 'legendary',
+  '6': 'goat',
+  goat: 'goat',
+};
+
+function normalizeMarketplaceRarity(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim().toLowerCase();
+  return marketplaceRarityAliases[normalized] ?? null;
+}
+
+function normalizeMarketplaceGeneration(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'original', 'first', 'first_generation', 'genesis'].includes(normalized)) {
+    return 'original';
+  }
+  if (['2', 'second', 'second_generation', 'bred', 'breeding'].includes(normalized)) {
+    return 'second_generation';
+  }
+  return null;
+}
+
+function matchesMarketplaceMetadata(
+  metadata: UkiMarketplaceAssetMetadata | undefined,
+  input: { type?: string; generation?: string },
+) {
+  if (input.type && input.type !== 'all') {
+    const expectedType = normalizeMarketplaceRarity(input.type);
+    if (!expectedType || !normalizeMarketplaceRarity(metadata?.rarity)) {
+      return false;
+    }
+    if (normalizeMarketplaceRarity(metadata?.rarity) !== expectedType) {
+      return false;
+    }
+  }
+  if (input.generation && input.generation !== 'all') {
+    const expectedGeneration = normalizeMarketplaceGeneration(input.generation);
+    if (!expectedGeneration || !normalizeMarketplaceGeneration(metadata?.generation)) {
+      return false;
+    }
+    if (normalizeMarketplaceGeneration(metadata?.generation) !== expectedGeneration) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function resolveActiveStatus(
@@ -276,8 +361,11 @@ async function metadataByOrder(
 async function orderViews(
   entries: ResolvedPublicOrder[],
   repository: UkiMarketplaceRepository,
+  metadataCache?: Map<string, UkiMarketplaceAssetMetadata>,
 ) {
-  const metadata = await metadataByOrder(entries, repository);
+  const metadata = metadataCache && metadataCache.size > 0
+    ? metadataCache
+    : await metadataByOrder(entries, repository);
   return entries.map((entry) => {
     const identity = orderAssetIdentity(entry.order);
     return toOrderView(
@@ -301,19 +389,27 @@ export async function listPublicUkiMarketplacePage(
     limit?: number;
     cursor?: string;
     search?: string;
+    type?: string;
+    generation?: string;
+    sort?: UkiMarketplaceSort;
   },
   dependencies: UkiMarketplaceServiceDependencies = defaultDependencies(),
 ): Promise<UkiMarketplacePublicPage> {
   const { chainId, marketplaceAddress } = assertRuntime(dependencies.runtime);
   const limit = validatedLimit(input.limit);
+  const sort = input.sort ?? 'newest';
   const now = dependencies.now();
   let cursor = decodeCursor(input.cursor);
+  if (sort.startsWith('price-') && cursor && !cursor.priceRaw) {
+    throw new UkiMarketplaceValidationError('price cursor is invalid');
+  }
   const entries: ResolvedPublicOrder[] = [];
+  const metadataCache = new Map<string, UkiMarketplaceAssetMetadata>();
   let scans = 0;
   let budgetExhausted = false;
 
   const page = async (nextCursor: UkiMarketplaceCursor | undefined, hasMore: boolean) => ({
-    orders: await orderViews(entries, dependencies.repository),
+    orders: await orderViews(entries, dependencies.repository, metadataCache),
     nextCursor: nextCursor ? encodeCursor(nextCursor) : null,
     hasMore,
   });
@@ -328,6 +424,7 @@ export async function listPublicUkiMarketplacePage(
         limit: 1,
         after: probe,
         ...(input.search ? { search: input.search } : {}),
+        ...(sort !== 'newest' ? { sort } : {}),
       });
       if (candidates.length === 0) return { hasMore: false, cursor: probe };
       const inspections = await dependencies.liveReader.inspectOrders(
@@ -346,17 +443,34 @@ export async function listPublicUkiMarketplacePage(
       ) {
         throw new UkiMarketplaceUnavailableError();
       }
-      if (
-        candidates.some(
-          (order) =>
-            resolveActiveStatus(order, inspections.get(order.orderId), now)
-              .status === 'active',
-        )
-      ) {
+      const resolved = candidates
+        .map((order) => ({
+          order,
+          ...resolveActiveStatus(order, inspections.get(order.orderId), now),
+        }))
+        .filter(({ status }) => status === 'active');
+      if (!input.type && !input.generation && resolved.length > 0) {
         return { hasMore: true, cursor: probe };
       }
+      if (resolved.length > 0) {
+        const probeMetadata = await metadataByOrder(resolved, dependencies.repository);
+        probeMetadata.forEach((metadata, key) => metadataCache.set(key, metadata));
+        if (resolved.some((entry) => {
+          const identity = orderAssetIdentity(entry.order);
+          return matchesMarketplaceMetadata(
+            identity ? probeMetadata.get(assetIdentityKey(identity)) : undefined,
+            input,
+          );
+        })) {
+          return { hasMore: true, cursor: probe };
+        }
+      }
       const lastCandidate = candidates[candidates.length - 1];
-      probe = { listedAt: lastCandidate.listedAt, id: lastCandidate._id };
+      probe = {
+        listedAt: lastCandidate.listedAt,
+        id: lastCandidate._id,
+        ...(sort.startsWith('price-') ? { priceRaw: lastCandidate.ukiPriceRaw } : {}),
+      };
     }
     return { hasMore: true, cursor: probe };
   };
@@ -369,6 +483,7 @@ export async function listPublicUkiMarketplacePage(
       limit,
       ...(cursor ? { after: cursor } : {}),
       ...(input.search ? { search: input.search } : {}),
+      ...(sort !== 'newest' ? { sort } : {}),
     });
     if (candidates.length === 0) break;
     scans += 1;
@@ -396,11 +511,23 @@ export async function listPublicUkiMarketplacePage(
         return { order, ...status };
       })
       .filter(({ status }) => status === 'active');
+    if (input.type || input.generation) {
+      const batchMetadata = await metadataByOrder(resolved, dependencies.repository);
+      batchMetadata.forEach((metadata, key) => metadataCache.set(key, metadata));
+    }
+    const filtered = resolved.filter((entry) => {
+      const identity = orderAssetIdentity(entry.order);
+      return matchesMarketplaceMetadata(
+        identity ? metadataCache.get(assetIdentityKey(identity)) : undefined,
+        input,
+      );
+    });
     const availableSlots = limit - entries.length;
-    for (const entry of resolved.slice(0, availableSlots)) {
+    for (const entry of filtered.slice(0, availableSlots)) {
       const entryCursor = encodeCursor({
         listedAt: entry.order.listedAt,
         id: entry.order._id,
+        ...(sort.startsWith('price-') ? { priceRaw: entry.order.ukiPriceRaw } : {}),
       });
       entries.push({
         order: entry.order,
@@ -408,10 +535,14 @@ export async function listPublicUkiMarketplacePage(
         attentionReason: entry.attentionReason,
         catalogCursor: entryCursor,
       });
-      cursor = { listedAt: entry.order.listedAt, id: entry.order._id };
+      cursor = {
+        listedAt: entry.order.listedAt,
+        id: entry.order._id,
+        ...(sort.startsWith('price-') ? { priceRaw: entry.order.ukiPriceRaw } : {}),
+      };
     }
     if (entries.length === limit) {
-      if (resolved.length > availableSlots) {
+      if (filtered.length > availableSlots) {
         return page(cursor, true);
       }
       const more =
@@ -421,7 +552,11 @@ export async function listPublicUkiMarketplacePage(
       return page(more.cursor, more.hasMore);
     }
     const lastCandidate = candidates[candidates.length - 1];
-    cursor = { listedAt: lastCandidate.listedAt, id: lastCandidate._id };
+    cursor = {
+      listedAt: lastCandidate.listedAt,
+      id: lastCandidate._id,
+      ...(sort.startsWith('price-') ? { priceRaw: lastCandidate.ukiPriceRaw } : {}),
+    };
     if (candidates.length < limit) break;
     if (scans >= 8) {
       budgetExhausted = true;
