@@ -2,7 +2,7 @@
 
 Estado: topologia activa y checklist operativo.
 Issue: #166 `UKI-090.4`.
-Fecha de ultima comprobacion: 2026-08-05.
+Fecha de ultima comprobacion: 2026-09-14.
 
 ## Decision
 
@@ -32,6 +32,9 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 - El smoke `STAGING_SMOKE_C31176A_2026_08_05` movio temporalmente `1 UKI` por contrato y termino con staking, reservas y balance del distribuidor a cero. No representa una cifra de producto.
 - Staging usa las bases logicas `cukies-hub-staging`, `cukies-legacy-staging` y `cukieshub-new-staging`. El cutover a la instancia fisica exclusiva `cukies-staging-rs0` se prepara en dos despliegues para no apuntar la aplicacion a una replica a medio inicializar.
 - Produccion conserva BSC mainnet y sus bases de produccion; no se han reapuntado durante esta separacion.
+- Marketplace legacy BSC sigue activo en `0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91` sobre la coleccion existente `0x0dbDeBCC62f11005BF434ABFad74564E896aC861`.
+- Marketplace UKI V2 esta desplegado en BSC Mainnet en `0x57726b8640818dec22624a8e6bd45188c0071b19` (bloque `121727979`, tx `0x15b81dded5169f095d7abe3d69bd129973c77bccd00bba9660b922382e95301e`). Mantiene una comision de `1000` bps (10%) para igualar el marketplace legacy live; tesoreria `0x538b7EC80B13325ecf7DC3b9b73A58ac56492e01`; owner `0x3d80cbEd6CA067a154A22659224EB5194aDCe24C`.
+- V2 tiene allowlist de la coleccion legacy y de ASM, USDT y USDC; el pago nativo BNB esta habilitado. El runtime live verificado es de `12486` bytes y hash `0x09b0512b568e76333dbb6279a85c701ae4d4088430c4be2e85e564a93254d2be`.
 - La VM Coolify/Traefik observada es `1001` (`192.168.1.201`) y publica Traefik en `80/443`.
 - Cloudflare Tunnel ya tiene ruta para `cukieshub.eurekand.com` hacia `https://192.168.1.201:443`.
 
@@ -43,6 +46,18 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 | Preview PR | Branch del PR | Coolify preview si se habilita | Sin valor real | Datos aislados o mocks | Revision visual/tecnica. |
 | Staging | `staging` | Coolify `game-hub-staging` | BSC testnet | DB staging | QA integrada. |
 | Production | `main` + tag `prod-*` | Coolify `game-hub` | BSC mainnet | DB production | Usuarios reales. |
+
+### Validacion local antes de desplegar
+
+El trabajo de una rama se prueba localmente por bloques y no provoca un despliegue de Coolify por cada cambio. Para contratos, el comando reproducible es:
+
+```bash
+pnpm test:staging:contracts
+```
+
+Este comando levanta la red Hardhat efimera con `chainId=97` y usa contratos mock para UKI, USDT, WBNB, NFT y router cuando el escenario lo requiere. No se conecta a BSC Testnet, no usa fondos y no escribe en las bases de staging. Las pruebas de dapp e indexer deben ejecutarse con sus flags de staging y fixtures de chain `97`; las pruebas que escriben usan exclusivamente servicios locales o en memoria.
+
+Solo cuando varios bloques formen un candidato coherente se integra en `staging`, se despliega una vez y se ejecuta el E2E real contra BSC Testnet y las bases aisladas de staging. Una simulacion local aprobada no se presenta como evidencia de que el despliegue real haya pasado.
 
 ## Reglas de ramas
 
@@ -187,6 +202,17 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `NEXT_PUBLIC_UKI_CHAIN_ID` | `97` | `56` | BSC testnet vs BSC mainnet. |
 | `NEXT_PUBLIC_ASM_TOKEN_ADDRESS` | ASM testnet | ASM mainnet | Verificado por chain. |
 | `NEXT_PUBLIC_UKI_TOKEN_ADDRESS` | UKI testnet | UKI mainnet | Desde freeze/deploy. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS` | Marketplace UKI testnet | `0x57726b8640818dec22624a8e6bd45188c0071b19` | Contrato V2; no sustituye al marketplace legacy. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ROUTER_ADDRESS` | Router Pancake testnet | `0x10ED43C718714eb63d5aA57B78B54704E256024E` | Router V2 usado por las compras con swap. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_WBNB_ADDRESS` | WBNB testnet | `0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c` | Wrapped native de BSC. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ASM_ADDRESS` | ASM testnet | `0x707F0f4a39a4a26239F7D00463B15AB5656861f9` | Ruta ASM -> UKI. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDT_ADDRESS` | USDT testnet | `0x55d398326f99059fF775485246999027B3197955` | Ruta USDT -> ASM -> UKI. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDC_ADDRESS` | USDC testnet | `0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d` | Ruta USDC -> USDT -> ASM -> UKI. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_BNB_PATH` | WBNB testnet, UKI testnet | `0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c,0x55d398326f99059fF775485246999027B3197955,0x707F0f4a39a4a26239F7D00463B15AB5656861f9,0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` | BNB -> USDT -> ASM -> UKI. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_ASM_PATH` | ASM testnet, UKI testnet | `0x707F0f4a39a4a26239F7D00463B15AB5656861f9,0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` | Ruta de compra ASM. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDT_PATH` | USDT testnet, ASM testnet, UKI testnet | `0x55d398326f99059fF775485246999027B3197955,0x707F0f4a39a4a26239F7D00463B15AB5656861f9,0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` | Ruta de compra USDT. |
+| `NEXT_PUBLIC_UKI_MARKETPLACE_USDC_PATH` | USDC testnet, USDT testnet, ASM testnet, UKI testnet | `0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d,0x55d398326f99059fF775485246999027B3197955,0x707F0f4a39a4a26239F7D00463B15AB5656861f9,0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA` | Ruta de compra USDC. |
+| `NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS` | `0xD4C7B16DB234D7f62Ba6a8f30153FAF85feaBec8` | `0x0dbDeBCC62f11005BF434ABFad74564E896aC861` | V2 reutiliza la coleccion ERC-721 legacy ya existente en mainnet. |
 | `NEXT_PUBLIC_UKI_VESTING_VAULT_ADDRESS` | Vault testnet | Vault mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_PRESALE_ADDRESS` | Presale testnet | Presale mainnet | Desde freeze/deploy. |
 | `NEXT_PUBLIC_UKI_STAKING_ADDRESS` | `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` | Staking mainnet pendiente | Contrato de custodia UKI sin rewards ni lock. |
@@ -262,6 +288,36 @@ No se migra ningun namespace de produccion. Si falta el marcador, el bootstrap s
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS` | `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` | Debe coincidir con la variable publica. |
 | `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK` | `123359171` | Bloque exacto de despliegue. |
 | `CHAIN_INDEXER_BSC_CONFIRMATIONS` | `12` | Gate de finalidad para las proyecciones UKI. |
+
+#### Marketplace en produccion
+
+Produccion conserva dos fuentes deliberadamente separadas. El marketplace legacy
+continua servido por los getters BSC/TRON y el GraphQL legacy que ya alimentan
+`/api/legacy-marketplace/*`; no se reinicia su cursor ni se fuerza un backfill
+historico en el `chain-indexer` nuevo. El `chain-indexer` de `game-hub` añade el
+contrato V2 bajo el alias `UKI_MARKETPLACE` y escribe sus ordenes en las
+colecciones nuevas, sin mezclar estados legacy.
+
+Para activar V2 en el recurso Coolify `game-hub` (`main`) se configuran estas
+variables, conservando los aliases/cursos existentes y sin tocar staging:
+
+| Variable | Valor production | Regla |
+| --- | --- | --- |
+| `CHAIN_INDEXER_CONTRACT_ALIASES` | Aliases live existentes + `UKI_MARKETPLACE` | En el recurso actual: `PRESALE,UKI_STAKING,UKI_MARKETPLACE`; no sustituir la lista completa. `MARKETPLACE` legacy permanece en sus getters dedicados. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS` | `0x57726b8640818dec22624a8e6bd45188c0071b19` | Contrato V2 BSC Mainnet. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK` | `121727979` | Igual que el bloque de despliegue. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_BSC_BLOCK` | `121727979` | El indexer comprueba el receipt. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH` | `0x15b81dded5169f095d7abe3d69bd129973c77bccd00bba9660b922382e95301e` | Receipt status `1`, BSC Mainnet. |
+| `CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH` | `0x09b0512b568e76333dbb6279a85c701ae4d4088430c4be2e85e564a93254d2be` | Hash del runtime observado en RPC live; no usar el artefacto con inmutables sin resolver. |
+| `CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID` | `56` | Fail-closed frente a RPC de testnet. |
+| `CHAIN_INDEXER_BSC_CONFIRMATIONS` | `12` | Confirmaciones antes de proyectar eventos. |
+
+La proyeccion V2 escribe `uki_marketplace_orders` y `uki_marketplace_token_nonces`
+con identidad `(chainId, marketplace, collection, tokenId/orderId)`. El API publico
+reconcilia cada anuncio activo contra `orderState`, propietario y aprobacion live;
+si no puede verificar la cadena, no expone el anuncio como comprable. La coleccion
+de metadata se reutiliza solo como enriquecimiento y no como fuente de verdad del
+estado de la orden.
 
 ### Publicador de rewards en staging
 

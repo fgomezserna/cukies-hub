@@ -5,6 +5,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "test:staging": "LOCAL_EVM_CHAIN_ID=97 hardhat test",
     "coverage": "hardhat coverage",
     "security:slither": "slither . --config-file slither.config.json --exclude timestamp,incorrect-equality,costly-loop",
     "clean": "hardhat clean",
@@ -14,6 +15,9 @@
     "deploy:testnet:nft-source": "hardhat run scripts/deploy-nft-source.testnet.cjs --network bscTestnet",
     "deploy:testnet:nft-v2": "hardhat run scripts/deploy-nft-v2-testnet.cjs --network bscTestnet",
     "deploy:testnet:nft-vaults": "hardhat run scripts/deploy-nft-vaults-testnet.cjs --network bscTestnet",
+    "deploy:testnet:marketplace": "hardhat run scripts/deploy-uki-marketplace.testnet.cjs --network bscTestnet",
+    "deploy:mainnet:marketplace": "hardhat run scripts/deploy-uki-marketplace.production.cjs --network bsc",
+    "configure:mainnet:marketplace": "hardhat run scripts/configure-uki-marketplace.production.cjs --network bsc",
     "deploy:testnet:staking-rewards": "hardhat run scripts/deploy-staking-rewards.testnet.cjs --network bscTestnet",
     "rehearse:testnet:liquidity-locker": "hardhat run scripts/rehearse-liquidity-locker.testnet.cjs --network bscTestnet",
     "complete:testnet:liquidity-locker": "hardhat run scripts/complete-liquidity-locker-rehearsal.testnet.cjs --network bscTestnet",

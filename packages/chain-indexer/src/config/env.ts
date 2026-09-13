@@ -69,6 +69,8 @@ const envSchema = z.object({
   CHAIN_INDEXER_TOKEN_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_TOKEN_V2_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_MARKETPLACE_ADDRESS: z.string().optional(),
+  CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS: z.string().optional(),
+  NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_BRIDGE_ADDRESS: z.string().optional(),
   CHAIN_INDEXER_UKI_STAKING_ADDRESS: z.string().optional(),
   NEXT_PUBLIC_UKI_STAKING_ADDRESS: z.string().optional(),
@@ -91,6 +93,10 @@ const envSchema = z.object({
   CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_TX_HASH: z.string().optional(),
   CHAIN_INDEXER_MARKETPLACE_RUNTIME_CODE_HASH: z.string().optional(),
+  CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
+  CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH: z.string().optional(),
+  CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH: z.string().optional(),
   CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_BRIDGE_DEPLOYMENT_BSC_BLOCK: optionalBlockSchema,
   CHAIN_INDEXER_BRIDGE_DEPLOYMENT_TX_HASH: z.string().optional(),
@@ -176,6 +182,7 @@ function parseContractAliases(value?: string): ContractAlias[] | undefined {
       item === 'STAKING_POINTS' ||
       item === 'BREEDING_POINTS' ||
       item === 'MARKETPLACE' ||
+      item === 'UKI_MARKETPLACE' ||
       item === 'BRIDGE' ||
       item === 'PRESALE' ||
       item === 'UKI_STAKING' ||
@@ -321,6 +328,7 @@ export function getIndexerConfig(): IndexerConfig {
   const tokenRequested = contractAliases?.includes('TOKEN') ?? false;
   const tokenV2Requested = contractAliases?.includes('TOKEN_V2') ?? false;
   const marketplaceRequested = contractAliases?.includes('MARKETPLACE') ?? false;
+  const ukiMarketplaceRequested = contractAliases?.includes('UKI_MARKETPLACE') ?? false;
   const bridgeRequested = contractAliases?.includes('BRIDGE') ?? false;
   const ukiStakingRequested = contractAliases?.includes('UKI_STAKING') ?? false;
   const vestingVaultRequested = contractAliases?.includes('VESTING_VAULT') ?? false;
@@ -344,6 +352,12 @@ export function getIndexerConfig(): IndexerConfig {
     env.CHAIN_INDEXER_MARKETPLACE_ADDRESS,
     'MARKETPLACE',
     marketplaceRequested,
+  );
+  const ukiMarketplaceAddress = resolveOptionalBscAddress(
+    env.CHAIN_INDEXER_UKI_MARKETPLACE_ADDRESS
+      ?? env.NEXT_PUBLIC_UKI_MARKETPLACE_ADDRESS,
+    'UKI_MARKETPLACE',
+    ukiMarketplaceRequested,
   );
   const bridgeAddress = resolveOptionalBscAddress(
     env.CHAIN_INDEXER_BRIDGE_ADDRESS,
@@ -408,6 +422,16 @@ export function getIndexerConfig(): IndexerConfig {
     deploymentTxHash: env.CHAIN_INDEXER_MARKETPLACE_DEPLOYMENT_TX_HASH,
     runtimeCodeHash: env.CHAIN_INDEXER_MARKETPLACE_RUNTIME_CODE_HASH,
     requested: marketplaceRequested,
+  });
+  const ukiMarketplaceIdentity = resolveVerifiedBscContractIdentity({
+    alias: 'UKI_MARKETPLACE',
+    chainId: bscExpectedChainId,
+    address: ukiMarketplaceAddress,
+    startBlock: env.CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK,
+    deploymentBlock: env.CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_BSC_BLOCK,
+    deploymentTxHash: env.CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH,
+    runtimeCodeHash: env.CHAIN_INDEXER_UKI_MARKETPLACE_RUNTIME_CODE_HASH,
+    requested: ukiMarketplaceRequested,
   });
   const bridgeIdentity = resolveVerifiedBscContractIdentity({
     alias: 'BRIDGE',
@@ -474,6 +498,11 @@ export function getIndexerConfig(): IndexerConfig {
     ['TOKEN', tokenRequested, env.CHAIN_INDEXER_TOKEN_START_BSC_BLOCK],
     ['TOKEN_V2', tokenV2Requested, env.CHAIN_INDEXER_TOKEN_V2_START_BSC_BLOCK],
     ['MARKETPLACE', marketplaceRequested, env.CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK],
+    [
+      'UKI_MARKETPLACE',
+      ukiMarketplaceRequested,
+      env.CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK,
+    ],
     ['BRIDGE', bridgeRequested, env.CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK],
     ['UKI_STAKING', ukiStakingRequested, env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK],
     ['VESTING_VAULT', vestingVaultRequested, env.CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK],
@@ -503,6 +532,7 @@ export function getIndexerConfig(): IndexerConfig {
       tokenRequested
       || tokenV2Requested
       || marketplaceRequested
+      || ukiMarketplaceRequested
       || bridgeRequested
       || ukiStakingRequested
       || vestingVaultRequested
@@ -537,6 +567,7 @@ export function getIndexerConfig(): IndexerConfig {
     tokenAddress,
     tokenV2Address,
     marketplaceAddress,
+    ukiMarketplaceAddress,
     bridgeAddress,
     ukiStakingAddress,
     vestingVaultAddress,
@@ -546,6 +577,7 @@ export function getIndexerConfig(): IndexerConfig {
     tokenStartBlock: env.CHAIN_INDEXER_TOKEN_START_BSC_BLOCK,
     tokenV2StartBlock: env.CHAIN_INDEXER_TOKEN_V2_START_BSC_BLOCK,
     marketplaceStartBlock: env.CHAIN_INDEXER_MARKETPLACE_START_BSC_BLOCK,
+    ukiMarketplaceStartBlock: env.CHAIN_INDEXER_UKI_MARKETPLACE_START_BSC_BLOCK,
     bridgeStartBlock: env.CHAIN_INDEXER_BRIDGE_START_BSC_BLOCK,
     ukiStakingStartBlock: env.CHAIN_INDEXER_UKI_STAKING_START_BSC_BLOCK,
     vestingVaultStartBlock: env.CHAIN_INDEXER_VESTING_VAULT_START_BSC_BLOCK,
@@ -558,6 +590,7 @@ export function getIndexerConfig(): IndexerConfig {
       ...(tokenIdentity ? { TOKEN: tokenIdentity } : {}),
       ...(tokenV2Identity ? { TOKEN_V2: tokenV2Identity } : {}),
       ...(marketplaceIdentity ? { MARKETPLACE: marketplaceIdentity } : {}),
+      ...(ukiMarketplaceIdentity ? { UKI_MARKETPLACE: ukiMarketplaceIdentity } : {}),
       ...(bridgeIdentity ? { BRIDGE: bridgeIdentity } : {}),
       ...(ukiStakingIdentity ? { UKI_STAKING: ukiStakingIdentity } : {}),
       ...(vestingVaultIdentity ? { VESTING_VAULT: vestingVaultIdentity } : {}),

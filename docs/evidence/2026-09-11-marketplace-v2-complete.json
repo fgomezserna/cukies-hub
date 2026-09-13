@@ -1,0 +1,374 @@
+{
+  "schema": "cukies.marketplace-v2-complete.v1",
+  "issue": "https://github.com/fgomezserna/cukies-hub/issues/409",
+  "environment": "staging",
+  "chainId": 97,
+  "status": "onchain_and_local_qa_verified_deployment_pending",
+  "baseSha": "0b34d7d9acf5e45faf22b9a502604e789410af5b",
+  "observedAt": "2026-09-11T01:51:35.450Z",
+  "addresses": {
+    "marketplace": "0x0ECeE45B7fF8dA15F8231484208540A6dCAd2C4D",
+    "uki": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+    "asm": "0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C",
+    "wbnb": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+    "router": "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+    "factory": "0x6725F303b657a9451d8BA641348b6761A6CC7a17",
+    "USDT": "0x5A4C2904E80d2d27F6996C0df989A53AeBAf968D",
+    "USDC": "0x3593f86E45Fe02536B30A2cb445628e5301289EC"
+  },
+  "setupTransactions": {
+    "deploy-USDT": {
+      "hash": "0x0fec2c94a361fc808e9998df2e3b00b2dfe9a850a683c4885a4f39876a50196d",
+      "status": "confirmed",
+      "blockNumber": 130319363,
+      "contractAddress": "0x5A4C2904E80d2d27F6996C0df989A53AeBAf968D"
+    },
+    "deploy-USDC": {
+      "hash": "0x4054aa188acdb5e9aaef127a3e9b45f88e1c38bfd5f1d1d5ef20bf61cb28e57f",
+      "status": "confirmed",
+      "blockNumber": 130319371,
+      "contractAddress": "0x3593f86E45Fe02536B30A2cb445628e5301289EC"
+    },
+    "mint-ASM": {
+      "hash": "0x89369500fb37dfbc776aa00e4c211ebc58cba82146e5ecf1a8921e7159e9a1de",
+      "status": "confirmed",
+      "blockNumber": 130319379,
+      "contractAddress": null
+    },
+    "approve-router-ASM": {
+      "hash": "0xf4c3fb6f751a0525f9f41d26898fb182cfac76ce96473835e6628a867e32ec15",
+      "status": "confirmed",
+      "blockNumber": 130319388,
+      "contractAddress": null
+    },
+    "approve-uki-ASM": {
+      "hash": "0x98b0d07c36518668cf75aaf02ace5b5f0c5c1423da233c9223843ccf50fcaf1f",
+      "status": "confirmed",
+      "blockNumber": 130319395,
+      "contractAddress": null
+    },
+    "liquidity-ASM": {
+      "hash": "0xf6a43fe5114c47993f7b2bcc99ce553e1d6b8403d3d6b29fbd771a4cf5b4bf62",
+      "status": "confirmed",
+      "blockNumber": 130319403,
+      "contractAddress": null
+    },
+    "mint-USDT": {
+      "hash": "0x487aa48f2fa65b36f3da2290078fa86ffb00f05ef68d0dd4815b7cdb5b866dd1",
+      "status": "confirmed",
+      "blockNumber": 130319410,
+      "contractAddress": null
+    },
+    "approve-router-USDT": {
+      "hash": "0x63427f02dee63f19f3cbff8bdcad66e42b2c20b1143f0bf996993052df1381ea",
+      "status": "confirmed",
+      "blockNumber": 130319424,
+      "contractAddress": null
+    },
+    "approve-uki-USDT": {
+      "hash": "0xec7bccc61a36e57c7b7eae4705ddd21d7ced9dfeda384eb1dccefea9429e8fc7",
+      "status": "confirmed",
+      "blockNumber": 130319431,
+      "contractAddress": null
+    },
+    "liquidity-USDT": {
+      "hash": "0x923f44334a6ed55b3a13fcba13d9cfa690f064b2c6278863819004e7bee73a07",
+      "status": "confirmed",
+      "blockNumber": 130319439,
+      "contractAddress": null
+    },
+    "mint-USDC": {
+      "hash": "0xdf440fd7b74ab4f5d130fc938e594c7a33dab6ca252342536ab6ce7ea690470e",
+      "status": "confirmed",
+      "blockNumber": 130319447,
+      "contractAddress": null
+    },
+    "approve-router-USDC": {
+      "hash": "0xc19f7e07e0ea5aafbf0f8c9989d682e6f18d4e8902678df800407321fbfe9681",
+      "status": "confirmed",
+      "blockNumber": 130319455,
+      "contractAddress": null
+    },
+    "approve-uki-USDC": {
+      "hash": "0x5e91898332c4287b27171ea677a04c9fbc4006193e63c2dee46108a27bc7130a",
+      "status": "confirmed",
+      "blockNumber": 130319463,
+      "contractAddress": null
+    },
+    "liquidity-USDC": {
+      "hash": "0xc2cb31276c90be5a00e59fbcb0b7f6f0da5c357bc495257fee4bbe2ed92c96db",
+      "status": "confirmed",
+      "blockNumber": 130319469,
+      "contractAddress": null
+    },
+    "approve-uki-BNB": {
+      "hash": "0x534e07428ea679cc56b1c37eaa3367d9129f46898df2cbca73f28bbc4e60a956",
+      "status": "confirmed",
+      "blockNumber": 130319477,
+      "contractAddress": null
+    },
+    "liquidity-BNB": {
+      "hash": "0xcc6c5b5bfff0bd116c0a19c3ce6442ab35797056628be8d179c10545a505761a",
+      "status": "confirmed",
+      "blockNumber": 130319484,
+      "contractAddress": null
+    },
+    "allow-ASM": {
+      "hash": "0x29dbdfb46d6692980d16cf76ad43209b56266d9b6c28510161a0937698a0b2ef",
+      "status": "confirmed",
+      "blockNumber": 130319496,
+      "contractAddress": null
+    },
+    "allow-USDT": {
+      "hash": "0xb715afca3a340e9d694e3f807671588756b8c592fbb7d3871dc20e20bc58273a",
+      "status": "confirmed",
+      "blockNumber": 130319504,
+      "contractAddress": null
+    },
+    "allow-USDC": {
+      "hash": "0x549721e7fb9a996a0f9f892e7755aa5c38a56ad28580f6e6c16abe65f35f7ecd",
+      "status": "confirmed",
+      "blockNumber": 130319511,
+      "contractAddress": null
+    },
+    "allow-BNB": {
+      "hash": "0x0784e776a50dbed02b7f5422adb0243f00e39320190523a9f86ec9d4e424f4ac",
+      "status": "confirmed",
+      "blockNumber": 130319518,
+      "contractAddress": null
+    }
+  },
+  "routesAfterSmoke": {
+    "chainId": 97,
+    "blockNumber": 130322150,
+    "observedAt": "2026-09-11T01:51:35.450Z",
+    "routes": {
+      "BNB": {
+        "allowed": true,
+        "path": [
+          "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+          "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c"
+        ],
+        "pair": "0xfE74Bd3b512d88872DfF67e9c12cfc64A1eC1831",
+        "reservesRaw": [
+          "48750000000000000000000",
+          "1025692410461950"
+        ],
+        "quote1250UkiRaw": [
+          "27045997533540",
+          "1250000000000000000000"
+        ]
+      },
+      "ASM": {
+        "allowed": true,
+        "path": [
+          "0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C",
+          "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c"
+        ],
+        "pair": "0x8fa397B4E1DED911161f13C128DF369cE9a95B3A",
+        "reservesRaw": [
+          "48809999999999999999800",
+          "85574301741501168013"
+        ],
+        "quote1250UkiRaw": [
+          "2253621565605484730",
+          "1250000000000000000000"
+        ]
+      },
+      "USDT": {
+        "allowed": true,
+        "path": [
+          "0x5A4C2904E80d2d27F6996C0df989A53AeBAf968D",
+          "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c"
+        ],
+        "pair": "0x938b70bcB1F7FDcf63D51E51D66401c1A56A3640",
+        "reservesRaw": [
+          "48750000000000000000000",
+          "5128462052309747700530"
+        ],
+        "quote1250UkiRaw": [
+          "135229987667697175945",
+          "1250000000000000000000"
+        ]
+      },
+      "USDC": {
+        "allowed": true,
+        "path": [
+          "0x3593f86E45Fe02536B30A2cb445628e5301289EC",
+          "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c"
+        ],
+        "pair": "0x50Df75ea49DB409b33592d12d5601F8710Eb3D67",
+        "reservesRaw": [
+          "5128462052309747700530",
+          "48750000000000000000000"
+        ],
+        "quote1250UkiRaw": [
+          "135229987667697175945",
+          "1250000000000000000000"
+        ]
+      }
+    },
+    "paused": false
+  },
+  "settlement": {
+    "sellerReceives": "1250 UKI exactly in each purchase",
+    "feeBps": 500,
+    "feeCurrency": "buyer payment currency",
+    "nativeFee": "claimableNativeFees credit; treasury withdrawal not executed",
+    "purchases": [
+      {
+        "symbol": "UKI",
+        "tokenId": 99091101,
+        "orderId": "0xf885a9e3c2137d4e278ab3a57b83ff580cf49c2e458b0e2aeddf50f297f34e71",
+        "hash": "0x175fcc9d2719d04f1534e9b231c3ade405f2cec141ca83d82022cae8c97a3f79",
+        "blockNumber": 130320288,
+        "paymentToken": "0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c",
+        "sellerUkiDeltaRaw": "1250000000000000000000",
+        "feeRaw": "62500000000000000000",
+        "paymentRaw": "1312500000000000000000",
+        "refundRaw": "0",
+        "feeRecipientDeltaRaw": "62500000000000000000",
+        "nftOwner": "0xE338bbC6157C93861792074b71733F75115ccB15",
+        "status": "success"
+      },
+      {
+        "symbol": "ASM",
+        "tokenId": 99091102,
+        "orderId": "0xb25e77b03891b6c209842ea905daf88ed1bf4717db352d0ac3bdd75dc285c4d7",
+        "hash": "0xd87456939a418a136c4145d46126425c1117fb3d06eddc4b3036365fb46cd424",
+        "blockNumber": 130320322,
+        "paymentToken": "0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C",
+        "sellerUkiDeltaRaw": "1250000000000000000000",
+        "feeRaw": "107048420408391734",
+        "paymentRaw": "2248016828576226414",
+        "refundRaw": "22480168285762265",
+        "feeRecipientDeltaRaw": "107048420408391734",
+        "nftOwner": "0xE338bbC6157C93861792074b71733F75115ccB15",
+        "status": "success"
+      },
+      {
+        "symbol": "BNB",
+        "tokenId": 99091103,
+        "orderId": "0x8147d2a5e6f69aadefc6dc7e100848bf782d113f6b20b992120f6356f6c297a6",
+        "hash": "0x73bc9afbc94499226e0973de9448ea2292665a701981d33380ce28a3080b23c5",
+        "blockNumber": 130320360,
+        "paymentToken": "0x0000000000000000000000000000000000000000",
+        "sellerUkiDeltaRaw": "1250000000000000000000",
+        "feeRaw": "1284620523098",
+        "paymentRaw": "26977030985048",
+        "refundRaw": "269770309851",
+        "feeRecipientDeltaRaw": "1284620523098",
+        "nftOwner": "0xE338bbC6157C93861792074b71733F75115ccB15",
+        "status": "success"
+      },
+      {
+        "symbol": "USDT",
+        "tokenId": 99091104,
+        "orderId": "0xc4ec7f23fcee072f747dae09ca8a6d9d474131183ff747c2fd18f2ccaa30d647",
+        "hash": "0xcf19454b71afb340e9314b9aa3f802da34f3dd8d5c8d4928f961b91da6414417",
+        "blockNumber": 130320395,
+        "paymentToken": "0x5A4C2904E80d2d27F6996C0df989A53AeBAf968D",
+        "sellerUkiDeltaRaw": "1250000000000000000000",
+        "feeRaw": "6423102615487385027",
+        "paymentRaw": "134885154925235085557",
+        "refundRaw": "1348851549252350856",
+        "feeRecipientDeltaRaw": "6423102615487385027",
+        "nftOwner": "0xE338bbC6157C93861792074b71733F75115ccB15",
+        "status": "success"
+      },
+      {
+        "symbol": "USDC",
+        "tokenId": 99091105,
+        "orderId": "0x9e796b5b937c8decbfd414cf22a35427a226fe9c687beded55faa47e6e8f6d14",
+        "hash": "0xa2ea60d9207cd34a924621ff3f46a68bea07bbd77f285e0c29c448ec042f2451",
+        "blockNumber": 130320432,
+        "paymentToken": "0x3593f86E45Fe02536B30A2cb445628e5301289EC",
+        "sellerUkiDeltaRaw": "1250000000000000000000",
+        "feeRaw": "6423102615487385027",
+        "paymentRaw": "134885154925235085557",
+        "refundRaw": "1348851549252350856",
+        "feeRecipientDeltaRaw": "6423102615487385027",
+        "nftOwner": "0xE338bbC6157C93861792074b71733F75115ccB15",
+        "status": "success"
+      }
+    ],
+    "cancellation": {
+      "tokenId": 99091106,
+      "orderId": "0xf4cf36004d5fd4c44df2db442fa5f1375438cc68ce5edd2ac98069c51453bcbf",
+      "hash": "0xcb0ecf859c55fdde8a8327ef5372650b5ddd1237e34a9d4126ee5121a92b221a",
+      "status": "success",
+      "nftRemainsWithSeller": true
+    },
+    "fixtureCustody": "All six NFTs and unspent ERC20 test tokens returned to the staging operator"
+  },
+  "testnetFunding": {
+    "amountUki": "210000",
+    "transaction": "0x7cc4d7e0928038b15dd5da2f7fefb1f396b75d6ef42c81d7f9d5ecea12da9362",
+    "sourceRole": "existing testnet UKI owner; kept over 450000000 UKI reward reserve",
+    "purpose": "200000 UKI liquidity across four test pools plus test purchase reserve",
+    "realValue": false
+  },
+  "publicBuildConfig": {
+    "environment": "cukies-staging",
+    "beforeHash": "af4346499166804d1177b5ce21ca842fa3bad436f6db8c3c426ed7f17fd79f27",
+    "hash": "c46000c2175d3e9b16f5620856a50e6fcec014cc13f8d5495167c074cfaf4533",
+    "appliedAndReadBack": true
+  },
+  "diagnosis": {
+    "missingImages": "Order API omitted canonical asset metadata; Mongo/MinIO images existed for 98000005 and 98000007.",
+    "collection": "Non-custodial orders; both assets remained owned by user in Mongo. Remove generic marketplace navigation and preserve listed pending state in filters; cancel exact saleOrderId from collection.",
+    "checkout": "Multi-column checkout rendered inside narrow catalogue card.",
+    "payments": "No viable BNB/stablecoin routes; ASM pool held only 60 UKI, insufficient for 1250 UKI orders. ASM/USDC also missing from web payment paths."
+  },
+  "validation": {
+    "contracts": "11 Hardhat tests passed",
+    "dapp": {
+      "tests": {
+        "suites": 269,
+        "passed": 2231,
+        "failed": 0
+      },
+      "lint": "passed",
+      "typecheck": "passed",
+      "build": "passed",
+      "commands": [
+        "pnpm dapp test --runInBand",
+        "pnpm dapp lint",
+        "pnpm dapp typecheck",
+        "pnpm dapp build"
+      ]
+    },
+    "visual": {
+      "scope": "Local browser with catalog fixtures derived from observed public orders and canonical NFT metadata; live read-only testnet quotes. No user signatures.",
+      "viewports": [
+        "1440x1000",
+        "390x844",
+        "320x740"
+      ],
+      "checks": [
+        "Five payment options visible",
+        "Images loaded for both user listings",
+        "Spanish canonical generation and rarity labels",
+        "Purchase in responsive Sheet, no inline checkout",
+        "CTA fits inside 320px viewport and remains at least 44px high"
+      ],
+      "screenshots": [
+        "docs/evidence/2026-09-11-marketplace-v2-qa/v2-purchase-sheet-desktop.png",
+        "docs/evidence/2026-09-11-marketplace-v2-qa/v2-purchase-usdc-mobile.png"
+      ]
+    },
+    "liveProduct": "pending merge and deployed SHA verification",
+    "deliveryInvariants": {
+      "passed": 131,
+      "failed": 0,
+      "generatedCompose": "up to date"
+    }
+  },
+  "limits": [
+    "Production unchanged.",
+    "No transactions for user NFT98000005/7.",
+    "Testnet stablecoins are tUSDT/tUSDC fixtures with 18 decimals, not real stablecoins.",
+    "Residual test BNB in ephemeral wallets was not swept.",
+    "30 to 15 minute cycle change remains cancelled."
+  ]
+}

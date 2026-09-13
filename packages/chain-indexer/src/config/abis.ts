@@ -24,6 +24,18 @@ export const eventSignatures: Record<EventName, string> = {
     'event MarketTokenSaleCancelled(uint256 tokenId)',
   MarketTokenPriceChanged:
     'event MarketTokenPriceChanged(uint256 tokenId, uint256 newPrice, uint256 newFee)',
+  UkiMarketplaceOrderCreated:
+    'event OrderCreated(bytes32 indexed orderId, address indexed collection, uint256 indexed tokenId, address seller, uint256 ukiPrice, uint64 expiresAt, uint64 nonce, uint16 feeBps)',
+  UkiMarketplaceOrderCancelled:
+    'event OrderCancelled(bytes32 indexed orderId, address indexed seller)',
+  UkiMarketplaceOrderExpired:
+    'event OrderExpired(bytes32 indexed orderId)',
+  UkiMarketplaceOrderInvalidated:
+    'event OrderInvalidated(bytes32 indexed orderId, bytes32 indexed reason)',
+  UkiMarketplaceTokenNonceInvalidated:
+    'event TokenNonceInvalidated(address indexed collection, uint256 indexed tokenId, uint64 nonce, address indexed owner)',
+  UkiMarketplaceOrderFilled:
+    'event OrderFilled(bytes32 indexed orderId, address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 feeAmount, uint256 ukiPrice)',
   JumpInBridge:
     'event JumpInBridge(uint256 tokenId, address originOwner, address destOwner, uint8 network, uint256 createdAt)',
   JumpOutBridge:
