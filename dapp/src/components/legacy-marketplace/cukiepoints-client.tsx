@@ -43,6 +43,16 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown CukiePoints error';
 }
 
+function requireAvailablePointsResponse(
+  payload: LegacyCukiePointsResponse,
+) {
+  if (payload.source === 'empty' || payload.coverage === 'unavailable') {
+    throw new Error(payload.error ?? 'No se puede verificar la actividad de CukiePoints.');
+  }
+
+  return payload;
+}
+
 function formatPointValue(value?: bigint | number | string | null) {
   if (value === undefined || value === null) return '-';
   if (typeof value === 'bigint') return value.toLocaleString('en-US');
@@ -231,7 +241,9 @@ export function CukiePointsClient() {
       if (!response.ok) {
         throw new Error('No se ha podido cargar CukiePoints.');
       }
-      const payload = (await response.json()) as LegacyCukiePointsResponse;
+      const payload = requireAvailablePointsResponse(
+        (await response.json()) as LegacyCukiePointsResponse,
+      );
       setPointsData(payload);
     } catch (error) {
       setStatus(getErrorMessage(error));
@@ -253,7 +265,9 @@ export function CukiePointsClient() {
       if (!response.ok) {
         throw new Error('No se han podido cargar mas movimientos.');
       }
-      const payload = (await response.json()) as LegacyCukiePointsResponse;
+      const payload = requireAvailablePointsResponse(
+        (await response.json()) as LegacyCukiePointsResponse,
+      );
       setPointsData({
         ...payload,
         items: [...pointsData.items, ...payload.items],
@@ -332,10 +346,13 @@ export function CukiePointsClient() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">
-                Total CukiePoints
+                Historical indexed sum
               </p>
               <p className="mt-1 font-headline text-2xl font-bold text-white">
                 {formatPointValue(pointsSummary?.totalPoints)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Suma del histórico Legacy; no es saldo transferible.
               </p>
             </div>
             <Database className="h-5 w-5 text-cyan-200" />
@@ -426,6 +443,19 @@ export function CukiePointsClient() {
             Refresh
           </Button>
         </div>
+
+        {pointsData?.coverage === 'legacy-historical' && (
+          <div
+            role="status"
+            className="mx-4 mt-4 rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-3 text-sm leading-5 text-amber-100"
+          >
+            Mostramos el historial disponible de Legacy. Es una lectura
+            histórica: puede faltar actividad mientras completamos la
+            reconciliación, y no habilita transferencia ni reclamación de
+            puntos. Los puntos pendientes de NFTs en staking tampoco están
+            incluidos en este saldo acreditado.
+          </div>
+        )}
 
         <div className="grid gap-3 border-b border-white/10 p-4 lg:grid-cols-[auto_auto_auto_1fr]">
           <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">

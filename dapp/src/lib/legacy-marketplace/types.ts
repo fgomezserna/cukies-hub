@@ -169,5 +169,12 @@ export type LegacyCukiePointsResponse = {
   offset: number;
   limit: number;
   summary: LegacyCukiePointsSummary;
+  /**
+   * The legacy collection is a historical read model. Keep that fact in the
+   * response so public consumers do not mistake indexed rows for a complete
+   * current on-chain projection.
+   */
+  status?: 'verified' | 'partial' | 'unknown';
+  coverage?: 'current' | 'legacy-historical' | 'unavailable';
   error?: string;
 };

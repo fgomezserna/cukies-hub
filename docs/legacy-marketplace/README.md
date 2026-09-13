@@ -254,7 +254,10 @@ desde `breedingPoints.getAllBreedsOwner/getBreed`, apertura con
 
 La vista CukiePoints reconstruye `/users/points`: balance por wallet desde
 `points.getPoints(address)`, supply emitida/quemada desde el ABI `points` y
-actividad indexada desde la coleccion Mongo legacy `points`.
+actividad indexada desde la coleccion Mongo legacy `points`. La respuesta marca
+esta actividad como `legacy-historical`/`partial`: es una lectura histórica para
+auditoría, no un saldo transferible o reclamable, y no incluye puntos pendientes
+calculados para NFTs que sigan en staking.
 
 La vista bridge reconstruye `/bridges/cukies`: selecciona Cukies disponibles
 por wallet/red, lee `bridge.bridgePrice()` y `bridge.paused()`, gestiona
