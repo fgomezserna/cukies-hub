@@ -151,18 +151,27 @@ distinta y no debe duplicar envios contra los mismos contratos.
 | Frontera | Stage | Produccion |
 | --- | --- | --- |
 | Contratos legacy | Los existentes BSC 56/TRON mainnet | Los mismos contratos |
-| Base dedicada propuesta | `cukies-legacy-indexer-staging` | `cukies-legacy-indexer` |
+| Base lógica de runtime | `cukieshub-new-staging` (unificada) | `cukieshub-new` (unificada) |
 | Contratos nuevos | Deployments de testnet | Deployments propios de mainnet |
-| Cursores y credenciales | Exclusivos de Stage | Exclusivos de produccion |
+| Cursores y consumidores | Exclusivos de Stage | Exclusivos de produccion |
 
-La configuracion legacy sera explicita y no heredara la URI, RPC, addresses o
-checkpoints del indexer de economia. Las bases dedicadas evitan prefijos
-redundantes en las colecciones. Dentro de cada base, NFTs/listings se identifican
-por red, coleccion NFT canonica y tokenId; el address emisor de staking, breeding
-o marketplace no sustituye al address de esa coleccion. Los puntos incorporan
-red, contrato POINTS y wallet. Un mismo tokenId en TRON y BSC debe conservar dos
-estados independientes. La ingesta legacy no genera outbox de economia nueva,
-creditos ni rewards.
+La configuracion legacy comparte la URI y la identidad Mongo runtime canónicas, pero mantiene
+explícitos sus RPC, addresses y checkpoints, sin heredarlos del indexer de
+economia. En staging y producción comparte la base
+lógica canónica (`cukieshub-new-staging` y `cukieshub-new`, respectivamente),
+pero mantiene su perfil, contrato de consumidor y cursores propios; las
+colecciones con contrato distinto conservan su nombre o un namespace explícito
+y las colisiones (`cukies`, `tx_nfts`) se resuelven con legacy como autoridad
+solo tras reconciliación. Dentro de cada base, NFTs/listings se identifican por red, coleccion NFT canonica y tokenId; el
+address emisor de staking, breeding o marketplace no sustituye al address de esa
+coleccion. Los puntos incorporan red, contrato POINTS y wallet. Un mismo tokenId
+en TRON y BSC debe conservar dos estados independientes. La ingesta legacy no
+genera outbox de economia nueva, creditos ni rewards.
+
+`eventlog` no forma parte del runtime de producción: `NX_TRON_DB`, `TRON_DB`,
+`CUKIES_TRON_DB` y las URI `EVENTLOG_*` quedan prohibidas. Los getters TRON
+leen directamente de la cadena/proveedor; las menciones históricas en evidencias
+no justifican crear o conservar otra base.
 
 Antes de arrancar la ingesta en Stage: verificar identidad y red de cada fuente,
 fijar el inicio historico y probar backfill/replay sin duplicados. Durante la
@@ -194,9 +203,10 @@ El primer destino es exclusivamente Coolify app `28`, UUID
 `u4s804o4wwcckowgk0woo4wg`, rama `staging`. El perfil Compose
 `legacy-indexer` se anade a los perfiles ya activos, conservandolos. El
 servicio `legacy-chain-indexer` requiere `CUKIES_LEGACY_INDEXER_ENABLED=true`
-y credenciales Mongo limitadas a `cukies-legacy-indexer-staging`. La URI debe
-nombrar esa misma base. La configuracion concreta se revisa con el SHA de la PR
-antes del merge; no se copia un entorno completo desde el runtime antiguo.
+y credenciales Mongo limitadas a la base unificada `cukieshub-new-staging`.
+La URI debe nombrar esa misma base. La configuracion concreta se revisa con el
+SHA de la PR antes del merge; no se copia un entorno completo desde el runtime
+antiguo.
 
 Destino comprobado por SSH el 2026-09-07: el Mongo exclusivo de Stage anuncia
 `cukies-hub-staging-mongo-u4s804o4wwcckowgk0woo4wg:27017` en la red `coolify`,
@@ -210,8 +220,8 @@ base y su usuario dedicado se provisionan para este worker. Esta lectura de
 | `APP_ENV` / `STAGING_ONLY_GUARD` | `staging` / `true` |
 | `COOLIFY_BRANCH` / `COOLIFY_RESOURCE_UUID` | `staging` / UUID de app 28 |
 | `CUKIES_SERVICE` | `legacy-chain-indexer` |
-| `CUKIES_LEGACY_INDEXER_DB_NAME` | `cukies-legacy-indexer-staging` |
-| `CUKIES_LEGACY_INDEXER_MONGO_URL` | Secreto exclusivo de esa base en Coolify; nunca versionado |
+| `CUKIES_LEGACY_INDEXER_DB_NAME` | `cukieshub-new-staging` |
+| `CUKIES_LEGACY_INDEXER_MONGO_URL` | Alias de la URI runtime canónica en Coolify; nunca versionado |
 | `CUKIES_LEGACY_BSC_CHAIN_ID` / `CUKIES_LEGACY_BSC_RPC_URLS` | `56` / proveedores mainnet capaces de servir el historico elegido |
 | `CUKIES_LEGACY_TRON_NETWORK` / `CUKIES_LEGACY_TRON_API_BASE_URL` | `mainnet` / API mainnet con eventos historicos; credencial opcional exclusiva |
 | `CUKIES_LEGACY_BSC_START_BLOCK` | Inicio explicito; `0` significa historia completa en el worker dedicado, no empezar desde el head |
@@ -372,7 +382,7 @@ autorizacion de implementar no significa que los workers ya esten activados.
 | Fase | Trabajo | Criterio de salida verificable |
 | --- | --- | --- |
 | P0 Inventario | Congelar manifests, addresses, fuentes, custodias, 34 contenedores y bases; registrar owners sin valores secretos | Evidencias durables de contracts/runtime/databases; cada pieza tiene destino y bloqueo; cero secretos en docs |
-| P1 Eventos y workers | Completar el catalogo ABI legacy/nuevo, ingesta, proyecciones y auditoria de approvals/admin; incluir breeding y correlacion de bridge. Worker legacy dedicado con destino Stage separado | Cobertura ABI automatizada, replay idempotente, fechas/identidades preservadas, ningun evento desconocido descartado y guards de fuente/destino verificados |
+| P1 Eventos y workers | Completar el catalogo ABI legacy/nuevo, ingesta, proyecciones y auditoria de approvals/admin; incluir breeding y correlacion de bridge. Worker legacy con perfil, cursores y credenciales aislados, pero destino Stage unificado | Cobertura ABI automatizada, replay idempotente, fechas/identidades preservadas, ningun evento desconocido descartado y guards de fuente/destino verificados |
 | P2 Datos y paridad Stage | Importadores reanudables de metadata, eventos, `tx_nfts`, points, users/wallets/referrals, originals y assets; dry-run antes de backfill acotado | Manifest por coleccion con origen/version/checkpoint; divergencias y huerfanos explicados por cadena/contrato/token/wallet; worker activo y observado tras reinicio |
 | P3 UX funcional | Marketplace conjunto Legacy/UKI, filtros historicos activos y acciones; bridge, puntos/staking y breeding completos; despues navegacion/dashboard. Conservar game/matchmaking/learn/ludo en su censo funcional | Flujos escritorio/movil, estados degradados y red/contrato exactos; las tarjetas legacy se identifican sin separar el catalogo en dos productos excluyentes |
 | P4 Corte | Cambiar consumidores por slice, validar auth/ownership/assets y observar egress. Los contratos legacy siguen donde estan desplegados | Cero llamadas del slice al GraphQL/auth/Mongo antiguo; rollback de consumidores documentado; no se detienen contratos on-chain por retirar el repo |

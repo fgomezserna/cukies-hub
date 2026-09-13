@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 
 const TARGETS = Object.freeze({
-  // The legacy reader/indexer is a staging consumer too.  It must share the
-  // unified staging database; production keeps its dedicated legacy target.
+  // The legacy reader/indexer is a staging and production consumer. Both
+  // environments use the canonical logical database; legacy collections and
+  // cursors are kept isolated by their runtime contracts.
   staging: { dbName: 'cukieshub-new-staging', branch: 'staging', guard: 'true', coolifyResourceUuid: 'u4s804o4wwcckowgk0woo4wg', applicationId: '28' },
-  production: { dbName: 'cukies-legacy-indexer', branch: 'main', guard: 'false', coolifyResourceUuid: 'jookw8ow8woks088s44404ok', applicationId: '12' },
+  production: { dbName: 'cukieshub-new', branch: 'main', guard: 'false', coolifyResourceUuid: 'jookw8ow8woks088s44404ok', applicationId: '12' },
   test: { dbName: 'cukies-legacy-worker-test', branch: null, guard: null },
 });
+
+const RETIRED_EVENTLOG_VARIABLES = Object.freeze([
+  'NX_TRON_DB',
+  'TRON_DB',
+  'CUKIES_TRON_DB',
+  'EVENTLOG_DATABASE_URL',
+  'EVENTLOG_MONGO_URL',
+]);
 
 function required(environment, key, failures) {
   const value = environment[key]?.trim();
@@ -25,6 +34,30 @@ function mongoDatabase(value, key, failures) {
     const dbName = decodeURIComponent(url.pathname.replace(/^\//, '')).trim();
     if (!dbName) failures.push(`${key} must include an explicit database name`);
     return dbName || null;
+  } catch {
+    failures.push(`${key} is not a valid MongoDB URL`);
+    return null;
+  }
+}
+
+function mongoRuntimeFingerprint(value, key, failures) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (!['mongodb:', 'mongodb+srv:'].includes(url.protocol)) {
+      failures.push(`${key} must be a MongoDB URL`);
+      return null;
+    }
+    const username = decodeURIComponent(url.username);
+    const password = decodeURIComponent(url.password);
+    const port = url.port || (url.protocol === 'mongodb+srv:' ? 'srv' : '27017');
+    const authSource = url.searchParams.get('authSource') ?? '';
+    // Compare the complete runtime identity in memory; never expose the
+    // password in an error or returned value.
+    return {
+      endpoint: `${url.protocol}//${username}@${url.hostname.toLowerCase()}:${port}|authSource=${authSource}`,
+      password,
+    };
   } catch {
     failures.push(`${key} is not a valid MongoDB URL`);
     return null;
@@ -52,11 +85,30 @@ export function validateLegacyIndexerEnvironment(environment = process.env, targ
   const configuredDbName = required(environment, 'CUKIES_LEGACY_INDEXER_DB_NAME', failures);
   if (expected && configuredDbName && configuredDbName !== expected.dbName) failures.push(`CUKIES_LEGACY_INDEXER_DB_NAME must equal ${expected.dbName}`);
   if (expected && encodedDbName && encodedDbName !== expected.dbName) failures.push(`CUKIES_LEGACY_INDEXER_MONGO_URL must target database ${expected.dbName}`);
+  if (environment.DATABASE_URL?.trim() && mongoUrl) {
+    const runtimeFingerprint = mongoRuntimeFingerprint(environment.DATABASE_URL.trim(), 'DATABASE_URL', failures);
+    const legacyFingerprint = mongoRuntimeFingerprint(mongoUrl, 'CUKIES_LEGACY_INDEXER_MONGO_URL', failures);
+    if (
+      runtimeFingerprint
+      && legacyFingerprint
+      && (runtimeFingerprint.endpoint !== legacyFingerprint.endpoint
+        || runtimeFingerprint.password !== legacyFingerprint.password)
+    ) {
+      failures.push('CUKIES_LEGACY_INDEXER_MONGO_URL must use the same endpoint and runtime credentials as DATABASE_URL');
+    }
+  }
   for (const [key, value] of [['CUKIES_LEGACY_BSC_RPC_URLS', environment.CUKIES_LEGACY_BSC_RPC_URLS], ['CUKIES_LEGACY_BSC_START_BLOCK', environment.CUKIES_LEGACY_BSC_START_BLOCK], ['CUKIES_LEGACY_TRON_API_BASE_URL', environment.CUKIES_LEGACY_TRON_API_BASE_URL], ['CUKIES_LEGACY_TRON_START_TIMESTAMP_MS', environment.CUKIES_LEGACY_TRON_START_TIMESTAMP_MS]]) {
     required(environment, key, failures);
     if (value && (key.endsWith('START_BLOCK') || key.endsWith('TIMESTAMP_MS')) && !/^\d+$/.test(value.trim())) failures.push(`${key} must be a non-negative integer`);
   }
   if (environment.CUKIES_LEGACY_CONTRACT_ALIASES && environment.CUKIES_LEGACY_CONTRACT_ALIASES !== 'TOKEN,MINT,REFERRALS,POINTS,STAKING_POINTS,BREEDING_POINTS,MARKETPLACE,BRIDGE') failures.push('CUKIES_LEGACY_CONTRACT_ALIASES contains a non-canonical alias');
+  for (const key of RETIRED_EVENTLOG_VARIABLES) {
+    if (environment[key]?.trim()) failures.push(`${key} is retired; Tron getters read the chain directly and must not use eventlog`);
+  }
+  for (const key of Object.keys(environment)) {
+    if (!/(?:MONGO|DATABASE|DB|URL)/i.test(key) || !/eventlog/i.test(environment[key] ?? '')) continue;
+    failures.push(`${key} must not reference retired eventlog`);
+  }
   if (failures.length) throw new Error(`LEGACY INDEXER guard rejected the operation:\n- ${failures.join('\n- ')}`);
   return { ok: true, target, dbName: expected?.dbName, runtimeScope: 'legacy' };
 }

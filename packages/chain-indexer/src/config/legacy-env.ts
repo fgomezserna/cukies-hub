@@ -14,6 +14,7 @@ const legacyEnvironmentSchema = z.object({
   APP_ENV: z.enum(['staging', 'production', 'test']),
   CUKIES_SERVICE: z.literal('legacy-chain-indexer'),
   CUKIES_LEGACY_INDEXER_ENABLED: z.string().optional(),
+  DATABASE_URL: z.string().optional(),
   CUKIES_LEGACY_INDEXER_MONGO_URL: z.string().min(1),
   CUKIES_LEGACY_INDEXER_DB_NAME: z.string().min(1),
   CUKIES_LEGACY_BSC_RPC_URLS: z.string().min(1),
@@ -33,10 +34,10 @@ const legacyEnvironmentSchema = z.object({
 });
 
 export const LEGACY_DB_NAMES = Object.freeze({
-  // Legacy Stage runs against the same logical database as the modern
-  // indexer/economy writers.  Production remains isolated below.
+  // Legacy readers/indexers share the canonical logical database. Legacy
+  // collections and cursors are kept isolated by their runtime contracts.
   staging: 'cukieshub-new-staging',
-  production: 'cukies-legacy-indexer',
+  production: 'cukieshub-new',
   test: 'cukies-legacy-worker-test',
 });
 
@@ -55,6 +56,35 @@ function mongoDatabaseName(uri: string) {
   const name = decodeURIComponent(parsed.pathname.replace(/^\//, '')).trim();
   if (!name) throw new Error('CUKIES_LEGACY_INDEXER_MONGO_URL debe incluir la base.');
   return name;
+}
+
+function mongoRuntimeFingerprint(uri: string) {
+  const parsed = new URL(uri);
+  if (parsed.protocol !== 'mongodb:' && parsed.protocol !== 'mongodb+srv:') {
+    throw new Error('La URL Mongo debe usar mongodb:// o mongodb+srv://.');
+  }
+  const username = decodeURIComponent(parsed.username);
+  const password = decodeURIComponent(parsed.password);
+  const port = parsed.port || (parsed.protocol === 'mongodb+srv:' ? 'srv' : '27017');
+  const authSource = parsed.searchParams.get('authSource') ?? '';
+  return {
+    endpoint: `${parsed.protocol}//${username}@${parsed.hostname.toLowerCase()}:${port}|authSource=${authSource}`,
+    password,
+  };
+}
+
+function assertSameMongoRuntime(environment: z.infer<typeof legacyEnvironmentSchema>, legacyUri: string) {
+  if (!environment.DATABASE_URL?.trim()) return;
+  try {
+    const runtime = mongoRuntimeFingerprint(environment.DATABASE_URL.trim());
+    const legacy = mongoRuntimeFingerprint(legacyUri);
+    if (runtime.endpoint !== legacy.endpoint || runtime.password !== legacy.password) {
+      throw new Error('Las URLs Mongo del indexador legacy y DATABASE_URL deben usar el mismo endpoint y credenciales runtime.');
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Las URLs Mongo')) throw error;
+    throw new Error('DATABASE_URL y CUKIES_LEGACY_INDEXER_MONGO_URL deben ser URLs Mongo compatibles.');
+  }
 }
 
 function rpcUrls(value: string) {
@@ -123,6 +153,7 @@ export function getLegacyIndexerConfig(environment: NodeJS.ProcessEnv = process.
   }
   const dbName = env.CUKIES_LEGACY_INDEXER_DB_NAME.trim();
   assertDatabaseBoundary(environment, appEnv, env.CUKIES_LEGACY_INDEXER_MONGO_URL, dbName);
+  assertSameMongoRuntime(env, env.CUKIES_LEGACY_INDEXER_MONGO_URL);
   const aliases = validateAliases(env.CUKIES_LEGACY_CONTRACT_ALIASES);
   const bscRpcUrls = rpcUrls(env.CUKIES_LEGACY_BSC_RPC_URLS);
   // El manifiesto compartido conserva aliases de economía; el runtime legacy

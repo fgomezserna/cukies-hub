@@ -26,6 +26,14 @@ export const STAGING_TARGET = Object.freeze({
 export const STAGING_DAPP_RESOURCE_UUID = 'rwwsc4kkwc0ck84cgk40s8kk';
 export const STAGING_DAPP_APPLICATION_ID = '32';
 
+const RETIRED_EVENTLOG_VARIABLES = Object.freeze([
+  'NX_TRON_DB',
+  'TRON_DB',
+  'CUKIES_TRON_DB',
+  'EVENTLOG_DATABASE_URL',
+  'EVENTLOG_MONGO_URL',
+]);
+
 export class StagingGuardError extends Error {
   constructor(failures) {
     super(`STAGING-ONLY guard rejected the operation:\n- ${failures.join('\n- ')}`);
@@ -77,6 +85,56 @@ function requireMongoDatabase(environment, key, expected, failures) {
     failures.push(`${key} must target database ${expected}`);
   }
   return databaseName;
+}
+
+function mongoConnectionFingerprint(value, key, failures) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'mongodb:' && url.protocol !== 'mongodb+srv:') {
+      failures.push(`${key} must be a MongoDB URL`);
+      return null;
+    }
+    const username = decodeURIComponent(url.username);
+    const password = decodeURIComponent(url.password);
+    const port = url.port || (url.protocol === 'mongodb+srv:' ? 'srv' : '27017');
+    const authSource = url.searchParams.get('authSource') ?? '';
+    // Compare the runtime identity in memory; never include the password in a
+    // guard error or in the returned result.
+    return {
+      endpoint: `${url.protocol}//${username}@${url.hostname.toLowerCase()}:${port}|authSource=${authSource}`,
+      password,
+    };
+  } catch {
+    failures.push(`${key} is not a valid MongoDB URL`);
+    return null;
+  }
+}
+
+function requireOneMongoRuntime(entries, failures) {
+  const fingerprints = [];
+  for (const [key, value] of entries) {
+    if (!value?.trim()) continue;
+    const fingerprint = mongoConnectionFingerprint(value.trim(), key, failures);
+    if (fingerprint) fingerprints.push(fingerprint);
+  }
+  const uniqueEndpoints = new Set(fingerprints.map(({ endpoint }) => endpoint));
+  const uniquePasswords = new Set(fingerprints.map(({ password }) => password));
+  if (uniqueEndpoints.size > 1 || uniquePasswords.size > 1) {
+    failures.push('all staging Mongo variables must use the same endpoint, database and runtime credentials');
+  }
+}
+
+function rejectRetiredEventlogVariables(environment, failures) {
+  for (const key of RETIRED_EVENTLOG_VARIABLES) {
+    if (environment[key]?.trim()) {
+      failures.push(`${key} is retired; Tron getters read the chain directly and must not use eventlog`);
+    }
+  }
+  for (const key of Object.keys(environment)) {
+    if (!/(?:MONGO|DATABASE|DB|URL)/i.test(key) || !/eventlog/i.test(environment[key] ?? '')) continue;
+    failures.push(`${key} must not reference retired eventlog`);
+  }
 }
 
 function requireStagingAuthUrl(environment, failures) {
@@ -365,6 +423,30 @@ export function validateStagingEnvironment(environment = process.env, scope = 'f
       'CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY',
     ]) required(environment, key, failures);
   }
+
+  if (scope === 'full' || scope === 'dapp' || scope === 'chain-indexer'
+    || scope === 'cuki-card-worker' || scope === 'cukies-bridge-relayer'
+    || scope === 'economy-scheduler') {
+    const mongoEntries = [['DATABASE_URL', environment.DATABASE_URL]];
+    if (scope === 'full' || scope === 'dapp' || scope === 'chain-indexer') {
+      mongoEntries.push(['CUKIES_DATABASE_URL', environment.CUKIES_DATABASE_URL]);
+    }
+    if (scope === 'full' || scope === 'dapp' || scope === 'chain-indexer' || scope === 'economy-scheduler') {
+      mongoEntries.push(['CHAIN_INDEXER_MONGO_URL', environment.CHAIN_INDEXER_MONGO_URL]);
+    }
+    if (scope === 'full' || scope === 'cuki-card-worker') {
+      mongoEntries.push(['CARD_WORKER_MONGO_URL', environment.CARD_WORKER_MONGO_URL]);
+    }
+    if (scope === 'full' && environment.CUKIES_LEGACY_INDEXER_MONGO_URL) {
+      mongoEntries.push(['CUKIES_LEGACY_INDEXER_MONGO_URL', environment.CUKIES_LEGACY_INDEXER_MONGO_URL]);
+    }
+    if (scope === 'cukies-bridge-relayer') {
+      mongoEntries.push(['CUKIES_BRIDGE_RELAYER_MONGO_URL', environment.CUKIES_BRIDGE_RELAYER_MONGO_URL]);
+    }
+    requireOneMongoRuntime(mongoEntries, failures);
+  }
+
+  rejectRetiredEventlogVariables(environment, failures);
 
   if (failures.length > 0) throw new StagingGuardError(failures);
 

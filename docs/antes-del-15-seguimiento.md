@@ -998,9 +998,10 @@ Evidencia local cerrada:
 - [ ] Para el primer arranque v2, definir temporalmente
   `STAGING_MONGO_MAINTENANCE_CONFIRMATION=staging-pii-v2-all-consumers-stopped`;
   retirarla despues de verificar `ready`.
-- [ ] Desplegar `staging-mongo`, DApp e indexer con nombres exactos
-  `cukies-hub-staging` y `cukies-legacy-staging`. Exigir health verde, un unico
-  marker v2 por base y estado admin `ready`.
+- [ ] Repuntar todos los servicios de Stage (DApp, indexer, legacy, schedulers,
+  cards y bridge cuando se habilite) al Mongo canónico y a la única base lógica
+  `cukieshub-new-staging`; no activar el perfil histórico `staging-mongo`. Exigir
+  health verde, un único marker v2 y estado admin `ready`.
 - [ ] Verificar cero `Session`, verificaciones, sesiones/resultados de juego,
   OAuth tokens, passwords y `blacklistedtokens`; probar que sesiones/bearers
   anteriores fallan y crear identidades QA nuevas.
@@ -1039,9 +1040,11 @@ Evidencia local cerrada:
   `CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID=56`; endpoint allowlisted sin redirects,
   queries minimas, errores normalizados, rate limit y observabilidad sin PII.
   No habilitarlo por una unica variable publica y fijar fecha de retirada.
-- [ ] Importar y reconciliar en colecciones propias todos los datos historicos
-  necesarios; demostrar cero llamadas a GraphQL/auth legacy y cero consumidores
-  de `CUKIES_DATABASE_URL` antes de desactivar la API/Mongo antiguos.
+- [ ] Importar y reconciliar en las colecciones/namespaces canónicos todos los
+  datos históricos necesarios; demostrar cero referencias a BDs antiguas y que
+  todos los aliases (`DATABASE_URL`, `CUKIES_DATABASE_URL`, indexer y cards)
+  usan la misma URI, usuario y `authSource` antes de retirar la infraestructura
+  Mongo anterior. `CUKIES_DATABASE_URL` se conserva como alias de compatibilidad.
 - [ ] Si una contencion de emergencia exige reconstruir legacy, hacerlo desde
   un SHA auditado y registrar digest OCI; esa imagen no se convierte en runtime
   permanente ni justifica reabrir GraphQL/auth.
@@ -1886,3 +1889,5 @@ los adelanta ni declara resueltos.
 | 2026-09-01 | Cerrado anticipadamente el torneo Stage, sellados y publicados los snapshots provisional/final y activada de hecho la ruta posterior de partidas por creditos. | Corte `2026-09-01T11:33:00Z`, bloque Testnet `128479727`, commit desplegado `7078ee5`, settlement `3` intentos/`0` elegibles, pool `52.600 UKI`, UI `Finalizadas` verificada y smoke economico `500 -> 490 -> 480` con dos partidas de coste `10`, ranking y sources de rewards. `main` y produccion no se modificaron. |
 | 2026-09-07 | Reconciliado el estado con producto: A operativo; B torneo lanzamiento activo; C resuelto; legacy con Points/crias antes del 15; 3 en pruebas Stage; 4 en main pendiente de publicar; 5 revision UX. | Secciones A/B/D, evidencia on-chain con bloques/tx, API publica de torneo y `output/verification/pancake-mainnet-20260907.json`. |
 | 2026-09-08 | Auditoria UX del punto 5: 27 rutas leidas en Stage, propuesta de navegacion y mapa por pantalla; se conservan los estados de producto de los demas puntos. | Stage `ed2d50d`, capturas/lecturas Edge en la tarea, `docs/uki-dapp-sitemap.md` y `docs/uki-ux-state-matrix.md`. Solo documentacion; sin rediseño implementado, firmas ni despliegue. |
+| 2026-09-13 | Verificación live del perímetro Stage: DApp, indexer, schedulers, cards, Game/Matchmaking/Learn/Ludo y APIs legacy resuelven `192.168.1.221:27018/cukieshub-new-staging` con la misma identidad runtime; se retiró `NX_TRON_DB` de `login` y `marketplace`, sin tocar producción. | `/api/health` y `/api/ready` de `https://cukieshub.eurekand.com` HTTP 200; contenedores Stage en ejecución; Compose legacy validado sin referencias `eventlog`. La copia previa del Compose queda como rollback operativo en Coolify. |
+| 2026-09-13 | Preparación de unificación de producción: guards, aliases Compose y target web fijan una única instancia/base lógica `cukieshub-new`; `eventlog` queda retirado y los getters TRON deben leer cadena/API. No se ejecutó snapshot, migración ni corte live. | `infrastructure/ci/production-data-unification.md`, `scripts/assert-production.mjs`, `scripts/assert-legacy-indexer.mjs`; 32 guards de producción/legacy y Compose focales PASS; App33 sigue candidata y App12/App13 conservan tráfico. |

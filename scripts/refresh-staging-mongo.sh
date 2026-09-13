@@ -3,7 +3,12 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Refresh Mongo staging databases from production snapshots.
+Historical two-database staging refresh (deprecated).
+
+The active runtime uses one logical staging database. This script is retained
+only for an explicitly authorised historical recovery; it must not be used for
+the normal staging refresh or production unification. Use
+infrastructure/ci/production-data-unification.md for the current procedure.
 
 Required env vars:
   PROD_DATABASE_URL            Mongo URI for production hub DB.
@@ -251,6 +256,11 @@ refresh_pair() {
 }
 
 main() {
+  if [[ "${ALLOW_LEGACY_TWO_DATABASE_REFRESH:-0}" != "1" ]]; then
+    echo "Refusing deprecated two-database staging refresh. Use the unified runbook; set ALLOW_LEGACY_TWO_DATABASE_REFRESH=1 only for an explicitly authorised historical recovery." >&2
+    exit 1
+  fi
+
   require_command python3
   require_command mongosh
   require_command mongodump

@@ -24,7 +24,7 @@ test('legacy staging is pinned to BSC 56 and the unified staging database', () =
 
 test('legacy rejects chain 97 and production database in staging', () => {
   assert.throws(() => getLegacyIndexerConfig(env({ CUKIES_LEGACY_BSC_CHAIN_ID: '97' })));
-  assert.throws(() => getLegacyIndexerConfig(env({ CUKIES_LEGACY_INDEXER_DB_NAME: 'cukies-legacy-indexer', CUKIES_LEGACY_INDEXER_MONGO_URL: 'mongodb://127.0.0.1:37018/cukies-legacy-indexer' })));
+  assert.throws(() => getLegacyIndexerConfig(env({ CUKIES_LEGACY_INDEXER_DB_NAME: 'cukieshub-new', CUKIES_LEGACY_INDEXER_MONGO_URL: 'mongodb://127.0.0.1:37018/cukieshub-new' })));
   assert.throws(() => getLegacyIndexerConfig(env({ CUKIES_LEGACY_CONTRACT_ALIASES: 'TOKEN,UKI_TOKEN' })));
   assert.throws(() => getLegacyIndexerConfig(env({ CUKIES_LEGACY_TRON_API_BASE_URL: 'https://nile.trongrid.io/v1' })));
   assert.throws(() => getLegacyIndexerConfig(env({ CUKIES_LEGACY_TRON_NETWORK: 'nile' })));
@@ -34,4 +34,10 @@ test('legacy disabled defaults closed without changing the parsed scope', () => 
   const config = getLegacyIndexerConfig(env({ CUKIES_LEGACY_INDEXER_ENABLED: 'false' }));
   assert.equal(config.enabled, false);
   assert.equal(config.runtimeScope, 'legacy');
+});
+
+test('legacy rejects a runtime Mongo identity different from DATABASE_URL', () => {
+  assert.throws(() => getLegacyIndexerConfig(env({
+    DATABASE_URL: 'mongodb://other-user:secret@other-host:37018/cukieshub-new-staging',
+  })), /mismo endpoint y credenciales runtime/);
 });

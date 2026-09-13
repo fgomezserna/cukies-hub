@@ -8,13 +8,30 @@ export const PRODUCTION_TARGET = Object.freeze({
   gitBranch: 'main',
   coolifyApplicationId: '12',
   coolifyResourceUuid: 'jookw8ow8woks088s44404ok',
+  coolifyResourceUuids: Object.freeze({
+    workers: 'jookw8ow8woks088s44404ok',
+    web: 'uo8gswsg84c488cowko0kkkg',
+    game: 'tkkggwcosc4gksckcc480cwg',
+  }),
   chainId: '56',
-  databaseName: 'cukies-hub',
-  legacyDatabaseName: 'cukies',
+  // Production has one logical database.  The old names are deliberately not
+  // accepted by any runtime guard; legacy collections are namespaced inside
+  // this database during the migration.
+  unifiedDatabaseName: 'cukieshub-new',
+  databaseName: 'cukieshub-new',
+  legacyDatabaseName: 'cukieshub-new',
   indexerDatabaseName: 'cukieshub-new',
   authHosts: new Set(['cukies.world', 'www.cukies.world']),
   stakingAddress: '0xad18ff665e99d0033c3bb9d73182c2b03df59696',
 });
+
+const RETIRED_EVENTLOG_VARIABLES = Object.freeze([
+  'NX_TRON_DB',
+  'TRON_DB',
+  'CUKIES_TRON_DB',
+  'EVENTLOG_DATABASE_URL',
+  'EVENTLOG_MONGO_URL',
+]);
 
 export class ProductionGuardError extends Error {
   constructor(failures) {
@@ -43,6 +60,32 @@ function requireQuotedOrExact(environment, key, expected, failures) {
   return value;
 }
 
+function productionResourceIds(scope) {
+  if (scope === 'dapp') {
+    return [
+      PRODUCTION_TARGET.coolifyResourceUuids.web,
+      PRODUCTION_TARGET.coolifyResourceUuids.workers,
+    ];
+  }
+  if (scope === 'game') return [PRODUCTION_TARGET.coolifyResourceUuids.game];
+  return [PRODUCTION_TARGET.coolifyResourceUuids.workers];
+}
+
+function requireProductionResource(environment, scope, failures) {
+  const value = required(environment, 'COOLIFY_RESOURCE_UUID', failures);
+  const allowed = productionResourceIds(scope);
+  if (value && !allowed.includes(value)) {
+    failures.push(`COOLIFY_RESOURCE_UUID must equal one of the approved production resources (${allowed.join(', ')})`);
+  }
+  return value;
+}
+
+function productionApplicationId(resourceUuid) {
+  if (resourceUuid === PRODUCTION_TARGET.coolifyResourceUuids.web) return '33';
+  if (resourceUuid === PRODUCTION_TARGET.coolifyResourceUuids.game) return '13';
+  return '12';
+}
+
 function databaseNameFromMongoUrl(value, key, failures) {
   if (!value) return null;
   try {
@@ -67,6 +110,56 @@ function requireMongoDatabase(environment, key, expected, failures) {
     failures.push(`${key} must target database ${expected}`);
   }
   return databaseName;
+}
+
+function mongoConnectionFingerprint(value, key, failures) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'mongodb:' && url.protocol !== 'mongodb+srv:') {
+      failures.push(`${key} must be a MongoDB URL`);
+      return null;
+    }
+    const username = decodeURIComponent(url.username);
+    const password = decodeURIComponent(url.password);
+    const port = url.port || (url.protocol === 'mongodb+srv:' ? 'srv' : '27017');
+    const authSource = url.searchParams.get('authSource') ?? '';
+    // The password is compared in memory so every service really uses one URI,
+    // but it is never included in an error or return value.
+    return {
+      endpoint: `${url.protocol}//${username}@${url.hostname.toLowerCase()}:${port}|authSource=${authSource}`,
+      password,
+    };
+  } catch {
+    failures.push(`${key} is not a valid MongoDB URL`);
+    return null;
+  }
+}
+
+function requireOneMongoRuntime(environment, entries, failures) {
+  const fingerprints = new Map();
+  for (const [key, value] of entries) {
+    if (!value?.trim()) continue;
+    const fingerprint = mongoConnectionFingerprint(value.trim(), key, failures);
+    if (fingerprint) fingerprints.set(key, fingerprint);
+  }
+  const uniqueEndpoints = new Set([...fingerprints.values()].map(({ endpoint }) => endpoint));
+  const uniquePasswords = new Set([...fingerprints.values()].map(({ password }) => password));
+  if (uniqueEndpoints.size > 1 || uniquePasswords.size > 1) {
+    failures.push('all production Mongo variables must use the same endpoint, database and runtime credentials');
+  }
+}
+
+function rejectRetiredEventlogVariables(environment, failures) {
+  for (const key of RETIRED_EVENTLOG_VARIABLES) {
+    if (environment[key]?.trim()) {
+      failures.push(`${key} is retired; Tron getters read the chain directly and must not use eventlog`);
+    }
+  }
+  for (const key of Object.keys(environment)) {
+    if (!/(?:MONGO|DATABASE|DB|URL)/i.test(key) || !/eventlog/i.test(environment[key] ?? '')) continue;
+    failures.push(`${key} must not reference retired eventlog`);
+  }
 }
 
 function requireProductionAuthUrl(environment, failures) {
@@ -95,7 +188,14 @@ function requireAddress(environment, key, expected, failures) {
 export function validateProductionEnvironment(environment = process.env, scope = 'full') {
   if (scope === 'legacy-chain-indexer') return validateLegacyIndexerEnvironment(environment, 'production');
   const failures = [];
-  const supportedScopes = new Set(['full', 'dapp', 'chain-indexer', 'cuki-card-worker']);
+  const supportedScopes = new Set([
+    'full',
+    'dapp',
+    'chain-indexer',
+    'cuki-card-worker',
+    'cukies-bridge-relayer',
+    'economy-scheduler',
+  ]);
   if (!supportedScopes.has(scope)) {
     throw new ProductionGuardError([`unsupported guard scope ${scope}`]);
   }
@@ -108,12 +208,7 @@ export function validateProductionEnvironment(environment = process.env, scope =
     PRODUCTION_TARGET.gitBranch,
     failures,
   );
-  const coolifyResourceUuid = requireExact(
-    environment,
-    'COOLIFY_RESOURCE_UUID',
-    PRODUCTION_TARGET.coolifyResourceUuid,
-    failures,
-  );
+  const coolifyResourceUuid = requireProductionResource(environment, scope, failures);
   const databaseName = requireMongoDatabase(
     environment,
     'DATABASE_URL',
@@ -126,8 +221,11 @@ export function validateProductionEnvironment(environment = process.env, scope =
   let legacyDatabaseName = null;
   let indexerDatabaseName = null;
   let indexerMongoDatabaseName = null;
+  let legacyIndexerDatabaseName = null;
   let cardWorkerDatabaseName = null;
   let cardWorkerMongoDatabaseName = null;
+  let bridgeRelayerDatabaseName = null;
+  let bridgeRelayerMongoDatabaseName = null;
   let authHost = null;
   let stakingAddress = null;
 
@@ -165,7 +263,7 @@ export function validateProductionEnvironment(environment = process.env, scope =
     );
   }
 
-  if (scope === 'full' || scope === 'chain-indexer') {
+  if (scope === 'full' || scope === 'chain-indexer' || scope === 'economy-scheduler') {
     indexerChainId = requireExact(
       environment,
       'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID',
@@ -200,6 +298,13 @@ export function validateProductionEnvironment(environment = process.env, scope =
   }
 
   if (scope === 'full' || scope === 'cuki-card-worker') {
+    if (environment.CARD_WORKER_SOURCE_FORMAT?.trim()
+      && environment.CARD_WORKER_SOURCE_FORMAT.trim() !== 'indexed') {
+      failures.push('CARD_WORKER_SOURCE_FORMAT must equal indexed in production');
+    }
+    if (environment.CARD_WORKER_LEGACY_STAGING_ENABLED?.trim() === 'true') {
+      failures.push('CARD_WORKER_LEGACY_STAGING_ENABLED must be false in production');
+    }
     cardWorkerDatabaseName = requireExact(
       environment,
       'CARD_WORKER_DB_NAME',
@@ -214,6 +319,60 @@ export function validateProductionEnvironment(environment = process.env, scope =
     );
   }
 
+  if (scope === 'full' && (environment.CUKIES_LEGACY_INDEXER_MONGO_URL?.trim()
+    || environment.CUKIES_LEGACY_INDEXER_DB_NAME?.trim())) {
+    legacyIndexerDatabaseName = requireExact(
+      environment,
+      'CUKIES_LEGACY_INDEXER_DB_NAME',
+      PRODUCTION_TARGET.unifiedDatabaseName,
+      failures,
+    );
+    requireMongoDatabase(
+      environment,
+      'CUKIES_LEGACY_INDEXER_MONGO_URL',
+      PRODUCTION_TARGET.unifiedDatabaseName,
+      failures,
+    );
+  }
+
+  if (scope === 'cukies-bridge-relayer') {
+    if (environment.CUKIES_BRIDGE_RELAYER_ENABLED?.trim() === 'true') {
+      failures.push('CUKIES_BRIDGE_RELAYER_ENABLED must be false in production; the relayer is staging-only');
+    }
+    bridgeRelayerDatabaseName = requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_DB_NAME',
+      PRODUCTION_TARGET.unifiedDatabaseName,
+      failures,
+    );
+    bridgeRelayerMongoDatabaseName = requireMongoDatabase(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_MONGO_URL',
+      PRODUCTION_TARGET.unifiedDatabaseName,
+      failures,
+    );
+  }
+
+  if (scope === 'full' || scope === 'dapp' || scope === 'chain-indexer'
+    || scope === 'cuki-card-worker' || scope === 'cukies-bridge-relayer'
+    || scope === 'economy-scheduler') {
+    const mongoEntries = [['DATABASE_URL', environment.DATABASE_URL]];
+    if (scope === 'full' || scope === 'dapp' || scope === 'chain-indexer') {
+      mongoEntries.push(['CUKIES_DATABASE_URL', environment.CUKIES_DATABASE_URL]);
+    }
+    if (scope === 'full' || scope === 'dapp' || scope === 'chain-indexer' || scope === 'economy-scheduler') {
+      mongoEntries.push(['CHAIN_INDEXER_MONGO_URL', environment.CHAIN_INDEXER_MONGO_URL]);
+    }
+    if (scope === 'full' || scope === 'cuki-card-worker') mongoEntries.push(['CARD_WORKER_MONGO_URL', environment.CARD_WORKER_MONGO_URL]);
+    if (scope === 'full' && environment.CUKIES_LEGACY_INDEXER_MONGO_URL) {
+      mongoEntries.push(['CUKIES_LEGACY_INDEXER_MONGO_URL', environment.CUKIES_LEGACY_INDEXER_MONGO_URL]);
+    }
+    if (scope === 'cukies-bridge-relayer') mongoEntries.push(['CUKIES_BRIDGE_RELAYER_MONGO_URL', environment.CUKIES_BRIDGE_RELAYER_MONGO_URL]);
+    requireOneMongoRuntime(environment, mongoEntries, failures);
+  }
+
+  rejectRetiredEventlogVariables(environment, failures);
+
   if (failures.length > 0) throw new ProductionGuardError(failures);
 
   return {
@@ -222,8 +381,9 @@ export function validateProductionEnvironment(environment = process.env, scope =
     scope,
     appEnv,
     gitBranch,
-    coolifyApplicationId: PRODUCTION_TARGET.coolifyApplicationId,
+    coolifyApplicationId: productionApplicationId(coolifyResourceUuid),
     coolifyResourceUuid,
+    unifiedDatabaseName: PRODUCTION_TARGET.unifiedDatabaseName,
     publicChainId,
     indexerChainId,
     databaseName,
@@ -232,6 +392,9 @@ export function validateProductionEnvironment(environment = process.env, scope =
     indexerMongoDatabaseName,
     cardWorkerDatabaseName,
     cardWorkerMongoDatabaseName,
+    legacyIndexerDatabaseName,
+    bridgeRelayerDatabaseName,
+    bridgeRelayerMongoDatabaseName,
     authHost,
     stakingAddress,
   };

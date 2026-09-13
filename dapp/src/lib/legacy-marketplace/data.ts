@@ -974,7 +974,7 @@ export async function getLegacyMarketplaceCuki(
       {
         $and: [
           { _id: tokenId },
-          buildLegacyMarketplaceIdentityFilter(normalizedIdentity) as unknown as Filter<LegacyCukiDocument>,
+         buildLegacyMarketplaceIdentityFilter(normalizedIdentity) as unknown as Filter<LegacyCukiDocument>,
         ],
       },
       { projection: cukiProjection },

@@ -12,6 +12,19 @@ se completan antes de habilitar el mismo proceso en producción. El estado live 
 | Staging | App32 `rwwsc4kkwc0ck84cgk40s8kk` | App31 `lc04cw8gs4koo4swwws0c4ss`, imagen por digest activa | App28 `u4s804o4wwcckowgk0woo4wg` | `https://cukieshub.eurekand.com`; runtime y ensayos en la evidencia INFRA |
 | Producción | App33 `uo8gswsg84c488cowko0kkkg`, nuevo recurso aún sin arrancar | App13 `tkkggwcosc4gksckcc480cwg`, Nixpacks/`e6e136b` sigue sirviendo; target registry preparado pero inactivo | App12 `jookw8ow8woks088s44404ok`, legacy/`main`/`4475baa` sigue sirviendo | `https://cukies.world`; PR361 draft, CI gate `false`, tráfico actual intacto |
 
+La preparación de producción usa App33 como candidato web y una instancia Mongo
+dedicada con la base lógica única `cukieshub-new`. App12/App13 y sus datos siguen
+siendo la fuente live hasta cerrar el ensayo; no se declara migración ni corte por
+el mero hecho de tener la configuración en el repositorio. `eventlog` queda retirado:
+los getters TRON consultan directamente la cadena y ningún servicio nuevo debe
+configurar `NX_TRON_DB`, `TRON_DB` o una URI `EVENTLOG_*`.
+
+La ventana prevista para el corte de datos es de 60 minutos: congelar escritores,
+crear snapshot y backup restaurable, cargar/reconciliar por lotes, ejecutar probes y
+smoke autenticado, y solo entonces repuntar Coolify. Si el backup, la identidad del
+endpoint o la reconciliación no son verificables, se conserva el tráfico actual y se
+aborta sin limpiar las fuentes antiguas.
+
 La web no publica un puerto del host ni usa un nombre fijo de contenedor.
 Coolify arranca su reemplazo, exige `/api/ready` y después termina la instancia
 anterior. `/api/ready` hace un ping read-only a Mongo con timeout; `/api/health`

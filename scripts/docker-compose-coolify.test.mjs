@@ -93,8 +93,8 @@ test('legacy card worker is opt-in and shares the unified staging database', () 
   assert.match(definition, /    profiles:\n      - legacy-card-worker/);
   assert.ok(definition.includes('CARD_WORKER_SOURCE_FORMAT: legacy'));
   assert.ok(definition.includes('CARD_WORKER_LEGACY_STAGING_ENABLED: ${CARD_WORKER_LEGACY_STAGING_ENABLED:-false}'));
-  assert.ok(definition.includes('CARD_WORKER_DB_NAME: ${CARD_WORKER_DB_NAME:-cukieshub-new-staging}'));
-  assert.ok(definition.includes('CARD_WORKER_MONGO_URL: ${CARD_WORKER_LEGACY_MONGO_URL:-${CUKIES_DATABASE_URL}}'));
+  assert.ok(definition.includes('CARD_WORKER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new-staging}'));
+  assert.ok(definition.includes('CARD_WORKER_MONGO_URL: ${DATABASE_URL}'));
   assert.ok(definition.includes('CARD_WORKER_S3_BUCKET: cukies-cards-staging'));
   assert.ok(definition.includes('CARD_WORKER_PUBLIC_BASE_URL: https://assets-staging.cukies.world'));
   assert.ok(definition.includes('AWS_ACCESS_KEY_ID: ${CARD_WORKER_LEGACY_S3_ACCESS_KEY_ID:-}'));
@@ -111,6 +111,22 @@ test('indexed card context is forwarded without mandatory interpolation in disab
   const definition = serviceDefinition('cuki-card-worker');
   for (const key of ['CARD_WORKER_SOURCE_NETWORK', 'CARD_WORKER_SOURCE_CHAIN_ID', 'CARD_WORKER_SOURCE_COLLECTION']) {
     assert.ok(definition.includes(`${key}: \${${key}:-}`));
+  }
+});
+
+test('all Mongo aliases derive from the canonical runtime variables', () => {
+  for (const serviceName of ['dapp', 'chain-indexer']) {
+    const definition = serviceDefinition(serviceName);
+    assert.ok(definition.includes('CUKIES_DATABASE_URL: ${DATABASE_URL}'));
+    assert.ok(definition.includes('CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}'));
+  }
+  const legacyIndexer = serviceDefinition('legacy-chain-indexer');
+  assert.ok(legacyIndexer.includes('CUKIES_LEGACY_INDEXER_MONGO_URL: ${DATABASE_URL}'));
+  assert.ok(legacyIndexer.includes('CUKIES_LEGACY_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-}'));
+  assert.ok(serviceDefinition('cuki-card-worker').includes('CARD_WORKER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}'));
+  assert.ok(serviceDefinition('cukies-bridge-relayer').includes('CUKIES_BRIDGE_RELAYER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new-staging}'));
+  for (const serviceName of sharedDappRuntimeWorkers) {
+    assert.ok(serviceDefinition(serviceName).includes('CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}'));
   }
 });
 
@@ -154,8 +170,8 @@ test('bridge relayer is opt-in, Nile-to-BSC-Testnet only and has no mainnet defa
 
   assert.match(definition, /    profiles:\n      - bridge-relayer/);
   assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_ENABLED: ${CUKIES_BRIDGE_RELAYER_ENABLED:-false}'));
-  assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_MONGO_URL: ${CUKIES_BRIDGE_RELAYER_MONGO_URL:-}'));
-  assert.doesNotMatch(definition, /CUKIES_BRIDGE_RELAYER_MONGO_URL:.*\$\{CHAIN_INDEXER_MONGO_URL/);
+  assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_MONGO_URL: ${DATABASE_URL}'));
+  assert.doesNotMatch(definition, /CUKIES_BRIDGE_RELAYER_MONGO_URL:.*\$\{CUKIES_BRIDGE_RELAYER_MONGO_URL/);
   assert.ok(definition.includes('process.env.CUKIES_BRIDGE_RELAYER_MONGO_URL || process.env.CHAIN_INDEXER_MONGO_URL || process.env.DATABASE_URL'));
   assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: ${CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID:-97}'));
   assert.ok(definition.includes('CUKIES_BRIDGE_RELAYER_TRON_NETWORK: ${CUKIES_BRIDGE_RELAYER_TRON_NETWORK:-nile}'));
@@ -212,6 +228,16 @@ for (const serviceName of sharedDappRuntimeWorkers) {
     assert.doesNotMatch(definition, /CUKIES_SERVICE: dapp/);
   });
 }
+
+test('scheduler services select the guard for the active environment', () => {
+  for (const serviceName of sharedDappRuntimeWorkers) {
+    const definition = serviceDefinition(serviceName);
+    assert.match(
+      definition,
+      /if \[ "\$\$APP_ENV" = staging \]; then node scripts\/assert-staging-only\.mjs --scope economy-scheduler; else node scripts\/assert-production\.mjs --scope economy-scheduler; fi/,
+    );
+  }
+});
 
 test('dapp injects the public environment identity and optional liquidity links', () => {
   const definition = serviceDefinition('dapp');

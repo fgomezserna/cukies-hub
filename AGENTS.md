@@ -174,7 +174,7 @@ The active integration deployment is Coolify on VM1001 (`192.168.1.201`) through
   - Workers resource: `game-hub-staging`, app28, UUID `u4s804o4wwcckowgk0woo4wg`
   - Branch: `staging`
   - Public URL: `https://cukieshub.eurekand.com`
-  - Chain/data: BSC Testnet (`97`), `cukies-hub-staging`, `cukies-legacy-staging`, `cukieshub-new-staging`.
+  - Chain/data: BSC Testnet (`97`), unified logical database `cukieshub-new-staging` (the former Hub/legacy names remain historical source snapshots only).
 - Production app:
   - Coolify resource: `game-hub`
   - Application ID: `12`
@@ -209,7 +209,10 @@ The separate web app33 is provisioned but has not started; the production regist
 migration remains inactive. Before the first infrastructure merge into `main`,
 follow `docs/deployment-rolling-transition.md`: snapshots, Git autodeploy OFF on
 app12/app13 and CI delivery gate false, then verified candidate/cutover. Preserve
-current production traffic throughout this preparation.
+current production traffic throughout this preparation. The target data topology
+is one dedicated Mongo instance and logical database `cukieshub-new`; until the
+backup/rehearsal/go-no-go evidence exists, this is a configuration target, not a
+live-cutover claim. `eventlog` is retired and TRON getters read the chain/API.
 
 `docker-compose.coolify.yml` is the topology source; regenerate the image-only
 Compose with `node scripts/ci/generate-images-compose.mjs --write` after changing
@@ -230,7 +233,8 @@ Operational rules:
 - Store runtime secrets in Coolify environment variables. Local worker secrets can live only in ignored `.env.local` files.
 - Before saying a staging worker is deployed, verify app 28 uses `docker-compose.workers.yml`, its running image digest matches the release manifest, and its database endpoint is the staging LXC. The release commit can differ from an image's `sourceSha` when CI reuses it; compare each digest with the manifest. A green build alone does not verify runtime.
 - Workers do not need public domains or Traefik labels; only `dapp` should be proxied.
-- Staging must use `DATABASE_URL` -> `cukies-hub-staging`, `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`, and `CHAIN_INDEXER_DB_NAME`/`CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`.
+- Staging must use `DATABASE_URL`, `CUKIES_DATABASE_URL`, `CHAIN_INDEXER_DB_NAME` and `CARD_WORKER_DB_NAME` -> the single logical database `cukieshub-new-staging`; legacy collection names remain namespaced within that database.
+- Production must use `DATABASE_URL`, `CUKIES_DATABASE_URL`, `CHAIN_INDEXER_MONGO_URL`, `CUKIES_LEGACY_INDEXER_MONGO_URL` and `CARD_WORKER_MONGO_URL` with the same endpoint, runtime user, `authSource` and logical database `cukieshub-new`; the production guard rejects legacy DB names, divergent identities and retired `eventlog` variables.
 - App 28 uses `COMPOSE_PROFILES=staging-runtime,card-worker,legacy-card-worker`. Preserve each worker's exclusive staging bucket and credentials; do not copy them to another resource. `CARD_WORKER_UPLOAD=true` requires the storage guard to pass.
 - Both card workers require a capacity heartbeat younger than 45 seconds and at least 10 GiB free on Coolify and MinIO. They pause and retry automatically; do not lower the floor or clear volumes to bypass it. Follow the storage recovery section in `docs/deployment-environments.md`.
 - Validate post-deploy with `/api/health`, authenticated `/indexer` views for `chain_indexer_runs` and `card_generation_jobs`, and indexer/both card-worker logs. Inspect only needed metadata; full Docker history or environment output can contain secrets.

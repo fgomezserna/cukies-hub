@@ -22,12 +22,12 @@ function stagingEnvironment(overrides = {}) {
     CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: '97',
     DATABASE_URL: 'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CUKIES_DATABASE_URL:
-      'mongodb://staging-legacy:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
+      'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CHAIN_INDEXER_MONGO_URL:
-      'mongodb://staging-economy:redacted@mongo:27017/cukieshub-new-staging?authSource=cukieshub-new-staging',
+      'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CHAIN_INDEXER_DB_NAME: 'cukieshub-new-staging',
     CARD_WORKER_MONGO_URL:
-      'mongodb://staging-card:redacted@mongo:27017/cukieshub-new-staging?authSource=cukieshub-new-staging',
+      'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CARD_WORKER_DB_NAME: 'cukieshub-new-staging',
     NEXTAUTH_URL: 'https://cukieshub.eurekand.com',
     ...overrides,
@@ -137,6 +137,36 @@ test('never includes Mongo credentials in a rejection message', () => {
   );
 });
 
+test('rejects divergent staging Mongo runtime identities', () => {
+  assert.throws(
+    () => validateStagingEnvironment(stagingEnvironment({
+      CARD_WORKER_MONGO_URL:
+        'mongodb://other-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
+    }), 'cuki-card-worker'),
+    /same endpoint, database and runtime credentials/,
+  );
+  assert.throws(
+    () => validateStagingEnvironment(stagingEnvironment({
+      CHAIN_INDEXER_MONGO_URL:
+        'mongodb://staging-user:other-secret@mongo:27017/cukieshub-new-staging?authSource=admin',
+    })),
+    /same endpoint, database and runtime credentials/,
+  );
+});
+
+test('rejects retired eventlog variables and URLs', () => {
+  for (const override of [
+    { NX_TRON_DB: 'eventlog' },
+    { EVENTLOG_MONGO_URL: 'mongodb://staging-user:redacted@mongo:27017/eventlog' },
+    { DATABASE_URL: 'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?appName=eventlog' },
+  ]) {
+    assert.throws(
+      () => validateStagingEnvironment(stagingEnvironment(override)),
+      /retired eventlog|must not reference retired eventlog/,
+    );
+  }
+});
+
 test('accepts an optional swap only when it uses the configured testnet tokens', () => {
   const result = validateStagingEnvironment(stagingEnvironment({
     NEXT_PUBLIC_UKI_SWAP_URL:
@@ -241,7 +271,7 @@ function legacyCardWorkerEnvironment(overrides = {}) {
   return stagingEnvironment({
     CARD_WORKER_SOURCE_FORMAT: 'legacy',
     CARD_WORKER_LEGACY_STAGING_ENABLED: 'true',
-    CARD_WORKER_MONGO_URL: 'mongodb://legacy-worker:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
+    CARD_WORKER_MONGO_URL: 'mongodb://staging-user:redacted@mongo:27017/cukieshub-new-staging?authSource=admin',
     CARD_WORKER_DB_NAME: 'cukieshub-new-staging',
     CARD_WORKER_S3_BUCKET: 'cukies-cards-staging',
     CARD_WORKER_PUBLIC_BASE_URL: 'https://assets-staging.cukies.world',

@@ -12,8 +12,8 @@ services:
       COOLIFY_BRANCH: ${COOLIFY_BRANCH:?Coolify must expose the staging branch}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CUKIES_DATABASE_URL: ${CUKIES_DATABASE_URL:-${DATABASE_URL}}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CUKIES_DATABASE_URL: ${DATABASE_URL}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_CHAINS: ${CHAIN_INDEXER_CHAINS:-BSC}
       CHAIN_INDEXER_CONTRACT_ALIASES: ${CHAIN_INDEXER_CONTRACT_ALIASES:-PRESALE}
@@ -115,8 +115,9 @@ services:
       COOLIFY_BRANCH: ${COOLIFY_BRANCH:-}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:-}
       CUKIES_LEGACY_INDEXER_ENABLED: ${CUKIES_LEGACY_INDEXER_ENABLED:-false}
-      CUKIES_LEGACY_INDEXER_MONGO_URL: ${CUKIES_LEGACY_INDEXER_MONGO_URL:-}
-      CUKIES_LEGACY_INDEXER_DB_NAME: ${CUKIES_LEGACY_INDEXER_DB_NAME:-}
+      DATABASE_URL: ${DATABASE_URL}
+      CUKIES_LEGACY_INDEXER_MONGO_URL: ${DATABASE_URL}
+      CUKIES_LEGACY_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-}
       CUKIES_LEGACY_BSC_RPC_URLS: ${CUKIES_LEGACY_BSC_RPC_URLS:-}
       CUKIES_LEGACY_BSC_START_BLOCK: ${CUKIES_LEGACY_BSC_START_BLOCK:-}
       CUKIES_LEGACY_TRON_API_BASE_URL: ${CUKIES_LEGACY_TRON_API_BASE_URL:-}
@@ -150,7 +151,7 @@ services:
     command:
       - sh
       - -c
-      - node scripts/assert-staging-only.mjs --scope economy-scheduler && exec node dapp/scripts/cukie-master-scheduler.mjs
+      - if [ "$$APP_ENV" = staging ]; then node scripts/assert-staging-only.mjs --scope economy-scheduler; else node scripts/assert-production.mjs --scope economy-scheduler; fi && exec node dapp/scripts/cukie-master-scheduler.mjs
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
@@ -159,7 +160,7 @@ services:
       CUKIES_WEB_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       CHAIN_INDEXER_CUKIE_MASTER_ENABLED: ${CHAIN_INDEXER_CUKIE_MASTER_ENABLED:-false}
@@ -187,7 +188,7 @@ services:
     command:
       - sh
       - -c
-      - node scripts/assert-staging-only.mjs --scope economy-scheduler && exec node dapp/scripts/competition-credit-scheduler.mjs
+      - if [ "$$APP_ENV" = staging ]; then node scripts/assert-staging-only.mjs --scope economy-scheduler; else node scripts/assert-production.mjs --scope economy-scheduler; fi && exec node dapp/scripts/competition-credit-scheduler.mjs
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
@@ -196,7 +197,7 @@ services:
       CUKIES_WEB_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       COMPETITION_CREDITS_SCHEDULER_ENABLED: ${COMPETITION_CREDITS_RUNTIME_ENABLED:-false}
@@ -223,7 +224,7 @@ services:
     command:
       - sh
       - -c
-      - node scripts/assert-staging-only.mjs --scope economy-scheduler && exec node dapp/scripts/game-economy-scheduler.mjs
+      - if [ "$$APP_ENV" = staging ]; then node scripts/assert-staging-only.mjs --scope economy-scheduler; else node scripts/assert-production.mjs --scope economy-scheduler; fi && exec node dapp/scripts/game-economy-scheduler.mjs
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
@@ -232,7 +233,7 @@ services:
       CUKIES_WEB_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       GAME_ECONOMY_RUNTIME_ENABLED: ${GAME_ECONOMY_RUNTIME_ENABLED:-false}
@@ -260,7 +261,7 @@ services:
     command:
       - sh
       - -c
-      - node scripts/assert-staging-only.mjs --scope economy-scheduler && exec node dapp/scripts/cukie-pool-scheduler.mjs
+      - if [ "$$APP_ENV" = staging ]; then node scripts/assert-staging-only.mjs --scope economy-scheduler; else node scripts/assert-production.mjs --scope economy-scheduler; fi && exec node dapp/scripts/cukie-pool-scheduler.mjs
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
@@ -269,7 +270,7 @@ services:
       CUKIES_WEB_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       CUKIE_POOL_RUNTIME_ENABLED: ${CUKIE_POOL_RUNTIME_ENABLED:-false}
@@ -296,7 +297,7 @@ services:
     command:
       - sh
       - -c
-      - node scripts/assert-staging-only.mjs --scope economy-scheduler && exec node dapp/scripts/weekly-ranking-scheduler.mjs
+      - if [ "$$APP_ENV" = staging ]; then node scripts/assert-staging-only.mjs --scope economy-scheduler; else node scripts/assert-production.mjs --scope economy-scheduler; fi && exec node dapp/scripts/weekly-ranking-scheduler.mjs
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
@@ -305,7 +306,7 @@ services:
       CUKIES_WEB_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       WEEKLY_RANKING_RUNTIME_ENABLED: ${WEEKLY_RANKING_RUNTIME_ENABLED:-false}
@@ -332,7 +333,7 @@ services:
     command:
       - sh
       - -c
-      - node scripts/assert-staging-only.mjs --scope economy-scheduler && exec node dapp/scripts/reward-accounting-scheduler.mjs
+      - if [ "$$APP_ENV" = staging ]; then node scripts/assert-staging-only.mjs --scope economy-scheduler; else node scripts/assert-production.mjs --scope economy-scheduler; fi && exec node dapp/scripts/reward-accounting-scheduler.mjs
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
@@ -341,7 +342,7 @@ services:
       CUKIES_WEB_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       REWARD_ACCOUNTING_SCHEDULER_ENABLED: ${REWARD_ACCOUNTING_SCHEDULER_ENABLED:-false}
@@ -375,7 +376,7 @@ services:
     command:
       - sh
       - -c
-      - node scripts/assert-staging-only.mjs --scope economy-scheduler && exec node dapp/scripts/reward-batch-publisher.mjs
+      - if [ "$$APP_ENV" = staging ]; then node scripts/assert-staging-only.mjs --scope economy-scheduler; else node scripts/assert-production.mjs --scope economy-scheduler; fi && exec node dapp/scripts/reward-batch-publisher.mjs
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in Coolify environment variables}
@@ -384,7 +385,7 @@ services:
       CUKIES_WEB_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Set the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CHAIN_INDEXER_MONGO_URL: ${CHAIN_INDEXER_MONGO_URL:-${DATABASE_URL}}
+      CHAIN_INDEXER_MONGO_URL: ${DATABASE_URL}
       CHAIN_INDEXER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID: ${CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:-56}
       CHAIN_INDEXER_BSC_RPC_URL: ${CHAIN_INDEXER_BSC_RPC_URL:-${BSC_RPC_URL:-}}
@@ -430,8 +431,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       CUKIES_BRIDGE_RELAYER_ENABLED: ${CUKIES_BRIDGE_RELAYER_ENABLED:-false}
       CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM: ${CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM:-}
-      CUKIES_BRIDGE_RELAYER_MONGO_URL: ${CUKIES_BRIDGE_RELAYER_MONGO_URL:-}
-      CUKIES_BRIDGE_RELAYER_DB_NAME: ${CUKIES_BRIDGE_RELAYER_DB_NAME:-cukieshub-new-staging}
+      CUKIES_BRIDGE_RELAYER_MONGO_URL: ${DATABASE_URL}
+      CUKIES_BRIDGE_RELAYER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new-staging}
       CUKIES_BRIDGE_RELAYER_TRON_NETWORK: ${CUKIES_BRIDGE_RELAYER_TRON_NETWORK:-nile}
       CUKIES_BRIDGE_RELAYER_TRON_RPC_URL: ${CUKIES_BRIDGE_RELAYER_TRON_RPC_URL:-https://nile.trongrid.io}
       CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL: ${CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL:-https://nile.trongrid.io/v1}
@@ -477,8 +478,8 @@ services:
       COOLIFY_BRANCH: ${COOLIFY_BRANCH:?Coolify must expose the staging branch}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CARD_WORKER_MONGO_URL: ${CARD_WORKER_MONGO_URL:-${DATABASE_URL}}
-      CARD_WORKER_DB_NAME: ${CARD_WORKER_DB_NAME:-cukieshub-new}
+      CARD_WORKER_MONGO_URL: ${DATABASE_URL}
+      CARD_WORKER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new}
       CARD_WORKER_SOURCE_FORMAT: indexed
       CARD_WORKER_LEGACY_STAGING_ENABLED: "false"
       CARD_WORKER_SOURCE_NETWORK: ${CARD_WORKER_SOURCE_NETWORK:-}
@@ -523,8 +524,8 @@ services:
       COOLIFY_BRANCH: ${COOLIFY_BRANCH:?Coolify must expose the staging branch}
       COOLIFY_RESOURCE_UUID: ${COOLIFY_RESOURCE_UUID:?Coolify must expose the staging resource UUID}
       DATABASE_URL: ${DATABASE_URL}
-      CARD_WORKER_MONGO_URL: ${CARD_WORKER_LEGACY_MONGO_URL:-${CUKIES_DATABASE_URL}}
-      CARD_WORKER_DB_NAME: ${CARD_WORKER_DB_NAME:-cukieshub-new-staging}
+      CARD_WORKER_MONGO_URL: ${DATABASE_URL}
+      CARD_WORKER_DB_NAME: ${CHAIN_INDEXER_DB_NAME:-cukieshub-new-staging}
       CARD_WORKER_SOURCE_FORMAT: legacy
       CARD_WORKER_LEGACY_STAGING_ENABLED: ${CARD_WORKER_LEGACY_STAGING_ENABLED:-false}
       CARD_WORKER_OUTPUT_DIR: /tmp/cuki-card-outputs

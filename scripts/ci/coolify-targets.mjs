@@ -8,8 +8,10 @@ const TARGETS = Object.freeze({
     publicUrl: 'https://cukieshub.eurekand.com',
   },
   production: {
-    // Provision and verify a separate web resource before enabling this lane.
-    web: null,
+    // App 33 is the dedicated production web candidate. Keep the existing
+    // app 12/app 13 traffic untouched until the rolling rehearsal is signed
+    // off and the route is explicitly switched.
+    web: { resourceUuid: 'uo8gswsg84c488cowko0kkkg', applicationId: '33' },
     game: { resourceUuid: 'tkkggwcosc4gksckcc480cwg', applicationId: '13', publicUrl: 'https://treasurehunt.cukies.world' },
     workers: { resourceUuid: 'jookw8ow8woks088s44404ok', applicationId: '12' },
     publicUrl: 'https://cukies.world',

@@ -7,11 +7,10 @@ This is a NextJS DApp for Hyppie Gaming Platform.
 Create a `.env.local` file in the root directory with the following variables:
 
 ```env
-# Database - Primary database (Prisma)
-DATABASE_URL="mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=admin"
-
-# Database - Legacy database (cukies with users and characters)
-CUKIES_DATABASE_URL="mongodb://admin:changeme123@192.168.1.221:27017/cukies?authSource=admin"
+# Database - canonical runtime (Prisma and legacy collections)
+# Use the environment-provided URI locally; never copy Coolify credentials here.
+DATABASE_URL="mongodb://<runtime-user>:<runtime-password>@<mongo-host>:<port>/cukieshub-new?authSource=admin"
+CUKIES_DATABASE_URL="mongodb://<runtime-user>:<runtime-password>@<mongo-host>:<port>/cukieshub-new?authSource=admin"
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
