@@ -199,7 +199,10 @@ export function buildBridgeRelayerConfig(
   const env = envSchema.parse(environment);
   if (!enabled(env.CUKIES_BRIDGE_RELAYER_ENABLED)) return { enabled: false };
 
-  const appEnv = env.NEXT_PUBLIC_APP_ENV ?? env.APP_ENV;
+  // El Dockerfile compartido declara NEXT_PUBLIC_APP_ENV para todos los
+  // servicios. En el relayer puede existir vacio si no se paso el build arg;
+  // ese valor no debe ocultar el APP_ENV de runtime.
+  const appEnv = env.NEXT_PUBLIC_APP_ENV?.trim() || env.APP_ENV?.trim();
   if (appEnv !== 'production') {
     throw new Error('El relayer legacy exige APP_ENV=production.');
   }

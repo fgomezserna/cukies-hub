@@ -55,6 +55,14 @@ describe('buildBridgeRelayerConfig', () => {
     assert.equal(config.tronStartTimestampMs, 1_788_000_000_000);
   });
 
+  it('no deja que un NEXT_PUBLIC_APP_ENV vacio oculte APP_ENV de runtime', () => {
+    const config = buildBridgeRelayerConfig({
+      ...validEnvironment(),
+      NEXT_PUBLIC_APP_ENV: '  ',
+    });
+    assert.equal(config.enabled, true);
+  });
+
   it('rechaza testnet, base incorrecta y ausencia de confirmacion explicita', () => {
     assert.throws(
       () => buildBridgeRelayerConfig({
