@@ -11,7 +11,8 @@ import {
   WalletCards,
 } from 'lucide-react';
 
-import { listCukiePoints, listCukies } from '@/lib/cukies-data/data';
+import { listCukies } from '@/lib/cukies-data/data';
+import { listLegacyCukiePoints } from '@/lib/legacy-marketplace/data';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ export default async function CukiesToolsPage() {
   const [allCukies, onSaleCukies, points] = await Promise.all([
     listCukies({ limit: 1 }),
     listCukies({ limit: 1, state: 'onSale' }),
-    listCukiePoints({ limit: 1 }),
+    listLegacyCukiePoints({ limit: 1 }),
   ]);
 
   const networks = allCukies.facets.networks
@@ -95,8 +96,8 @@ export default async function CukiesToolsPage() {
     {
       label: 'CukiePoints',
       value: formatMetric(points.summary.totalPoints),
-      helper: `${formatMetric(points.summary.totalTransactions)} movimientos`,
-      detail: 'actividad historica',
+      helper: `${formatMetric(points.summary.totalTransactions)} movimientos legacy`,
+      detail: 'historial parcial de solo lectura',
       Icon: Sparkles,
     },
   ] as const;

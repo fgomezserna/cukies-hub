@@ -76,6 +76,7 @@ type LegacyHistoryDocument = {
 type LegacyPointDocument = {
   _id: unknown;
   address?: unknown;
+  addressNormalized?: unknown;
   points?: unknown;
   type?: unknown;
   date?: unknown;
@@ -348,6 +349,29 @@ function isLegacyState(value?: string): value is LegacyCukiState {
 
 function buildOwnerRegex(owner: string) {
   return new RegExp(`^${owner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+}
+
+function buildPointWalletClauses(wallets: string[], network?: string) {
+  return wallets.flatMap<Filter<LegacyPointDocument>>((wallet) => {
+    const isBscWallet = /^0x/i.test(wallet);
+    const walletNetwork = isBscWallet ? 'BSC' : 'TRON';
+
+    if (isLegacyNetwork(network) && network !== walletNetwork) return [];
+
+    if (walletNetwork === 'TRON') {
+      // TRON Base58 addresses are case-sensitive. Do not apply EVM-style
+      // case folding to a wallet filter on the historical source.
+      return [{ network: 'TRON', address: wallet }];
+    }
+
+    return [{
+      network: 'BSC',
+      $or: [
+        { address: buildOwnerRegex(wallet) },
+        { addressNormalized: wallet.toLowerCase() },
+      ],
+    }];
+  });
 }
 
 function normalizeFacet(rows: Array<{ _id: unknown; count: number }>) {
@@ -900,16 +924,27 @@ export async function listLegacyCukiePoints(
       .filter((wallet) => wallet.length > 0);
 
     if (wallets?.length) {
-      filter.$or = wallets.map((wallet) => ({
-        address: buildOwnerRegex(wallet),
-      }));
+      const walletClauses = buildPointWalletClauses(wallets, params.network);
+      if (walletClauses.length === 0) {
+        return {
+          source: 'mongo',
+          status: 'partial',
+          coverage: 'legacy-historical',
+          items: [],
+          total: 0,
+          offset,
+          limit,
+          summary: emptySummary,
+        };
+      }
+      filter.$or = walletClauses;
     }
 
     if (isLegacyNetwork(params.network)) {
       filter.network = params.network;
     }
 
-    if (params.type?.trim()) {
+    if (params.type?.trim() && params.type.trim() !== 'ALL') {
       filter.type = params.type.trim();
     }
 
@@ -959,6 +994,8 @@ export async function listLegacyCukiePoints(
 
     return {
       source: 'mongo',
+      status: 'partial',
+      coverage: 'legacy-historical',
       items: documents.map(normalizePointTransaction),
       total,
       offset,
@@ -975,15 +1012,14 @@ export async function listLegacyCukiePoints(
   } catch (error) {
     return {
       source: 'empty',
+      status: 'unknown',
+      coverage: 'unavailable',
       items: [],
       total: 0,
       offset,
       limit,
       summary: emptySummary,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Legacy CukiePoints unavailable',
+      error: 'No se pudo cargar el historial de Cukie Points.',
     };
   }
 }
