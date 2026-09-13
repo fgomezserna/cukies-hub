@@ -163,10 +163,12 @@ To set up Telegram verification:
 
 ## Database Configuration
 
-This project uses two MongoDB databases:
-
-1. **cukies-hub**: Primary database managed with Prisma (for new features)
-2. **cukies**: Legacy database with existing users and characters (cukies)
+Each environment uses one logical MongoDB database. Staging uses
+`cukieshub-new-staging` and production uses `cukieshub-new`; `DATABASE_URL`,
+`CUKIES_DATABASE_URL`, the indexer aliases and card-worker aliases must resolve
+to the same endpoint, runtime identity, `authSource` and database. Prisma and
+legacy collections can keep distinct names or namespaces inside that database
+while reconciliation is in progress; they are not separate runtime databases.
 
 See [docs/database-setup.md](./docs/database-setup.md) for detailed information about database structure and usage.
 
