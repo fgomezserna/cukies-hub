@@ -1,0 +1,78 @@
+{
+  "checkedAt": "2026-09-14",
+  "environment": "production",
+  "chain": "BSC",
+  "chainId": 56,
+  "legacy": {
+    "marketplace": "0x2C291aD4C491aCA75Fb3fb5a17465bBC871FBF91",
+    "collection": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+    "status": "existing-live-contract"
+  },
+  "ukiMarketplace": {
+    "marketplace": "0x57726b8640818dec22624a8e6bd45188c0071b19",
+    "collection": "0x0dbDeBCC62f11005BF434ABFad74564E896aC861",
+    "deploymentBlock": 121727979,
+    "deploymentTransaction": "0x15b81dded5169f095d7abe3d69bd129973c77bccd00bba9660b922382e95301e",
+    "runtimeBytes": 12486,
+    "runtimeCodeHash": "0x09b0512b568e76333dbb6279a85c701ae4d4088430c4be2e85e564a93254d2be",
+    "feeBps": 1000,
+    "feeRecipient": "0x538b7EC80B13325ecf7DC3b9b73A58ac56492e01",
+    "owner": "0x3d80cbEd6CA067a154A22659224EB5194aDCe24C",
+    "paused": false,
+    "nativePaymentAllowed": true,
+    "allowlistedPaymentTokens": {
+      "asm": "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+      "usdt": "0x55d398326f99059fF775485246999027B3197955",
+      "usdc": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+    },
+    "router": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+    "wrappedNative": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+    "paths": {
+      "bnb": [
+        "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+        "0x55d398326f99059fF775485246999027B3197955",
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA"
+      ],
+      "asm": [
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA"
+      ],
+      "usdt": [
+        "0x55d398326f99059fF775485246999027B3197955",
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA"
+      ],
+      "usdc": [
+        "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+        "0x55d398326f99059fF775485246999027B3197955",
+        "0x707F0f4a39a4a26239F7D00463B15AB5656861f9",
+        "0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA"
+      ]
+    },
+    "configurationTransactions": {
+      "collectionAllowlist": "0x6e9e8902e95078fdad806cfd76753f519c4cda82715c45d09d5f1826b7ed53c3",
+      "asmAllowlist": "0xb1dc51fa673adf7279d3ed2a23901f6fee092bf0777d17fc85bc5ed50183b9bf",
+      "usdtAllowlist": "0x41a4f57bdb250d91ca9bdcba2d2dd73f1bd99c2709a158b06f94f5308b483015",
+      "usdcAllowlist": "0xa747afa0ad385f5b759aa5d07f11b3ad126f8b13d7f8264c4fd0dc661988d1e5",
+      "nativePaymentEnablement": "0x0a7830e41f561e49059e6daa884b1ca884aa9b5fb61d5480d108d925be76eb99"
+    }
+  },
+  "indexer": {
+    "legacyAlias": "MARKETPLACE",
+    "ukiAlias": "UKI_MARKETPLACE",
+    "legacySource": "existing-getter-bsc-tron-and-legacy-graphql",
+    "newChainIndexerAliases": [
+      "PRESALE",
+      "UKI_STAKING",
+      "UKI_MARKETPLACE"
+    ],
+    "ukiStartBlock": 121727979,
+    "identityRequiresRuntimeCodeHash": true
+  },
+  "notes": [
+    "V2 es no custodial: el NFT permanece con el vendedor hasta la compra atomica.",
+    "Las rutas se validan contra el router PancakeSwap V2 y terminan en UKI.",
+    "No se incluye ninguna private key ni URL de base de datos en esta evidencia."
+  ]
+}

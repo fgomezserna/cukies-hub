@@ -85,8 +85,8 @@ export default function MarketplacePage() {
             Marketplace Legacy · BNB y TRX
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            Conserva los anuncios y condiciones anteriores. En Stage/Testnet las
-            operaciones Legacy permanecen desactivadas y solo se consulta el inventario.
+            Conserva los anuncios y condiciones anteriores. En producción mantiene
+            las operaciones BNB/TRX; Stage/Testnet solo expone consulta de inventario.
           </p>
         </div>
         <MarketplaceClient

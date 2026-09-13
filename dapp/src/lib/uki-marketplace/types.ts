@@ -133,6 +133,7 @@ export type UkiMarketplaceRuntime = {
   ready: boolean;
   chainId: 56 | 97 | null;
   marketplaceAddress: `0x${string}` | null;
-  rpcUrls: string[];
+  /** The first validated BSC endpoint. The indexer itself keeps its own RPC fallback list. */
+  rpcUrl: string | null;
   issues: string[];
 };

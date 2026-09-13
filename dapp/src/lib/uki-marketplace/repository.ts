@@ -21,6 +21,10 @@ const MAX_METADATA_IDENTITIES = 200;
 type InventoryDocumentWithCardImage = CukiesInventoryDocument & {
   /** URL inmutable escrita por cuki-card-worker (MinIO/S3). */
   cardImageUrl?: unknown;
+  /** Campos canónicos presentes en inventarios materializados por el indexer. */
+  chainId?: unknown;
+  collectionAddressNormalized?: unknown;
+  imageUrl?: unknown;
 };
 
 function canonicalTokenId(value: unknown) {
@@ -58,10 +62,21 @@ export function ukiMarketplaceAssetIdentityKey(input: UkiMarketplaceAssetIdentit
 function canonicalAssetIdentity(
   document: InventoryDocumentWithCardImage,
 ): UkiMarketplaceAssetIdentity | null {
+  const normalizedNetwork = typeof document.network === 'string'
+    ? document.network.trim().toLowerCase()
+    : '';
   const chainId = document.chainId === 56 || document.chainId === 97
     ? document.chainId
+    : normalizedNetwork === 'bsc' || normalizedNetwork === 'bsc-mainnet'
+      ? 56
+      : normalizedNetwork === 'bsc-testnet' || normalizedNetwork === 'bsc_testnet'
+        ? 97
+        : null;
+  const configuredCollection = typeof process.env.NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS === 'string'
+    ? process.env.NEXT_PUBLIC_CUKIES_NFT_COLLECTION_ADDRESS
     : null;
-  const collectionAddress = canonicalCollection(document.collectionAddressNormalized);
+  const collectionAddress = canonicalCollection(document.collectionAddressNormalized)
+    ?? canonicalCollection(configuredCollection);
   const tokenId = canonicalTokenId(document.tokenId);
   if (!chainId || !collectionAddress || !tokenId) return null;
   return { chainId, collectionAddress, tokenId };
@@ -239,7 +254,9 @@ export class MongoUkiMarketplaceRepository implements UkiMarketplaceRepository {
         : null;
       const metadata: UkiMarketplaceAssetMetadata = {
         ...identity,
-        imageUrl: cardImageUrl ?? normalized.imageUrl ?? null,
+        imageUrl: cardImageUrl
+          ?? (typeof document.imageUrl === 'string' ? document.imageUrl.trim() || null : null)
+          ?? (typeof document.img === 'string' ? document.img.trim() || null : null),
         rarity: normalized.rarity === 'unknown' ? null : normalized.rarity,
         generation: normalized.generation === 'unknown' ? null : normalized.generation,
       };
