@@ -11,6 +11,15 @@ export const PRODUCTION_TARGET = Object.freeze({
   databaseName: 'cukies-hub',
   legacyDatabaseName: 'cukies',
   indexerDatabaseName: 'cukieshub-new',
+  bridgeRelayerDatabaseName: 'cukieshub-new',
+  tronNetwork: 'mainnet',
+  tronRpcUrl: 'https://api.trongrid.io',
+  tronApiBaseUrl: 'https://api.trongrid.io/v1',
+  tronCollectionAddress: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
+  tronBridgeAddress: 'TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ',
+  bscBridgeAddress: '0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E',
+  bscCollectionAddress: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
+  bscRelayerExecutionConfirm: 'ENABLE_TRON_MAINNET_TO_BSC_MAINNET_LEGACY_RELAYER',
   authHosts: new Set(['cukies.world', 'www.cukies.world']),
   stakingAddress: '0xad18ff665e99d0033c3bb9d73182c2b03df59696',
 });
@@ -93,7 +102,13 @@ function requireAddress(environment, key, expected, failures) {
 
 export function validateProductionEnvironment(environment = process.env, scope = 'full') {
   const failures = [];
-  const supportedScopes = new Set(['full', 'dapp', 'chain-indexer', 'cuki-card-worker']);
+  const supportedScopes = new Set([
+    'full',
+    'dapp',
+    'chain-indexer',
+    'cuki-card-worker',
+    'cukies-bridge-relayer',
+  ]);
   if (!supportedScopes.has(scope)) {
     throw new ProductionGuardError([`unsupported guard scope ${scope}`]);
   }
@@ -112,12 +127,14 @@ export function validateProductionEnvironment(environment = process.env, scope =
     PRODUCTION_TARGET.coolifyResourceUuid,
     failures,
   );
-  const databaseName = requireMongoDatabase(
-    environment,
-    'DATABASE_URL',
-    PRODUCTION_TARGET.databaseName,
-    failures,
-  );
+  const databaseName = scope === 'cukies-bridge-relayer'
+    ? null
+    : requireMongoDatabase(
+      environment,
+      'DATABASE_URL',
+      PRODUCTION_TARGET.databaseName,
+      failures,
+    );
 
   let publicChainId = null;
   let indexerChainId = null;
@@ -128,6 +145,8 @@ export function validateProductionEnvironment(environment = process.env, scope =
   let cardWorkerMongoDatabaseName = null;
   let authHost = null;
   let stakingAddress = null;
+  let bridgeRelayerDatabaseName = null;
+  let bridgeRelayerMongoDatabaseName = null;
 
   if (scope === 'full' || scope === 'dapp') {
     publicChainId = requireExact(
@@ -212,6 +231,93 @@ export function validateProductionEnvironment(environment = process.env, scope =
     );
   }
 
+  if (scope === 'cukies-bridge-relayer') {
+    requireExact(environment, 'CUKIES_BRIDGE_RELAYER_ENABLED', 'true', failures);
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM',
+      PRODUCTION_TARGET.bscRelayerExecutionConfirm,
+      failures,
+    );
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_DB_NAME',
+      PRODUCTION_TARGET.bridgeRelayerDatabaseName,
+      failures,
+    );
+    bridgeRelayerDatabaseName = PRODUCTION_TARGET.bridgeRelayerDatabaseName;
+    bridgeRelayerMongoDatabaseName = requireMongoDatabase(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_MONGO_URL',
+      PRODUCTION_TARGET.bridgeRelayerDatabaseName,
+      failures,
+    );
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_TRON_NETWORK',
+      PRODUCTION_TARGET.tronNetwork,
+      failures,
+    );
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_TRON_RPC_URL',
+      PRODUCTION_TARGET.tronRpcUrl,
+      failures,
+    );
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL',
+      PRODUCTION_TARGET.tronApiBaseUrl,
+      failures,
+    );
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID',
+      PRODUCTION_TARGET.chainId,
+      failures,
+    );
+    requireExact(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS',
+      PRODUCTION_TARGET.tronCollectionAddress,
+      failures,
+    );
+    const tronBridgeAddress = environment.CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS?.trim()
+      ?? environment.CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS?.trim();
+    if (!tronBridgeAddress) {
+      failures.push('CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS is required');
+    } else if (tronBridgeAddress !== PRODUCTION_TARGET.tronBridgeAddress) {
+      failures.push('CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS must equal the approved legacy mainnet bridge');
+    }
+    const bscCollectionAddress = required(
+      environment,
+      'CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS',
+      failures,
+    );
+    if (
+      bscCollectionAddress
+      && bscCollectionAddress.toLowerCase() !== PRODUCTION_TARGET.bscCollectionAddress.toLowerCase()
+    ) {
+      failures.push('CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS must equal the approved legacy mainnet collection');
+    }
+    const bscBridgeAddress = environment.CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS?.trim()
+      ?? environment.CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS?.trim();
+    if (!bscBridgeAddress) {
+      failures.push('CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS is required');
+    } else if (bscBridgeAddress.toLowerCase() !== PRODUCTION_TARGET.bscBridgeAddress.toLowerCase()) {
+      failures.push('CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS must equal the approved legacy mainnet bridge');
+    }
+    required(environment, 'CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS', failures);
+    required(environment, 'CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS', failures);
+    required(environment, 'CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY', failures);
+    if (
+      !environment.CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS?.trim()
+      && !environment.CUKIES_BRIDGE_RELAYER_EXPECTED_SIGNER_ADDRESS?.trim()
+    ) {
+      failures.push('CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS is required');
+    }
+  }
+
   if (failures.length > 0) throw new ProductionGuardError(failures);
 
   return {
@@ -230,6 +336,8 @@ export function validateProductionEnvironment(environment = process.env, scope =
     indexerMongoDatabaseName,
     cardWorkerDatabaseName,
     cardWorkerMongoDatabaseName,
+    bridgeRelayerDatabaseName,
+    bridgeRelayerMongoDatabaseName,
     authHost,
     stakingAddress,
   };

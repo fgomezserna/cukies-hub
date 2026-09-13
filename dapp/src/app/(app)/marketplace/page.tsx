@@ -49,13 +49,6 @@ export default function MarketplacePage() {
               CukiePoints
               <ArrowUpRight className="h-4 w-4" />
             </Link>
-            <Link
-              href="/bridge"
-              className="inline-flex items-center gap-2 rounded-[8px] border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:border-amber-200/60 hover:bg-amber-300/15"
-            >
-              Bridge
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
           </div>
         </div>
       </section>

@@ -30,6 +30,41 @@ function productionEnvironment(overrides = {}) {
   };
 }
 
+function bridgeRelayerEnvironment(overrides = {}) {
+  return {
+    APP_ENV: 'production',
+    STAGING_ONLY_GUARD: 'false',
+    COOLIFY_BRANCH: 'main',
+    COOLIFY_RESOURCE_UUID: 'jookw8ow8woks088s44404ok',
+    CUKIES_BRIDGE_RELAYER_ENABLED: 'true',
+    CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM:
+      'ENABLE_TRON_MAINNET_TO_BSC_MAINNET_LEGACY_RELAYER',
+    CUKIES_BRIDGE_RELAYER_MONGO_URL:
+      'mongodb://bridge:redacted@mongo:27017/cukieshub-new?authSource=admin',
+    CUKIES_BRIDGE_RELAYER_DB_NAME: 'cukieshub-new',
+    CUKIES_BRIDGE_RELAYER_TRON_NETWORK: 'mainnet',
+    CUKIES_BRIDGE_RELAYER_TRON_RPC_URL: 'https://api.trongrid.io',
+    CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL: 'https://api.trongrid.io/v1',
+    CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS:
+      'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
+    CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS:
+      'TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ',
+    CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS: '1750000000000',
+    CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: '56',
+    CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS:
+      'https://bsc-rpc.publicnode.com,https://bsc-dataseed.bnbchain.org',
+    CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS:
+      '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
+    CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS:
+      '0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E',
+    CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS:
+      '0x3d80cbEd6CA067a154A22659224EB5194aDCe24C',
+    CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY:
+      '0x0000000000000000000000000000000000000000000000000000000000000001',
+    ...overrides,
+  };
+}
+
 test('accepts the exact production application, chain, databases and staking contract', () => {
   const result = validateProductionEnvironment(productionEnvironment());
   assert.equal(result.ok, true);
@@ -95,6 +130,35 @@ test('uses service scopes without requiring unrelated credentials', () => {
     CARD_WORKER_MONGO_URL: 'mongodb://mongo:27017/cukies-hub',
     CARD_WORKER_DB_NAME: 'cukieshub-new',
   }, 'cuki-card-worker').scope, 'cuki-card-worker');
+
+  assert.equal(validateProductionEnvironment(
+    bridgeRelayerEnvironment(),
+    'cukies-bridge-relayer',
+  ).scope, 'cukies-bridge-relayer');
+});
+
+test('accepts the explicitly enabled TRON-mainnet to BSC-mainnet bridge relayer', () => {
+  const result = validateProductionEnvironment(
+    bridgeRelayerEnvironment(),
+    'cukies-bridge-relayer',
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.bridgeRelayerDatabaseName, 'cukieshub-new');
+  assert.equal(result.bridgeRelayerMongoDatabaseName, 'cukieshub-new');
+});
+
+test('rejects the bridge relayer without its explicit execution confirmation', () => {
+  assert.throws(
+    () => validateProductionEnvironment(
+      bridgeRelayerEnvironment({
+        CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM: 'not-authorized',
+      }),
+      'cukies-bridge-relayer',
+    ),
+    (error) => error instanceof ProductionGuardError
+      && error.message.includes('ENABLE_TRON_MAINNET_TO_BSC_MAINNET_LEGACY_RELAYER'),
+  );
 });
 
 test('rejects unknown service scopes', () => {

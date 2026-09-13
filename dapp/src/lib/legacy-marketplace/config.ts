@@ -17,7 +17,11 @@ export const legacyMarketplaceContracts = {
   bsc: {
     chainId: 56,
     chainName: 'BNB Smart Chain',
-    rpcUrl: 'https://bsc-dataseed.binance.org',
+    rpcUrl: 'https://bsc-dataseed.bnbchain.org',
+    rpcUrls: [
+      'https://bsc-dataseed.bnbchain.org',
+      'https://bsc-rpc.publicnode.com',
+    ],
     blockExplorerBaseUrl: 'https://bscscan.com',
     contracts: {
       token: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
@@ -78,13 +82,6 @@ export const legacyMarketplaceRoutes = [
     path: '/breeding/completed-breeds',
     label: 'Completed breeds',
     status: 'active',
-  },
-  { path: '/bridges/cukies', label: 'Cukies bridge', status: 'active' },
-  { path: '/bridges/gems', label: 'Gems bridge', status: 'coming-soon' },
-  {
-    path: '/bridges/resources',
-    label: 'Resources bridge',
-    status: 'coming-soon',
   },
   { path: '/users/profile', label: 'Profile', status: 'active' },
   { path: '/users/cukies', label: 'Owned Cukies', status: 'active' },
