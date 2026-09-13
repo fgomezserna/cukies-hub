@@ -25,6 +25,7 @@ import {
 
 import { CukiCard } from './cuki-card';
 import { CukiImage } from './cuki-image';
+import { getTypeLabel } from './format';
 
 const PAGE_SIZE = 24;
 type MarketplaceScope = 'all' | 'legacy' | 'uki';
@@ -408,11 +409,11 @@ export function MarketplaceClient({
   }
 
   return (
-    <section className="grid gap-5">
-      <div className="rounded-[8px] border border-white/10 bg-black/30 p-4 backdrop-blur">
-        <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-[minmax(18rem,1fr)_repeat(5,minmax(9rem,auto))]">
-          <label className="grid min-w-0 gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Buscar</span>
+    <section className="grid gap-3">
+      <div className="rounded-[8px] border border-white/10 bg-black/30 p-3 backdrop-blur">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-[minmax(13rem,1.45fr)_repeat(5,minmax(8rem,1fr))_auto]">
+          <label className="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-1">
+            <span className="sr-only">Buscar en el catálogo</span>
             <span className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <Input
@@ -422,13 +423,13 @@ export function MarketplaceClient({
                   setSearch(event.target.value);
                   resetPagination();
                 }}
-                placeholder="Número o wallet"
-                className="pl-9"
+                placeholder="Número, ID o wallet"
+                className="h-9 pl-9 text-sm"
               />
             </span>
           </label>
-          <label className="grid min-w-0 gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Catálogo</span>
+          <label className="min-w-0">
+            <span className="sr-only">Origen del anuncio</span>
             <select
               aria-label="Origen del anuncio"
               value={scope}
@@ -442,15 +443,15 @@ export function MarketplaceClient({
                 setSelectedUkiOrderId(null);
                 resetPagination();
               }}
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
             >
               <option value="all">Todos los catálogos</option>
               <option value="legacy">Solo Legacy</option>
               <option value="uki">Solo V2 · UKI</option>
             </select>
           </label>
-          <label className="grid min-w-0 gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Red</span>
+          <label className="min-w-0">
+            <span className="sr-only">Red</span>
             <select
               aria-label="Red"
               value={network}
@@ -462,7 +463,7 @@ export function MarketplaceClient({
                 }
                 resetPagination();
               }}
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
             >
               <option value="all">Todas las redes</option>
               <option value="BSC">BSC</option>
@@ -471,33 +472,33 @@ export function MarketplaceClient({
           </label>
           {scope !== 'uki' && (
             <>
-              <label className="grid min-w-0 gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tipo</span>
+              <label className="min-w-0">
+                <span className="sr-only">Tipo de Cukie</span>
                 <select
                   aria-label="Tipo de Cukie"
                   value={type}
                   onChange={(event) => {
                     applyLegacyFacet(setType, event.target.value);
                   }}
-                  className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
                 >
                   <option value="all">Todos los tipos</option>
                   {typeOptions.map((value) => (
                     <option key={value} value={String(value)}>
-                      Tipo {value}
+                      {getTypeLabel(value)}
                     </option>
                   ))}
                 </select>
               </label>
-              <label className="grid min-w-0 gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Generación</span>
+              <label className="min-w-0">
+                <span className="sr-only">Generación</span>
                 <select
                   aria-label="Generación"
                   value={generation}
                   onChange={(event) => {
                     applyLegacyFacet(setGeneration, event.target.value);
                   }}
-                  className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
                 >
                   <option value="all">Todas las generaciones</option>
                   {generationOptions.map((value) => (
@@ -509,8 +510,8 @@ export function MarketplaceClient({
               </label>
             </>
           )}
-          <label className="grid min-w-0 gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ordenar por</span>
+          <label className="min-w-0">
+            <span className="sr-only">Ordenar resultados</span>
             <select
               aria-label="Ordenar resultados"
               value={sort}
@@ -518,7 +519,12 @@ export function MarketplaceClient({
                 setSort(event.target.value);
                 resetPagination();
               }}
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+              title={
+                priceSortAllowed
+                  ? 'Ordena por precio en la moneda de la red seleccionada'
+                  : 'Selecciona solo Legacy y una red para ordenar por precio'
+              }
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
             >
               <option value="newest">Más recientes</option>
               {scope === 'legacy' && (
@@ -529,30 +535,32 @@ export function MarketplaceClient({
               )}
               {priceSortAllowed && (
                 <>
-                  <option value="price-asc">Precio más bajo</option>
-                  <option value="price-desc">Precio más alto</option>
+                  <option value="price-asc">Precio: menor primero</option>
+                  <option value="price-desc">Precio: mayor primero</option>
                 </>
               )}
             </select>
           </label>
+          <Button
+            type="button"
+            onClick={resetFilters}
+            variant="outline"
+            size="sm"
+            className="col-span-2 h-9 border-white/10 bg-white/[0.03] px-3 sm:col-span-1"
+          >
+            <Filter className="h-4 w-4" />
+            <span>Limpiar</span>
+          </Button>
           {!priceSortAllowed && (
-            <p className="col-span-full text-xs text-amber-100">
+            <p className="col-span-full text-[11px] leading-4 text-slate-500">
               El precio se puede ordenar cuando muestras solo Legacy y una red.
             </p>
           )}
           {scope === 'all' && (
-            <p className="col-span-full text-xs text-slate-400">
+            <p className="col-span-full text-[11px] leading-4 text-slate-500">
               Tipo y generación pertenecen al catálogo Legacy; al elegir uno se mostrará solo ese catálogo.
             </p>
           )}
-          <Button
-            onClick={resetFilters}
-            variant="outline"
-            className="border-white/10 bg-white/[0.03]"
-          >
-            <Filter className="mr-2 h-4 w-4" />
-            Limpiar filtros
-          </Button>
         </div>
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

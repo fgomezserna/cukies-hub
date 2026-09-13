@@ -62,17 +62,17 @@ export function MarketplaceSections({
     <Tabs value={activeTab} onValueChange={selectTab} className="min-w-0">
       <TabsList
         aria-label="Secciones del marketplace"
-        className="grid h-auto w-full min-w-0 grid-cols-2 gap-1 rounded-[12px] border border-white/10 bg-black/25 p-1"
+        className="grid h-auto w-full min-w-0 grid-cols-2 gap-1 rounded-[10px] border border-white/10 bg-black/25 p-1"
       >
         <TabsTrigger
           value="buy"
-          className="min-h-11 min-w-0 rounded-[9px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+          className="min-h-9 min-w-0 rounded-[8px] px-3 py-1.5 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
         >
           Comprar
         </TabsTrigger>
         <TabsTrigger
           value="sell"
-          className="min-h-11 min-w-0 rounded-[9px] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
+          className="min-h-9 min-w-0 rounded-[8px] px-3 py-1.5 text-xs font-black uppercase tracking-[0.08em] text-[var(--uki-muted)] focus-visible:ring-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)] sm:text-sm"
         >
           Mis anuncios
         </TabsTrigger>
@@ -82,7 +82,7 @@ export function MarketplaceSections({
         value="buy"
         forceMount
         hidden={activeTab !== 'buy'}
-        className="mt-6 min-w-0 data-[state=inactive]:hidden"
+        className="mt-3 min-w-0 data-[state=inactive]:hidden"
       >
         {buy}
       </TabsContent>
@@ -90,7 +90,7 @@ export function MarketplaceSections({
         value="sell"
         forceMount
         hidden={activeTab !== 'sell'}
-        className="mt-6 min-w-0 data-[state=inactive]:hidden"
+        className="mt-3 min-w-0 data-[state=inactive]:hidden"
       >
         {sell}
       </TabsContent>

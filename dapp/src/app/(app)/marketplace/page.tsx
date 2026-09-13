@@ -18,14 +18,14 @@ export default function MarketplacePage() {
 
   return (
     <div className="uki-theme mx-auto flex min-h-full w-full max-w-[1480px] flex-col pb-10 text-[var(--uki-cream)]">
-      <header className="border-b border-white/10 pb-5 pt-1 sm:pb-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="border-b border-white/10 pb-3 pt-1 sm:pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <p className="flex items-center gap-2 text-sm font-bold text-[var(--uki-lilac)]"><Store className="h-4 w-4" /> Marketplace</p>
-            <h1 className="mt-2 text-balance font-headline text-3xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-4xl">Encuentra tu próximo Cukie</h1>
-            <p className="mt-3 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)] sm:text-base">Busca por número, tipo o generación. Abre una ficha para revisar todos los datos antes de comprar.</p>
+            <h1 className="mt-1 text-balance font-headline text-2xl font-black leading-[0.98] tracking-[-0.035em] text-[var(--uki-cream)] sm:text-3xl">Encuentra tu próximo Cukie</h1>
+            <p className="mt-1 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)]">Busca por número, tipo o generación. Abre una ficha para revisar todos los datos antes de comprar.</p>
           </div>
-          <Link href="/cukies" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-4 text-sm font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
+          <Link href="/cukies" className="inline-flex min-h-9 w-fit items-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/45 bg-[var(--uki-lilac)]/10 px-3 text-xs font-black text-[var(--uki-cream)] transition hover:bg-[var(--uki-lilac)]/18">
             <Cookie className="h-4 w-4 text-[var(--uki-lilac)]" />
             Ver mis Cukies
             <ArrowRight className="h-4 w-4" />
@@ -33,7 +33,7 @@ export default function MarketplacePage() {
         </div>
       </header>
 
-      <div className="pt-5">
+      <div className="pt-3">
         <MarketplaceSections
           buy={(
             <section id="cukies-disponibles" className="scroll-mt-24">
