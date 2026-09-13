@@ -1,10 +1,15 @@
 # Configuración de Bases de Datos
 
-Este proyecto utiliza dos bases de datos MongoDB:
+El runtime de staging y producción usa una única base lógica MongoDB por
+entorno. Los nombres históricos de variables se conservan solo como aliases de
+compatibilidad: `DATABASE_URL` y `CUKIES_DATABASE_URL` deben llevar la misma URI,
+identidad de usuario, `authSource` y base (`cukieshub-new-staging` en staging;
+`cukieshub-new` en producción). No se deben crear dos BDs para separar Hub y
+legacy.
 
-## 1. Base de Datos Principal: `cukies-hub`
+## Colecciones Hub y legacy en la misma base
 
-**Conexión**: `DATABASE_URL` en `.env.local`
+**Conexión**: `DATABASE_URL` en `.env.local` (URI canónica del entorno)
 
 **Propósito**: Base de datos principal del proyecto gestionada con Prisma.
 
@@ -27,11 +32,15 @@ const user = await prisma.user.findUnique({
 });
 ```
 
-## 2. Base de Datos Legacy: `cukies`
+El código legacy usa `CUKIES_DATABASE_URL`, que debe ser un alias de la misma
+conexión. Las colecciones legacy se mantienen con nombres o namespaces
+explícitos durante la reconciliación; no se sobrescriben colecciones indexadas
+sin una regla de identidad.
 
-**Conexión**: `CUKIES_DATABASE_URL` en `.env.local`
+### Colecciones legacy
 
-**Propósito**: Base de datos legacy que contiene usuarios y personajes (cukies) existentes.
+**Propósito**: colecciones legacy que contienen usuarios y personajes (cukies)
+existentes dentro de la base canónica.
 
 **Contiene**:
 - **users**: Usuarios con name, lastName, username, email, wallets, password, role
@@ -63,16 +72,16 @@ const userCukies = await cukiesCollection.find({
 Crea un archivo `.env.local` en la raíz de `dapp/` con:
 
 ```env
-# Base de datos principal (Prisma)
-DATABASE_URL="mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=admin"
-
-# Base de datos legacy (cukies)
-CUKIES_DATABASE_URL="mongodb://admin:changeme123@192.168.1.221:27017/cukies?authSource=admin"
+# Desarrollo local: sustituye los placeholders por credenciales locales.
+# En staging/prod Coolify inyecta la URI; no la guardes en el repositorio.
+DATABASE_URL="mongodb://<runtime-user>:<runtime-password>@<mongo-host>:<port>/cukieshub-new?authSource=admin"
+CUKIES_DATABASE_URL="mongodb://<runtime-user>:<runtime-password>@<mongo-host>:<port>/cukieshub-new?authSource=admin"
 ```
 
-## Colecciones Disponibles en `cukies`
+## Colecciones legacy disponibles en la BD canónica
 
-El helper `cukiesDb` proporciona acceso a las siguientes colecciones:
+El helper `cukiesDb` proporciona acceso a las siguientes colecciones legacy (o a
+su namespace reconciliado) dentro de la BD canónica:
 
 - `users()` - Usuarios del sistema legacy
 - `cukies()` - Personajes/cukies
@@ -121,11 +130,14 @@ async function getUserPoints(walletAddress: string) {
 
 ## Migración de Datos
 
-Si necesitas migrar datos de `cukies` a `cukies-hub`, puedes crear scripts de migración que:
+La migración entre las fuentes históricas no se hace con un script ad-hoc ni
+creando otra BD. Sigue el runbook de unificación, que exige snapshot,
+reconciliación idempotente, namespaces para legacy, reconstrucción de índices y
+smoke autenticado antes del corte:
+[`infrastructure/ci/production-data-unification.md`](../../infrastructure/ci/production-data-unification.md).
 
-1. Leen datos de `cukies` usando `cukiesDb`
-2. Transforman los datos al formato esperado por Prisma
-3. Escriben los datos en `cukies-hub` usando `prisma`
+Los ejemplos de lectura/escritura siguientes son válidos para una misma base
+canónica una vez completada esa reconciliación:
 
 Ejemplo:
 
@@ -138,7 +150,7 @@ async function migrateUsers() {
   const users = await usersCollection.find({}).toArray();
   
   for (const user of users) {
-    // Transformar y crear en la nueva BD
+    // Transformar y crear en la colección canónica tras reconciliar identidad.
     await prisma.user.create({
       data: {
         walletAddress: user.wallets[0]?.address || '',
@@ -149,4 +161,3 @@ async function migrateUsers() {
   }
 }
 ```
-

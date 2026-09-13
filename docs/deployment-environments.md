@@ -18,7 +18,7 @@ mientras se estabiliza una release.
 | Scope | Recurso y rama | Ruta de despliegue | Datos y dominio |
 | --- | --- | --- | --- |
 | Stage / Hub | Web app32 `rwwsc4kkwc0ck84cgk40s8kk`; workers app28 `u4s804o4wwcckowgk0woo4wg`; rama `staging` | Push `staging` -> GitHub Actions `.github/workflows/cukies-images.yml` -> runner VM1012 `192.168.1.244` -> registry VM1007 `192.168.1.207:5000` -> API Coolify VM1001 `192.168.1.201`. El catálogo contiene ocho imágenes (seis componentes activos y dos World desactivados); el plan puede actualizar web32 y `docker-compose.workers.yml` en app28, o la lane `treasure-hunt` de app31; app31 sigue fuera del Compose de workers. Autodeploy Git: **OFF**. `CUKIES_DELIVERY_MODE=rolling`, `CUKIES_IMAGE_DEPLOY_ENABLED=true`. | BSC Testnet `97`; Mongo en LXC2007 `192.168.1.221:27018`, servicio `mongod-cukies-staging`; `https://cukieshub.eurekand.com`. |
-| Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`; app12 sigue sirviendo `main`/`4475baa` mientras la migración de registry de PR361 permanece inactiva. | BSC mainnet y datos de producción; `https://cukies.world`. |
+| Main / Hub | App 12 `game-hub`, `main`, UUID `jookw8ow8woks088s44404ok` | Build/deploy legacy de Coolify con `docker-compose.coolify.yml`; app12 sigue sirviendo `main`/`4475baa` mientras la migración de registry de PR361 permanece inactiva. | BSC mainnet; `https://cukies.world`. Mongo dedicado objetivo: base lógica `cukieshub-new`; el corte aún está pendiente. |
 | Stage / Treasure Hunt | App31 `game-treasurehunt-staging`, `staging`, UUID `lc04cw8gs4koo4swwws0c4ss` | Docker Image `treasure-hunt` activo por digest en el mismo CI/registry, fuera del Compose de workers. Bootstrap servido y reemplazo aislado verificados en `dc4c21e`; el fallo inicial de metadata y su recuperación se conservan en la evidencia INFRA. | `https://cukieshub.eurekand.com/treasurehunt-game`, `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y origen dapp de staging. |
 | Main / Treasure Hunt | App13 `game-treasurehunt`, `main`, UUID `tkkggwcosc4gksckcc480cwg` | Nixpacks/e6e136b sigue sirviendo tráfico; el target Docker Image de PR361 está preparado pero la migración por registry/CI permanece inactiva. | `https://treasurehunt.cukies.world`, basePath vacío; parent/origins exclusivos de producción. |
 
@@ -34,10 +34,11 @@ servidos independientes de web/juego. No habilita runtime, escrituras, datos
 ni tráfico. La activación requiere una entrega revisada y los gates de
 [World](../infrastructure/world/README.md); flags/profile solos no bastan.
 
-Las tres bases de Stage (`cukies-hub-staging`, `cukies-legacy-staging` y
-`cukieshub-new-staging`) están fuera del Compose operativo y viven en el Mongo
-dedicado de LXC2007, servicio `mongod-cukies-staging`, `192.168.1.221:27018`,
-verificado como `PRIMARY`. El Mongo existente de `27017` permanece sin cambios.
+La base lógica única de Stage (`cukieshub-new-staging`) está fuera del Compose
+operativo y vive en el Mongo dedicado de LXC2007, servicio
+`mongod-cukies-staging`, `192.168.1.221:27018`, verificado como `PRIMARY`. Las
+antiguas bases `cukies-hub-staging` y `cukies-legacy-staging` son fuentes
+históricas del corte; el Mongo existente de `27017` permanece sin cambios.
 
 ## Topología local y de preview
 
@@ -317,6 +318,24 @@ repetición controlada en [`staging-data-handoff.md`](../infrastructure/ci/stagi
 Las integraciones externas, schedulers y gates económicos mantienen sus perfiles y credenciales
 separadas; nada de esto debe usar secrets en el repo.
 
+### Objetivo de unificación de producción
+
+El destino de producción aprobado es una única instancia Mongo dedicada y una única base lógica
+`cukieshub-new`. `DATABASE_URL`, `CUKIES_DATABASE_URL`, `CHAIN_INDEXER_MONGO_URL`,
+`CUKIES_LEGACY_INDEXER_MONGO_URL` y `CARD_WORKER_MONGO_URL` deben resolver al mismo endpoint,
+usuario runtime y `authSource`; sus nombres históricos solo son aliases de compatibilidad. Las
+plantillas Compose derivan esos aliases de `DATABASE_URL` y `CHAIN_INDEXER_DB_NAME`, por lo que un
+valor antiguo guardado en Coolify no puede desviar el contenedor. Las
+colecciones legacy se conservan dentro de esa base con namespace/proyección explícitos y no se
+sobrescriben las colecciones canónicas del indexer hasta reconciliar identidad, red, colección y
+`tokenId`. El cambio live requiere snapshot, backup restaurable, ensayo y ventana de 60 minutos;
+este documento no acredita que el corte se haya ejecutado.
+
+`eventlog` queda retirado de producción. No se configura `NX_TRON_DB`, `TRON_DB`,
+`CUKIES_TRON_DB` ni ninguna URI de base `eventlog`: los getters TRON consultan directamente el
+proveedor/API de cadena. Las evidencias históricas que mencionan ese nombre no representan una
+dependencia runtime vigente.
+
 ### Diagnóstico de Nx después de OOM
 
 En Nx 23.2, `task_invocations` persiste una fila identificada por `root_pid` y
@@ -368,8 +387,7 @@ El guard `pnpm guard:staging` valida sin imprimir secretos:
 - UUID real del recurso `u4s804o4wwcckowgk0woo4wg` (app `28`);
 - BSC Testnet `97` tanto en la dapp como en el indexer;
 - explorer público exacto `https://testnet.bscscan.com` y ausencia de enlaces PancakeSwap mainnet;
-- `DATABASE_URL` -> `cukies-hub-staging`;
-- `CUKIES_DATABASE_URL` -> `cukies-legacy-staging`;
+- `DATABASE_URL` y `CUKIES_DATABASE_URL` -> `cukieshub-new-staging` (base lógica única de staging);
 - `CHAIN_INDEXER_DB_NAME` y `CARD_WORKER_DB_NAME` -> `cukieshub-new-staging`;
 - `NEXTAUTH_URL` -> uno de los hosts HTTPS aprobados de staging.
 
@@ -398,8 +416,8 @@ topologia o migracion de BBDD requiere una operacion separada con su propio plan
 
 | Variable | Staging | Production | Nota |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | Mongo staging | Mongo production | Nunca compartir escritura con produccion. |
-| `CUKIES_DATABASE_URL` | Mongo legacy staging | Mongo legacy production | Usar replica sanitizada de `cukies`, no produccion directa. |
+| `DATABASE_URL` | Mongo staging unificado (`cukieshub-new-staging`) | Mongo producción unificado (`cukieshub-new`) | Nunca compartir escritura entre entornos; la identidad runtime es única por entorno. |
+| `CUKIES_DATABASE_URL` | Mismo Mongo staging unificado (`cukieshub-new-staging`) | Mismo Mongo producción unificado (`cukieshub-new`) | Alias de compatibilidad; debe usar el mismo endpoint, usuario y `authSource`; las colecciones legacy se aíslan por namespace/proyección. |
 | `NEXTAUTH_URL` | URL staging | URL production | Debe coincidir con OAuth callbacks. |
 | `NEXTAUTH_SECRET` | Secret staging | Secret production | Distinto por entorno. |
 | `ADMIN_WALLET_ALLOWLIST` | Wallets EVM admin separadas por coma | Wallets EVM admin separadas por coma | `/indexer` devuelve 404 sin sesion firmada allowlisted; vacio falla cerrado y no abre Mongo. |

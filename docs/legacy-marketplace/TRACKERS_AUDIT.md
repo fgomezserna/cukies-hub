@@ -1,5 +1,12 @@
 # Auditoria de trackers legacy Cukies World
 
+> **Decisión posterior (2026-09-13):** las preguntas de destino y separación de
+> bases de este informe quedan resueltas por la unificación: una instancia y una
+> base lógica por entorno (`cukieshub-new-staging` / `cukieshub-new`), con
+> namespaces y contratos de consumidor para legacy. Las decisiones históricas
+> de este documento se conservan como contexto; el procedimiento vigente está
+> en [`infrastructure/ci/production-data-unification.md`](../../infrastructure/ci/production-data-unification.md).
+
 Fecha: 2026-05-18
 
 Origen revisado: `/Users/fgomezserna/Proyectos/cukies-world`
@@ -349,10 +356,10 @@ La UI nunca debe depender de listeners live. La UI lee Mongo. El indexer puede e
 - `JumpOutBridge`: owner/red final, `state=available`, tx `Bridge`.
 - Cualquier transaccion firmada por backend para `jumpOutBridge` debe estar en un worker separado de tipo executor, no en el indexer de lectura.
 
-## Decisiones pendientes
+## Decisiones y preguntas pendientes
 
-1. Si la nueva base de datos canonica sera `cukies-hub` o si se seguira leyendo `cukies` legacy durante una fase de transicion.
-2. Si `points` y `tx_points` se mantienen por compatibilidad o se consolidan en una coleccion nueva.
+1. **Resuelta 2026-09-13:** el destino runtime es `cukieshub-new-staging` en staging y `cukieshub-new` en producción; no se mantienen BDs lógicas paralelas.
+2. **Resuelta 2026-09-13:** `points`/`tx_points` se conservan como colecciones legacy durante reconciliación y se proyectan a `point_transactions` con identidad y procedencia explícitas.
 3. Cuantos bloques de confirmacion usar en BSC.
 4. Como paginar TRON de forma oficial y estable en produccion.
 5. Si el bridge backend debe ejecutar `jumpOutBridge` automaticamente o quedar como operacion controlada/manual.

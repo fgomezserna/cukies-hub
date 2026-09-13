@@ -18,7 +18,7 @@ const TARGETS = Object.freeze({
     branch: 'main',
     guard: 'false',
     uuid: 'jookw8ow8woks088s44404ok',
-    dbName: 'cukies-legacy-indexer',
+    dbName: 'cukieshub-new',
   },
 });
 
@@ -135,5 +135,23 @@ test('rejects an APP_ENV that disagrees with the explicit staging target', () =>
   assert.throws(
     () => validators.staging(legacyEnvironment('staging', { APP_ENV: 'production' })),
     /APP_ENV must equal staging/,
+  );
+});
+
+test('rejects a legacy Mongo runtime that diverges from the unified DATABASE_URL', () => {
+  assert.throws(
+    () => validateLegacyIndexerEnvironment(legacyEnvironment('production', {
+      DATABASE_URL: 'mongodb://other-user@other-mongo.example.test:27017/cukieshub-new',
+    }), 'production'),
+    /same endpoint and runtime credentials as DATABASE_URL/,
+  );
+});
+
+test('rejects retired eventlog variables in the legacy perimeter', () => {
+  assert.throws(
+    () => validateLegacyIndexerEnvironment(legacyEnvironment('production', {
+      NX_TRON_DB: 'eventlog',
+    }), 'production'),
+    /NX_TRON_DB is retired/,
   );
 });

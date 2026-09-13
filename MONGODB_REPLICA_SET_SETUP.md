@@ -1,5 +1,10 @@
 # Configuración de MongoDB Replica Set para Prisma
 
+> **Alcance:** esta guía es solo para desarrollo local/histórico. No contiene
+> endpoints ni credenciales de staging o producción. La unificación operativa de
+> producción se ejecuta con el runbook
+> [`infrastructure/ci/production-data-unification.md`](infrastructure/ci/production-data-unification.md).
+
 ## Problema
 Prisma requiere que MongoDB esté configurado como replica set para usar transacciones, incluso para operaciones simples como `create()`.
 
@@ -7,11 +12,13 @@ Prisma requiere que MongoDB esté configurado como replica set para usar transac
 
 ### Opción 1: Configurar en el Servidor MongoDB
 
-Si tienes acceso al servidor MongoDB (192.168.1.221), puedes configurarlo como replica set:
+Si tienes acceso a una instancia de desarrollo, puedes configurarla como replica
+set. Usa siempre un endpoint y credenciales locales proporcionados por el
+entorno; no copies valores de Coolify en esta guía:
 
 #### 1. Conéctate al servidor MongoDB
 ```bash
-mongosh "mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=admin"
+mongosh "mongodb://<user>:<password>@<host>:<port>/<database>?authSource=admin"
 ```
 
 #### 2. Inicializa el replica set
@@ -19,7 +26,7 @@ mongosh "mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=a
 rs.initiate({
   _id: "rs0",
   members: [
-    { _id: 0, host: "192.168.1.221:27017" }
+    { _id: 0, host: "<host>:<port>" }
   ]
 })
 ```
@@ -58,7 +65,7 @@ docker exec -it mongodb-replica-set mongosh --eval "rs.initiate()"
 Si no puedes modificar el servidor MongoDB, puedes intentar agregar parámetros a la conexión (aunque esto no siempre funciona):
 
 ```env
-DATABASE_URL="mongodb://admin:changeme123@192.168.1.221:27017/cukies-hub?authSource=admin&replicaSet=rs0"
+DATABASE_URL="mongodb://<user>:<password>@<host>:<port>/<database>?authSource=admin&replicaSet=rs0"
 ```
 
 **Nota**: Esto solo funciona si el servidor ya está configurado como replica set.
@@ -71,7 +78,6 @@ Después de configurar el replica set, prueba crear una sesión de juego nuevame
 
 - [Prisma MongoDB Transactions](https://www.prisma.io/docs/concepts/components/prisma-client/transactions)
 - [MongoDB Replica Set Setup](https://www.mongodb.com/docs/manual/replication/)
-
 
 
 

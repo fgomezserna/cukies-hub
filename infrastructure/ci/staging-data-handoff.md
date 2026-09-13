@@ -1,7 +1,19 @@
 # Mongo de staging en LXC 2007
 
-Estado 2026-09-09: migración completada y live verificada. Las tres bases operan en el LXC;
-el Mongo original está detenido con sus volúmenes conservados.
+Estado 2026-09-12: la operación histórica del 2026-09-09 dejó tres bases en el
+LXC; el corte unificado posterior usa `cukieshub-new-staging` como única base
+lógica de runtime. El Mongo original y producción conservan sus volúmenes y no
+forman parte de esta operación.
+
+## Estado operativo actual
+
+Todos los servicios de staging (Hub, legacy, indexer, economía, card worker,
+bridge y los consumidores legacy que se habiliten) deben resolver
+`cukieshub-new-staging`. `cukies-hub-staging`, `cukies-legacy-staging` y las
+bases `cukies-staging`/`cukies-game-staging`/`cukies-learn-staging` son fuentes
+históricas de la carga, no destinos runtime. Las colisiones de colección las
+resuelve la fuente legacy; Game/Learn conservan prefijos o nombres propios si el
+contrato difiere.
 
 [Evidencia de reconciliación y servicio](2026-09-09-mongo-lxc-evidence.json):
 577.434 documentos, hashes de colecciones, índices y vistas sin diferencias antes
@@ -48,8 +60,8 @@ backup, reconciliación y validación equivalentes; no son pasos pendientes de a
    la instancia con autenticación, inicializar la replica en
    `192.168.1.221:27018` y verificar `PRIMARY`.
 6. Reconciliar datos, índices y vistas antes de reactivar escrituras. Comprobar la
-   conexión de los usuarios de aplicación a `cukies-hub-staging`,
-   `cukies-legacy-staging` y `cukieshub-new-staging`.
+   conexión de todos los usuarios de aplicación a `cukieshub-new-staging` y
+   verificar que no queda ningún consumidor de staging en las bases históricas.
 7. Cambiar solo los endpoints de staging en Coolify y recrear sus clientes con las
    imágenes ya desplegadas. Retirar el servicio Mongo del Compose operativo, sin
    borrar sus volúmenes. Verificar web, consultas de aplicación y avance de workers.
