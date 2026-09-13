@@ -5,6 +5,9 @@ export type IndexedUkiMarketplaceStatus =
   | 'expired'
   | 'invalid';
 
+/** Ordenes soportadas por el feed publico del marketplace UKI. */
+export type UkiMarketplaceSort = 'newest' | 'price-asc' | 'price-desc';
+
 export type UkiMarketplaceDisplayStatus =
   | IndexedUkiMarketplaceStatus
   | 'requires_attention';

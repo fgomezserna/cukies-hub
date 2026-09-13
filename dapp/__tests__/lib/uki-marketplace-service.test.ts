@@ -273,6 +273,74 @@ describe('UKI marketplace Stage service', () => {
     expect(context.repository.listPublicCandidates).toHaveBeenCalledTimes(2);
   });
 
+  it('propaga el orden por precio UKI y conserva la clave numérica en el cursor', async () => {
+    const cheap = order('1', { ukiPriceRaw: '9' });
+    const expensive = order('2', { ukiPriceRaw: '100' });
+    const context = dependencies({
+      publicOrders: [cheap, expensive],
+      inspections: new Map([
+        [cheap.orderId, inspection()],
+        [expensive.orderId, inspection()],
+      ]),
+    });
+    context.repository.listPublicCandidates.mockImplementation(
+      async ({ after }: { after?: { priceRaw?: string } }) => {
+        if (!after) return [cheap];
+        return after.priceRaw === '9' ? [expensive] : [];
+      },
+    );
+
+    const first = await listPublicUkiMarketplacePage(
+      { limit: 1, sort: 'price-asc' },
+      context.dependencies,
+    );
+
+    expect(first.orders.map(({ orderId }) => orderId)).toEqual([cheap.orderId]);
+    expect(first.nextCursor).toBeTruthy();
+    expect(context.repository.listPublicCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'price-asc' }),
+    );
+    const encoded = first.nextCursor as string;
+    const decoded = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as {
+      priceRaw?: string;
+    };
+    expect(decoded.priceRaw).toBe('9');
+
+    const second = await listPublicUkiMarketplacePage(
+      { limit: 1, cursor: first.nextCursor ?? undefined, sort: 'price-asc' },
+      context.dependencies,
+    );
+    expect(second.orders.map(({ orderId }) => orderId)).toEqual([expensive.orderId]);
+  });
+
+  it('aplica los filtros de tipo y generación UKI solo cuando la metadata los confirma', async () => {
+    const matching = order('3', { tokenId: '73' });
+    const unknown = order('4', { tokenId: '74' });
+    const context = dependencies({
+      publicOrders: [matching, unknown],
+      inspections: new Map([
+        [matching.orderId, inspection()],
+        [unknown.orderId, inspection()],
+      ]),
+      metadata: [{
+        chainId: 97,
+        collectionAddress: collection,
+        tokenId: '73',
+        imageUrl: null,
+        rarity: 'rare',
+        generation: 'second_generation',
+      }],
+    });
+
+    const result = await listPublicUkiMarketplacePage(
+      { limit: 10, type: 'rare', generation: 'second_generation' },
+      context.dependencies,
+    );
+
+    expect(result.orders.map(({ tokenId }) => tokenId)).toEqual(['73']);
+    expect(result.orders).not.toContainEqual(expect.objectContaining({ tokenId: '74' }));
+  });
+
   it('continúa con el cursor cuando agota el presupuesto de lotes antes de un anuncio válido', async () => {
     const invalid = Array.from({ length: 193 }, (_, index) =>
       order((index + 1).toString(16).padStart(2, '0')),

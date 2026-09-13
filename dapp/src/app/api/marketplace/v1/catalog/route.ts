@@ -11,7 +11,10 @@ import type {
   LegacyMarketplaceListResponse,
 } from '@/lib/legacy-marketplace/types';
 import { listPublicUkiMarketplacePage } from '@/lib/uki-marketplace';
-import type { UkiMarketplaceOrderView } from '@/lib/uki-marketplace/types';
+import type {
+  UkiMarketplaceOrderView,
+  UkiMarketplaceSort,
+} from '@/lib/uki-marketplace/types';
 import { UkiMarketplaceValidationError } from '@/lib/uki-marketplace/errors';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +24,8 @@ const PAGE_SIZE = 24;
 type CatalogItem =
   | { source: 'legacy'; item: LegacyMarketplaceCukiItem }
   | { source: 'uki'; item: UkiMarketplaceOrderView };
+
+type CatalogFacets = LegacyMarketplaceListResponse['facets'];
 
 type VerifiedLegacyPage = LegacyMarketplaceListResponse & {
   scannedOffset: number;
@@ -128,6 +133,84 @@ function catalogNetwork(value: string | undefined) {
   return value === 'all' ? undefined : value;
 }
 
+const rarityAliases: Record<string, string> = {
+  '1': 'common',
+  common: 'common',
+  '2': 'uncommon',
+  uncommon: 'uncommon',
+  'no común': 'uncommon',
+  'no-comun': 'uncommon',
+  '3': 'rare',
+  rare: 'rare',
+  raro: 'rare',
+  '4': 'epic',
+  epic: 'epic',
+  épico: 'epic',
+  '5': 'legendary',
+  legendary: 'legendary',
+  legendario: 'legendary',
+  '6': 'goat',
+  goat: 'goat',
+};
+
+function normalizeRarityFacet(value: unknown) {
+  if (value === null || value === undefined) return null;
+  return rarityAliases[String(value).trim().toLowerCase()] ?? null;
+}
+
+function normalizeGenerationFacet(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'original', 'first', 'first_generation', 'genesis'].includes(normalized)) {
+    return 'original';
+  }
+  if (['2', 'second', 'second_generation', 'bred', 'breeding'].includes(normalized)) {
+    return 'second_generation';
+  }
+  return null;
+}
+
+function mergeFacetRows(
+  rows: Array<{ value: string; count: number }>,
+  normalize: (value: unknown) => string | null,
+) {
+  const counts = new Map<string, number>();
+  rows.forEach((row) => {
+    const normalized = normalize(row.value);
+    if (normalized) counts.set(normalized, (counts.get(normalized) ?? 0) + row.count);
+  });
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort((left, right) => left.value.localeCompare(right.value));
+}
+
+function buildCatalogFacets(
+  legacyFacets: CatalogFacets,
+  ukiItems: UkiMarketplaceOrderView[],
+): CatalogFacets {
+  const ukiTypes = ukiItems.flatMap((item) => item.rarity ? [{ value: item.rarity, count: 1 }] : []);
+  const ukiGenerations = ukiItems.flatMap((item) => item.generation ? [{ value: item.generation, count: 1 }] : []);
+  return {
+    states: legacyFacets.states,
+    networks: legacyFacets.networks,
+    types: mergeFacetRows([...legacyFacets.types, ...ukiTypes], normalizeRarityFacet),
+    generations: mergeFacetRows(
+      [...legacyFacets.generations, ...ukiGenerations],
+      normalizeGenerationFacet,
+    ),
+  };
+}
+
+function priceSortCurrency(
+  scope: 'all' | 'legacy' | 'uki',
+  network: string | undefined,
+) {
+  if (scope === 'uki' && (!network || network === 'BSC')) return 'UKI';
+  if (network === 'TRON' && scope !== 'uki') return 'TRX';
+  if (scope === 'legacy' && network === 'BSC') return 'BNB';
+  return null;
+}
+
 function compareNewest(left: CatalogItem, right: CatalogItem) {
   const normalizeTimestamp = (value: number) =>
     value > 0 && value < 1_000_000_000_000 ? value * 1_000 : value;
@@ -196,12 +279,12 @@ export async function GET(request: NextRequest) {
     ) {
       throw new UkiMarketplaceValidationError('invalid sort');
     }
-    if (
-      sort.startsWith('price-') &&
-      !(scope === 'legacy' && (network === 'BSC' || network === 'TRON'))
-    ) {
+    const selectedPriceCurrency = sort.startsWith('price-')
+      ? priceSortCurrency(scope, network)
+      : null;
+    if (sort.startsWith('price-') && !selectedPriceCurrency) {
       throw new UkiMarketplaceValidationError(
-        'price sorting requires one catalog currency',
+        'price sorting requires one selected currency',
       );
     }
     if (
@@ -234,7 +317,16 @@ export async function GET(request: NextRequest) {
           })
         : Promise.resolve(null),
       wantUki
-        ? listPublicUkiMarketplacePage({ limit, cursor: ukiCursor, search })
+        ? listPublicUkiMarketplacePage({
+            limit,
+            cursor: ukiCursor,
+            search,
+            ...(type ? { type } : {}),
+            ...(generation ? { generation } : {}),
+            ...(sort.startsWith('price-')
+              ? { sort: sort as UkiMarketplaceSort }
+              : {}),
+          })
         : Promise.resolve(null),
     ]);
 
@@ -255,8 +347,9 @@ export async function GET(request: NextRequest) {
     const ukiItems: CatalogItem[] =
       uki?.orders.map((item) => ({ source: 'uki', item })) ?? [];
     const merged = [...legacyItems, ...ukiItems];
-    if (scope === 'legacy' && (sort === 'price-asc' || sort === 'price-desc')) {
-      // listLegacyMarketplaceCukies already applied this single-currency order.
+    if (sort === 'price-asc' || sort === 'price-desc') {
+      // Cada fuente ya viene ordenada por la moneda seleccionada. Nunca se
+      // mezclan UKI, BNB y TRX en una comparación numérica común.
     } else if (sort === 'number-asc' || sort === 'number-desc') {
       merged.sort(
         (left, right) =>
@@ -312,6 +405,15 @@ export async function GET(request: NextRequest) {
             types: [],
             generations: [],
           } satisfies LegacyMarketplaceListResponse['facets']),
+        facets: buildCatalogFacets(
+          legacy?.facets ?? {
+            states: [],
+            networks: [],
+            types: [],
+            generations: [],
+          },
+          uki?.orders ?? [],
+        ),
         sources: {
           legacy:
             wantLegacy && legacyResult.status === 'fulfilled' && legacy?.source !== 'empty'

@@ -45,6 +45,12 @@ type CatalogResponse = {
       types: { value: string; count: number }[];
       generations: { value: string; count: number }[];
     };
+    facets?: {
+      states: { value: string; count: number }[];
+      networks: { value: string; count: number }[];
+      types: { value: string; count: number }[];
+      generations: { value: string; count: number }[];
+    };
     sources: { legacy: 'ready' | 'unavailable'; uki: 'ready' | 'unavailable' };
     legacyNetworks: {
       BSC: 'ready' | 'unavailable' | 'paused';
@@ -99,8 +105,45 @@ function targetCatalogSignature(
   return entry ? JSON.stringify(stableCatalogItemSignature(entry)) : 'missing';
 }
 
-function canSortByPrice(scope: MarketplaceScope, network: string) {
-  return scope === 'legacy' && network !== 'all';
+function priceSortCurrency(scope: MarketplaceScope, network: string) {
+  if (scope === 'uki' && (network === 'all' || network === 'BSC')) return 'UKI';
+  if (network === 'TRON' && scope !== 'uki') return 'TRX';
+  if (scope === 'legacy' && network === 'BSC') return 'BNB';
+  return null;
+}
+
+function canonicalTypeFacet(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return ({
+    '1': 'common',
+    common: 'common',
+    '2': 'uncommon',
+    uncommon: 'uncommon',
+    'no común': 'uncommon',
+    'no-comun': 'uncommon',
+    '3': 'rare',
+    rare: 'rare',
+    raro: 'rare',
+    '4': 'epic',
+    epic: 'epic',
+    épico: 'epic',
+    '5': 'legendary',
+    legendary: 'legendary',
+    legendario: 'legendary',
+    '6': 'goat',
+    goat: 'goat',
+  } as Record<string, string>)[normalized] ?? null;
+}
+
+function canonicalGenerationFacet(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'original', 'first', 'first_generation', 'genesis'].includes(normalized)) {
+    return 'original';
+  }
+  if (['2', 'second', 'second_generation', 'bred', 'breeding'].includes(normalized)) {
+    return 'second_generation';
+  }
+  return null;
 }
 
 function formatUkiAmount(raw: string) {
@@ -239,14 +282,26 @@ export function MarketplaceClient({
   const requestIdRef = useRef(0);
   const eventRefreshAbortRef = useRef<AbortController | null>(null);
   const cursor = history[page] ?? history[0];
-  const priceSortAllowed = canSortByPrice(scope, network);
+  const selectedPriceCurrency = priceSortCurrency(scope, network);
+  const priceSortAllowed = selectedPriceCurrency !== null;
+  const facets = catalog?.facets ?? catalog?.legacyFacets;
   const typeOptions = useMemo(
-    () => catalog?.legacyFacets?.types.map((facet) => facet.value) ?? [],
-    [catalog?.legacyFacets?.types],
+    () => [...new Set(
+      (facets?.types ?? [])
+        .map((facet) => canonicalTypeFacet(facet.value))
+        .filter((value): value is string => value !== null),
+    )],
+    [facets?.types],
   );
   const generationOptions = useMemo(
-    () => catalog?.legacyFacets?.generations.map((facet) => facet.value) ?? [],
-    [catalog?.legacyFacets?.generations],
+    () => [...new Set(
+      (facets?.generations ?? [])
+        .map((facet) => canonicalGenerationFacet(facet.value))
+        .filter(
+          (value): value is 'original' | 'second_generation' => value !== null,
+        ),
+    )],
+    [facets?.generations],
   );
 
   const query = useMemo(() => {
@@ -259,9 +314,8 @@ export function MarketplaceClient({
     if (cursor.ukiCursor) params.set('ukiCursor', cursor.ukiCursor);
     if (search.trim()) params.set('search', search.trim());
     if (network !== 'all') params.set('network', network);
-    if (scope !== 'uki' && type !== 'all') params.set('type', type);
-    if (scope !== 'uki' && generation !== 'all')
-      params.set('generation', generation);
+    if (type !== 'all') params.set('type', type);
+    if (generation !== 'all') params.set('generation', generation);
     return params.toString();
   }, [
     cursor.legacyOffset,
@@ -391,14 +445,10 @@ export function MarketplaceClient({
     setSelectedUkiOrderId(null);
     resetPagination();
   }
-  function applyLegacyFacet(
+  function applyFacet(
     setter: (value: string) => void,
     value: string,
   ) {
-    if (scope === 'all' && value !== 'all') {
-      setScope('legacy');
-      setSelectedUkiOrderId(null);
-    }
     setter(value);
     resetPagination();
   }
@@ -437,9 +487,9 @@ export function MarketplaceClient({
                 const nextScope = event.target.value as MarketplaceScope;
                 setScope(nextScope);
                 if (nextScope === 'uki' && network === 'TRON') setNetwork('all');
-                setType('all');
-                setGeneration('all');
-                if (nextScope !== 'legacy') setSort('newest');
+                if (sort.startsWith('price-') && !priceSortCurrency(nextScope, network)) {
+                  setSort('newest');
+                }
                 setSelectedUkiOrderId(null);
                 resetPagination();
               }}
@@ -458,7 +508,7 @@ export function MarketplaceClient({
               onChange={(event) => {
                 const nextNetwork = event.target.value;
                 setNetwork(nextNetwork);
-                if (nextNetwork === 'all' && sort.startsWith('price-')) {
+                if (sort.startsWith('price-') && !priceSortCurrency(scope, nextNetwork)) {
                   setSort('newest');
                 }
                 resetPagination();
@@ -470,15 +520,14 @@ export function MarketplaceClient({
               {scope !== 'uki' && <option value="TRON">TRON</option>}
             </select>
           </label>
-          {scope !== 'uki' && (
-            <>
-              <label className="min-w-0">
+          <>
+            <label className="min-w-0">
                 <span className="sr-only">Tipo de Cukie</span>
                 <select
                   aria-label="Tipo de Cukie"
                   value={type}
                   onChange={(event) => {
-                    applyLegacyFacet(setType, event.target.value);
+                    applyFacet(setType, event.target.value);
                   }}
                   className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
                 >
@@ -489,27 +538,26 @@ export function MarketplaceClient({
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="min-w-0">
+            </label>
+            <label className="min-w-0">
                 <span className="sr-only">Generación</span>
                 <select
                   aria-label="Generación"
                   value={generation}
                   onChange={(event) => {
-                    applyLegacyFacet(setGeneration, event.target.value);
+                    applyFacet(setGeneration, event.target.value);
                   }}
                   className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
                 >
                   <option value="all">Todas las generaciones</option>
                   {generationOptions.map((value) => (
                     <option key={value} value={String(value)}>
-                      Generación {value}
+                      {ukiGenerationLabel(value)}
                     </option>
                   ))}
                 </select>
-              </label>
-            </>
-          )}
+            </label>
+          </>
           <label className="min-w-0">
             <span className="sr-only">Ordenar resultados</span>
             <select
@@ -521,8 +569,8 @@ export function MarketplaceClient({
               }}
               title={
                 priceSortAllowed
-                  ? 'Ordena por precio en la moneda de la red seleccionada'
-                  : 'Selecciona solo Legacy y una red para ordenar por precio'
+                  ? `Ordena por precio en ${selectedPriceCurrency}`
+                  : 'Selecciona una sola moneda (V2 · UKI, BSC · BNB o TRON · TRX) para ordenar por precio'
               }
               className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
             >
@@ -553,12 +601,7 @@ export function MarketplaceClient({
           </Button>
           {!priceSortAllowed && (
             <p className="col-span-full text-[11px] leading-4 text-slate-500">
-              El precio se puede ordenar cuando muestras solo Legacy y una red.
-            </p>
-          )}
-          {scope === 'all' && (
-            <p className="col-span-full text-[11px] leading-4 text-slate-500">
-              Tipo y generación pertenecen al catálogo Legacy; al elegir uno se mostrará solo ese catálogo.
+              Para ordenar por precio, elige una sola moneda: V2 · UKI, BSC · BNB o TRON · TRX. No se comparan importes entre monedas.
             </p>
           )}
         </div>

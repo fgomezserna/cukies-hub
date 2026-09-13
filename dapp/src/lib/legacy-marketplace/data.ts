@@ -724,14 +724,38 @@ export function buildLegacyMarketplaceMongoFilter(
   }
 
   if (params.type && params.type !== 'all') {
-    const parsedType = Number(params.type);
-    addClause({ type: Number.isFinite(parsedType) ? parsedType : params.type });
+    const normalizedType = params.type.trim().toLowerCase();
+    const canonicalTypeValues: Record<string, Array<number | string>> = {
+      common: [1, '1', 'common'],
+      uncommon: [2, '2', 'uncommon', 'no común'],
+      rare: [3, '3', 'rare', 'raro'],
+      epic: [4, '4', 'epic', 'épico'],
+      legendary: [5, '5', 'legendary', 'legendario'],
+      goat: [6, '6', 'goat'],
+    };
+    const values = canonicalTypeValues[normalizedType];
+    if (values) {
+      addClause({ type: { $in: values } });
+    } else {
+      const parsedType = Number(params.type);
+      addClause({ type: Number.isFinite(parsedType) ? parsedType : params.type });
+    }
   }
 
   if (params.generation && params.generation !== 'all') {
-    const parsedGeneration = Number(params.generation);
-    if (Number.isFinite(parsedGeneration)) {
-      addClause({ 'skills.generation': parsedGeneration });
+    const normalizedGeneration = params.generation.trim().toLowerCase();
+    const canonicalGenerationValues: Record<string, Array<number | string>> = {
+      original: [1, '1', 'original', 'first_generation'],
+      second_generation: [2, '2', 'second_generation', 'second'],
+    };
+    const values = canonicalGenerationValues[normalizedGeneration];
+    if (values) {
+      addClause({ 'skills.generation': { $in: values } });
+    } else {
+      const parsedGeneration = Number(params.generation);
+      if (Number.isFinite(parsedGeneration)) {
+        addClause({ 'skills.generation': parsedGeneration });
+      }
     }
   }
 

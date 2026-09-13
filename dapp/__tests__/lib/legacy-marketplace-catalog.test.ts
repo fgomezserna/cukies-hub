@@ -29,6 +29,17 @@ describe('catálogo e identidad del marketplace Legacy', () => {
     expect(filter.$and?.[0]).toHaveProperty('$or');
   });
 
+  it('acepta los valores canonicos de tipo y generacion compartidos con V2', () => {
+    const filter = buildLegacyMarketplaceMongoFilter({
+      type: 'rare',
+      generation: 'second_generation',
+    });
+    expect(filter.$and).toEqual(expect.arrayContaining([
+      { type: { $in: [3, '3', 'rare', 'raro'] } },
+      { 'skills.generation': { $in: [2, '2', 'second_generation', 'second'] } },
+    ]));
+  });
+
   it('mantiene red, colección y token en el enlace de detalle', () => {
     const href = getLegacyMarketplaceDetailHref(cuki);
     expect(href).toContain('/marketplace/4000000008733?');

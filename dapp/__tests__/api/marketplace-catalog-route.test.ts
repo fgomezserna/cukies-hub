@@ -165,8 +165,14 @@ describe('/api/marketplace/v1/catalog', () => {
     expect(unavailableBody.data.items).toEqual([]);
   });
 
-  it('rechaza ordenar precios sin una moneda única y conserva filtros Legacy válidos', async () => {
+  it('ordena por la moneda seleccionada y rechaza comparar monedas mezcladas', async () => {
     expect((await GET(request('scope=all&sort=price-asc'))).status).toBe(400);
+    expect((await GET(request('scope=all&network=BSC&sort=price-asc'))).status).toBe(400);
+
+    await GET(request('scope=uki&sort=price-asc'));
+    expect(ukiList).toHaveBeenCalledWith(expect.objectContaining({
+      sort: 'price-asc',
+    }));
 
     await GET(request('scope=legacy&network=BSC&type=2&generation=1&sort=price-asc'));
     expect(legacyList).toHaveBeenCalledWith(expect.objectContaining({
@@ -176,7 +182,18 @@ describe('/api/marketplace/v1/catalog', () => {
       sort: 'price-asc',
       marketplaceOnly: true,
     }));
-    expect(ukiList).not.toHaveBeenCalled();
+  });
+
+  it('mantiene tipo y generación como filtros comunes del catálogo', async () => {
+    await GET(request('scope=all&type=rare&generation=second_generation'));
+    expect(legacyList).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'rare',
+      generation: 'second_generation',
+    }));
+    expect(ukiList).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'rare',
+      generation: 'second_generation',
+    }));
   });
 
   it('descarta anuncios Legacy obsoletos y avanza por los candidatos ya verificados', async () => {

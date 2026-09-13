@@ -12,11 +12,18 @@ import type {
   IndexedUkiMarketplaceOrder,
   UkiMarketplaceAssetIdentity,
   UkiMarketplaceAssetMetadata,
+  UkiMarketplaceSort,
 } from './types';
 
 const CANONICAL_TOKEN_ID = /^(0|[1-9][0-9]*)$/;
 const MAX_UINT256 = (BigInt(1) << BigInt(256)) - BigInt(1);
 const MAX_METADATA_IDENTITIES = 200;
+
+type PublicCandidateCursor = {
+  listedAt: Date;
+  id: string;
+  priceRaw?: string;
+};
 
 type InventoryDocumentWithCardImage = CukiesInventoryDocument & {
   /** URL inmutable escrita por cuki-card-worker (MinIO/S3). */
@@ -73,8 +80,9 @@ export interface UkiMarketplaceRepository {
     marketplaceAddress: `0x${string}`;
     now: Date;
     limit: number;
-    after?: { listedAt: Date; id: string };
+    after?: PublicCandidateCursor;
     search?: string;
+    sort?: UkiMarketplaceSort;
   }): Promise<IndexedUkiMarketplaceOrder[]>;
   listSellerOrders(input: {
     chainId: 56 | 97;
@@ -126,22 +134,18 @@ export class MongoUkiMarketplaceRepository implements UkiMarketplaceRepository {
     marketplaceAddress: `0x${string}`;
     now: Date;
     limit: number;
-    after?: { listedAt: Date; id: string };
+    after?: PublicCandidateCursor;
     search?: string;
+    sort?: UkiMarketplaceSort;
   }) {
     const collection = await this.collectionFactory();
+    const sort = input.sort ?? 'newest';
     const filter: Record<string, unknown> = {
       chainId: input.chainId,
       marketplaceAddressNormalized: input.marketplaceAddress,
       status: 'active',
       expiresAt: { $gt: input.now },
     };
-    if (input.after) {
-      filter.$or = [
-        { listedAt: { $lt: input.after.listedAt } },
-        { listedAt: input.after.listedAt, _id: { $lt: input.after.id } },
-      ];
-    }
     const search = input.search?.trim();
     if (search) {
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -165,11 +169,80 @@ export class MongoUkiMarketplaceRepository implements UkiMarketplaceRepository {
         },
       ];
     }
-    return collection
-      .find(filter)
-      .sort({ listedAt: -1, _id: -1 })
-      .limit(input.limit)
-      .toArray();
+
+    if (sort === 'newest') {
+      if (input.after) {
+        filter.$or = [
+          { listedAt: { $lt: input.after.listedAt } },
+          { listedAt: input.after.listedAt, _id: { $lt: input.after.id } },
+        ];
+      }
+      return collection
+        .find(filter)
+        .sort({ listedAt: -1, _id: -1 })
+        .limit(input.limit)
+        .toArray();
+    }
+
+    // ukiPriceRaw es una cadena uint256. Ordenarlo como texto rompería el
+    // orden (por ejemplo, "9" aparecería después de "100"); convertirlo en
+    // Decimal128 dentro de Mongo mantiene la comparación exacta sin inventar
+    // conversiones de moneda.
+    const direction = sort === 'price-asc' ? 1 : -1;
+    const pipeline: Record<string, unknown>[] = [
+      { $match: filter },
+      {
+        $addFields: {
+          __ukiPriceDecimal: {
+            $convert: {
+              input: '$ukiPriceRaw',
+              to: 'decimal',
+              onError: null,
+              onNull: null,
+            },
+          },
+        },
+      },
+      { $match: { __ukiPriceDecimal: { $ne: null } } },
+    ];
+    if (input.after) {
+      if (!input.after.priceRaw || !/^\d+$/.test(input.after.priceRaw)) {
+        return [];
+      }
+      const afterPrice = {
+        $convert: {
+          input: input.after.priceRaw,
+          to: 'decimal',
+          onError: null,
+          onNull: null,
+        },
+      };
+      pipeline.push({
+        $match: {
+          $expr: {
+            $or: [
+              direction === 1
+                ? { $gt: ['$__ukiPriceDecimal', afterPrice] }
+                : { $lt: ['$__ukiPriceDecimal', afterPrice] },
+              {
+                $and: [
+                  { $eq: ['$__ukiPriceDecimal', afterPrice] },
+                  direction === 1
+                    ? { $gt: ['$_id', input.after.id] }
+                    : { $lt: ['$_id', input.after.id] },
+                ],
+              },
+            ],
+          },
+        },
+      });
+    }
+    pipeline.push(
+      { $sort: { __ukiPriceDecimal: direction, _id: direction } },
+      { $limit: input.limit },
+      { $project: { __ukiPriceDecimal: 0 } },
+    );
+    return collection.aggregate<IndexedUkiMarketplaceOrder>(pipeline).toArray();
   }
 
   async listSellerOrders(input: {
