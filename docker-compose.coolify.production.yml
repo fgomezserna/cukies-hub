@@ -1,0 +1,26 @@
+# Production-only Compose entrypoint.
+#
+# The full docker-compose.coolify.yml remains the shared staging definition.
+# Production imports only the public dapp, the BSC indexer and the already
+# enabled bridge relayer. Keeping the staging-only profiles out of this
+# entrypoint avoids Coolify's generated Compose command exceeding the host
+# argument limit while preserving the staging topology for app 28.
+services:
+  dapp:
+    extends:
+      file: ./docker-compose.coolify.yml
+      service: dapp
+
+  chain-indexer:
+    extends:
+      file: ./docker-compose.coolify.yml
+      service: chain-indexer
+
+  cukies-bridge-relayer:
+    extends:
+      file: ./docker-compose.coolify.yml
+      service: cukies-bridge-relayer
+
+networks:
+  coolify:
+    external: true
