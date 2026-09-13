@@ -35,6 +35,10 @@ case "${CUKIES_SERVICE:-dapp}" in
     pnpm --filter @cukies/cuki-card-worker run setup:prod
     exec pnpm --filter @cukies/cuki-card-worker run start
     ;;
+  cukies-bridge-relayer)
+    pnpm --filter @cukies/cukies-bridge-relayer run setup:prod
+    exec pnpm --filter @cukies/cukies-bridge-relayer run start
+    ;;
   *)
     echo "CUKIES_SERVICE no soportado: ${CUKIES_SERVICE:-}"
     exit 1

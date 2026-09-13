@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import {
   ArrowRight,
-  ArrowRightLeft,
   Baby,
   Coins,
   Cookie,
@@ -26,14 +25,6 @@ const tools = [
     status: 'Compra y gestion',
   },
   {
-    title: 'Bridge',
-    href: '/bridge',
-    description: 'Mueve un Cukie entre TRON y BSC, revisando primero wallet origen, destino y coste.',
-    Icon: ArrowRightLeft,
-    action: 'Abrir bridge',
-    status: 'TRON <-> BSC',
-  },
-  {
     title: 'CukiePoints',
     href: '/cukiepoints',
     description: 'Comprueba saldo por wallet, actividad global y movimientos ligados a mint o breeding.',
@@ -53,13 +44,12 @@ const tools = [
 
 const highlights = [
   'Marketplace es el punto de entrada para inspeccionar y comprar.',
-  'Bridge y breeding requieren conectar la wallet correcta antes de operar.',
+  'Breeding requiere conectar la wallet correcta antes de operar.',
   'CukiePoints sirve para verificar actividad antes y despues de acciones.',
 ] as const;
 
 const flow = [
   { label: 'Comprar', detail: 'Marketplace' },
-  { label: 'Mover', detail: 'Bridge' },
   { label: 'Criar', detail: 'Breeding' },
   { label: 'Auditar', detail: 'CukiePoints' },
 ] as const;
@@ -69,10 +59,9 @@ function formatMetric(value: number) {
 }
 
 export default async function CukiesToolsPage() {
-  const [allCukies, onSaleCukies, bridgeCukies, points] = await Promise.all([
+  const [allCukies, onSaleCukies, points] = await Promise.all([
     listCukies({ limit: 1 }),
     listCukies({ limit: 1, state: 'onSale' }),
-    listCukies({ limit: 1, state: 'inBridge' }),
     listCukiePoints({ limit: 1 }),
   ]);
 
@@ -95,13 +84,6 @@ export default async function CukiesToolsPage() {
       helper: 'listados ahora',
       detail: 'disponibles para compra',
       Icon: Tag,
-    },
-    {
-      label: 'Bridge',
-      value: formatMetric(bridgeCukies.total),
-      helper: 'en movimiento',
-      detail: 'pendientes de salida',
-      Icon: ArrowRightLeft,
     },
     {
       label: 'Redes',
@@ -133,7 +115,7 @@ export default async function CukiesToolsPage() {
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
               Panel operativo para decidir que hacer con tu coleccion: comprar,
-              mover entre redes, criar nuevos Cukies o verificar puntos y actividad.
+              criar nuevos Cukies o verificar puntos y actividad.
             </p>
           </div>
 
@@ -184,7 +166,7 @@ export default async function CukiesToolsPage() {
         ))}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {tools.map(({ title, href, description, Icon, action, status }) => (
           <Link
             key={href}

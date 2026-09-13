@@ -14,16 +14,191 @@ type LegacyTronContractInstance = Record<
   (...args: readonly unknown[]) => LegacyTronContractCall
 >;
 
+type LegacyTrxLike = {
+  getTransactionInfo?: (transactionId: string) => Promise<unknown>;
+};
+
 export type LegacyTronWebLike = {
   ready?: boolean;
   defaultAddress?: {
     base58?: string;
   };
+  trx?: LegacyTrxLike;
   contract: (
     abi: unknown,
     address: string,
   ) => LegacyTronContractInstance | Promise<LegacyTronContractInstance>;
 };
+
+export type LegacyTronReceipt = Readonly<{
+  transactionId: string;
+  info: Record<string, unknown>;
+}>;
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : null;
+}
+
+/** Extract the tx id returned by the different TronWeb versions/providers. */
+export function getLegacyTronTransactionId(value: unknown): string | null {
+  if (typeof value === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(value.trim())) {
+    return value.trim();
+  }
+
+  const root = record(value);
+  if (!root) return null;
+
+  for (const key of ['txid', 'txID', 'transactionId', 'id']) {
+    const candidate = root[key];
+    if (typeof candidate === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(candidate.trim())) {
+      return candidate.trim();
+    }
+  }
+
+  for (const key of ['transaction', 'result']) {
+    const nested: string | null = getLegacyTronTransactionId(root[key]);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function receiptResult(info: Record<string, unknown>) {
+  const receipt = record(info.receipt);
+  const result = receipt?.result ?? info.result;
+  return typeof result === 'string' ? result.trim().toUpperCase() : null;
+}
+
+const TRON_RECEIPT_FAILURE_PREFIX = 'TRON receipt failure:';
+
+function isReceiptReady(info: Record<string, unknown>) {
+  const result = receiptResult(info);
+  if (result) return true;
+
+  return (
+    typeof info.blockNumber === 'number'
+    || typeof info.blockNumber === 'string'
+    || typeof info.blockTimeStamp === 'number'
+    || typeof info.block_timestamp === 'number'
+  );
+}
+
+function receiptFailure(info: Record<string, unknown>) {
+  const result = receiptResult(info);
+  if (!result || ['SUCCESS', 'OK', 'DEFAULT'].includes(result)) return null;
+
+  const receipt = record(info.receipt);
+  const message = receipt?.resMessage ?? receipt?.message ?? info.resMessage;
+  return typeof message === 'string' && message.trim()
+    ? `${TRON_RECEIPT_FAILURE_PREFIX} ${message.trim()}`
+    : `${TRON_RECEIPT_FAILURE_PREFIX} ${result}`;
+}
+
+/**
+ * Wait for a confirmed TRON receipt. `send(..., shouldPollResponse:false)`
+ * returns before inclusion; callers must use this helper before presenting a
+ * bridge as confirmed or clearing the selected NFT.
+ */
+export async function waitForLegacyTronReceipt(
+  tronWeb: LegacyTronWebLike,
+  transactionId: string,
+  options: Readonly<{
+    timeoutMs?: number;
+    pollIntervalMs?: number;
+  }> = {},
+): Promise<LegacyTronReceipt> {
+  const getTransactionInfo = tronWeb.trx?.getTransactionInfo;
+  if (typeof getTransactionInfo !== 'function') {
+    throw new Error('TronLink no permite consultar el receipt TRON.');
+  }
+
+  const timeoutMs = Math.max(options.timeoutMs ?? 120_000, 1_000);
+  const pollIntervalMs = Math.max(options.pollIntervalMs ?? 3_000, 250);
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown = null;
+
+  while (Date.now() <= deadline) {
+    try {
+      const value = await getTransactionInfo(transactionId);
+      const info = record(value);
+      if (info && isReceiptReady(info)) {
+        const failure = receiptFailure(info);
+        if (failure) throw new Error(failure);
+        return { transactionId, info };
+      }
+    } catch (error) {
+      // A transient TronGrid/provider error should not turn a submitted bridge
+      // into a false failure while the receipt can still be queried later.
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith(TRON_RECEIPT_FAILURE_PREFIX)) throw error;
+    }
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(pollIntervalMs, remaining)));
+  }
+
+  if (lastError instanceof Error && lastError.message) {
+    throw new Error(`No se pudo confirmar la transaccion TRON: ${lastError.message}`);
+  }
+  throw new Error('No se pudo confirmar la transaccion TRON dentro del tiempo esperado.');
+}
+
+export async function getTronContractAt(
+  tronWeb: LegacyTronWebLike,
+  abi: unknown,
+  address: string,
+) {
+  return tronWeb.contract(abi, address);
+}
+
+export async function readTronContractAt<TValue = unknown>(
+  tronWeb: LegacyTronWebLike,
+  abi: unknown,
+  address: string,
+  functionName: string,
+  args: readonly unknown[] = [],
+) {
+  const contract = await getTronContractAt(tronWeb, abi, address);
+  const method = contract[functionName];
+
+  if (typeof method !== 'function') {
+    throw new Error(`TRON contract ${address} has no method ${functionName}`);
+  }
+
+  const call = method(...args);
+  if (typeof call.call !== 'function') {
+    throw new Error(`TRON contract ${address}.${functionName} is not readable`);
+  }
+
+  return call.call() as Promise<TValue>;
+}
+
+export async function sendTronContractAt(
+  tronWeb: LegacyTronWebLike,
+  abi: unknown,
+  address: string,
+  functionName: string,
+  args: readonly unknown[] = [],
+  options?: Record<string, unknown>,
+) {
+  const contract = await getTronContractAt(tronWeb, abi, address);
+  const method = contract[functionName];
+
+  if (typeof method !== 'function') {
+    throw new Error(`TRON contract ${address} has no method ${functionName}`);
+  }
+
+  const call = method(...args);
+  if (typeof call.send !== 'function') {
+    throw new Error(`TRON contract ${address}.${functionName} is not writable`);
+  }
+
+  return call.send(options);
+}
 
 export function getLegacyTronContractDescriptor(
   contractName: LegacyTronContractName,
@@ -40,7 +215,7 @@ export async function getLegacyTronContract(
 ) {
   const { address, abi } = getLegacyTronContractDescriptor(contractName);
 
-  return tronWeb.contract(abi, address);
+  return getTronContractAt(tronWeb, abi, address);
 }
 
 export async function readLegacyTronContract<TValue = unknown>(

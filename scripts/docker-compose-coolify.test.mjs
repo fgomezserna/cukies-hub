@@ -86,6 +86,19 @@ test('dapp keeps Ambassadors hidden unless Coolify enables it at build time', ()
   );
 });
 
+test('bridge relayer is opt-in, mainnet-only and fail-closed when incomplete', () => {
+  const definition = serviceDefinition('cukies-bridge-relayer');
+
+  assert.match(definition, /    profiles:\n      - bridge-relayer\n/);
+  assert.match(definition, /      CUKIES_SERVICE: cukies-bridge-relayer/);
+  assert.match(definition, /      CUKIES_BRIDGE_RELAYER_ENABLED: \$\{CUKIES_BRIDGE_RELAYER_ENABLED:-false\}/);
+  assert.match(definition, /      CUKIES_BRIDGE_RELAYER_TRON_NETWORK: \$\{CUKIES_BRIDGE_RELAYER_TRON_NETWORK:-mainnet\}/);
+  assert.match(definition, /      CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: \$\{CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID:-56\}/);
+  assert.match(definition, /      CUKIES_BRIDGE_RELAYER_BSC_CONFIRMATIONS: \$\{CUKIES_BRIDGE_RELAYER_BSC_CONFIRMATIONS:-12\}/);
+  assert.match(definition, /      CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY: \$\{CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY:-\}/);
+  assert.match(definition, /      CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM: \$\{CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM:-\}/);
+});
+
 for (const serviceName of guardedWorkers.filter((name) => name.endsWith('-scheduler'))) {
   test(`${serviceName} only calls its resource-scoped dapp alias`, () => {
     const definition = serviceDefinition(serviceName);

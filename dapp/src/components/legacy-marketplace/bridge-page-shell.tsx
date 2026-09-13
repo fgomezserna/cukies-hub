@@ -1,9 +1,35 @@
+import 'server-only';
+
 import Link from 'next/link';
 import { ArrowRightLeft, ArrowUpRight, CheckCircle2, Network, Wallet } from 'lucide-react';
 
 import { BridgeClient } from '@/components/legacy-marketplace/bridge-client';
+import { buildCukiesBridgeRuntimeConfig } from '@/lib/legacy-marketplace/bridge-runtime';
 
 export function BridgePageShell() {
+  const config = buildCukiesBridgeRuntimeConfig({
+    APP_ENV: process.env.APP_ENV,
+    NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
+    NEXT_PUBLIC_UKI_CHAIN_ID: process.env.NEXT_PUBLIC_UKI_CHAIN_ID,
+    CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID:
+      process.env.CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID,
+    NEXT_PUBLIC_CUKIES_BRIDGE_MODE: process.env.NEXT_PUBLIC_CUKIES_BRIDGE_MODE,
+    NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID:
+      process.env.NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID,
+    NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS:
+      process.env.NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS,
+    NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS:
+      process.env.NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS,
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK:
+      process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK,
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL:
+      process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL,
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS:
+      process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS,
+    NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS:
+      process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS,
+  });
+
   return (
     <div className="mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6 overflow-hidden text-foreground">
       <section className="min-w-0 overflow-hidden rounded-[8px] border border-cyan-300/20 bg-black/30 px-4 py-4 shadow-lg shadow-cyan-950/20 backdrop-blur sm:px-5">
@@ -17,13 +43,13 @@ export function BridgePageShell() {
               Cukies Bridge
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-5 text-slate-300">
-              Prepara un movimiento entre TRON y BSC con origen, destino y coste
-              visibles antes de aprobar la operacion.
+              Migra un Cukie de TRON a BSC con destino y coste visibles antes de
+              aprobar la operación. Este flujo es unidireccional.
             </p>
             <div className="mt-4 grid gap-2 text-xs text-slate-300 sm:grid-cols-3">
               {[
-                [Network, 'Elige red origen'],
-                [Wallet, 'Confirma wallet destino'],
+                [Network, 'Origen TRON mainnet'],
+                [Wallet, 'Confirma wallet BSC destino'],
                 [CheckCircle2, 'Aprueba y ejecuta bridge'],
               ].map(([Icon, label]) => (
                 <div key={String(label)} className="flex items-center gap-2 rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
@@ -53,7 +79,7 @@ export function BridgePageShell() {
         </div>
       </section>
 
-      <BridgeClient />
+      <BridgeClient config={config} />
     </div>
   );
 }
