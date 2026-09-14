@@ -17,14 +17,26 @@ const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
+// The CI job exports its target environment.  Keep this fixture valid for
+// both the local (staging-default) test run and the production verification
+// job instead of relying on the environment metadata compatibility escape
+// hatch.
+const TEST_ENVIRONMENT = process.env.CUKIES_DEPLOY_ENVIRONMENT === 'production'
+  ? 'production'
+  : 'staging';
+const TEST_CHAIN_ID = TEST_ENVIRONMENT === 'production' ? '56' : '97';
 
 const completeState = {
+  environment: TEST_ENVIRONMENT,
+  chainId: TEST_CHAIN_ID,
   commit: SHA_A,
   configHash: HASH_A,
   components: Object.fromEntries(COMPONENTS.map((component) => [component, {
     image: `192.168.1.207:5000/cukies-hub/${component}:${SHA_A}-${HASH_A}@sha256:${'1'.repeat(64)}`,
     digest: `sha256:${'1'.repeat(64)}`,
     configHash: HASH_A,
+    environment: TEST_ENVIRONMENT,
+    chainId: TEST_CHAIN_ID,
   }])),
 };
 
