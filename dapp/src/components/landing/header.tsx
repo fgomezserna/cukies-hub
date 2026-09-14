@@ -8,13 +8,11 @@ import { Menu, X } from 'lucide-react';
 import { LandingWalletConnectButton } from './wallet-connect-dynamic';
 import { PUBLIC_LOCALES, type PublicLocale } from '@/lib/public-locale';
 import { usePublicLocale } from '@/providers/public-locale-provider';
-import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
 const navItems = [
   { label: { es: 'Inicio', en: 'Home' }, href: '/' },
-  { label: { es: 'Comprar UKI', en: 'Buy UKI' }, href: '/#comprar-uki' },
+  { label: { es: 'Mi dashboard', en: 'My dashboard' }, href: '/dashboard' },
   { label: { es: 'Staking', en: 'Staking' }, href: '/cukie-master' },
-  { label: { es: 'Embajadores', en: 'Ambassadors' }, href: '/embajadores' },
   { label: { es: 'Jugar', en: 'Play' }, href: '/games/treasure-hunt' },
   { label: { es: 'Vesting', en: 'Vesting' }, href: '/vesting' },
 ];
@@ -103,15 +101,12 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
   const closeMenu = () => setIsOpen(false);
   const navLabel = (item: (typeof navItems)[number]) => item.label[locale];
   const copy = headerCopy[locale];
-  const visibleNavItems = navItems.filter(
-    (item) => item.href !== '/embajadores' || isAmbassadorsPubliclyListed(),
-  );
 
   return (
     <>
       <a
         href="#contenido-principal"
-        className="fixed left-4 top-3 z-[90] -translate-y-20 rounded-[6px] bg-[var(--uki-cyan)] px-4 py-2 text-sm font-black text-[#041010] transition focus:translate-y-0"
+        className="fixed left-4 top-3 z-[90] -translate-y-20 rounded-[6px] bg-[var(--uki-lilac)] px-4 py-2 text-sm font-black text-[#0b0810] transition focus:translate-y-0"
       >
         {locale === 'es' ? 'Saltar al contenido' : 'Skip to content'}
       </a>
@@ -123,7 +118,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
 
           {/* Menú de Desktop */}
           <div className="hidden items-center gap-6 lg:flex">
-            {visibleNavItems.map((item) => {
+            {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -146,7 +141,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
           <button
             ref={menuButtonRef}
             type="button"
-            className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10 bg-white/5 text-[var(--uki-cyan)] hover:bg-white/10 lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-[8px] border border-white/10 bg-white/5 text-[var(--uki-lilac)] hover:bg-white/10 lg:hidden"
             onClick={toggleMenu}
             aria-label={isOpen ? copy.closeMenu : copy.openMenu}
             aria-expanded={isOpen}
@@ -173,7 +168,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
         <div className="flex h-full flex-col justify-between">
           <div className="space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
-              <span className="font-headline text-lg font-black uppercase text-[var(--uki-cyan)]">{copy.menuTitle}</span>
+              <span className="font-headline text-lg font-black uppercase text-[var(--uki-lilac)]">{copy.menuTitle}</span>
               <button
                 type="button"
                 className="flex h-11 w-11 items-center justify-center rounded-[6px] border border-white/10 bg-white/5 text-[var(--uki-muted)] hover:text-white"
@@ -184,7 +179,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
               </button>
             </div>
             <nav className="flex flex-col gap-4">
-              {visibleNavItems.map((item) => {
+              {navItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link
@@ -192,7 +187,7 @@ export function LandingHeader({ evmOnly = false }: { evmOnly?: boolean }) {
                     href={item.href}
                     onClick={closeMenu}
                     className={`font-headline text-xl font-black uppercase tracking-[0.04em] transition ${
-                      isActive ? 'text-[var(--uki-cyan)]' : 'text-[var(--uki-cream)] hover:text-[var(--uki-cyan)]'
+                      isActive ? 'text-[var(--uki-lilac)]' : 'text-[var(--uki-cream)] hover:text-[var(--uki-lilac)]'
                     }`}
                   >
                     {navLabel(item)}

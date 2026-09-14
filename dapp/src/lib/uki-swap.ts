@@ -6,8 +6,10 @@ export const PANCAKE_V2_ROUTER_BY_CHAIN = Object.freeze({
 } satisfies Record<number, Address>);
 
 export const BSC_MAINNET_SWAP_TOKENS = Object.freeze({
+  asm: '0x707F0f4a39a4a26239F7D00463B15AB5656861f9',
   usdc: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
   usdt: '0x55d398326f99059fF775485246999027B3197955',
+  uki: '0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA',
   wbnb: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
 } satisfies Record<string, Address>);
 
@@ -98,6 +100,14 @@ export type UkiSwapConfig = {
   routerAddress: Address;
   sources: readonly UkiSwapSource[];
 };
+
+export function getUkiSwapNetworkLabel(chainId: number) {
+  return chainId === 97
+    ? 'BSC Testnet'
+    : chainId === 56
+      ? 'BNB Smart Chain'
+      : 'Red no configurada';
+}
 
 export function buildUkiSwapConfig({
   chainId,

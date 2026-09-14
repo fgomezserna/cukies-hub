@@ -29,7 +29,7 @@ export default function GamesPage() {
       <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-6">
           <div className="text-center space-y-4">
-            <h1 className="text-4xl md:text-5xl font-bold font-headline text-cyan-200">
+            <h1 className="text-4xl md:text-5xl font-bold font-headline text-lilac-200">
               Juegos / Jugar
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">

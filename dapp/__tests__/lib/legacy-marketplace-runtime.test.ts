@@ -1,0 +1,104 @@
+import {
+  buildLegacyMarketplaceRuntime,
+  getLegacyPointExplorerUrl,
+} from '@/lib/legacy-marketplace/runtime';
+
+describe('legacy marketplace runtime safety', () => {
+  it('permite el marketplace Legacy real en Stage sin habilitar el resto de lecturas mainnet', () => {
+    const runtime = buildLegacyMarketplaceRuntime({
+      APP_ENV: 'staging',
+      NEXT_PUBLIC_APP_ENV: 'staging',
+    });
+
+    expect(runtime).toMatchObject({
+      appEnv: 'staging',
+      legacyMainnetEnabled: false,
+      legacyMainnetReadEnabled: true,
+      legacyMainnetOperationsEnabled: false,
+      legacyMarketplaceActionsEnabled: true,
+      bscChainId: 56,
+      bscExplorerBaseUrl: 'https://bscscan.com',
+      tronExplorerBaseUrl: 'https://tronscan.org',
+    });
+    expect(runtime.reason).toBeNull();
+  });
+
+  it('solo mantiene el marketplace legacy en el entorno de produccion', () => {
+    const runtime = buildLegacyMarketplaceRuntime({
+      APP_ENV: 'production',
+      NEXT_PUBLIC_APP_ENV: 'production',
+    });
+
+    expect(runtime).toEqual({
+      appEnv: 'production',
+      legacyMainnetEnabled: true,
+      legacyMainnetReadEnabled: true,
+      legacyMainnetOperationsEnabled: true,
+      legacyMarketplaceActionsEnabled: true,
+      bscChainId: 56,
+      bscExplorerBaseUrl: 'https://bscscan.com',
+      tronExplorerBaseUrl: 'https://tronscan.org',
+      reason: null,
+    });
+  });
+
+  it('falla cerrado si el entorno falta o no esta reconocido', () => {
+    expect(buildLegacyMarketplaceRuntime({})).toMatchObject({
+      appEnv: 'unknown',
+      legacyMainnetEnabled: false,
+      legacyMainnetReadEnabled: false,
+      legacyMainnetOperationsEnabled: false,
+      legacyMarketplaceActionsEnabled: false,
+      bscChainId: null,
+    });
+    expect(buildLegacyMarketplaceRuntime({ APP_ENV: 'preview' })).toMatchObject({
+      appEnv: 'unknown',
+      legacyMainnetEnabled: false,
+      legacyMainnetReadEnabled: false,
+      legacyMainnetOperationsEnabled: false,
+      legacyMarketplaceActionsEnabled: false,
+      bscChainId: null,
+    });
+  });
+
+  it('prioriza la identidad publica y falla cerrado ante valores contradictorios', () => {
+    const runtime = buildLegacyMarketplaceRuntime({
+      APP_ENV: 'production',
+      NEXT_PUBLIC_APP_ENV: 'staging',
+    });
+
+    expect(runtime).toMatchObject({
+      appEnv: 'staging',
+      legacyMainnetEnabled: false,
+      legacyMarketplaceActionsEnabled: true,
+    });
+  });
+
+  it('usa BscScan Testnet para eventos 97 y no filtra enlaces mainnet en Stage', () => {
+    const staging = buildLegacyMarketplaceRuntime({ APP_ENV: 'staging' });
+
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', 97, '0xtest')).toBe(
+      'https://testnet.bscscan.com/tx/0xtest',
+    );
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', 56, '0xmain')).toBe(
+      'https://bscscan.com/tx/0xmain',
+    );
+    expect(getLegacyPointExplorerUrl(staging, 'BSC', null, '0xlegacy')).toBe(
+      'https://bscscan.com/tx/0xlegacy',
+    );
+    expect(getLegacyPointExplorerUrl(staging, 'TRON', null, 'tron-main')).toBe(
+      'https://tronscan.org/#/transaction/tron-main',
+    );
+  });
+
+  it('conserva los exploradores legacy exclusivamente en produccion', () => {
+    const production = buildLegacyMarketplaceRuntime({ APP_ENV: 'production' });
+
+    expect(getLegacyPointExplorerUrl(production, 'BSC', 56, '0xbsc')).toBe(
+      'https://bscscan.com/tx/0xbsc',
+    );
+    expect(getLegacyPointExplorerUrl(production, 'TRON', null, 'tron')).toBe(
+      'https://tronscan.org/#/transaction/tron',
+    );
+  });
+});

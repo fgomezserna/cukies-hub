@@ -158,7 +158,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
         'z-50 flex items-center',
         isGameOverlay
           ? 'pointer-events-none absolute h-auto w-auto bg-transparent p-0'
-          : 'sticky top-0 h-16 shrink-0 gap-4 border-b border-teal-400/20 bg-black/25 px-4 shadow-lg shadow-teal-400/10 backdrop-blur-md sm:px-6',
+          : 'sticky top-0 h-16 shrink-0 gap-4 border-b border-lilac-400/20 bg-black/25 px-4 shadow-lg shadow-lilac-400/10 backdrop-blur-md sm:px-6',
       )}
       style={isGameOverlay ? {
         top: 'max(0.5rem, env(safe-area-inset-top))',
@@ -170,7 +170,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
           variant="ghost"
           size="icon"
           onClick={toggleSidebar}
-          className="hover:bg-teal-400/10 hover:text-cyan-300 transition-all duration-300"
+          className="hover:bg-lilac-400/10 hover:text-lilac-300 transition-all duration-300"
         >
           <PanelLeft />
           <span className="sr-only">Alternar barra lateral</span>
@@ -193,24 +193,24 @@ export default function Header({ variant = 'default' }: HeaderProps) {
         {user && !isGameOverlay && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative rounded-full group hover:bg-teal-400/10 transition-all duration-300">
-                <Bell className="group-hover:text-cyan-300 transition-colors" />
+              <Button variant="ghost" size="icon" className="relative rounded-full group hover:bg-lilac-400/10 transition-all duration-300">
+                <Bell className="group-hover:text-lilac-300 transition-colors" />
                 <span className="absolute top-1 right-1 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-300 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-300"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lilac-300 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-lilac-300"></span>
                 </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-teal-400/10" align="end">
+            <PopoverContent className="w-80 border-2 border-lilac-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-lilac-400/10" align="end">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-foreground">Notificaciones</CardTitle>
                   <CardDescription>Tienes 1 mensaje sin leer.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4">
-                  <div className="flex items-start gap-4 p-3 rounded-lg bg-teal-400/5 border border-teal-400/10">
-                      <Avatar className="h-10 w-10 border-2 border-cyan-300/30">
+                  <div className="flex items-start gap-4 p-3 rounded-lg bg-lilac-400/5 border border-lilac-400/10">
+                      <Avatar className="h-10 w-10 border-2 border-lilac-300/30">
                           <AvatarImage src="https://placehold.co/100x100.png" alt="Avatar" data-ai-hint="logo icon"/>
-                          <AvatarFallback className="bg-gradient-to-br from-cyan-300 to-teal-400 text-white font-bold">HL</AvatarFallback>
+                          <AvatarFallback className="bg-gradient-to-br from-lilac-300 to-lilac-400 text-white font-bold">HL</AvatarFallback>
                       </Avatar>
                       <div className="grid gap-1">
                           <p className="text-sm font-medium text-foreground">Bienvenido a Cukies World</p>
@@ -219,7 +219,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                   </div>
                   <Button 
                     variant="outline" 
-                    className="w-full border-teal-400/30 bg-teal-400/10 hover:bg-teal-400/20 hover:border-cyan-300/50 transition-all duration-300" 
+                    className="w-full border-lilac-400/30 bg-lilac-400/10 hover:bg-lilac-400/20 hover:border-lilac-300/50 transition-all duration-300"
                     asChild
                   >
                     <Link href="/quests">Ver todo</Link>
@@ -235,19 +235,19 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               <Button
                 variant="ghost"
                 className={cn(
-                  'relative h-10 w-10 rounded-full group hover:bg-teal-400/10 transition-all duration-300',
+                  'relative h-10 w-10 rounded-full group hover:bg-lilac-400/10 transition-all duration-300',
                   isGameOverlay && 'h-11 w-auto gap-2 rounded-full border border-emerald-300/30 bg-black/55 px-2 pr-3 text-white backdrop-blur-md hover:bg-black/70',
                 )}
                 aria-label={isGameOverlay ? 'Wallet conectada' : undefined}
               >
                 <Avatar
                   className={cn(
-                    'h-10 w-10 border-2 border-cyan-300/30 group-hover:border-cyan-300/60 transition-all duration-300',
+                    'h-10 w-10 border-2 border-lilac-300/30 group-hover:border-lilac-300/60 transition-all duration-300',
                     isGameOverlay && 'h-11 w-11',
                   )}
                 >
                   <AvatarImage src={user.profilePictureUrl ?? "https://placehold.co/100x100.png"} alt={user.username ?? "user"} data-ai-hint="profile avatar" />
-                  <AvatarFallback className="bg-gradient-to-br from-cyan-300 to-teal-400 text-white font-bold">
+                  <AvatarFallback className="bg-gradient-to-br from-lilac-300 to-lilac-400 text-white font-bold">
                     {user.username?.slice(0,1).toUpperCase() ?? "U"}
                   </AvatarFallback>
                 </Avatar>
@@ -256,7 +256,7 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                 ) : null}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-teal-400/10">
+            <DropdownMenuContent align="end" className="w-64 border-2 border-lilac-400/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-xl shadow-lilac-400/10">
               <DropdownMenuLabel className="text-base font-bold text-foreground">
                 {user.username 
                   ? user.username.length > 15 
@@ -265,27 +265,27 @@ export default function Header({ variant = 'default' }: HeaderProps) {
                   : "Mi cuenta"}
               </DropdownMenuLabel>
               <div className="px-3 pt-2 pb-3 space-y-3">
-                <div className="p-3 rounded-lg bg-gradient-to-r from-teal-400/10 to-teal-400/10 border border-cyan-300/20">
+                <div className="p-3 rounded-lg bg-gradient-to-r from-lilac-400/10 to-lilac-400/10 border border-lilac-300/20">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Rango</p>
-                  <p className="font-bold text-cyan-300 text-sm">{userRank}</p>
+                  <p className="font-bold text-lilac-300 text-sm">{userRank}</p>
                 </div>
-                <div className="p-3 rounded-lg bg-gradient-to-r from-teal-400/10 to-cyan-400/10 border border-cyan-300/20">
+                <div className="p-3 rounded-lg bg-gradient-to-r from-lilac-400/10 to-lilac-400/10 border border-lilac-300/20">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">XP</p>
-                  <p className="font-bold font-mono text-cyan-300 text-lg">{userXP.toLocaleString()}</p>
+                  <p className="font-bold font-mono text-lilac-300 text-lg">{userXP.toLocaleString()}</p>
                 </div>
               </div>
-              <DropdownMenuSeparator className="bg-teal-400/20" />
+              <DropdownMenuSeparator className="bg-lilac-400/20" />
               <DropdownMenuItem disabled className="opacity-50">
                 <Wallet className="mr-3 h-4 w-4 text-gray-400" />
                 <span>Mi wallet</span>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild className="hover:bg-teal-400/10 transition-colors">
+              <DropdownMenuItem asChild className="hover:bg-lilac-400/10 transition-colors">
                 <Link href={isGameOverlay ? '/games/treasure-hunt/profile' : '/profile'}>
-                  <UserRound className="mr-3 h-4 w-4 text-cyan-300" />
+                  <UserRound className="mr-3 h-4 w-4 text-lilac-300" />
                   <span>Mi perfil</span>
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-teal-400/20" />
+              <DropdownMenuSeparator className="bg-lilac-400/20" />
               <DropdownMenuItem 
                 onClick={() => disconnect()} 
                 className="hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors"
@@ -303,9 +303,9 @@ export default function Header({ variant = 'default' }: HeaderProps) {
               className={cn(
                 isWaitingForApproval
                   ? 'cursor-not-allowed bg-gradient-to-r from-amber-500 to-orange-600 shadow-amber-500/30 animate-pulse'
-                  : 'bg-gradient-to-r from-teal-400 to-teal-500 shadow-teal-400/30 hover:from-teal-500 hover:to-teal-600 hover:scale-105 hover:shadow-xl hover:shadow-teal-400/40',
+                  : 'bg-gradient-to-r from-lilac-400 to-lilac-500 shadow-lilac-400/30 hover:from-lilac-500 hover:to-lilac-600 hover:scale-105 hover:shadow-xl hover:shadow-lilac-400/40',
                 'rounded-xl px-6 py-2 font-bold text-white shadow-lg transition-all duration-300',
-                isGameOverlay && 'h-11 w-auto gap-2 rounded-full border border-cyan-200/30 bg-black/55 px-4 backdrop-blur-md hover:bg-black/70',
+                isGameOverlay && 'h-11 w-auto gap-2 rounded-full border border-lilac-200/30 bg-black/55 px-4 backdrop-blur-md hover:bg-black/70',
               )}
               aria-label={isWaitingForApproval ? 'Esperando aprobación de wallet' : 'Conectar wallet'}
               title={isGameOverlay ? 'Conectar wallet' : undefined}

@@ -59,7 +59,7 @@ export default function TreasureHuntPlaySidebar({
           : 'No disponible';
 
   return (
-    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-white/20 bg-[#071312]/94 p-5">
+    <aside className="flex h-full min-h-0 flex-col rounded-[8px] border border-white/20 bg-[#0d0914]/94 p-5">
       <h2 className="font-headline text-xl font-black text-[#f2eee7]">{TREASURE_HUNT_LAUNCH_TOURNAMENT_NAME}</h2>
       <TreasureHuntCompetitionCountdown
         phase={status?.phase}

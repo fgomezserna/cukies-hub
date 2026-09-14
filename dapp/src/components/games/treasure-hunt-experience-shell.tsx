@@ -82,7 +82,10 @@ export default function TreasureHuntExperienceShell({
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#030c0c] text-[#f2eee7]"
     >
       <header className="relative z-40 shrink-0 border-b border-[#2ce8dc]/20 bg-[#030c0c]/95">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          data-treasure-hunt-header-art
+          className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block"
+        >
           <Image
             src="/brand/generated/uki-treasure-hunt-reference-scene.png"
             alt=""
@@ -126,14 +129,16 @@ export default function TreasureHuntExperienceShell({
             </div>
           </div>
 
-          <div className="absolute right-4 top-3 sm:right-7 lg:right-8">
-            <Header variant="game-overlay" />
-          </div>
+          {isGameViewActive ? (
+            <div className="absolute right-4 top-3 sm:right-7 lg:right-8">
+              <Header variant="game-overlay" />
+            </div>
+          ) : null}
         </div>
 
         <nav
           aria-label="Secciones de Treasure Hunt"
-          className="border-t border-[#2ce8dc]/16 bg-[#071312]/88"
+          className="border-t border-[#2ce8dc]/16 bg-[#0d0914]/88"
         >
           <div className="flex min-w-max overflow-x-auto px-1 sm:px-6 lg:px-8">
             {tabs.map(({ href, label }) => {

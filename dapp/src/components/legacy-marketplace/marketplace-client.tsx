@@ -1,218 +1,611 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Filter, RefreshCw, Search } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ChevronDown,
+  Filter,
+  RefreshCw,
+  Search,
+} from 'lucide-react';
+import { useAccount } from 'wagmi';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { LegacyMarketplaceListResponse } from '@/lib/legacy-marketplace/types';
+import type { LegacyMarketplaceCukiItem } from '@/lib/legacy-marketplace/types';
+import type { UkiMarketplaceOrderView } from '@/lib/uki-marketplace/types';
+import { UkiMarketplacePurchaseSheet } from '@/components/uki-marketplace/purchase-sheet';
+import {
+  ukiGenerationLabel,
+  ukiRarityLabel,
+} from '@/components/uki-marketplace/metadata-labels';
+import {
+  retryTransactionRefresh,
+} from '@/lib/transaction-refresh';
 
 import { CukiCard } from './cuki-card';
+import { CukiImage } from './cuki-image';
+import { getTypeLabel } from './format';
 
 const PAGE_SIZE = 24;
-
-const initialData: LegacyMarketplaceListResponse = {
-  source: 'empty',
-  items: [],
-  total: 0,
-  offset: 0,
-  limit: PAGE_SIZE,
-  facets: {
-    states: [],
-    networks: [],
-    types: [],
-    generations: [],
-  },
+type MarketplaceScope = 'all' | 'legacy' | 'uki';
+type CursorState = { legacyOffset: number; ukiCursor: string | null };
+type CatalogItem =
+  | { source: 'legacy'; item: LegacyMarketplaceCukiItem }
+  | { source: 'uki'; item: UkiMarketplaceOrderView };
+type CatalogResponse = {
+  status: 'ok' | 'error';
+  data?: {
+    items: CatalogItem[];
+    cursors: CursorState;
+    hasMore: boolean;
+    legacyFacets?: {
+      states: { value: string; count: number }[];
+      networks: { value: string; count: number }[];
+      types: { value: string; count: number }[];
+      generations: { value: string; count: number }[];
+    };
+    facets?: {
+      states: { value: string; count: number }[];
+      networks: { value: string; count: number }[];
+      types: { value: string; count: number }[];
+      generations: { value: string; count: number }[];
+    };
+    sources: { legacy: 'ready' | 'unavailable'; uki: 'ready' | 'unavailable' };
+    legacyNetworks: {
+      BSC: 'ready' | 'unavailable' | 'paused';
+      TRON: 'ready' | 'unavailable' | 'paused';
+    };
+  };
+  code?: string;
 };
+type MarketplaceClientProps = { heading?: string; description?: string };
 
-type MarketplaceClientProps = {
-  heading?: string;
-  description?: string;
-};
+function stableCatalogItemSignature(entry: CatalogItem) {
+  return entry.source === 'legacy'
+    ? [
+        'legacy',
+        entry.item.id,
+        entry.item.tokenId,
+        entry.item.network,
+        entry.item.collectionAddress,
+        entry.item.owner,
+        entry.item.state,
+        entry.item.price,
+        entry.item.priceOriginal,
+      ]
+    : [
+        'uki',
+        entry.item.orderId,
+        entry.item.collectionAddress,
+        entry.item.tokenId,
+        entry.item.seller,
+        entry.item.buyer,
+        entry.item.status,
+        entry.item.ukiPriceRaw,
+        entry.item.paymentAmountRaw,
+      ];
+}
+
+function targetCatalogSignature(
+  data: CatalogResponse['data'] | null,
+  target: { orderId?: string; tokenId?: string; collectionAddress?: string } | null,
+) {
+  if (!target?.orderId && !(target?.tokenId && target.collectionAddress)) return null;
+  const entry = (data?.items ?? []).find((candidate) => {
+    if (target.orderId && candidate.source === 'uki') {
+      return candidate.item.orderId.toLowerCase() === target.orderId;
+    }
+    if (target.tokenId && target.collectionAddress) {
+      return candidate.item.tokenId === target.tokenId
+        && candidate.item.collectionAddress?.toLowerCase() === target.collectionAddress;
+    }
+    return false;
+  });
+  return entry ? JSON.stringify(stableCatalogItemSignature(entry)) : 'missing';
+}
+
+function priceSortCurrency(scope: MarketplaceScope, network: string) {
+  if (scope === 'uki' && (network === 'all' || network === 'BSC')) return 'UKI';
+  if (network === 'TRON' && scope !== 'uki') return 'TRX';
+  if (scope === 'legacy' && network === 'BSC') return 'BNB';
+  return null;
+}
+
+function canonicalTypeFacet(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return ({
+    '1': 'common',
+    common: 'common',
+    '2': 'uncommon',
+    uncommon: 'uncommon',
+    'no común': 'uncommon',
+    'no-comun': 'uncommon',
+    '3': 'rare',
+    rare: 'rare',
+    raro: 'rare',
+    '4': 'epic',
+    epic: 'epic',
+    épico: 'epic',
+    '5': 'legendary',
+    legendary: 'legendary',
+    legendario: 'legendary',
+    '6': 'goat',
+    goat: 'goat',
+  } as Record<string, string>)[normalized] ?? null;
+}
+
+function canonicalGenerationFacet(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'original', 'first', 'first_generation', 'genesis'].includes(normalized)) {
+    return 'original';
+  }
+  if (['2', 'second', 'second_generation', 'bred', 'breeding'].includes(normalized)) {
+    return 'second_generation';
+  }
+  return null;
+}
+
+function formatUkiAmount(raw: string) {
+  if (!/^\d+$/.test(raw)) return 'Precio UKI no disponible';
+  const padded = raw.padStart(19, '0');
+  const integer = padded.slice(0, -18).replace(/^0+(?=\d)/, '');
+  const fraction = padded.slice(-18).slice(0, 4).replace(/0+$/, '');
+  return `${BigInt(integer || '0').toLocaleString('es-ES')}${
+    fraction ? `,${fraction}` : ''
+  } UKI`;
+}
+
+function ukiSellerManagementHref(order: UkiMarketplaceOrderView) {
+  const query = new URLSearchParams({
+    tokenId: order.tokenId,
+    collection: order.collectionAddress,
+    chainId: String(order.chainId),
+    orderId: order.orderId,
+  });
+  return `/marketplace?${query.toString()}#mis-anuncios`;
+}
+
+function UkiMarketplaceCard({
+  order,
+  open,
+  onOpenChange,
+  onPurchased,
+}: {
+  order: UkiMarketplaceOrderView;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPurchased: () => void;
+}) {
+  const { address } = useAccount();
+  const ownOrder = Boolean(address && address.toLowerCase() === order.seller.toLowerCase());
+  return (
+    <>
+      <article className="group flex min-w-0 flex-col overflow-hidden rounded-[8px] border border-lilac-200/20 bg-[#0d121d] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-lilac-300/45">
+      <div className="relative aspect-[4/5] min-h-[22rem] overflow-hidden bg-[radial-gradient(circle_at_center,rgba(228,92,255,0.2),transparent_65%)]">
+        <CukiImage
+          src={order.imageUrl ?? null}
+          alt={`Cukie #${order.tokenId}`}
+          sizes="(min-width: 1536px) 280px, (min-width: 1024px) 30vw, 50vw"
+          className="object-contain p-4 transition duration-500 group-hover:scale-[1.02]"
+        />
+        <div className="absolute left-3 top-3 rounded-full border border-lilac-200/30 bg-lilac-200/15 px-2.5 py-1 text-xs font-bold text-lilac-100 backdrop-blur">
+          V2 · UKI
+        </div>
+        <div className="absolute right-3 top-3 rounded-full border border-emerald-200/30 bg-emerald-200/15 px-2.5 py-1 text-xs font-bold text-emerald-100 backdrop-blur">
+          Anuncio validado
+        </div>
+      </div>
+      <div className="grid gap-3 p-4">
+        <div>
+          <h3 className="font-headline text-lg font-bold text-white">
+            Cukie #{order.tokenId}
+          </h3>
+            <p className="mt-1 text-xs text-slate-400">Red {order.chainId === 97 ? 'BSC Testnet' : 'BSC'} · anuncio UKI</p>
+            {(order.rarity || order.generation) && (
+              <p className="mt-2 text-xs font-semibold text-slate-400">
+                {[
+                  order.rarity ? ukiRarityLabel(order.rarity) : null,
+                  order.generation ? ukiGenerationLabel(order.generation) : null,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="uppercase tracking-wide text-slate-500">Precio</p>
+            <p className="mt-1 font-semibold text-lilac-100">
+              {formatUkiAmount(order.ukiPriceRaw)}
+            </p>
+          </div>
+          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="uppercase tracking-wide text-slate-500">Estado</p>
+            <p className="mt-1 font-semibold text-white">
+              {order.status === 'active' ? 'Activo' : 'Revisar'}
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400">Precio fijado en UKI</p>
+        {ownOrder ? (
+          <Link
+            href={ukiSellerManagementHref(order)}
+            className="inline-flex min-h-9 items-center justify-center rounded-md bg-lilac-200 px-3 text-sm font-bold text-[#0d0914] hover:bg-lilac-100"
+          >
+            Gestionar anuncio
+          </Link>
+        ) : (
+          <Button
+            type="button"
+            onClick={() => onOpenChange(true)}
+            aria-haspopup="dialog"
+            className="bg-lilac-200 text-[#0d0914] hover:bg-lilac-100"
+          >
+            Comprar
+            <ChevronDown className="ml-2 h-4 w-4 -rotate-90" />
+          </Button>
+        )}
+      </div>
+      </article>
+      {!ownOrder ? (
+        <UkiMarketplacePurchaseSheet
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+          onPurchased={onPurchased}
+        />
+      ) : null}
+    </>
+  );
+}
 
 export function MarketplaceClient({
-  heading = 'Cukies marketplace',
+  heading = 'Cukies disponibles',
   description,
 }: MarketplaceClientProps = {}) {
-  const [data, setData] = useState<LegacyMarketplaceListResponse>(initialData);
+  const [scope, setScope] = useState<MarketplaceScope>('all');
   const [search, setSearch] = useState('');
   const [network, setNetwork] = useState('all');
-  const [state, setState] = useState('onSale');
   const [type, setType] = useState('all');
   const [generation, setGeneration] = useState('all');
   const [sort, setSort] = useState('newest');
-  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(0);
+  const [history, setHistory] = useState<CursorState[]>([
+    { legacyOffset: 0, ukiCursor: null },
+  ]);
+  const [catalog, setCatalog] = useState<CatalogResponse['data'] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedUkiOrderId, setSelectedUkiOrderId] = useState<string | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const requestIdRef = useRef(0);
+  const eventRefreshAbortRef = useRef<AbortController | null>(null);
+  const cursor = history[page] ?? history[0];
+  const selectedPriceCurrency = priceSortCurrency(scope, network);
+  const priceSortAllowed = selectedPriceCurrency !== null;
+  const facets = catalog?.facets ?? catalog?.legacyFacets;
+  const typeOptions = useMemo(
+    () => [...new Set(
+      (facets?.types ?? [])
+        .map((facet) => canonicalTypeFacet(facet.value))
+        .filter((value): value is string => value !== null),
+    )],
+    [facets?.types],
+  );
+  const generationOptions = useMemo(
+    () => [...new Set(
+      (facets?.generations ?? [])
+        .map((facet) => canonicalGenerationFacet(facet.value))
+        .filter(
+          (value): value is 'original' | 'second_generation' => value !== null,
+        ),
+    )],
+    [facets?.generations],
+  );
 
-  const queryString = useMemo(() => {
+  const query = useMemo(() => {
     const params = new URLSearchParams({
       limit: String(PAGE_SIZE),
-      offset: String(offset),
-      sort,
+      scope,
+      legacyOffset: String(cursor.legacyOffset),
+      sort: sort.startsWith('price-') && !priceSortAllowed ? 'newest' : sort,
     });
-
+    if (cursor.ukiCursor) params.set('ukiCursor', cursor.ukiCursor);
     if (search.trim()) params.set('search', search.trim());
     if (network !== 'all') params.set('network', network);
-    if (state !== 'all') params.set('state', state);
     if (type !== 'all') params.set('type', type);
     if (generation !== 'all') params.set('generation', generation);
-
     return params.toString();
-  }, [generation, network, offset, search, sort, state, type]);
+  }, [
+    cursor.legacyOffset,
+    cursor.ukiCursor,
+    generation,
+    network,
+    priceSortAllowed,
+    scope,
+    search,
+    sort,
+    type,
+  ]);
+
+  const queryRef = useRef(query);
+  const catalogRef = useRef(catalog);
+  queryRef.current = query;
+  catalogRef.current = catalog;
 
   useEffect(() => {
     const controller = new AbortController();
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    eventRefreshAbortRef.current?.abort();
     setIsLoading(true);
-
-    fetch(`/api/cukies?${queryString}`, {
+    fetch(`/api/marketplace/v1/catalog?${query}`, {
       signal: controller.signal,
+      cache: 'no-store',
     })
-      .then(async (response) => {
-        const payload = (await response.json()) as LegacyMarketplaceListResponse;
-        if (controller.signal.aborted || requestId !== requestIdRef.current) return;
-        setData(payload);
+      .then(async (response) => (await response.json()) as CatalogResponse)
+      .then((payload) => {
+        if (controller.signal.aborted || requestId !== requestIdRef.current)
+          return;
+        if (payload.status !== 'ok' || !payload.data) {
+          setCatalog(null);
+          setError('No se pudo consultar el catálogo. Inténtalo de nuevo.');
+          return;
+        }
+        setCatalog(payload.data);
+        setError(null);
       })
-      .catch((error) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        if (controller.signal.aborted || requestId !== requestIdRef.current) return;
-        setData({
-          ...initialData,
-          error: error instanceof Error ? error.message : 'Marketplace error',
-        });
+      .catch((reason: unknown) => {
+        if (controller.signal.aborted || requestId !== requestIdRef.current)
+          return;
+        setCatalog(null);
+        setError('No se pudo consultar el catálogo. Inténtalo de nuevo.');
       })
       .finally(() => {
-        if (!controller.signal.aborted && requestId === requestIdRef.current) {
+        if (!controller.signal.aborted && requestId === requestIdRef.current)
           setIsLoading(false);
-        }
       });
-
     return () => controller.abort();
-  }, [queryString, reloadKey]);
+  }, [query, reloadKey]);
 
+  useEffect(() => {
+    let active = true;
+    const refreshFromTransaction = (event: Event) => {
+      eventRefreshAbortRef.current?.abort();
+      const controller = new AbortController();
+      eventRefreshAbortRef.current = controller;
+      const requestedQuery = queryRef.current;
+      const requestId = requestIdRef.current;
+      const detail = event instanceof CustomEvent && event.detail && typeof event.detail === 'object'
+        ? event.detail as { hash?: string; orderId?: string; tokenId?: string; collectionAddress?: string }
+        : null;
+      const hasExpectedChange = Boolean(detail?.hash);
+      const target = detail
+        ? {
+            orderId: typeof detail.orderId === 'string' ? detail.orderId.toLowerCase() : undefined,
+            tokenId: typeof detail.tokenId === 'string' ? detail.tokenId : undefined,
+            collectionAddress: typeof detail.collectionAddress === 'string' ? detail.collectionAddress.toLowerCase() : undefined,
+          }
+        : null;
+      const baselineTarget = targetCatalogSignature(catalogRef.current, target);
+      void retryTransactionRefresh(
+        async () => {
+          if (!active || controller.signal.aborted) return true;
+          try {
+            const response = await fetch(`/api/marketplace/v1/catalog?${requestedQuery}`, {
+              signal: controller.signal,
+              cache: 'no-store',
+            });
+            const payload = await response.json() as CatalogResponse;
+            if (!active || controller.signal.aborted) return true;
+            if (requestId !== requestIdRef.current || requestedQuery !== queryRef.current) return true;
+            if (!response.ok || payload.status !== 'ok' || !payload.data) return false;
+            setCatalog(payload.data);
+            setError(null);
+            if (!hasExpectedChange) return true;
+            if (target?.orderId || (target?.tokenId && target.collectionAddress)) {
+              return targetCatalogSignature(payload.data, target) !== baselineTarget;
+            }
+            // A hash without an affected item cannot prove that another row's
+            // change belongs to this operation. Keep the bounded retry window.
+            return false;
+          } catch (reason) {
+            if (!active || controller.signal.aborted) return true;
+            if (reason instanceof Error && reason.name === 'AbortError') return true;
+            return false;
+          }
+        },
+        { signal: controller.signal },
+      ).catch(() => {
+        // Unmount or a newer transaction event cancels the refresh loop.
+      });
+    };
+    window.addEventListener('cukies:legacy-marketplace:refresh', refreshFromTransaction);
+    window.addEventListener('cukies:uki-marketplace:refresh', refreshFromTransaction);
+    return () => {
+      active = false;
+      eventRefreshAbortRef.current?.abort();
+      window.removeEventListener('cukies:legacy-marketplace:refresh', refreshFromTransaction);
+      window.removeEventListener('cukies:uki-marketplace:refresh', refreshFromTransaction);
+    };
+  }, []);
+
+  function resetPagination() {
+    setPage(0);
+    setHistory([{ legacyOffset: 0, ukiCursor: null }]);
+  }
   function resetFilters() {
     setSearch('');
+    setScope('all');
     setNetwork('all');
-    setState('onSale');
     setType('all');
     setGeneration('all');
     setSort('newest');
-    setOffset(0);
+    setSelectedUkiOrderId(null);
+    resetPagination();
+  }
+  function applyFacet(
+    setter: (value: string) => void,
+    value: string,
+  ) {
+    setter(value);
+    resetPagination();
+  }
+  function nextPage() {
+    if (!catalog?.hasMore) return;
+    setHistory((current) => [...current.slice(0, page + 1), catalog.cursors]);
+    setPage((current) => current + 1);
   }
 
-  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
-  const totalPages = Math.max(Math.ceil(data.total / PAGE_SIZE), 1);
-
   return (
-    <section className="grid gap-5">
-      <div className="rounded-[8px] border border-white/10 bg-black/30 p-4 backdrop-blur">
-        <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-[minmax(18rem,1fr)_repeat(6,minmax(9rem,auto))]">
-          <div className="relative min-w-0">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <Input
-              value={search}
+    <section className="grid gap-3">
+      <div className="rounded-[8px] border border-white/10 bg-black/30 p-3 backdrop-blur">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-[minmax(13rem,1.45fr)_repeat(5,minmax(8rem,1fr))_auto]">
+          <label className="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-1">
+            <span className="sr-only">Buscar en el catálogo</span>
+            <span className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                aria-label="Buscar en el catálogo"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  resetPagination();
+                }}
+                placeholder="Número, ID o wallet"
+                className="h-9 pl-9 text-sm"
+              />
+            </span>
+          </label>
+          <label className="min-w-0">
+            <span className="sr-only">Origen del anuncio</span>
+            <select
+              aria-label="Origen del anuncio"
+              value={scope}
               onChange={(event) => {
-                setSearch(event.target.value);
-                setOffset(0);
+                const nextScope = event.target.value as MarketplaceScope;
+                setScope(nextScope);
+                if (nextScope === 'uki' && network === 'TRON') setNetwork('all');
+                if (sort.startsWith('price-') && !priceSortCurrency(nextScope, network)) {
+                  setSort('newest');
+                }
+                setSelectedUkiOrderId(null);
+                resetPagination();
               }}
-              placeholder="Search token ID, number, owner or type"
-              className="pl-9"
-            />
-          </div>
-
-          <select
-            value={network}
-            onChange={(event) => {
-              setNetwork(event.target.value);
-              setOffset(0);
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">All networks</option>
-            {data.facets.networks.map((facet) => (
-              <option key={facet.value} value={facet.value}>
-                {facet.value} ({facet.count})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={state}
-            onChange={(event) => {
-              setState(event.target.value);
-              setOffset(0);
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">All states</option>
-            {data.facets.states.map((facet) => (
-              <option key={facet.value} value={facet.value}>
-                {facet.value} ({facet.count})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={type}
-            onChange={(event) => {
-              setType(event.target.value);
-              setOffset(0);
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">All types</option>
-            {data.facets.types.map((facet) => (
-              <option key={facet.value} value={facet.value}>
-                Type {facet.value} ({facet.count})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={generation}
-            onChange={(event) => {
-              setGeneration(event.target.value);
-              setOffset(0);
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="all">All generations</option>
-            {data.facets.generations.map((facet) => (
-              <option key={facet.value} value={facet.value}>
-                Gen {facet.value} ({facet.count})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={sort}
-            onChange={(event) => {
-              setSort(event.target.value);
-              setOffset(0);
-            }}
-            className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-          >
-            <option value="newest">Newest</option>
-            <option value="number-asc">Number asc</option>
-            <option value="number-desc">Number desc</option>
-            <option value="price-asc">Price asc</option>
-            <option value="price-desc">Price desc</option>
-          </select>
-
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
+            >
+              <option value="all">Todos los catálogos</option>
+              <option value="legacy">Solo Legacy</option>
+              <option value="uki">Solo V2 · UKI</option>
+            </select>
+          </label>
+          <label className="min-w-0">
+            <span className="sr-only">Red</span>
+            <select
+              aria-label="Red"
+              value={network}
+              onChange={(event) => {
+                const nextNetwork = event.target.value;
+                setNetwork(nextNetwork);
+                if (sort.startsWith('price-') && !priceSortCurrency(scope, nextNetwork)) {
+                  setSort('newest');
+                }
+                resetPagination();
+              }}
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
+            >
+              <option value="all">Todas las redes</option>
+              <option value="BSC">BSC</option>
+              {scope !== 'uki' && <option value="TRON">TRON</option>}
+            </select>
+          </label>
+          <>
+            <label className="min-w-0">
+                <span className="sr-only">Tipo de Cukie</span>
+                <select
+                  aria-label="Tipo de Cukie"
+                  value={type}
+                  onChange={(event) => {
+                    applyFacet(setType, event.target.value);
+                  }}
+                  className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
+                >
+                  <option value="all">Todos los tipos</option>
+                  {typeOptions.map((value) => (
+                    <option key={value} value={String(value)}>
+                      {getTypeLabel(value)}
+                    </option>
+                  ))}
+                </select>
+            </label>
+            <label className="min-w-0">
+                <span className="sr-only">Generación</span>
+                <select
+                  aria-label="Generación"
+                  value={generation}
+                  onChange={(event) => {
+                    applyFacet(setGeneration, event.target.value);
+                  }}
+                  className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
+                >
+                  <option value="all">Todas las generaciones</option>
+                  {generationOptions.map((value) => (
+                    <option key={value} value={String(value)}>
+                      {ukiGenerationLabel(value)}
+                    </option>
+                  ))}
+                </select>
+            </label>
+          </>
+          <label className="min-w-0">
+            <span className="sr-only">Ordenar resultados</span>
+            <select
+              aria-label="Ordenar resultados"
+              value={sort}
+              onChange={(event) => {
+                setSort(event.target.value);
+                resetPagination();
+              }}
+              title={
+                priceSortAllowed
+                  ? `Ordena por precio en ${selectedPriceCurrency}`
+                  : 'Selecciona una sola moneda (V2 · UKI, BSC · BNB o TRON · TRX) para ordenar por precio'
+              }
+              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm text-foreground"
+            >
+              <option value="newest">Más recientes</option>
+              {scope === 'legacy' && (
+                <>
+                  <option value="number-asc">Número ascendente</option>
+                  <option value="number-desc">Número descendente</option>
+                </>
+              )}
+              {priceSortAllowed && (
+                <>
+                  <option value="price-asc">Precio: menor primero</option>
+                  <option value="price-desc">Precio: mayor primero</option>
+                </>
+              )}
+            </select>
+          </label>
           <Button
+            type="button"
             onClick={resetFilters}
             variant="outline"
-            className="border-white/10 bg-white/[0.03]"
+            size="sm"
+            className="col-span-2 h-9 border-white/10 bg-white/[0.03] px-3 sm:col-span-1"
           >
-            <Filter className="mr-2 h-4 w-4" />
-            Reset
+            <Filter className="h-4 w-4" />
+            <span>Limpiar</span>
           </Button>
+          {!priceSortAllowed && (
+            <p className="col-span-full text-[11px] leading-4 text-slate-500">
+              Para ordenar por precio, elige una sola moneda: V2 · UKI, BSC · BNB o TRON · TRX. No se comparan importes entre monedas.
+            </p>
+          )}
         </div>
       </div>
-
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-headline text-2xl font-bold text-white">
@@ -220,41 +613,74 @@ export function MarketplaceClient({
           </h2>
           <p className="text-sm text-slate-400">
             {isLoading
-              ? 'Loading indexed inventory...'
-              : description
-                ? `${data.total.toLocaleString()} results · ${description}`
-                : `${data.total.toLocaleString()} results · source ${data.source}`}
+              ? 'Cargando Cukies…'
+              : `${description ? `${description} · ` : ''}Página ${page + 1}`}
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-400">
           <Button
-            onClick={() => setOffset(Math.max(offset - PAGE_SIZE, 0))}
-            disabled={offset === 0 || isLoading}
+            onClick={() => setPage((current) => Math.max(current - 1, 0))}
+            disabled={page === 0 || isLoading}
             variant="outline"
             className="border-white/10 bg-white/[0.03]"
           >
-            Previous
+            Anterior
           </Button>
-          <span className="min-w-24 text-center">
-            {currentPage} / {totalPages}
-          </span>
+          <span className="min-w-20 text-center">{page + 1}</span>
           <Button
-            onClick={() => setOffset(offset + PAGE_SIZE)}
-            disabled={offset + PAGE_SIZE >= data.total || isLoading}
+            onClick={nextPage}
+            disabled={!catalog?.hasMore || isLoading}
             variant="outline"
             className="border-white/10 bg-white/[0.03]"
           >
-            Next
+            Siguiente
           </Button>
         </div>
       </div>
-
-      {data.error && (
+      {error && (
         <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
-          {data.error}
+          {error}
         </div>
       )}
-
+      {catalog?.sources.legacy === 'unavailable' && scope !== 'uki' && (
+        <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+          El catálogo Legacy no está disponible; se muestran los anuncios UKI
+          que sí respondieron.
+        </div>
+      )}
+      {catalog?.sources.uki === 'unavailable' && scope !== 'legacy' && (
+        <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+          El catálogo UKI no está disponible; se muestran los anuncios Legacy
+          que sí respondieron.
+        </div>
+      )}
+      {catalog?.sources.legacy === 'ready' &&
+        catalog.legacyNetworks?.BSC === 'unavailable' &&
+        scope !== 'uki' &&
+        network !== 'TRON' && (
+          <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+            BSC no ha podido verificarse ahora. Se conservan únicamente los anuncios TRON comprobados; no se interpreta como cero anuncios BSC.
+          </div>
+        )}
+      {catalog?.sources.legacy === 'ready' &&
+        catalog.legacyNetworks?.TRON === 'unavailable' &&
+        scope !== 'uki' &&
+        network !== 'BSC' && (
+          <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+            TRON no ha podido verificarse ahora. Se conservan únicamente los anuncios BSC comprobados; no se interpreta como cero anuncios TRON.
+          </div>
+        )}
+      {catalog?.sources.legacy === 'ready' &&
+        (catalog.legacyNetworks?.BSC === 'paused' ||
+          catalog.legacyNetworks?.TRON === 'paused') &&
+        scope !== 'uki' && (
+          <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+            {catalog.legacyNetworks.BSC === 'paused' ? 'BSC' : 'TRON'} está en
+            pausa contractual. Sus anuncios se conservan y no se interpretan
+            como cancelados, pero no se muestran como comprables mientras dure
+            la pausa.
+          </div>
+        )}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
@@ -264,30 +690,51 @@ export function MarketplaceClient({
             />
           ))}
         </div>
-      ) : data.items.length > 0 ? (
+      ) : catalog?.items.length ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {data.items.map((cuki) => (
-            <CukiCard key={cuki.tokenId} cuki={cuki} />
-          ))}
+          {catalog.items.map((entry) =>
+            entry.source === 'legacy' ? (
+              <CukiCard
+                key={`legacy-${entry.item.network}-${entry.item.tokenId}`}
+                cuki={entry.item}
+              />
+            ) : (
+              <UkiMarketplaceCard
+                key={`uki-${entry.item.chainId}-${entry.item.collectionAddress}-${entry.item.tokenId}-${entry.item.orderId}`}
+                order={entry.item}
+                open={selectedUkiOrderId === entry.item.orderId}
+                onOpenChange={(open) => setSelectedUkiOrderId(open ? entry.item.orderId : null)}
+                onPurchased={() => {
+                  setSelectedUkiOrderId(null);
+                  setReloadKey((value) => value + 1);
+                }}
+              />
+            ),
+          )}
+        </div>
+      ) : catalog?.sources.legacy === 'unavailable' &&
+        catalog.sources.uki === 'unavailable' ? (
+        <div className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-8 text-center text-amber-100">
+          Los catálogos Legacy y UKI no están disponibles ahora. Inténtalo de
+          nuevo más tarde.
         </div>
       ) : (
         <div className="rounded-[8px] border border-white/10 bg-black/30 p-8 text-center text-slate-400">
-          No Cukies match these filters.
+          No hay Cukies que coincidan con estos filtros.
         </div>
       )}
-
       <div className="flex justify-end">
         <Button
           onClick={() => {
-            setOffset(0);
-            setData(initialData);
+            resetPagination();
+            setCatalog(null);
             setReloadKey((value) => value + 1);
           }}
           variant="ghost"
           className="text-slate-400 hover:text-white"
         >
           <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh data
+          Actualizar
         </Button>
       </div>
     </section>

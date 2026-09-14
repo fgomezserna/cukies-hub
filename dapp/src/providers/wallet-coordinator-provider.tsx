@@ -1,24 +1,52 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useSwitchChain,
+} from 'wagmi';
 
 import { WalletConnectorDialog } from '@/components/landing/wallet-connector-dialog';
-import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
+import {
+  getMobileWalletConnector,
+  getMobileWalletLaunchUrl,
+  getVisibleWalletConnectors,
+  type MobileWalletId,
+} from '@/lib/wallet-connectors';
+import {
+  TRON_MAINNET_CHAIN_ID,
+  resolveTronProvider,
+  resolveTronChainId,
+  tronNetworkFromChainId,
+} from '@/lib/tronlink-provider';
+import { useTronLink } from '@/hooks/use-tronlink';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useOptionalAuth } from '@/providers/auth-provider';
 import {
   WalletCoordinatorContext,
   type Connector,
-  type EvmWalletSlot,
   type WalletCoordinatorContextValue,
   type WalletDialogKind,
   type WalletKind,
   type WalletReady,
   type WalletRequest,
+  type EvmWalletSlot,
+  type TronWalletSlot,
 } from '@/providers/wallet-coordinator-context';
 
 type PendingRequest = {
   id: number;
   request: WalletRequest;
+  startedAddress: string | null;
   resolve: (value: WalletReady) => void;
   reject: (reason?: unknown) => void;
 };
@@ -26,6 +54,7 @@ type PendingRequest = {
 export type {
   Connector,
   EvmWalletSlot,
+  TronWalletSlot,
   WalletCoordinatorContextValue,
   WalletDialogKind,
   WalletKind,
@@ -41,20 +70,44 @@ function errorMessage(error: unknown) {
 
 function isRejected(error: unknown) {
   const message = errorMessage(error).toLowerCase();
-  return message.includes('reject') || message.includes('denied') || message.includes('cancel') || message.includes('4001');
+  return message.includes('reject')
+    || message.includes('denied')
+    || message.includes('cancel')
+    || message.includes('4001');
+}
+
+function sameRequest(left: WalletRequest, right: WalletRequest) {
+  return left.kind === right.kind
+    && left.targetChainId === right.targetChainId
+    && left.targetTronNetwork === right.targetTronNetwork;
 }
 
 export function WalletCoordinatorProvider({ children }: { children: ReactNode }) {
+  const { user, fetchUser } = useOptionalAuth();
+  const isMobile = useIsMobile();
   const { address, chainId, isConnected, connector } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+  const {
+    address: tronAddress,
+    chainId: tronChainId,
+    network: tronStateNetwork,
+    rpcHost: tronRpcHost,
+    isInstalled: tronIsInstalled,
+    isConnected: tronIsConnected,
+    isLoading: tronIsLoading,
+    error: tronError,
+    connect: connectTronLink,
+    disconnect: disconnectTronLink,
+  } = useTronLink();
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [walletDialogKind, setWalletDialogKind] = useState<WalletDialogKind>('any');
   const [walletDialogReason, setWalletDialogReason] = useState<string | null>(null);
   const [walletDialogError, setWalletDialogError] = useState<string | null>(null);
-  const pendingRef = useRef<PendingRequest | null>(null);
+  const pendingRequestRef = useRef<PendingRequest | null>(null);
   const requestIdRef = useRef(0);
+
   const evmConnectors = useMemo(() => getVisibleWalletConnectors(connectors), [connectors]);
   const evm = useMemo<EvmWalletSlot>(() => ({
     address,
@@ -64,110 +117,265 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
     connector,
     error: null,
   }), [address, chainId, connector, isConnected, isConnecting, isSwitching]);
-  const tron = useMemo(() => ({
-    address: null,
-    chainId: null,
-    network: 'unknown' as const,
-    rpcHost: null,
-    isInstalled: false,
-    isConnected: false,
-    isConnecting: false,
-    error: null,
-  }), []);
+  const tron = useMemo<TronWalletSlot>(() => ({
+    address: tronAddress,
+    chainId: tronChainId,
+    network: tronStateNetwork,
+    rpcHost: tronRpcHost,
+    isInstalled: tronIsInstalled,
+    isConnected: tronIsConnected,
+    isConnecting: tronIsLoading,
+    error: tronError,
+  }), [tronAddress, tronChainId, tronError, tronIsConnected, tronIsInstalled, tronIsLoading, tronRpcHost, tronStateNetwork]);
 
-  const isCurrent = useCallback((pending: PendingRequest | null) => (
-    Boolean(pending && pendingRef.current?.id === pending.id)
+  const buildReady = useCallback((request: WalletRequest): WalletReady | null => {
+    if (request.kind === 'evm') {
+      if (!address || !isConnected) return null;
+      if (request.targetChainId !== undefined && chainId !== request.targetChainId) return null;
+      return { kind: 'evm', address, chainId };
+    }
+    if (!tronAddress || !tronIsConnected) return null;
+    const currentChainId = tronChainId ?? resolveTronChainId();
+    if (request.targetTronNetwork === 'mainnet' && currentChainId !== TRON_MAINNET_CHAIN_ID) return null;
+    return {
+      kind: 'tron',
+      address: tronAddress,
+      tronChainId: currentChainId,
+      network: tronNetworkFromChainId(currentChainId),
+    };
+  }, [address, chainId, isConnected, tronAddress, tronChainId, tronIsConnected]);
+
+  const isCurrentPending = useCallback((pending: PendingRequest | null) => (
+    Boolean(pending && pendingRequestRef.current?.id === pending.id)
   ), []);
-  const settle = useCallback((pending: PendingRequest, ready: WalletReady) => {
-    if (!isCurrent(pending)) return;
+
+  const pendingAddress = useCallback((request: WalletRequest) => (
+    request.kind === 'evm' ? address ?? null : tronAddress ?? null
+  ), [address, tronAddress]);
+
+  const addressesMatch = useCallback((kind: WalletKind, left: string, right: string) => (
+    kind === 'evm'
+      ? left.toLowerCase() === right.toLowerCase()
+      : left === right
+  ), []);
+
+  const settlePending = useCallback((pending: PendingRequest, ready: WalletReady) => {
+    if (!isCurrentPending(pending)) return;
     pending.resolve(ready);
-    pendingRef.current = null;
+    pendingRequestRef.current = null;
     setWalletDialogOpen(false);
     setWalletDialogError(null);
-  }, [isCurrent]);
-  const reject = useCallback((pending: PendingRequest | null, reason: unknown) => {
-    if (!pending || !isCurrent(pending)) return;
-    pending.reject(reason);
-    pendingRef.current = null;
+  }, [isCurrentPending]);
+
+  const rejectPending = useCallback((pending: PendingRequest | null, error: unknown) => {
+    if (pending && !isCurrentPending(pending)) return;
+    if (!pending && pendingRequestRef.current) return;
+    if (pending) {
+      pending.reject(error);
+      pendingRequestRef.current = null;
+    }
     setWalletDialogOpen(false);
-    setWalletDialogError(errorMessage(reason));
-  }, [isCurrent]);
-  const buildReady = useCallback((request: WalletRequest): WalletReady | null => {
-    if (request.kind !== 'evm' || !address || !isConnected) return null;
-    if (request.targetChainId !== undefined && chainId !== request.targetChainId) return null;
-    return { kind: 'evm', address, chainId };
-  }, [address, chainId, isConnected]);
+    setWalletDialogError(errorMessage(error));
+  }, [isCurrentPending]);
+
+  const switchTronToMainnet = useCallback(async () => {
+    const provider = resolveTronProvider();
+    if (!provider?.request) throw new Error('TRON_PROVIDER_UNAVAILABLE');
+    await provider.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: TRON_MAINNET_CHAIN_ID }],
+    });
+  }, []);
+
+  const finishPendingIfReady = useCallback((pending = pendingRequestRef.current) => {
+    if (!pending || !isCurrentPending(pending)) return;
+    const currentAddress = pendingAddress(pending.request);
+    if (currentAddress && !pending.startedAddress) {
+      pending.startedAddress = currentAddress;
+    } else if (
+      pending.startedAddress
+      && (!currentAddress || !addressesMatch(pending.request.kind, pending.startedAddress, currentAddress))
+    ) {
+      rejectPending(pending, new Error('WALLET_ACCOUNT_CHANGED'));
+      return;
+    }
+    const ready = buildReady(pending.request);
+    if (ready) settlePending(pending, ready);
+  }, [addressesMatch, buildReady, isCurrentPending, pendingAddress, rejectPending, settlePending]);
 
   useEffect(() => {
-    const pending = pendingRef.current;
-    if (!pending) return;
-    const ready = buildReady(pending.request);
-    if (ready) settle(pending, ready);
-  }, [address, chainId, buildReady, isConnected, settle]);
+    finishPendingIfReady();
+  }, [finishPendingIfReady, address, chainId, isConnected, tronAddress, tronChainId, tronIsConnected]);
 
   useEffect(() => () => {
-    const pending = pendingRef.current;
-    if (pending) {
-      pendingRef.current = null;
-      pending.reject(new Error('WALLET_REQUEST_CANCELLED'));
-    }
+    const pending = pendingRequestRef.current;
+    if (!pending) return;
+    pendingRequestRef.current = null;
+    pending.reject(new Error('WALLET_REQUEST_CANCELLED'));
   }, []);
+
+  useEffect(() => {
+    const pending = pendingRequestRef.current;
+    if (!pending || !pending.startedAddress) return;
+    const currentAddress = pendingAddress(pending.request);
+    if (!currentAddress || !addressesMatch(pending.request.kind, pending.startedAddress, currentAddress)) {
+      rejectPending(pending, new Error('WALLET_ACCOUNT_CHANGED'));
+    }
+  }, [addressesMatch, pendingAddress, rejectPending, address, tronAddress]);
 
   const requestWallet = useCallback((request: WalletRequest) => {
     const ready = buildReady(request);
-    if (ready) return Promise.resolve(ready);
-    if (request.kind !== 'evm') return Promise.reject(new Error('TRON_WALLET_UNAVAILABLE'));
+    if (ready) {
+      const pending = pendingRequestRef.current;
+      if (pending) {
+        if (sameRequest(pending.request, request)) settlePending(pending, ready);
+        else rejectPending(pending, new Error('WALLET_REQUEST_REPLACED'));
+      }
+      return Promise.resolve(ready);
+    }
+    if (pendingRequestRef.current) {
+      if (sameRequest(pendingRequestRef.current.request, request)) {
+        return new Promise<WalletReady>((resolve, reject) => {
+          const current = pendingRequestRef.current;
+          if (!current) return reject(new Error('WALLET_REQUEST_CANCELLED'));
+          const previousResolve = current.resolve;
+          const previousReject = current.reject;
+          current.resolve = (value) => {
+            previousResolve(value);
+            resolve(value);
+          };
+          current.reject = (reason) => {
+            previousReject(reason);
+            reject(reason);
+          };
+        });
+      }
+      rejectPending(pendingRequestRef.current, new Error('WALLET_REQUEST_REPLACED'));
+    }
 
-    if (pendingRef.current) reject(pendingRef.current, new Error('WALLET_REQUEST_REPLACED'));
-    const promise = new Promise<WalletReady>((resolve, rejectPromise) => {
-      pendingRef.current = {
+    const promise = new Promise<WalletReady>((resolve, reject) => {
+      pendingRequestRef.current = {
         id: ++requestIdRef.current,
         request,
+        startedAddress: pendingAddress(request),
         resolve,
-        reject: rejectPromise,
+        reject,
       };
     });
-    const pending = pendingRef.current;
+    const pending = pendingRequestRef.current;
     if (!pending) return promise;
-    setWalletDialogKind('evm');
+    setWalletDialogKind(request.kind);
     setWalletDialogReason(request.reason);
     setWalletDialogError(null);
-    if (isConnected && request.targetChainId !== undefined && chainId !== request.targetChainId) {
+
+    if (request.kind === 'evm' && isConnected && request.targetChainId !== undefined && chainId !== request.targetChainId) {
+      const targetChainId = request.targetChainId;
       void (async () => {
         try {
-          await switchChainAsync({ chainId: request.targetChainId! });
-          if (address && isCurrent(pending)) {
-            settle(pending, { kind: 'evm', address, chainId: request.targetChainId });
-          }
+          await switchChainAsync({ chainId: targetChainId });
+          if (isCurrentPending(pending)) finishPendingIfReady(pending);
         } catch (error) {
-          reject(pending, new Error(isRejected(error) ? 'Cambio de red cancelado en la wallet.' : errorMessage(error)));
+          rejectPending(pending, new Error(isRejected(error) ? 'Cambio de red cancelado en la wallet.' : errorMessage(error)));
         }
       })();
-    } else {
-      setWalletDialogOpen(true);
+      return promise;
     }
+
+    if (request.kind === 'tron' && tronIsConnected && request.targetTronNetwork === 'mainnet' && tronChainId !== TRON_MAINNET_CHAIN_ID) {
+      void (async () => {
+        try {
+          await switchTronToMainnet();
+          if (isCurrentPending(pending)) finishPendingIfReady(pending);
+        } catch (error) {
+          rejectPending(pending, new Error(isRejected(error) ? 'Cambio a TRON Mainnet cancelado en TronLink.' : errorMessage(error)));
+        }
+      })();
+      return promise;
+    }
+
+    setWalletDialogOpen(true);
     return promise;
-  }, [address, buildReady, chainId, isConnected, isCurrent, reject, settle, switchChainAsync]);
+  }, [buildReady, chainId, finishPendingIfReady, isConnected, isCurrentPending, pendingAddress, rejectPending, settlePending, switchChainAsync, switchTronToMainnet, tronChainId, tronIsConnected]);
 
   const selectEvmConnector = useCallback(async (selectedConnector: Connector) => {
-    const pending = pendingRef.current;
+    const pending = pendingRequestRef.current;
     try {
-      const targetChainId = pending?.request.targetChainId;
-      const result = await connectAsync({ connector: selectedConnector, ...(targetChainId ? { chainId: targetChainId } : {}) });
-      if (pending && !isCurrent(pending)) return;
-      if (targetChainId !== undefined && result.chainId !== targetChainId) {
-        await switchChainAsync({ chainId: targetChainId });
+      const request = pending?.request;
+      const result = await connectAsync({
+        connector: selectedConnector,
+        ...(request?.targetChainId ? { chainId: request.targetChainId } : {}),
+      });
+      if (pending ? !isCurrentPending(pending) : pendingRequestRef.current !== null) return;
+      if (request?.targetChainId !== undefined && result.chainId !== request.targetChainId) {
+        await switchChainAsync({ chainId: request.targetChainId });
       }
-      const connectedAddress = result.accounts?.[0] ?? address;
-      if (pending && connectedAddress && isCurrent(pending)) {
-        settle(pending, { kind: 'evm', address: connectedAddress, chainId: targetChainId ?? result.chainId });
-      } else if (!pending) {
+      if (pending) {
+        if (isCurrentPending(pending)) finishPendingIfReady(pending);
+      } else {
         setWalletDialogOpen(false);
+        const connectedAddress = result.accounts?.[0] ?? address;
+        if (connectedAddress && !user) {
+          await fetchUser(connectedAddress, {
+            evmConnector: selectedConnector,
+            promptForSignature: true,
+            walletType: 'evm',
+          });
+        }
       }
     } catch (error) {
-      reject(pending, new Error(isRejected(error) ? 'Conexión o cambio de red cancelado en la wallet.' : errorMessage(error)));
+      rejectPending(pending, new Error(isRejected(error) ? 'Conexión o cambio de red cancelado en la wallet.' : errorMessage(error)));
     }
-  }, [address, connectAsync, isCurrent, reject, settle, switchChainAsync]);
+  }, [address, connectAsync, fetchUser, finishPendingIfReady, isCurrentPending, rejectPending, switchChainAsync, user]);
+
+  const selectTronLink = useCallback(async () => {
+    const pending = pendingRequestRef.current;
+    try {
+      const request = pending?.request;
+      const connectedAddress = tronIsConnected && tronAddress
+        ? tronAddress
+        : await connectTronLink();
+      if (pending ? !isCurrentPending(pending) : pendingRequestRef.current !== null) return;
+      if (!connectedAddress) throw new Error(tronError ?? 'TRON_CONNECTION_FAILED');
+      if (request?.targetTronNetwork === 'mainnet') {
+        const chainId = tronChainId ?? resolveTronChainId();
+        if (chainId !== TRON_MAINNET_CHAIN_ID) {
+          await switchTronToMainnet();
+        }
+      }
+      if (request) {
+        if (isCurrentPending(pending)) finishPendingIfReady(pending);
+      } else {
+        setWalletDialogOpen(false);
+        if (connectedAddress && !user) {
+          await fetchUser(connectedAddress, {
+            promptForSignature: true,
+            walletType: 'tron',
+          });
+        }
+      }
+    } catch (error) {
+      rejectPending(pending, new Error(isRejected(error) ? 'Conexión o cambio a TRON Mainnet cancelado en TronLink.' : errorMessage(error)));
+    }
+  }, [connectTronLink, fetchUser, finishPendingIfReady, isCurrentPending, rejectPending, switchTronToMainnet, tronAddress, tronChainId, tronError, tronIsConnected, user]);
+
+  const selectMobileWallet = useCallback(async (walletId: MobileWalletId) => {
+    const connector = getMobileWalletConnector(evmConnectors, walletId);
+    if (connector) {
+      await selectEvmConnector(connector);
+      return;
+    }
+
+    const launchUrl = getMobileWalletLaunchUrl(walletId, window.location.href);
+    if (walletId === 'safepal' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+      } catch {
+        // SafePal still opens its official install page if clipboard is unavailable.
+      }
+    }
+    setWalletDialogOpen(false);
+    window.location.assign(launchUrl);
+  }, [evmConnectors, selectEvmConnector]);
 
   const openWalletSelector = useCallback((kind: WalletDialogKind = 'any', reason?: string) => {
     setWalletDialogKind(kind);
@@ -175,13 +383,17 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
     setWalletDialogError(null);
     setWalletDialogOpen(true);
   }, []);
+
   const closeWalletSelector = useCallback(() => {
-    if (pendingRef.current) reject(pendingRef.current, new Error('WALLET_REQUEST_CANCELLED'));
+    if (pendingRequestRef.current) rejectPending(pendingRequestRef.current, new Error('WALLET_REQUEST_CANCELLED'));
     else setWalletDialogOpen(false);
-  }, [reject]);
+  }, [rejectPending]);
+
   const disconnectWallet = useCallback((kind: WalletKind) => {
     if (kind === 'evm') disconnect();
-  }, [disconnect]);
+    else disconnectTronLink();
+  }, [disconnect, disconnectTronLink]);
+
   const value = useMemo<WalletCoordinatorContextValue>(() => ({
     evm,
     tron,
@@ -193,23 +405,36 @@ export function WalletCoordinatorProvider({ children }: { children: ReactNode })
     walletDialogReason,
     walletDialogError,
     selectEvmConnector,
-    selectTronLink: async () => { throw new Error('TRON_WALLET_UNAVAILABLE'); },
+    selectTronLink,
     disconnectWallet,
-  }), [closeWalletSelector, disconnectWallet, evm, openWalletSelector, requestWallet, selectEvmConnector, tron, walletDialogError, walletDialogKind, walletDialogOpen, walletDialogReason]);
+  }), [closeWalletSelector, disconnectWallet, evm, openWalletSelector, requestWallet, selectEvmConnector, selectTronLink, tron, walletDialogError, walletDialogKind, walletDialogOpen, walletDialogReason]);
 
   return (
     <WalletCoordinatorContext.Provider value={value}>
       {children}
       <WalletConnectorDialog
         open={walletDialogOpen}
-        onOpenChange={(open) => { if (open) setWalletDialogOpen(true); else closeWalletSelector(); }}
-        connectors={evmConnectors}
+        onOpenChange={(open) => {
+          if (open) setWalletDialogOpen(true);
+          else closeWalletSelector();
+        }}
+        connectors={walletDialogKind === 'tron' ? [] : evmConnectors}
         onSelectConnector={selectEvmConnector}
+        isMobile={isMobile && walletDialogKind !== 'tron'}
+        onSelectMobileWallet={selectMobileWallet}
         isConnecting={isConnecting || isSwitching}
-        title="Conectar wallet EVM"
+        title={walletDialogKind === 'tron' ? 'Conectar wallet TRON' : 'Conectar wallet'}
         description={walletDialogReason ?? 'Elige la wallet que quieres usar para continuar.'}
-        tronLinkNative={undefined}
+        errorMessage={walletDialogError}
+        tronLinkNative={walletDialogKind === 'evm' ? undefined : {
+          error: tronError,
+          isInstalled: tronIsInstalled,
+          isLoading: tronIsLoading,
+          onSelect: selectTronLink,
+        }}
       />
     </WalletCoordinatorContext.Provider>
   );
 }
+
+export { useWalletCoordinator } from '@/providers/wallet-coordinator-context';

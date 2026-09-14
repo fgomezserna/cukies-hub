@@ -35,7 +35,7 @@ function renderDialog(onSelectMobileWallet = jest.fn()) {
 }
 
 describe('components/layout/HeaderWalletDialog', () => {
-  it('muestra únicamente las cuatro wallets priorizadas', () => {
+  it('muestra las cuatro wallets priorizadas y las opciones nativas adicionales', () => {
     renderDialog();
 
     const options = screen.getByTestId('mobile-wallet-options');
@@ -47,9 +47,9 @@ describe('components/layout/HeaderWalletDialog', () => {
       expect.stringContaining('MetaMask'),
       expect.stringContaining('TokenPocket'),
     ]);
-    expect(screen.queryByText('Otras opciones')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Brave Wallet/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /TronLink/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Otras opciones EVM')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Brave Wallet/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /TronLink TRON/i })).toBeInTheDocument();
   });
 
   it('usa un logotipo gráfico propio para cada wallet', () => {

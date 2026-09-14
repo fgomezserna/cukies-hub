@@ -22,6 +22,19 @@ export default {
         code: ['monospace'],
       },
       colors: {
+        lilac: {
+          50: '#fff5ff',
+          100: '#fde8ff',
+          200: '#facfff',
+          300: '#f5a7ff',
+          400: '#e45cff',
+          500: '#cd35ee',
+          600: '#ad1ecc',
+          700: '#8e1aa5',
+          800: '#751986',
+          900: '#61196e',
+          950: '#41064e',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -30,14 +43,12 @@ export default {
         },
         // Colores personalizados para diseño vibrante
         neon: {
-          green: '#00FFD0',
-          blue: '#00ADEF',
           purple: '#8B5CF6',
         },
         vibrant: {
           green: '#10B981',
           emerald: '#059669',
-          teal: '#0D9488',
+          lilac: '#e45cff',
         },
         popover: {
           DEFAULT: 'hsl(var(--popover))',

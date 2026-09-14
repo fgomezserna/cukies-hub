@@ -46,7 +46,7 @@ function setupCollection({
 describe('historial Legacy de Cukie Points', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('marca la cobertura histórica y conserva la suma/paginación', async () => {
+  it('publica la fuente histórica con total, suma y paginación coherentes', async () => {
     const { page } = setupCollection({
       documents: [{
         _id: 'tx-2',
@@ -71,7 +71,7 @@ describe('historial Legacy de Cukie Points', () => {
     });
 
     expect(response).toMatchObject({
-      source: 'mongo',
+      source: 'legacy',
       status: 'partial',
       coverage: 'legacy-historical',
       total: 31,
@@ -80,6 +80,10 @@ describe('historial Legacy de Cukie Points', () => {
       summary: {
         totalPoints: 93,
         totalTransactions: 31,
+        facets: {
+          networks: [{ value: 'BSC', count: 31 }],
+          types: [{ value: 'Breeding', count: 31 }],
+        },
       },
     });
     expect(response.items[0]).toMatchObject({
@@ -93,17 +97,22 @@ describe('historial Legacy de Cukie Points', () => {
     expect(page.limit).toHaveBeenCalledWith(1);
   });
 
-  it('filtra TRON con igualdad exacta y BSC con addressNormalized', async () => {
+  it('mantiene TRON exacto y normaliza la coincidencia EVM por BSC', async () => {
     const { collection: tronCollection } = setupCollection();
     await listLegacyCukiePoints({ wallets: ['TaExacta'], network: 'TRON' });
-    expect(tronCollection.find).toHaveBeenCalledWith({
+    const tronFilter = tronCollection.find.mock.calls[0][0];
+    expect(tronFilter.$and).toHaveLength(2);
+    expect(tronFilter.$and[0]).toHaveProperty('network', /^TRON$/i);
+    expect(tronFilter.$and[1]).toEqual({
       $or: [{ network: 'TRON', address: 'TaExacta' }],
-      network: 'TRON',
     });
 
     const { collection: bscCollection } = setupCollection();
     await listLegacyCukiePoints({ wallets: ['0xAbCd'], network: 'BSC' });
-    expect(bscCollection.find.mock.calls[0][0]).toMatchObject({
+    const bscFilter = bscCollection.find.mock.calls[0][0];
+    expect(bscFilter.$and).toHaveLength(2);
+    expect(bscFilter.$and[0]).toHaveProperty('network', /^BSC$/i);
+    expect(bscFilter.$and[1]).toMatchObject({
       $or: [{
         network: 'BSC',
         $or: [
@@ -111,14 +120,16 @@ describe('historial Legacy de Cukie Points', () => {
           { addressNormalized: '0xabcd' },
         ],
       }],
-      network: 'BSC',
     });
+    expect(bscFilter.$and[1].$or[0].$or[0].address.flags).toContain('i');
   });
 
-  it('no trata ALL como tipo literal y sanea errores de conexión', async () => {
+  it('no filtra por ALL y devuelve fuente no disponible sin convertirla en cero verificado', async () => {
     const { collection } = setupCollection();
     await listLegacyCukiePoints({ type: 'ALL' });
-    expect(collection.find.mock.calls[0][0]).toEqual({});
+    const allFilter = collection.find.mock.calls[0][0];
+    expect(allFilter.$and).toHaveLength(1);
+    expect(allFilter.$and[0]).toHaveProperty('$or');
 
     pointsCollection.mockRejectedValueOnce(new Error('INTERNAL_DB_CONNECTION_DETAILS'));
     const unavailable = await listLegacyCukiePoints({});
@@ -128,8 +139,8 @@ describe('historial Legacy de Cukie Points', () => {
       coverage: 'unavailable',
       total: 0,
       summary: { totalPoints: 0, totalTransactions: 0 },
-      error: 'No se pudo cargar el historial de Cukie Points.',
     });
+    expect(unavailable.error).toBe('No se pudo cargar el historial de Cukie Points.');
     expect(JSON.stringify(unavailable)).not.toContain('INTERNAL_DB_CONNECTION_DETAILS');
   });
 });

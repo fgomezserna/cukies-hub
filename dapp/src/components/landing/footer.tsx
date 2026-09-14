@@ -3,14 +3,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePublicLocale } from '@/providers/public-locale-provider';
-import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
 const footerCopy = {
   es: {
     home: 'Inicio',
     buy: 'Comprar UKI',
     staking: 'Staking',
-    ambassadors: 'Embajadores',
     play: 'Jugar',
     vesting: 'Vesting',
     rights: 'Todos los derechos reservados.',
@@ -19,7 +17,6 @@ const footerCopy = {
     home: 'Home',
     buy: 'Buy UKI',
     staking: 'Staking',
-    ambassadors: 'Ambassadors',
     play: 'Play',
     vesting: 'Vesting',
     rights: 'All rights reserved.',
@@ -82,14 +79,11 @@ export function LandingFooter() {
         </div>
 
         <div className="uki-footer-links">
-          <Link href="/" className="hover:text-[var(--uki-cyan)]">{copy.home}</Link>
-          <Link href="/#comprar-uki" className="hover:text-[var(--uki-cyan)]">{copy.buy}</Link>
-          <Link href="/cukie-master" className="hover:text-[var(--uki-cyan)]">{copy.staking}</Link>
-          {isAmbassadorsPubliclyListed() ? (
-            <Link href="/embajadores" className="hover:text-[var(--uki-lilac)]">{copy.ambassadors}</Link>
-          ) : null}
-          <Link href="/games/treasure-hunt" className="hover:text-[var(--uki-cyan)]">{copy.play}</Link>
-          <Link href="/vesting" className="hover:text-[var(--uki-cyan)]">{copy.vesting}</Link>
+          <Link href="/" className="hover:text-[var(--uki-lilac)]">{copy.home}</Link>
+          <Link href="/#comprar" className="hover:text-[var(--uki-lilac)]">{copy.buy}</Link>
+          <Link href="/cukie-master" className="hover:text-[var(--uki-lilac)]">{copy.staking}</Link>
+          <Link href="/games/treasure-hunt" className="hover:text-[var(--uki-lilac)]">{copy.play}</Link>
+          <Link href="/vesting" className="hover:text-[var(--uki-lilac)]">{copy.vesting}</Link>
         </div>
 
         <p className="uki-footer-copy">

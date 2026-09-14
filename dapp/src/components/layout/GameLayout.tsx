@@ -391,7 +391,7 @@ export default function GameLayout({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-10 gap-2 border-[#35eee2]/35 bg-[#071312] px-3 text-xs font-black text-[#f2eee7] hover:bg-[#0b211e]"
+                className="h-10 gap-2 border-[#35eee2]/35 bg-[#0d0914] px-3 text-xs font-black text-[#f2eee7] hover:bg-[#0b211e]"
                 onClick={() => void handleFullScreen()}
                 aria-label="Abrir pantalla completa"
               >
@@ -473,7 +473,7 @@ export default function GameLayout({
                     size="icon"
                     variant="ghost"
                     onClick={() => void handleFullScreen()}
-                    className="h-11 w-11 rounded-xl border border-white/20 bg-[#101719]/90 text-white shadow-lg backdrop-blur-md transition-transform hover:bg-[#182224] hover:text-white active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-[#35eee2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071312]"
+                    className="h-11 w-11 rounded-xl border border-white/20 bg-[#101719]/90 text-white shadow-lg backdrop-blur-md transition-transform hover:bg-[#182224] hover:text-white active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-[#35eee2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0914]"
                     aria-label="Salir de pantalla completa"
                     title="Salir de pantalla completa"
                   >
@@ -485,7 +485,7 @@ export default function GameLayout({
                       size="icon"
                       variant="ghost"
                       onClick={handleMobileLayoutFlip}
-                      className="h-11 w-11 rounded-xl border border-white/20 bg-[#101719]/90 text-white shadow-lg backdrop-blur-md transition-transform hover:bg-[#182224] hover:text-white active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-[#35eee2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#071312]"
+                      className="h-11 w-11 rounded-xl border border-white/20 bg-[#101719]/90 text-white shadow-lg backdrop-blur-md transition-transform hover:bg-[#182224] hover:text-white active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-[#35eee2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0914]"
                       aria-label="Voltear tablero y tótem"
                       aria-pressed={isMobileLayoutFlipped}
                       title="Voltear tablero y tótem"

@@ -1,5 +1,6 @@
 import type { ClientSession, Db } from 'mongodb';
 
+import { normalizeLegacyMarketplaceNftImageUrl } from '@/lib/legacy-marketplace/config';
 import { normalizeWalletAddress } from '@/lib/wallet-address';
 
 import {
@@ -70,7 +71,6 @@ export type NftAssetActiveLock = {
 export type NormalizedNftAsset = {
   assetId: string;
   tokenId: string | null;
-  /** URL publica inmutable de la card ya publicada (MinIO/S3-compatible). */
   imageUrl?: string | null;
   network: NftAssetNetwork;
   ownerWallet: string | null;
@@ -86,6 +86,9 @@ export type NormalizedNftAsset = {
 export type CukiesInventoryDocument = {
   _id?: unknown;
   tokenId?: unknown;
+  chainId?: unknown;
+  collectionAddress?: unknown;
+  collectionAddressNormalized?: unknown;
   owner?: unknown;
   user?: unknown;
   wallet?: unknown;
@@ -101,13 +104,24 @@ export type CukiesInventoryDocument = {
   metadata?: unknown;
   attributes?: unknown;
   img?: unknown;
-  /** Campos emitidos por el indexer/card-worker. */
-  imageUrl?: unknown;
-  cardImageUrl?: unknown;
   timeStamp?: unknown;
   updatedAt?: unknown;
   /** Ultimo evento que cambio la tenencia, no el ultimo cambio de estado/listing. */
   ownershipEventId?: unknown;
+  ownershipEventBlockNumber?: unknown;
+  ownershipEventLogIndex?: unknown;
+  ownershipEventBlockHash?: unknown;
+  ownershipEventTransactionHash?: unknown;
+  ownershipEventTimestampMs?: unknown;
+  ownershipEventFromNormalized?: unknown;
+  ownershipEventToNormalized?: unknown;
+  ownershipObservedEventId?: unknown;
+  ownershipObservedBlockNumber?: unknown;
+  ownershipObservedLogIndex?: unknown;
+  ownershipObservedBlockHash?: unknown;
+  marketplaceListingStatus?: unknown;
+  marketplaceListingChain?: unknown;
+  marketplaceListingOwnerNormalized?: unknown;
 };
 
 export type NftAssetLockDocument = {
@@ -234,15 +248,6 @@ function normalizeObservedAt(value: unknown) {
 
 function uniqueBlockers(blockers: NftInventoryBlocker[]) {
   return Array.from(new Set(blockers));
-}
-
-function resolveImageUrl(document: CukiesInventoryDocument) {
-  for (const candidate of [document.cardImageUrl, document.imageUrl, document.img]) {
-    if (typeof candidate === 'string' && candidate.trim().length > 0) {
-      return candidate.trim();
-    }
-  }
-  return null;
 }
 
 export function normalizeNftNetwork(value: unknown): NftAssetNetwork {
@@ -537,7 +542,9 @@ export function normalizeCukiesInventoryDocument(
   return {
     assetId: buildCukiesAssetId(document),
     tokenId,
-    imageUrl: resolveImageUrl(document),
+    imageUrl: tokenId
+      ? normalizeLegacyMarketplaceNftImageUrl(tokenId, toStringOrNull(document.img))
+      : null,
     network,
     ownerWallet,
     ownerNormalized,

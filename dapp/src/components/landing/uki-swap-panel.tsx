@@ -19,33 +19,31 @@ import {
 } from 'viem';
 import {
   useAccount,
-  useConnect,
   usePublicClient,
   useReadContract,
-  useSwitchChain,
   useWriteContract,
-  type Connector,
 } from 'wagmi';
 
-import { PANCAKESWAP_UKI_URL, UKI_MAINNET_ADDRESSES } from './data';
 import { Panel } from './primitives';
-import { UKI_PRESALE_CHAIN_ID, UKI_PRESALE_CHAIN_LABEL } from './sale-config';
-import { WalletConnectorDialog } from './wallet-connector-dialog';
+import { UKI_PRESALE_CHAIN_ID } from './sale-config';
 import { useHasMounted } from '@/hooks/use-has-mounted';
 import { useToast } from '@/hooks/use-toast';
 import { erc20Abi, ukiSaleContracts } from '@/lib/contracts/uki-sale';
+import { landingNetworkConfig } from '@/lib/landing-network';
 import {
   applyMaximumSlippageBps,
   applySlippageBps,
+  BSC_MAINNET_SWAP_TOKENS,
   buildUkiSwapConfig,
   createSwapDeadline,
   formatEditableSwapAmount,
   formatSwapAmount,
+  getUkiSwapNetworkLabel,
   pancakeV2RouterAbi,
   type UkiSwapSourceSymbol,
 } from '@/lib/uki-swap';
-import { getVisibleWalletConnectors } from '@/lib/wallet-connectors';
 import { usePublicLocale } from '@/providers/public-locale-provider';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
 
 const SWAP_COPY = {
   es: {
@@ -59,7 +57,7 @@ const SWAP_COPY = {
     maximum: 'Máximo a pagar',
     slippage: 'Tolerancia',
     connect: 'Conectar wallet',
-    switchNetwork: 'Cambiar a BNB Smart Chain',
+    switchNetwork: (network: string) => `Cambiar a ${network}`,
     approve: 'Autorizar importe exacto',
     approving: 'Confirmando autorización',
     buy: 'Comprar UKI',
@@ -67,11 +65,12 @@ const SWAP_COPY = {
     enterAmount: 'Introduce una cantidad',
     quoting: 'Calculando ruta',
     unavailable: 'Ruta no disponible',
+    availableSources: 'Monedas disponibles para firmar',
     helper: 'La operación se firma en tu wallet y se ejecuta directamente en PancakeSwap V2.',
     gas: 'Necesitas BNB para pagar el gas de red.',
-    staging: 'En testnet solo está habilitada la ruta de prueba ASM → UKI.',
     approved: 'Importe autorizado. Ya puedes firmar la compra.',
-    success: 'Compra confirmada en BNB Smart Chain.',
+    success: (network: string) => `Compra confirmada en ${network}.`,
+    network: (network: string) => `Red objetivo: ${network}. Firma la operación en tu wallet.`,
     tx: 'Ver transacción',
     fallback: 'Abrir el pool ASM/UKI en PancakeSwap',
     quoteError: 'No se ha podido cotizar esta ruta. Revisa el importe o inténtalo de nuevo.',
@@ -90,7 +89,7 @@ const SWAP_COPY = {
     maximum: 'Maximum to pay',
     slippage: 'Tolerance',
     connect: 'Connect wallet',
-    switchNetwork: 'Switch to BNB Smart Chain',
+    switchNetwork: (network: string) => `Switch to ${network}`,
     approve: 'Approve exact amount',
     approving: 'Confirming approval',
     buy: 'Buy UKI',
@@ -98,11 +97,12 @@ const SWAP_COPY = {
     enterAmount: 'Enter an amount',
     quoting: 'Calculating route',
     unavailable: 'Route unavailable',
+    availableSources: 'Currencies available to sign',
     helper: 'You sign in your wallet and the swap executes directly through PancakeSwap V2.',
     gas: 'You need BNB to pay network gas.',
-    staging: 'Only the ASM → UKI test route is enabled on testnet.',
     approved: 'Amount approved. You can now sign the purchase.',
-    success: 'Purchase confirmed on BNB Smart Chain.',
+    success: (network: string) => `Purchase confirmed on ${network}.`,
+    network: (network: string) => `Target network: ${network}. Sign the operation in your wallet.`,
     tx: 'View transaction',
     fallback: 'Open the ASM/UKI pool on PancakeSwap',
     quoteError: 'This route could not be quoted. Check the amount or try again.',
@@ -140,9 +140,8 @@ export function UkiSwapPanel() {
   const { locale } = usePublicLocale();
   const copy = SWAP_COPY[locale];
   const { address, chainId, isConnected } = useAccount();
-  const { connectAsync, connectors, isPending: isConnecting } = useConnect();
-  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
+  const { requestWallet, evm: evmWallet } = useWalletCoordinator();
   const { toast } = useToast();
   const hasMounted = useHasMounted();
   const [sourceSymbol, setSourceSymbol] = useState<UkiSwapSourceSymbol>('BNB');
@@ -154,15 +153,14 @@ export function UkiSwapPanel() {
   const [operationMessage, setOperationMessage] = useState<string | null>(null);
   const [lastTxHash, setLastTxHash] = useState<Hash | null>(null);
   const [locallyApproved, setLocallyApproved] = useState<{ token: Address; amount: bigint } | null>(null);
-  const [isConnectorDialogOpen, setIsConnectorDialogOpen] = useState(false);
 
   const asmAddress = configuredAddress(
     ukiSaleContracts.asmTokenAddress,
-    UKI_PRESALE_CHAIN_ID === 56 ? UKI_MAINNET_ADDRESSES.asm : undefined,
+    UKI_PRESALE_CHAIN_ID === 56 ? BSC_MAINNET_SWAP_TOKENS.asm : undefined,
   );
   const ukiAddress = configuredAddress(
     ukiSaleContracts.ukiTokenAddress,
-    UKI_PRESALE_CHAIN_ID === 56 ? UKI_MAINNET_ADDRESSES.token : undefined,
+    UKI_PRESALE_CHAIN_ID === 56 ? BSC_MAINNET_SWAP_TOKENS.uki : undefined,
   );
   const swapConfig = useMemo(() => (
     asmAddress && ukiAddress
@@ -178,11 +176,8 @@ export function UkiSwapPanel() {
   const parsedSourceInput = useMemo(() => parsePositiveAmount(sourceAmountInput), [sourceAmountInput]);
   const parsedUkiInput = useMemo(() => parsePositiveAmount(ukiAmountInput), [ukiAmountInput]);
   const routePath = useMemo(() => source ? [...source.path] : [], [source]);
-  const visibleConnectors = useMemo(
-    () => (hasMounted ? getVisibleWalletConnectors(connectors) : []),
-    [connectors, hasMounted],
-  );
   const targetChainId = swapConfig?.chainId ?? UKI_PRESALE_CHAIN_ID;
+  const targetNetworkLabel = getUkiSwapNetworkLabel(targetChainId);
   const publicClient = usePublicClient({ chainId: targetChainId });
   const isWrongChain = Boolean(hasMounted && isConnected && chainId !== targetChainId);
 
@@ -270,39 +265,21 @@ export function UkiSwapPanel() {
   const isBusy = operationState === 'approving' || operationState === 'swapping';
   const canSwap = Boolean(sourceAmount && quotedUki && !quoteError && swapConfig && source);
 
-  async function connectWallet(connector: Connector) {
-    try {
-      await connectAsync({ connector, chainId: targetChainId });
-      setIsConnectorDialogOpen(false);
-      setOperationMessage(null);
-    } catch {
-      setOperationState('error');
-      setOperationMessage(copy.connectError);
-    }
-  }
-
   async function handlePrimaryAction() {
     if (!hasMounted || isBusy) return;
 
-    if (!isConnected) {
-      if (visibleConnectors.length === 1) {
-        await connectWallet(visibleConnectors[0]);
-      } else if (visibleConnectors.length > 1) {
-        setIsConnectorDialogOpen(true);
-      } else {
-        setOperationState('error');
-        setOperationMessage(copy.connectError);
-      }
-      return;
-    }
-
-    if (isWrongChain) {
+    if (!isConnected || isWrongChain) {
       try {
-        await switchChainAsync({ chainId: targetChainId });
-        setOperationMessage(null);
-      } catch {
+        await requestWallet({
+          kind: 'evm',
+          targetChainId: targetChainId as 56 | 97,
+          reason: `Prepara la wallet en ${targetNetworkLabel} para comprar UKI. No se firmará nada hasta confirmar.`,
+        });
+        setOperationState('idle');
+        setOperationMessage('Wallet lista. Revisa la operación y pulsa de nuevo para firmar.');
+      } catch (error) {
         setOperationState('error');
-        setOperationMessage(copy.connectError);
+        setOperationMessage(error instanceof Error ? error.message : copy.connectError);
       }
       return;
     }
@@ -414,10 +391,10 @@ export function UkiSwapPanel() {
       await publicClient.waitForTransactionReceipt({ hash: swapHash });
       setLastTxHash(swapHash);
       setOperationState('success');
-      setOperationMessage(copy.success);
+      setOperationMessage(copy.success(targetNetworkLabel));
       setLocallyApproved(null);
       await Promise.all([refetchExactInputQuote(), refetchExactOutputQuote(), refetchAllowance()]);
-      toast({ title: copy.success, description: `${formatSwapAmount(receivedUki)} UKI` });
+      toast({ title: copy.success(targetNetworkLabel), description: `${formatSwapAmount(receivedUki)} UKI` });
     } catch {
       setOperationState('error');
       setOperationMessage(copy.transactionError);
@@ -459,8 +436,8 @@ export function UkiSwapPanel() {
 
   const ctaLabel = !isConnected
     ? copy.connect
-    : isWrongChain
-      ? copy.switchNetwork
+      : isWrongChain
+      ? copy.switchNetwork(targetNetworkLabel)
       : !activeInputAmount
         ? copy.enterAmount
         : isQuoteLoading
@@ -486,14 +463,14 @@ export function UkiSwapPanel() {
       className="uki-swap-panel scroll-mt-24"
       innerClassName="relative overflow-hidden p-4 sm:p-5"
     >
-      <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[var(--uki-cyan)]/8 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[var(--uki-lilac)]/8 blur-3xl" />
       <div className="relative">
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <p className="uki-label">{copy.eyebrow}</p>
             <h2 className="mt-1 font-headline text-2xl font-black text-[var(--uki-cream)]">{copy.title}</h2>
           </div>
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 text-[var(--uki-cyan)]">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[9px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/10 text-[var(--uki-lilac)]">
             <Route className="h-5 w-5" strokeWidth={1.8} />
           </span>
         </div>
@@ -506,6 +483,9 @@ export function UkiSwapPanel() {
           <>
             <fieldset className="mt-4">
               <legend className="uki-label">{copy.payWith}</legend>
+              <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
+                {copy.availableSources}: {swapConfig.sources.map((option) => option.symbol).join(', ')}
+              </p>
               <div className={`mt-2 grid gap-2 ${swapConfig.sources.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'}`}>
                 {swapConfig.sources.map((option) => {
                   const selected = option.symbol === source.symbol;
@@ -516,7 +496,7 @@ export function UkiSwapPanel() {
                       aria-pressed={selected}
                       onClick={() => selectSource(option.symbol)}
                       className={`min-h-10 rounded-[8px] border px-3 font-mono text-xs font-black transition active:translate-y-px ${selected
-                        ? 'border-[var(--uki-cyan)] bg-[var(--uki-cyan)]/14 text-[var(--uki-cyan)]'
+                        ? 'border-[var(--uki-lilac)] bg-[var(--uki-lilac)]/14 text-[var(--uki-lilac)]'
                         : 'border-white/10 bg-white/[0.035] text-[var(--uki-muted)] hover:border-white/20 hover:text-[var(--uki-cream)]'
                       }`}
                     >
@@ -529,7 +509,7 @@ export function UkiSwapPanel() {
 
             <label className="mt-4 block">
               <span className="uki-label">{copy.amount}</span>
-              <span className="mt-2 grid grid-cols-[1fr_auto] items-center overflow-hidden rounded-[9px] border border-white/12 bg-[#070817]/92 focus-within:border-[var(--uki-cyan)]">
+              <span className="mt-2 grid grid-cols-[1fr_auto] items-center overflow-hidden rounded-[9px] border border-white/12 bg-[#070817]/92 focus-within:border-[var(--uki-lilac)]">
                 <input
                   value={displayedSourceAmount}
                   onChange={(event) => changeSourceAmount(event.target.value)}
@@ -545,15 +525,15 @@ export function UkiSwapPanel() {
             </label>
 
             <div className="my-2 flex justify-center" aria-hidden="true">
-              <span className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-[#070817] text-[var(--uki-cyan)]">
+              <span className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-[#070817] text-[var(--uki-lilac)]">
                 <ArrowDown className="h-4 w-4" strokeWidth={1.8} />
               </span>
             </div>
 
-            <div className="rounded-[9px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/[0.055] p-3.5">
+            <div className="rounded-[9px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/[0.055] p-3.5">
               <label className="block">
                 <span className="text-xs font-semibold text-[var(--uki-muted)]">{copy.receive}</span>
-                <span className="mt-2 grid grid-cols-[1fr_auto] items-center overflow-hidden rounded-[8px] border border-white/12 bg-[#070817]/78 focus-within:border-[var(--uki-cyan)]">
+                <span className="mt-2 grid grid-cols-[1fr_auto] items-center overflow-hidden rounded-[8px] border border-white/12 bg-[#070817]/78 focus-within:border-[var(--uki-lilac)]">
                   <input
                     value={displayedUkiAmount}
                     onChange={(event) => changeUkiAmount(event.target.value)}
@@ -580,7 +560,7 @@ export function UkiSwapPanel() {
                   <select
                     value={slippageBps}
                     onChange={(event) => setSlippageBps(Number(event.target.value))}
-                    className="rounded-[6px] border border-white/10 bg-[#070817] px-2 py-1 font-mono text-[var(--uki-cream)] outline-none focus:border-[var(--uki-cyan)]"
+                    className="rounded-[6px] border border-white/10 bg-[#070817] px-2 py-1 font-mono text-[var(--uki-cream)] outline-none focus:border-[var(--uki-lilac)]"
                   >
                     <option value={50}>0,5%</option>
                     <option value={100}>1%</option>
@@ -596,9 +576,7 @@ export function UkiSwapPanel() {
               </p>
             ) : null}
 
-            {UKI_PRESALE_CHAIN_ID === 97 ? (
-              <p className="mt-3 text-xs font-semibold text-[#ffe2a0]">{copy.staging}</p>
-            ) : null}
+            <p className="mt-3 text-xs font-semibold text-[#ffe2a0]">{copy.network(targetNetworkLabel)}</p>
 
             {operationMessage ? (
               <div
@@ -616,10 +594,10 @@ export function UkiSwapPanel() {
             <button
               type="button"
               onClick={() => void handlePrimaryAction()}
-              disabled={ctaDisabled || isConnecting || isSwitching}
+              disabled={ctaDisabled || evmWallet.isConnecting}
               className="uki-wallet-button mt-4 w-full justify-center disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {isBusy || isConnecting || isSwitching || isQuoteLoading ? (
+              {isBusy || evmWallet.isConnecting || isQuoteLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.8} />
               ) : !isConnected ? (
                 <Wallet className="h-4 w-4" strokeWidth={1.8} />
@@ -632,12 +610,12 @@ export function UkiSwapPanel() {
             <div className="mt-3 flex flex-col gap-2 text-[0.68rem] font-semibold leading-relaxed text-[var(--uki-muted)]">
               <span>{copy.helper} {copy.gas}</span>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                {UKI_PRESALE_CHAIN_ID === 56 ? (
+                {UKI_PRESALE_CHAIN_ID === 56 && landingNetworkConfig.swapUrl ? (
                   <a
-                    href={PANCAKESWAP_UKI_URL}
+                    href={landingNetworkConfig.swapUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+                    className="inline-flex items-center gap-1.5 font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
                   >
                     {copy.fallback}
                     <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -648,7 +626,7 @@ export function UkiSwapPanel() {
                     href={transactionUrl(lastTxHash)}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 font-black text-[#65e2a2] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+                    className="inline-flex items-center gap-1.5 font-black text-[#65e2a2] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
                   >
                     {copy.tx}
                     <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -660,15 +638,6 @@ export function UkiSwapPanel() {
         )}
       </div>
 
-      <WalletConnectorDialog
-        open={isConnectorDialogOpen}
-        onOpenChange={setIsConnectorDialogOpen}
-        connectors={visibleConnectors}
-        onSelectConnector={connectWallet}
-        isConnecting={isConnecting}
-        title={copy.connect}
-        description={`${UKI_PRESALE_CHAIN_LABEL}. ${copy.helper}`}
-      />
     </Panel>
   );
 }

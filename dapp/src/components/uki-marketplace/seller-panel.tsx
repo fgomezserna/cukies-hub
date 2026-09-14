@@ -1359,7 +1359,7 @@ export function UkiMarketplaceSellerPanel() {
                             className="border-rose-300/20 bg-rose-300/[0.06] text-rose-100 hover:bg-rose-300/10 active:scale-[0.98]"
                           >
                             <XCircle aria-hidden className="mr-1.5 h-4 w-4" />
-                            {working ? 'Cancelando…' : 'Cancelar on-chain'}
+                            {working ? 'Cancelando…' : 'Cancelar anuncio'}
                           </Button>
                           <p className="max-w-48 text-right text-[11px] leading-4 text-slate-500">
                             Para cambiar el precio, cancela y vuelve a publicar.
