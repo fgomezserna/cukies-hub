@@ -152,4 +152,26 @@ describe('UKI NFT vault public config', () => {
       ready: { cukieMaster: true, cukiePool: true },
     });
   });
+
+  it('keeps former Pool vaults empty by default and parses an explicit allowlist', () => {
+    const empty = parseUkiNftVaultPublicConfig({ chainId: '97', collectionAddress: collection });
+    expect(empty.poolRecoveryVaults).toEqual([]);
+    const result = parseUkiNftVaultPublicConfig({
+      chainId: '97',
+      collectionAddress: collection,
+      poolRecoveryVaultAddresses: `${pool},${pool.toLowerCase()}`,
+    });
+    expect(result.poolRecoveryVaults).toEqual([{ chainId: 97, vaultAddress: pool }]);
+    expect(result.poolRecoveryVaultConfigInvalid).toBe(false);
+  });
+
+  it('fails closed for malformed former Pool vault configuration', () => {
+    const result = parseUkiNftVaultPublicConfig({
+      chainId: '97',
+      collectionAddress: collection,
+      poolRecoveryVaultAddresses: `${pool},not-an-address`,
+    });
+    expect(result.poolRecoveryVaultConfigInvalid).toBe(true);
+    expect(result.poolRecoveryVaults).toEqual([{ chainId: 97, vaultAddress: pool }]);
+  });
 });

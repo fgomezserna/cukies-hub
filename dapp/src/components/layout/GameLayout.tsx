@@ -40,6 +40,7 @@ interface GameLayoutComponentProps extends GameLayoutProps {
   desktopBanner?: ReactNode; // Important desktop context rendered above the game shell
   desktopSidebar?: ReactNode; // Optional game-specific preparation/status panel
   desktopFooter?: ReactNode;
+  desktopGameFirst?: boolean; // Let the game keep its full aspect ratio and move secondary content below it
   mobileFocus?: boolean;
   mobileLayoutFlipEnabled?: boolean;
 }
@@ -87,6 +88,7 @@ export default function GameLayout({
   desktopBanner,
   desktopSidebar,
   desktopFooter,
+  desktopGameFirst = false,
   mobileFocus = false,
   mobileLayoutFlipEnabled = false,
 }: GameLayoutComponentProps) {
@@ -337,7 +339,9 @@ export default function GameLayout({
         isMobileFocus
           ? 'flex h-full flex-col gap-2'
           : desktopSidebar
-            ? 'grid grid-cols-1 gap-3 lg:h-full lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]'
+            ? desktopGameFirst
+              ? 'grid grid-cols-1 gap-3 lg:h-full lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]'
+              : 'grid grid-cols-1 gap-3 lg:h-full lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]'
             : 'grid grid-cols-1 gap-6 lg:grid-cols-4',
         !isMobileFocus && !hasDesktopBanner && 'h-full',
         !isMobileFocus && hasDesktopBanner && 'items-start lg:items-stretch',
@@ -658,6 +662,24 @@ export default function GameLayout({
 
   if (isMobileFocus || !hasDesktopBanner) return gameShell;
 
+  if (desktopSidebar && desktopGameFirst) {
+    return (
+      <div
+        className="space-y-3 lg:h-full lg:space-y-4"
+        data-game-desktop-priority="game-first"
+      >
+        <div
+          data-game-desktop-stage
+          className="space-y-3 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-4 lg:space-y-0"
+        >
+          <div data-game-desktop-banner className="shrink-0">{desktopBanner}</div>
+          <div className="lg:min-h-0 lg:flex-1">{gameShell}</div>
+        </div>
+        {desktopFooter ? <div data-game-desktop-footer>{desktopFooter}</div> : null}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -665,6 +687,7 @@ export default function GameLayout({
           ? 'space-y-3 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-3 lg:space-y-0'
           : 'space-y-5',
       )}
+      data-game-desktop-priority="fit-shell"
     >
       {desktopBanner ? (
         <div data-game-desktop-banner className="shrink-0">{desktopBanner}</div>

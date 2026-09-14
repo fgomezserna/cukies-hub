@@ -2,12 +2,15 @@ import "server-only";
 
 import type { ClientSession, Db } from "mongodb";
 
+import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
+
 import {
   DomainConflictError,
   DomainNotFoundError,
   SchemaNotReadyError,
 } from "../errors";
 import {
+  expectedBscCursorFilter,
   stakingBalancesMatchState,
   vestingLedgerMatchesPositions,
 } from "../cukie-master/repository";
@@ -18,9 +21,26 @@ import {
   stableCreditHash,
 } from "./rules";
 import {
+  materializeCreditLots,
+  type CreditMaterializationState,
+} from './materialization';
+import {
   buildCreditSourceHealthEvidenceHash,
+  classifyCreditSourceHealth,
+  creditSourceBlockingEventFilter,
+  creditSourceChainIntegrityIncidentFilter,
   creditSourceCursorIsHealthy,
 } from "./source-health";
+import {
+  deriveVerifiedCreditHistoryCoverage,
+  PENDING_CREDIT_SOURCE_EVENT_STATUSES,
+  type CreditVerifiedHistoryCoverage,
+  type CreditVerifiedSlotVersion,
+} from "./history-coverage";
+import {
+  isBlockingCreditIncident,
+  isBlockingCreditIncidentGlobally,
+} from "./integrity";
 import {
   CREDIT_RULE_SCOPE,
   CREDIT_SCHEMA_VERSION,
@@ -79,6 +99,11 @@ export interface CompetitionCreditRepository {
     route: CreditRoute,
     limit: number
   ): Promise<CreditSnapshotSlot[]>;
+  ensureVerifiedHistoryCoverage(
+    route: CreditRoute,
+    limit: number,
+    now: Date
+  ): Promise<CreditVerifiedHistoryCoverage>;
   readSourceHealth(
     now: Date,
     rule: CompetitionCreditRule,
@@ -149,7 +174,7 @@ export interface CompetitionCreditRepository {
   findLedgerByIdempotencyKey(
     idempotencyKey: string
   ): Promise<CompetitionCreditLedgerEntry | null>;
-  hasOpenCreditBlock(walletNormalized: string): Promise<boolean>;
+  hasOpenCreditBlock(walletNormalized: string, cutoff: Date): Promise<boolean>;
   listAvailableOwnLots(
     walletNormalized: string,
     periodId: string,
@@ -255,6 +280,11 @@ function mongoCollections(db: Db) {
       _id: CreditRoute;
       completeFrom: Date;
       completeFromBlockNumber?: number;
+      historicalBlockCoverage?: string;
+      verifiedSlotCount?: number;
+      verifiedAt?: Date;
+      observedThrough?: Date;
+      updatedAt?: Date;
     }>("cukie_master_slot_history_state"),
     configs: db.collection<CreditPoolConfiguration>(
       "competition_credit_pool_configs"
@@ -326,6 +356,195 @@ export function createMongoCompetitionCreditRepository(
     );
   }
 
+  type CreditLotMaterialization = Pick<
+    CreditLot,
+    | "totalCredits"
+    | "poolDepositedCredits"
+    | "availableCredits"
+    | "reservedCredits"
+    | "spentCredits"
+    | "expiredCredits"
+    | "expiresAt"
+    | "blocked"
+  >;
+
+  const creditLotMaterializationProjection = {
+    _id: 0,
+    totalCredits: 1,
+    poolDepositedCredits: 1,
+    availableCredits: 1,
+    reservedCredits: 1,
+    spentCredits: 1,
+    expiredCredits: 1,
+    expiresAt: 1,
+    blocked: 1,
+  } as const;
+
+  type AccountMaterialization = {
+    grantedCredits: number;
+    poolDepositedCredits: number;
+    availableCredits: number;
+    reservedCredits: number;
+    spentCredits: number;
+    expiredCredits: number;
+    blocked: boolean;
+    state: CreditMaterializationState;
+  };
+
+  type PoolMaterialization = {
+    contributedCredits: number;
+    availableCredits: number;
+    reservedCredits: number;
+    spentCredits: number;
+    expiredCredits: number;
+    blocked: boolean;
+    state: CreditMaterializationState;
+  };
+
+  function materializationConflict(
+    id: string,
+    state: CreditMaterializationState,
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    const reason = state === "stale"
+      ? "CREDIT_PROJECTION_STALE"
+      : state === "blocked"
+        ? "CREDIT_LOTS_BLOCKED"
+        : state === "too_large"
+          ? "CREDIT_LOT_PROJECTION_TOO_LARGE"
+          : "CREDIT_LOT_MATERIALIZATION_UNKNOWN";
+    return new DomainConflictError(
+      `La ${kind} ${id} no puede reconciliarse de forma segura (${state}).`,
+      { reason },
+    );
+  }
+
+  function requireReadyMaterialization(
+    id: string,
+    materialization: { state: CreditMaterializationState },
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    if (materialization.state !== "ready") {
+      throw materializationConflict(id, materialization.state, kind);
+    }
+  }
+
+  const accountProjectionFields = [
+    "grantedCredits",
+    "poolDepositedCredits",
+    "availableCredits",
+    "reservedCredits",
+    "spentCredits",
+    "expiredCredits",
+  ] as const;
+  const poolProjectionFields = [
+    "contributedCredits",
+    "availableCredits",
+    "reservedCredits",
+    "spentCredits",
+    "expiredCredits",
+  ] as const;
+
+  function assertProjectionCoherent(
+    id: string,
+    projection: Record<string, unknown>,
+    expected: Record<string, number>,
+    increments: Partial<Record<string, number>>,
+    fields: readonly string[],
+    kind: "cuenta" | "periodo de pool",
+  ) {
+    if (projection.blocked === true) {
+      throw materializationConflict(id, "blocked", kind);
+    }
+    if (projection.blocked !== false) {
+      throw materializationConflict(id, "unknown", kind);
+    }
+    for (const field of fields) {
+      const current = projection[field];
+      if (!Number.isSafeInteger(current) || (current as number) < 0) {
+        throw materializationConflict(id, "unknown", kind);
+      }
+      const delta = increments[field] ?? 0;
+      if (!Number.isSafeInteger(delta)) {
+        throw materializationConflict(id, "unknown", kind);
+      }
+      const next = (current as number) + delta;
+      if (!Number.isSafeInteger(next) || next < 0) {
+        throw new DomainConflictError(
+          `La ${kind} ${id} produciria un saldo negativo o inseguro.`,
+          { reason: "CREDIT_PROJECTION_NEGATIVE" },
+        );
+      }
+      if (next !== expected[field]) {
+        throw materializationConflict(id, "stale", kind);
+      }
+    }
+  }
+
+  async function accountMaterialization(
+    walletNormalized: string,
+    periodId: string,
+    route: CreditRoute,
+  ): Promise<AccountMaterialization> {
+    const lots = await collections.ownLots
+      .find(
+        { walletNormalized, periodId, route },
+        { ...options, projection: creditLotMaterializationProjection },
+      )
+      .limit(RECONCILIATION_DOCUMENT_LIMITS.ownLots)
+      .toArray() as CreditLotMaterialization[];
+    const materialized = materializeCreditLots(
+      lots,
+      RECONCILIATION_DOCUMENT_LIMITS.ownLots - 1,
+    );
+    if (materialized.state === "ready" && lots.some((lot) => (
+      !(lot.expiresAt instanceof Date) || Number.isNaN(lot.expiresAt.getTime())
+    ))) {
+      materialized.state = "unknown";
+    }
+    return {
+      grantedCredits: materialized.totals.totalCredits,
+      poolDepositedCredits: materialized.totals.poolDepositedCredits,
+      availableCredits: materialized.totals.availableCredits,
+      reservedCredits: materialized.totals.reservedCredits,
+      spentCredits: materialized.totals.spentCredits,
+      expiredCredits: materialized.totals.expiredCredits,
+      blocked: materialized.state === "blocked",
+      state: materialized.state,
+    };
+  }
+
+  async function poolMaterialization(
+    periodId: string,
+    route: CreditRoute,
+  ): Promise<PoolMaterialization> {
+    const lots = await collections.poolLots
+      .find(
+        { periodId, route },
+        { ...options, projection: creditLotMaterializationProjection },
+      )
+      .limit(RECONCILIATION_DOCUMENT_LIMITS.poolLots)
+      .toArray() as CreditLotMaterialization[];
+    const materialized = materializeCreditLots(
+      lots,
+      RECONCILIATION_DOCUMENT_LIMITS.poolLots - 1,
+    );
+    if (materialized.state === "ready" && lots.some((lot) => (
+      !(lot.expiresAt instanceof Date) || Number.isNaN(lot.expiresAt.getTime())
+    ))) {
+      materialized.state = "unknown";
+    }
+    return {
+      contributedCredits: materialized.totals.totalCredits,
+      availableCredits: materialized.totals.availableCredits,
+      reservedCredits: materialized.totals.reservedCredits,
+      spentCredits: materialized.totals.spentCredits,
+      expiredCredits: materialized.totals.expiredCredits,
+      blocked: materialized.state === "blocked",
+      state: materialized.state,
+    };
+  }
+
   async function incrementAccount(
     walletNormalized: string,
     periodId: string,
@@ -344,27 +563,60 @@ export function createMongoCompetitionCreditRepository(
     now: Date
   ) {
     const id = accountPeriodId(walletNormalized, periodId, route);
-    await collections.accounts.updateOne(
-      { _id: id },
-      {
-        $setOnInsert: {
-          _id: id,
-          walletNormalized,
-          periodId,
-          route,
-          grantedCredits: 0,
-          poolDepositedCredits: 0,
-          availableCredits: 0,
-          reservedCredits: 0,
-          spentCredits: 0,
-          expiredCredits: 0,
-          blocked: false,
-          revision: 0,
-          createdAt: now,
-          updatedAt: now,
+    const existing = await collections.accounts.findOne({ _id: id }, options);
+    const materialization = await accountMaterialization(
+      walletNormalized,
+      periodId,
+      route,
+    );
+    if (!existing) {
+      requireReadyMaterialization(id, materialization, "cuenta");
+      const { state: _state, ...seedMaterialization } = materialization;
+      const seeded = await collections.accounts.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            walletNormalized,
+            periodId,
+            route,
+            ...seedMaterialization,
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
         },
+        { ...options, upsert: true },
+      );
+      if (seeded.upsertedCount === 1) {
+        // The lot mutation that triggered this call is already reflected in
+        // the materialization. Applying the same delta again would drift the
+        // projection away from the authoritative lots.
+        return;
+      }
+    }
+    requireReadyMaterialization(id, materialization, "cuenta");
+    const projection = existing ?? await collections.accounts.findOne({ _id: id }, options);
+    if (!projection) {
+      throw new DomainConflictError(
+        `La cuenta de creditos ${id} esta ausente tras la carrera de materializacion.`,
+        { reason: "CREDIT_PROJECTION_MISSING" },
+      );
+    }
+    assertProjectionCoherent(
+      id,
+      projection as Record<string, unknown>,
+      {
+        grantedCredits: materialization.grantedCredits,
+        poolDepositedCredits: materialization.poolDepositedCredits,
+        availableCredits: materialization.availableCredits,
+        reservedCredits: materialization.reservedCredits,
+        spentCredits: materialization.spentCredits,
+        expiredCredits: materialization.expiredCredits,
       },
-      { ...options, upsert: true }
+      increments,
+      accountProjectionFields,
+      "cuenta",
     );
     const updated = await collections.accounts.updateOne(
       { _id: id, blocked: false },
@@ -394,25 +646,52 @@ export function createMongoCompetitionCreditRepository(
     now: Date
   ) {
     const id = poolPeriodId(periodId, route);
-    await collections.poolPeriods.updateOne(
-      { _id: id },
-      {
-        $setOnInsert: {
-          _id: id,
-          periodId,
-          route,
-          contributedCredits: 0,
-          availableCredits: 0,
-          reservedCredits: 0,
-          spentCredits: 0,
-          expiredCredits: 0,
-          blocked: false,
-          revision: 0,
-          createdAt: now,
-          updatedAt: now,
+    const existing = await collections.poolPeriods.findOne({ _id: id }, options);
+    const materialization = await poolMaterialization(periodId, route);
+    if (!existing) {
+      requireReadyMaterialization(id, materialization, "periodo de pool");
+      const { state: _state, ...seedMaterialization } = materialization;
+      const seeded = await collections.poolPeriods.updateOne(
+        { _id: id },
+        {
+          $setOnInsert: {
+            _id: id,
+            periodId,
+            route,
+            ...seedMaterialization,
+            revision: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
         },
+        { ...options, upsert: true },
+      );
+      if (seeded.upsertedCount === 1) {
+        // See incrementAccount: the lot mutation is included in the baseline.
+        return;
+      }
+    }
+    requireReadyMaterialization(id, materialization, "periodo de pool");
+    const projection = existing ?? await collections.poolPeriods.findOne({ _id: id }, options);
+    if (!projection) {
+      throw new DomainConflictError(
+        `El periodo de pool ${id} esta ausente tras la carrera de materializacion.`,
+        { reason: "CREDIT_PROJECTION_MISSING" },
+      );
+    }
+    assertProjectionCoherent(
+      id,
+      projection as Record<string, unknown>,
+      {
+        contributedCredits: materialization.contributedCredits,
+        availableCredits: materialization.availableCredits,
+        reservedCredits: materialization.reservedCredits,
+        spentCredits: materialization.spentCredits,
+        expiredCredits: materialization.expiredCredits,
       },
-      { ...options, upsert: true }
+      increments,
+      poolProjectionFields,
+      "periodo de pool",
     );
     const updated = await collections.poolPeriods.updateOne(
       { _id: id, blocked: false },
@@ -493,22 +772,33 @@ export function createMongoCompetitionCreditRepository(
           },
           options
         ),
-        collections.incidents.countDocuments({ status: "open", route }, options),
-        db.collection("chain_integrity_incidents").countDocuments(
-          {
+        collections.incidents
+          .find({
             status: "open",
-            $or: [
-              { route },
-              { scope: route },
-              { contractAlias: { $in: routeAliases } },
-              {
-                route: { $exists: false },
-                scope: { $exists: false },
-                contractAlias: { $exists: false },
-                type: { $regex: /economy|canonical|cukie|credit/i },
-              },
-            ],
-          },
+            $or: [{ route }, { route: { $nin: ["uki", "nft"] } }],
+          }, {
+            ...options,
+            projection: {
+              _id: 1,
+              incidentId: 1,
+              type: 1,
+              status: 1,
+              runId: 1,
+              route: 1,
+              periodId: 1,
+              reasonCodes: 1,
+              evidenceHash: 1,
+              containment: 1,
+              selectorCutoff: 1,
+              planHash: 1,
+            },
+          })
+          .toArray()
+          .then((incidents) => incidents.filter((incident) =>
+            isBlockingCreditIncident(incident, route, cutoff)
+          ).length),
+        db.collection("chain_integrity_incidents").countDocuments(
+          creditSourceChainIntegrityIncidentFilter({ route, aliases: routeAliases }),
           options
         ),
         collections.slots.countDocuments(
@@ -535,6 +825,112 @@ export function createMongoCompetitionCreditRepository(
         .sort({ _id: 1 })
         .limit(limit)
         .toArray(),
+    async ensureVerifiedHistoryCoverage(route, limit, now) {
+      const existing = await collections.slotHistoryState.findOne(
+        { _id: route },
+        options
+      );
+      if (
+        existing &&
+        Number.isSafeInteger(existing.completeFromBlockNumber) &&
+        Number(existing.completeFromBlockNumber) >= 0 &&
+        existing.completeFrom instanceof Date &&
+        !Number.isNaN(existing.completeFrom.getTime())
+      ) {
+        return {
+          completeFrom: existing.completeFrom,
+          completeFromBlockNumber: Number(existing.completeFromBlockNumber),
+          verifiedSlotCount: Number(existing.verifiedSlotCount ?? 0),
+        };
+      }
+
+      const [sourceSlots, earliestVerifiedVersions] = await Promise.all([
+        collections.slots
+          .find({ route }, { ...options, projection: { _id: 1, route: 1 } })
+          .sort({ _id: 1 })
+          .limit(limit + 1)
+          .toArray(),
+        collections.slotVersions.aggregate<CreditVerifiedSlotVersion>([
+          {
+            $match: {
+              route,
+              effectiveBlockNumber: { $type: "number" },
+              effectiveBlockHash: { $regex: /^0x[0-9a-f]{64}$/ },
+              effectiveBlockTimestamp: { $type: "date" },
+              "slot.sourceBlockNumber": { $type: "number" },
+              "slot.sourceBlockHash": { $regex: /^0x[0-9a-f]{64}$/ },
+              "slot.sourceBlockTimestamp": { $type: "date" },
+            },
+          },
+          {
+            $sort: {
+              slotId: 1,
+              effectiveBlockNumber: 1,
+              "slot.revision": 1,
+              _id: 1,
+            },
+          },
+          { $group: { _id: "$slotId", version: { $first: "$$ROOT" } } },
+          { $replaceRoot: { newRoot: "$version" } },
+          { $sort: { slotId: 1 } },
+          { $limit: limit + 1 },
+        ], options).toArray(),
+      ]);
+      if (
+        sourceSlots.length > limit ||
+        earliestVerifiedVersions.length > limit
+      ) {
+        throw new DomainConflictError(
+          `La cobertura historica ${route} excede el limite auditable.`,
+          { reasonCode: "HISTORY_COVERAGE_LIMIT_EXCEEDED", route }
+        );
+      }
+      const coverage = deriveVerifiedCreditHistoryCoverage({
+        route,
+        sourceSlots,
+        earliestVerifiedVersions,
+      });
+      await collections.slotHistoryState.updateOne(
+        {
+          _id: route,
+          completeFromBlockNumber: { $exists: false },
+        },
+        {
+          $setOnInsert: { _id: route },
+          $set: {
+            completeFrom: coverage.completeFrom,
+            completeFromBlockNumber: coverage.completeFromBlockNumber,
+            historicalBlockCoverage: "verified_from_canonical_slot_versions",
+            verifiedSlotCount: coverage.verifiedSlotCount,
+            verifiedAt: now,
+            updatedAt: now,
+          },
+          $max: { observedThrough: now },
+        },
+        { ...options, upsert: !existing }
+      );
+      const persisted = await collections.slotHistoryState.findOne(
+        { _id: route },
+        options
+      );
+      if (
+        !persisted ||
+        !Number.isSafeInteger(persisted.completeFromBlockNumber) ||
+        !(persisted.completeFrom instanceof Date)
+      ) {
+        throw new DomainConflictError(
+          `No se pudo acreditar la cobertura historica ${route}.`,
+          { reasonCode: "HISTORY_COVERAGE_PERSIST_FAILED", route }
+        );
+      }
+      return {
+        completeFrom: persisted.completeFrom,
+        completeFromBlockNumber: Number(persisted.completeFromBlockNumber),
+        verifiedSlotCount: Number(
+          persisted.verifiedSlotCount ?? coverage.verifiedSlotCount
+        ),
+      };
+    },
     async listSourceSlotsAtCutoff(cutoffBlock, route, limit) {
       const coverage = await collections.slotHistoryState.findOne(
         { _id: route },
@@ -546,7 +942,13 @@ export function createMongoCompetitionCreditRepository(
         Number(coverage.completeFromBlockNumber) > cutoffBlock.blockNumber
       ) {
         throw new DomainConflictError(
-          `El historial temporal ${route} no cubre el bloque ${cutoffBlock.blockNumber}.`
+          `El historial temporal ${route} no cubre el bloque ${cutoffBlock.blockNumber}.`,
+          {
+            reasonCode: "HISTORY_CUTOFF_NOT_COVERED",
+            route,
+            cutoffBlockNumber: cutoffBlock.blockNumber,
+            completeFromBlockNumber: coverage?.completeFromBlockNumber ?? null,
+          }
         );
       }
       const versions = await collections.slotVersions.aggregate<{
@@ -594,6 +996,15 @@ export function createMongoCompetitionCreditRepository(
       const aliases = route === "uki"
         ? ["UKI_STAKING", "VESTING_VAULT"]
         : ["TOKEN_V2", "CUKIE_MASTER_NFT_VAULT"];
+      // Only TOKEN_V2 Transfer ownership is ancillary for the custodial NFT
+      // route. Metadata and unknown TOKEN_V2 events can change entitlement
+      // inputs and therefore remain in the blocking predicate.
+      const nftMode = route === "nft" ? ukiNftVaults.mode.cukieMaster : undefined;
+      const blockingEventFilter = creditSourceBlockingEventFilter({
+        route,
+        nftMode,
+        aliases,
+      });
       const expectedCursorIds = route === "uki"
         ? [
             "UKI_STAKING:Staked",
@@ -616,6 +1027,8 @@ export function createMongoCompetitionCreditRepository(
         cursors,
         deadLetters,
         pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
         incidents,
         rounds,
         stakingPositions,
@@ -648,13 +1061,10 @@ export function createMongoCompetitionCreditRepository(
         db
           .collection("chain_cursors")
           .find(
-            {
-              chain: "BSC",
-              contractAlias: { $in: aliases },
-            },
+            expectedBscCursorFilter(expectedCursorIds),
             options
           )
-          .limit(100)
+          .limit(expectedCursorIds.length + 1)
           .toArray(),
         db.collection("chain_dead_letters").countDocuments(
           {
@@ -665,26 +1075,23 @@ export function createMongoCompetitionCreditRepository(
         db.collection("chain_events").countDocuments(
           {
             contractAlias: { $in: aliases },
-            status: { $ne: "projected" },
+            status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
+          },
+          options
+        ),
+        db.collection("chain_dead_letters").countDocuments(
+          blockingEventFilter,
+          options
+        ),
+        db.collection("chain_events").countDocuments(
+          {
+            ...blockingEventFilter,
+            status: { $in: [...PENDING_CREDIT_SOURCE_EVENT_STATUSES] },
           },
           options
         ),
         db.collection("chain_integrity_incidents").countDocuments(
-          {
-            status: "open",
-            $or: [
-              { contractAlias: { $in: aliases } },
-              { route },
-              { scope: route },
-              {
-                chain: "BSC",
-                route: { $exists: false },
-                scope: { $exists: false },
-                contractAlias: { $exists: false },
-                type: { $regex: /canonical|economy|vesting|staking|nft/i },
-              },
-            ],
-          },
+          creditSourceChainIntegrityIncidentFilter({ route, aliases }),
           options
         ),
         db
@@ -957,6 +1364,15 @@ export function createMongoCompetitionCreditRepository(
           }
         : null;
       const sortedWarnings = [...warnings].sort(compareCreditText);
+      const healthClassification = classifyCreditSourceHealth({
+        route,
+        nftMode,
+        warnings: sortedWarnings,
+        deadLetters,
+        pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
+      });
       const cukieProjectionHash = stableCreditHash({
         positions: cukiePositions.map((position) => ({
           _id: position._id,
@@ -1000,6 +1416,9 @@ export function createMongoCompetitionCreditRepository(
         })),
         deadLetters,
         pendingEvents,
+        blockingDeadLetters,
+        blockingPendingEvents,
+        nftMode,
         incidents,
         sourceRuleVersions,
         rounds: rounds.map((round) => ({
@@ -1028,7 +1447,9 @@ export function createMongoCompetitionCreditRepository(
         warnings: sortedWarnings,
       });
       return {
-        healthy: sortedWarnings.length === 0,
+        // `warnings` intentionally retains ancillary TOKEN_V2 alarms. Only
+        // warnings outside that explicitly non-blocking set gate new cuts.
+        healthy: healthClassification.healthy,
         warnings: sortedWarnings,
         observedThrough,
         sourceRuleVersions,
@@ -1489,21 +1910,26 @@ export function createMongoCompetitionCreditRepository(
         .findOne({ _id: sessionId }, { ...options, projection: { _id: 1, status: 1 } }),
     findLedgerByIdempotencyKey: (idempotencyKey) =>
       collections.ledger.findOne({ idempotencyKey }, options),
-    async hasOpenCreditBlock(walletNormalized) {
+    async hasOpenCreditBlock(walletNormalized, cutoff) {
       const [incidents, accountBlocks] = await Promise.all([
-        collections.incidents.countDocuments(
-          {
-            status: "open",
-            $or: [{ walletNormalized: null }, { walletNormalized }],
-          },
-          options
-        ),
+        collections.incidents
+          .find(
+            {
+              status: "open",
+              $or: [{ walletNormalized: null }, { walletNormalized }],
+            },
+            options,
+          )
+          .toArray()
+          .then((items) => items.some((incident) =>
+            isBlockingCreditIncidentGlobally(incident, cutoff)
+          )),
         collections.accounts.countDocuments(
           { walletNormalized, blocked: true },
           options
         ),
       ]);
-      return incidents + accountBlocks > 0;
+      return incidents || accountBlocks > 0;
     },
     async listAvailableOwnLots(walletNormalized, periodId, now, limit, after) {
       const runIds = await openRunIdsAt(periodId, now);

@@ -5,6 +5,7 @@ import {
   safeCompetitionCreditPeriodScopeId,
   stableCreditHash,
 } from "@/lib/uki-economy/credits/rules";
+import { classifyCreditSourceHealth } from "@/lib/uki-economy/credits/source-health";
 import {
   createMemoryCompetitionCreditRunner,
   MemoryCompetitionCreditRepository,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/uki-economy/credits/testing";
 import type {
   CompetitionCreditRun,
+  CreditIntegrityIncident,
   CreditLot,
   CreditSnapshotSlot,
 } from "@/lib/uki-economy/credits/types";
@@ -44,12 +46,15 @@ function slot(overrides: Partial<CreditSnapshotSlot> = {}): CreditSnapshotSlot {
 async function openDailyRun(input: {
   repository: MemoryCompetitionCreditRepository;
   service: ReturnType<typeof createCompetitionCreditService>;
+  route?: "uki" | "nft";
   cutoff?: Date;
   now?: Date;
 }) {
+  const route = input.route ?? "uki";
   const cutoff = input.cutoff ?? CUTOFF;
   const now = input.now ?? new Date(cutoff.getTime() + 60_000);
   const run = await input.service.createDailyRun({
+    route,
     cutoff,
     expectedRuleVersion: "credits-v1",
     now,
@@ -146,7 +151,317 @@ function replaceWithFragmentedLots(input: {
   return lots;
 }
 
+function historicalSlotHistoryIncident(
+  run: CompetitionCreditRun,
+  overrides: Partial<CreditIntegrityIncident> = {},
+): CreditIntegrityIncident {
+  return {
+    _id: `incident:${run.runId}`,
+    incidentId: `incident:${run.runId}`,
+    type: "credit_reconciliation_mismatch",
+    status: "open",
+    runId: run.runId,
+    route: run.route,
+    periodId: run.period.periodId,
+    walletNormalized: null,
+    reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED"],
+    evidenceHash: "b".repeat(64),
+    containment: "pool_positions_excluded_by_reward_contributor_selector",
+    selectorCutoff: 0,
+    planHash: "a".repeat(64),
+    detectedAt: new Date("2026-07-10T12:01:00.000Z"),
+    updatedAt: new Date("2026-07-10T12:01:00.000Z"),
+    ...overrides,
+  };
+}
+
+function nftRepositoryForFlow() {
+  const repository = new MemoryCompetitionCreditRepository({
+    slots: [slot({ route: "nft", _id: "nft-slot-1" })],
+  });
+  const sourceHash = buildCreditSourceSlotsHash(repository.state.slots);
+  const watermark = testCreditSourceWatermark({
+    _id: "cukie-master-slots:nft",
+    route: "nft",
+    sourceHash,
+    slotCount: 1,
+  });
+  repository.state.watermark = watermark;
+  repository.state.sourceHealth = {
+    ...repository.state.sourceHealth,
+    observedThrough: watermark.observedThrough,
+    sourceRuleVersions: watermark.sourceRuleVersions,
+    evidenceHash: watermark.healthEvidenceHash,
+    canonicalSafeBlock: watermark.canonicalSafeBlock,
+    canonicalSafeBlockHash: watermark.canonicalSafeBlockHash,
+    checkedAt: watermark.updatedAt,
+  };
+  return repository;
+}
+
+function setNftSourceHealth(
+  repository: MemoryCompetitionCreditRepository,
+  input: {
+    warnings: string[];
+    deadLetters: number;
+    pendingEvents: number;
+    blockingDeadLetters: number;
+    blockingPendingEvents: number;
+  },
+) {
+  const classification = classifyCreditSourceHealth({
+    route: 'nft',
+    nftMode: 'custodial',
+    ...input,
+  });
+  repository.state.sourceHealth = {
+    ...repository.state.sourceHealth,
+    healthy: classification.healthy,
+    warnings: input.warnings,
+  };
+  return classification;
+}
+
+async function setupNftHistoricalIncident() {
+  const repository = nftRepositoryForFlow();
+  const service = createCompetitionCreditService(
+    createMemoryCompetitionCreditRunner(repository),
+  );
+  const first = await openDailyRun({ repository, service, route: "nft" });
+  repository.state.incidents.push(historicalSlotHistoryIncident(first));
+  const nextCutoff = new Date("2026-07-11T12:00:00.000Z");
+  repository.state.sourceHealth.observedThrough = nextCutoff;
+  await service.refreshSourceWatermark({
+    route: "nft",
+    expectedRuleVersion: "credits-v1",
+    now: new Date(nextCutoff.getTime() + 1_000),
+  });
+  return { repository, service, first, nextCutoff };
+}
+
 describe("competition credit grant -> pool -> reservation flow", () => {
+  it('grants 100 per slot every 30 minutes, expires only unused credits and preserves a real reservation across the cutoff', async () => {
+    const at = (seconds: number) => new Date(CUTOFF.getTime() + seconds * 1000);
+    const calendar = { version: 'cycle-v1' as const, chainId: 97 as const, cycleSeconds: 1800 as const, anchorAt: CUTOFF.toISOString() };
+    const rule = testCompetitionCreditRule({ calendar, expectedBscChainId: 97, activeFrom: CUTOFF, cutoffHourUtc: 12, settlementHourUtc: 12 });
+    const sourceSlot = slot();
+    const repository = new MemoryCompetitionCreditRepository({
+      rule,
+      slots: [sourceSlot],
+      watermark: testCreditSourceWatermark({ observedThrough: CUTOFF, updatedAt: CUTOFF, sourceHash: buildCreditSourceSlotsHash([sourceSlot]), slotCount: 1 }),
+    });
+    const service = createCompetitionCreditService(createMemoryCompetitionCreditRunner(repository));
+    const first = await openDailyRun({ repository, service, cutoff: CUTOFF, now: at(60) });
+    expect(first.expectedGrantCredits).toBe(100);
+    expect(first.period.calendar).toEqual(calendar);
+    expect(first.period.nextCutoff).toEqual(at(1800));
+    const spent = await service.reserve({ walletAddress: WALLET, sessionId: 'fast-spent', costCode: 'treasure-hunt:start', idempotencyKey: 'fast-spent-reserve', now: at(120) });
+    await service.consumeReservation({ reservationId: spent.reservationId, idempotencyKey: 'fast-spent-consume', committedAt: at(121), now: at(122) });
+    expect(repository.state.ownLots[0]).toMatchObject({ availableCredits: 90, spentCredits: 10 });
+    const crossing = await service.reserve({ walletAddress: WALLET, sessionId: 'fast-cross-cutoff', costCode: 'treasure-hunt:start', idempotencyKey: 'fast-cross-reserve', now: at(1799) });
+    expect(crossing.periodId).toBe(first.period.periodId);
+    expect(crossing.expiresAt).toEqual(at(2399));
+    await expect(service.expireAvailableLotsBatch({ now: at(1799) })).resolves.toMatchObject({ expired: 0 });
+    await expect(service.expireAvailableLotsBatch({ now: at(1800) })).resolves.toMatchObject({ expired: 1 });
+    expect(repository.state.ownLots[0]).toMatchObject({ availableCredits: 0, reservedCredits: 10, spentCredits: 10, expiredCredits: 80, expiresAt: at(1800) });
+    await expect(service.expireAvailableLotsBatch({ now: at(1800) })).resolves.toMatchObject({ expired: 0 });
+
+    repository.state.sourceHealth.observedThrough = at(1800);
+    repository.state.sourceHealth.checkedAt = at(1800);
+    await service.refreshSourceWatermark({ route: 'uki', expectedRuleVersion: rule.version, now: at(1800) });
+    const second = await openDailyRun({ repository, service, cutoff: at(1800), now: at(1801) });
+    expect(second.expectedGrantCredits).toBe(100);
+    expect(second.period.periodId).not.toBe(first.period.periodId);
+    expect(second.period.nextCutoff).toEqual(at(3600));
+    const consumed = await service.consumeReservation({ reservationId: crossing.reservationId, idempotencyKey: 'fast-cross-consume', committedAt: at(1860), now: at(1861) });
+    expect(consumed).toMatchObject({ status: 'consumed', periodId: first.period.periodId });
+    expect(repository.state.ownLots.find((lot) => lot.runId === first.runId)).toMatchObject({ availableCredits: 0, reservedCredits: 0, spentCredits: 20, expiredCredits: 80 });
+    expect(repository.state.ownLots.find((lot) => lot.runId === second.runId)).toMatchObject({ availableCredits: 100, reservedCredits: 0, spentCredits: 0, expiredCredits: 0 });
+    await expect(service.createDailyRun({ cutoff: at(1800), expectedRuleVersion: rule.version, now: at(1862) })).resolves.toMatchObject({ runId: second.runId, status: 'open' });
+    await expect(service.consumeReservation({ reservationId: crossing.reservationId, idempotencyKey: 'fast-cross-consume', committedAt: at(1860), now: at(1863) })).resolves.toMatchObject({ status: 'consumed' });
+    expect(repository.state.runs).toHaveLength(2);
+    expect(repository.state.ownLots).toHaveLength(2);
+    expect(repository.state.ledger.filter((entry) => entry.operation === 'grant')).toHaveLength(2);
+    expect(repository.state.ledger.filter((entry) => entry.operation === 'expire')).toHaveLength(1);
+    expect(new Set(repository.state.ledger.map((entry) => entry._id)).size).toBe(repository.state.ledger.length);
+    expect(repository.state.incidents).toEqual([]);
+  });
+
+  it('opens a new NFT cut while retaining an ancillary TOKEN_V2 alarm', async () => {
+    const repository = nftRepositoryForFlow();
+    // The ownership alarm is intentionally visible but does not invalidate
+    // the custodial Master slot source used for this new cut.
+    setNftSourceHealth(repository, {
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN', 'CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 3,
+      pendingEvents: 3,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+
+    await expect(service.refreshSourceWatermark({
+      route: 'nft',
+      expectedRuleVersion: 'credits-v1',
+      now: new Date(CUTOFF.getTime() + 1_000),
+    })).resolves.toMatchObject({
+      route: 'nft',
+      status: 'healthy',
+    });
+    const run = await service.createDailyRun({
+      route: 'nft',
+      cutoff: CUTOFF,
+      expectedRuleVersion: 'credits-v1',
+      now: new Date(CUTOFF.getTime() + 2_000),
+    });
+
+    expect(run.status).toBe('snapshotted');
+    expect(repository.state.sourceHealth.warnings).toEqual(expect.arrayContaining([
+      'CHAIN_DEAD_LETTERS_OPEN',
+      'CHAIN_EVENTS_NOT_PROJECTED',
+    ]));
+  });
+
+  it('keeps a Cukie Master vault projection alarm blocking the NFT cut', async () => {
+    const repository = nftRepositoryForFlow();
+    setNftSourceHealth(repository, {
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 0,
+      pendingEvents: 1,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 1,
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+
+    await expect(service.refreshSourceWatermark({
+      route: 'nft',
+      expectedRuleVersion: 'credits-v1',
+      now: new Date(CUTOFF.getTime() + 1_000),
+    })).rejects.toMatchObject({
+      details: expect.objectContaining({
+        reasonCode: 'SOURCE_UNHEALTHY',
+        warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      }),
+    });
+  });
+
+  it("grants every eligible UKI and NFT slot exactly once for a 5+5 Cukie Master", async () => {
+    const stagingCutoff = new Date("2026-07-10T14:00:00.000Z");
+    const maximumWalletSlots = (["uki", "nft"] as const).flatMap((route) =>
+      Array.from({ length: 5 }, (_, index) =>
+        slot({
+          _id: `${route}-max-wallet-${index + 1}`,
+          walletNormalized: WALLET,
+          route,
+          ordinal: index + 1,
+        })
+      )
+    );
+    const secondWalletSlots = (["uki", "nft"] as const).map((route) =>
+      slot({
+        _id: `${route}-second-wallet-1`,
+        walletNormalized: BORROWER,
+        route,
+        ordinal: 1,
+      })
+    );
+    const repository = new MemoryCompetitionCreditRepository({
+      rule: testCompetitionCreditRule({
+        cutoffHourUtc: 14,
+        settlementHourUtc: 16,
+        expectedBscChainId: 97,
+      }),
+      slots: [...maximumWalletSlots, ...secondWalletSlots],
+    });
+    repository.state.sourceHealth.observedThrough = stagingCutoff;
+    repository.state.sourceHealth.checkedAt = stagingCutoff;
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+
+    const openedRuns: CompetitionCreditRun[] = [];
+    for (const [index, route] of (["uki", "nft"] as const).entries()) {
+      const refreshAt = new Date(stagingCutoff.getTime() + index * 10_000);
+      await service.refreshSourceWatermark({
+        route,
+        expectedRuleVersion: "credits-v1",
+        now: refreshAt,
+      });
+      const run = await openDailyRun({
+        repository,
+        service,
+        route,
+        cutoff: stagingCutoff,
+        now: new Date(refreshAt.getTime() + 1_000),
+      });
+      expect(run).toMatchObject({
+        route,
+        expectedItemCount: 6,
+        expectedGrantCredits: 600,
+        expectedOwnCredits: 600,
+        expectedPoolCredits: 0,
+      });
+      openedRuns.push(run);
+    }
+
+    expect(repository.state.runs).toHaveLength(2);
+    expect(repository.state.items).toHaveLength(12);
+    expect(repository.state.ownLots).toHaveLength(12);
+    expect(
+      repository.state.ledger.filter((entry) => entry.operation === "grant")
+    ).toHaveLength(12);
+    expect(
+      new Set(repository.state.ledger.map((entry) => entry._id)).size
+    ).toBe(repository.state.ledger.length);
+    expect(repository.state.accounts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          walletNormalized: WALLET.toLowerCase(),
+          route: "uki",
+          grantedCredits: 500,
+          availableCredits: 500,
+        }),
+        expect.objectContaining({
+          walletNormalized: WALLET.toLowerCase(),
+          route: "nft",
+          grantedCredits: 500,
+          availableCredits: 500,
+        }),
+        expect.objectContaining({
+          walletNormalized: BORROWER.toLowerCase(),
+          route: "uki",
+          grantedCredits: 100,
+          availableCredits: 100,
+        }),
+        expect.objectContaining({
+          walletNormalized: BORROWER.toLowerCase(),
+          route: "nft",
+          grantedCredits: 100,
+          availableCredits: 100,
+        }),
+      ])
+    );
+
+    for (const run of openedRuns) {
+      const replay = await service.createDailyRun({
+        route: run.route,
+        cutoff: stagingCutoff,
+        expectedRuleVersion: "credits-v1",
+        now: new Date(stagingCutoff.getTime() + 60_000),
+      });
+      expect(replay.runId).toBe(run.runId);
+    }
+    expect(repository.state.runs).toHaveLength(2);
+    expect(repository.state.items).toHaveLength(12);
+    expect(
+      repository.state.ledger.filter((entry) => entry.operation === "grant")
+    ).toHaveLength(12);
+  });
+
   it("does not replay a rule marked unrecoverable by the schema migration", async () => {
     const legacyRule = testCompetitionCreditRule({
       _id: "competition-credits:legacy",
@@ -174,6 +489,62 @@ describe("competition credit grant -> pool -> reservation flow", () => {
       rule: currentRule,
       now: new Date("2026-08-20T18:00:00.000Z"),
     })).resolves.toBeNull();
+  });
+
+  it.each([
+    ["blocked", "blocked" as const],
+    ["snapshotted", "snapshotted" as const],
+    ["open", "open" as const],
+  ])("starts the current accelerated period instead of replaying a stale %s run", async (_label, status) => {
+    const calendar = {
+      version: "cycle-v1" as const,
+      chainId: 97 as const,
+      cycleSeconds: 1800 as const,
+      anchorAt: CUTOFF.toISOString(),
+    };
+    const rule = testCompetitionCreditRule({
+      calendar,
+      expectedBscChainId: 97,
+      activeFrom: CUTOFF,
+    });
+    const repository = new MemoryCompetitionCreditRepository({ rule, slots: [] });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    await openDailyRun({
+      repository,
+      service,
+      cutoff: CUTOFF,
+      now: new Date(CUTOFF.getTime() + 60_000),
+    });
+    repository.state.runs[0].status = status;
+
+    const currentPeriod = await service.findOldestPendingRoutePeriod({
+      route: "uki",
+      rule,
+      now: new Date(CUTOFF.getTime() + 3_900_000),
+    });
+
+    expect(currentPeriod?.cutoff).toEqual(
+      new Date(CUTOFF.getTime() + 3_600_000),
+    );
+  });
+
+  it("keeps production daily catch-up when the rule has no accelerated calendar", async () => {
+    const repository = new MemoryCompetitionCreditRepository({ slots: [] });
+    const rule = testCompetitionCreditRule();
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    await openDailyRun({ repository, service });
+
+    const pending = await service.findOldestPendingRoutePeriod({
+      route: "uki",
+      rule,
+      now: new Date("2026-07-12T16:00:00.000Z"),
+    });
+
+    expect(pending?.cutoff).toEqual(new Date("2026-07-11T12:00:00.000Z"));
   });
 
   it("includes a pre-cutoff chain event even when its slot projection is processed afterwards", async () => {
@@ -618,6 +989,75 @@ describe("competition credit grant -> pool -> reservation flow", () => {
     ).toEqual([]);
   });
 
+  it("expires own and pooled unused credits exactly once at the same daily cutoff", async () => {
+    const repository = new MemoryCompetitionCreditRepository({
+      slots: [slot()],
+    });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+    await service.configurePool({
+      walletAddress: WALLET,
+      slotId: "uki-slot-1",
+      poolCreditsPerSlot: 40,
+      idempotencyKey: "pool-config-daily-expiry",
+      now: new Date("2026-07-10T11:00:00.000Z"),
+    });
+    const run = await openDailyRun({ repository, service });
+
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 60,
+      expiredCredits: 0,
+    });
+    expect(repository.state.poolLots[0]).toMatchObject({
+      availableCredits: 40,
+      expiredCredits: 0,
+    });
+
+    const cutoff = new Date("2026-07-11T12:00:00.000Z");
+    await expect(service.expireAvailableLotsBatch({ now: cutoff })).resolves.toEqual({
+      scanned: 2,
+      expired: 2,
+      skipped: 0,
+    });
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 0,
+      expiredCredits: 60,
+    });
+    expect(repository.state.poolLots[0]).toMatchObject({
+      availableCredits: 0,
+      expiredCredits: 40,
+    });
+    expect(repository.state.accounts).toContainEqual(expect.objectContaining({
+      walletNormalized: WALLET.toLowerCase(),
+      availableCredits: 0,
+      expiredCredits: 60,
+      poolDepositedCredits: 40,
+    }));
+    expect(repository.state.poolPeriods).toContainEqual(expect.objectContaining({
+      availableCredits: 0,
+      expiredCredits: 40,
+      contributedCredits: 40,
+    }));
+    expect(
+      repository.state.ledger
+        .filter((entry) => entry.operation === "expire")
+        .map((entry) => ({ bucket: entry.bucket, amountCredits: entry.amountCredits }))
+    ).toEqual(expect.arrayContaining([
+      { bucket: "own", amountCredits: 60 },
+      { bucket: "pool", amountCredits: 40 },
+    ]));
+
+    await expect(service.expireAvailableLotsBatch({
+      now: new Date(cutoff.getTime() + 1_000),
+    })).resolves.toEqual({ scanned: 0, expired: 0, skipped: 0 });
+    expect(
+      reconcileCompetitionCreditSnapshot(
+        (await repository.readReconciliationSnapshot(run.runId))!
+      ).reasonCodes
+    ).toEqual([]);
+  });
+
   it("rolls back the complete transaction when persistence fails after work", async () => {
     const repository = new MemoryCompetitionCreditRepository({
       slots: [slot()],
@@ -952,6 +1392,71 @@ describe("competition credit grant -> pool -> reservation flow", () => {
       "active-exact",
       "grace-valid",
     ]);
+  });
+
+  it("excludes a withdrawal immediately before cutoff while preserving prior credits", async () => {
+    const active = slot({
+      _id: "nft-slot-withdrawn",
+      route: "nft",
+      sourceBlockNumber: 998,
+      sourceBlockHash: `0x${"d".repeat(64)}`,
+      sourceBlockTimestamp: new Date(CUTOFF.getTime() - 2_000),
+    });
+    const repository = new MemoryCompetitionCreditRepository({ slots: [active] });
+    const nftWatermark = testCreditSourceWatermark({
+      _id: "cukie-master-slots:nft",
+      route: "nft",
+      observedThrough: new Date(CUTOFF.getTime() + 30 * 60 * 1_000),
+      updatedAt: new Date(CUTOFF.getTime() + 30 * 60 * 1_000),
+      sourceRuleVersions: { uki: "cukie-master-v1", nft: "cukie-master-v1" },
+      sourceHash: buildCreditSourceSlotsHash([active]),
+      slotCount: 1,
+    });
+    repository.state.watermark = nftWatermark;
+    repository.state.sourceHealth.observedThrough = nftWatermark.observedThrough;
+    repository.state.sourceHealth.sourceRuleVersions = nftWatermark.sourceRuleVersions;
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository)
+    );
+    const first = await openDailyRun({ repository, service, route: "nft" });
+    expect(first.expectedItemCount).toBe(1);
+    const priorLots = repository.state.ownLots.length + repository.state.poolLots.length;
+
+    const withdrawn = {
+      ...active,
+      status: "inactive" as const,
+      sourceBlockNumber: 999,
+      sourceBlockHash: `0x${"e".repeat(64)}`,
+      sourceBlockTimestamp: new Date(CUTOFF.getTime() - 1_000),
+      inactiveAt: new Date(CUTOFF.getTime() - 1_000),
+      revision: active.revision + 1,
+    };
+    repository.state.slots[0] = withdrawn;
+    repository.state.slotVersions.push({
+      _id: `${withdrawn._id}:${withdrawn.revision}`,
+      slotId: withdrawn._id,
+      route: "nft",
+      effectiveBlockNumber: 999,
+      effectiveBlockHash: withdrawn.sourceBlockHash!,
+      effectiveBlockTimestamp: withdrawn.sourceBlockTimestamp!,
+      observedAt: withdrawn.updatedAt,
+      slot: withdrawn,
+    });
+    const nextCutoff = new Date(CUTOFF.getTime() + 24 * 60 * 60 * 1_000);
+    repository.state.sourceHealth.observedThrough = nextCutoff;
+    await service.refreshSourceWatermark({
+      route: "nft",
+      expectedRuleVersion: "credits-v1",
+      now: nextCutoff,
+    });
+    const second = await service.createDailyRun({
+      route: "nft",
+      cutoff: nextCutoff,
+      expectedRuleVersion: "credits-v1",
+      now: new Date(nextCutoff.getTime() + 1_000),
+    });
+    expect(second.expectedItemCount).toBe(0);
+    expect(repository.state.ownLots.length + repository.state.poolLots.length).toBe(priorLots);
   });
 
   it("binds pool config to eligibilityEpoch and restarts the 24h maturity gate", async () => {
@@ -1400,6 +1905,157 @@ describe("competition credit grant -> pool -> reservation flow", () => {
         now: new Date("2026-07-10T11:00:00.000Z"),
       })
     ).rejects.toThrow(/solapadas/);
+  });
+
+  it("allows a later NFT snapshot while keeping a contained correction open", async () => {
+    const { repository, service, nextCutoff } = await setupNftHistoricalIncident();
+
+    const next = await openDailyRun({
+      repository,
+      service,
+      route: "nft",
+      cutoff: nextCutoff,
+      now: new Date(nextCutoff.getTime() + 60_000),
+    });
+
+    expect(next.period.cutoff).toEqual(nextCutoff);
+    expect(repository.state.incidents).toEqual([
+      expect.objectContaining({
+        status: "open",
+        reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED"],
+        containment: "pool_positions_excluded_by_reward_contributor_selector",
+      }),
+    ]);
+  });
+
+  it("allows one reservation with two contained historical NFT incidents and keeps both open", async () => {
+    const { repository, service, first, nextCutoff } = await setupNftHistoricalIncident();
+    await openDailyRun({
+      repository,
+      service,
+      route: "nft",
+      cutoff: nextCutoff,
+      now: new Date(nextCutoff.getTime() + 60_000),
+    });
+    repository.state.incidents.push(
+      historicalSlotHistoryIncident(first, {
+        _id: "incident:nft-historical-second",
+        incidentId: "incident:nft-historical-second",
+      }),
+    );
+
+    const request = {
+      walletAddress: WALLET,
+      sessionId: "nft-historical-reservation",
+      costCode: "treasure-hunt:start",
+      idempotencyKey: "nft-historical-reservation-v1",
+      now: new Date(nextCutoff.getTime() + 5 * 60_000),
+    };
+    const reservation = await service.reserve(request);
+    const replay = await service.reserve({
+      ...request,
+      now: new Date(request.now.getTime() + 60_000),
+    });
+
+    expect(replay.reservationId).toBe(reservation.reservationId);
+    expect(repository.state.reservations).toHaveLength(1);
+    expect(repository.state.incidents).toHaveLength(2);
+    expect(repository.state.incidents.every((incident) => incident.status === "open")).toBe(true);
+  });
+
+  it.each([
+    ["same cutoff", {}],
+    ["future cutoff", { periodId: `${"credits-v1"}:${"a".repeat(64)}:2026-07-12T12:00:00.000Z` }],
+    ["malformed period", { periodId: "malformed-period" }],
+    ["extra reason", { reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED", "RUNTIME_RUN_INVALID"] }],
+    ["missing containment", { containment: undefined }],
+    ["invalid hash", { evidenceHash: "invalid" }],
+    ["unknown route", { route: "legacy" as never }],
+  ])("blocks reservation for a %s incident", async (_label, overrides) => {
+    const repository = nftRepositoryForFlow();
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    const run = await openDailyRun({ repository, service, route: "nft" });
+    repository.state.incidents.push(
+      historicalSlotHistoryIncident(run, overrides),
+    );
+
+    await expect(
+      service.reserve({
+        walletAddress: WALLET,
+        sessionId: `blocked-${_label.replace(/ /g, "-")}`,
+        costCode: "treasure-hunt:start",
+        idempotencyKey: `blocked-${_label.replace(/ /g, "-")}`,
+        now: new Date("2026-07-10T12:05:00.000Z"),
+      }),
+    ).rejects.toThrow(/wallet o el ledger de creditos estan bloqueados/);
+    expect(repository.state.reservations).toHaveLength(0);
+  });
+
+  it("blocks reservation when an account from another period is blocked", async () => {
+    const repository = new MemoryCompetitionCreditRepository({ slots: [slot()] });
+    const service = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    await openDailyRun({ repository, service });
+    const currentAccount = repository.state.accounts[0];
+    repository.state.accounts.push({
+      ...currentAccount,
+      _id: `${currentAccount._id}:historical`,
+      periodId: `${currentAccount.periodId}:historical`,
+      blocked: true,
+    });
+
+    await expect(
+      service.reserve({
+        walletAddress: WALLET,
+        sessionId: "blocked-account-other-period",
+        costCode: "treasure-hunt:start",
+        idempotencyKey: "blocked-account-other-period",
+        now: new Date("2026-07-10T12:05:00.000Z"),
+      }),
+    ).rejects.toThrow(/wallet o el ledger de creditos estan bloqueados/);
+    expect(repository.state.reservations).toHaveLength(0);
+  });
+
+  it.each([
+    ["normal reason", { reasonCodes: ["RUNTIME_RUN_INVALID"] }],
+    ["mixed reasons", { reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED", "RUNTIME_RUN_INVALID"] }],
+    ["duplicated reason", { reasonCodes: ["SOURCE_SLOT_HISTORY_CORRECTED", "SOURCE_SLOT_HISTORY_CORRECTED"] }],
+    ["missing containment", { containment: undefined }],
+    ["wrong containment", { containment: "pool_positions_excluded_by_reward_contributor_selector:other" }],
+    ["nonzero selector cutoff", { selectorCutoff: 1 }],
+    ["invalid plan hash", { planHash: "invalid" }],
+    ["invalid evidence hash", { evidenceHash: "invalid" }],
+    ["invalid run id", { runId: "invalid-run-id" }],
+    ["invalid period id", { periodId: "malformed-period" }],
+  ])("keeps blocking later NFT snapshots for a %s incident", async (_label, overrides) => {
+    const { repository, service, first, nextCutoff } = await setupNftHistoricalIncident();
+    repository.state.incidents[0] = historicalSlotHistoryIncident(first, overrides);
+    await expect(
+      service.createDailyRun({
+        route: "nft",
+        cutoff: nextCutoff,
+        expectedRuleVersion: "credits-v1",
+        now: new Date(nextCutoff.getTime() + 60_000),
+      }),
+    ).rejects.toThrow(/incidentes de integridad/);
+  });
+
+  it("does not exempt a contained correction for its own or an earlier cutoff", async () => {
+    const { repository, first } = await setupNftHistoricalIncident();
+    const rule = (await repository.findRuleAt(CUTOFF))!;
+    await expect(repository.readSnapshotGate(rule, CUTOFF, "nft")).resolves.toMatchObject({
+      openIntegrityIncidents: 1,
+    });
+    await expect(repository.readSnapshotGate(
+      rule,
+      new Date("2026-07-09T12:00:00.000Z"),
+      "nft",
+    )).resolves.toMatchObject({ openIntegrityIncidents: 1 });
+    expect(repository.state.incidents[0].periodId).toBe(first.period.periodId);
+    expect(repository.state.incidents[0].status).toBe("open");
   });
 
   it("turns malformed Mongo runtime values into a blocking incident instead of throwing", async () => {

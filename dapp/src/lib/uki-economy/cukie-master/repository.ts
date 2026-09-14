@@ -10,6 +10,7 @@ import {
 import { ukiNftVaults } from '@/lib/contracts/uki-nft-vaults';
 
 import { DomainConflictError } from '../errors';
+import { creditSourceBlockingEventFilter } from '../credits/source-health';
 import type { CukieMasterRoute } from '../rules';
 import {
   CUKIE_MASTER_PRESALE_VESTING_SCHEDULE_ID,
@@ -111,6 +112,10 @@ function firstEnvironmentValue(...names: string[]) {
     if (value) return value;
   }
   return undefined;
+}
+
+function exactAddressRegex(address: string) {
+  return new RegExp(`^${address}$`, 'i');
 }
 
 function expectedContractConfig(input: {
@@ -461,14 +466,27 @@ export function pendingNftEventFilter(input: {
       $or: [
         {
           contractAlias: 'TOKEN_V2',
+          eventName: 'Transfer',
           $or: [
             { 'normalized.fromNormalized': wallet },
             { 'normalized.toNormalized': wallet },
           ],
         },
+        // Metadata has no wallet fields; any pending TOKEN_V2 event that is
+        // not a Transfer remains globally blocking for entitlement reads.
+        {
+          contractAlias: 'TOKEN_V2',
+          eventName: { $ne: 'Transfer' },
+        },
         {
           contractAlias: 'CUKIE_MASTER_NFT_VAULT',
-          'normalized.beneficiaryNormalized': wallet,
+          $or: [
+            { 'normalized.beneficiaryNormalized': wallet },
+            // A pending vault event without a decoded beneficiary cannot be
+            // proven unrelated to this wallet, so keep it blocking.
+            { 'normalized.beneficiaryNormalized': { $exists: false } },
+            { 'normalized.beneficiaryNormalized': null },
+          ],
         },
       ],
     };
@@ -514,6 +532,19 @@ export const EXPECTED_CUSTODIAL_NFT_CURSOR_IDS = [
   'CUKIE_MASTER_NFT_VAULT:CukieMasterWithdrawn',
   'CUKIE_MASTER_NFT_VAULT:CukieMasterUntrackedERC721Recovered',
 ] as const;
+
+export function expectedBscCursorFilter(expectedCursorIds: readonly string[]) {
+  return {
+    chain: 'BSC',
+    $or: expectedCursorIds.map((cursorId) => {
+      const separator = cursorId.indexOf(':');
+      return {
+        contractAlias: cursorId.slice(0, separator),
+        eventName: cursorId.slice(separator + 1),
+      };
+    }),
+  };
+}
 
 export function cukieMasterNftHealthScope(mode: 'legacy' | 'custodial' | 'invalid') {
   if (mode === 'custodial') {
@@ -644,6 +675,8 @@ export interface CukieMasterRepository {
   findEvent(idempotencyKey: string): Promise<CukieMasterPositionEvent | null>;
   insertEvent(event: CukieMasterPositionEvent): Promise<void>;
   findProjectedChainEvidence(eventId: string): Promise<CukieMasterChainEvidence | null>;
+  /** Latest projected custodial event affecting this wallet's NFT entitlement. */
+  findLatestNftChainEvidence?(walletNormalized: string): Promise<CukieMasterChainEvidence | null>;
   findPresaleParticipant(walletNormalized: string): Promise<PresaleParticipantRawDocument | null>;
   findUkiStakingPosition(walletNormalized: string): Promise<UkiStakingPositionRawDocument | null>;
   findPresaleVestingPosition(
@@ -835,6 +868,64 @@ export function createMongoCukieMasterRepository(
         blockTimestamp,
       };
     },
+    async findLatestNftChainEvidence(walletNormalized) {
+      const expectedChainId = expectedBscChainId();
+      const expectedVault = expectedChainId
+        ? expectedNftContractConfigs(expectedChainId).CUKIE_MASTER_NFT_VAULT?.contractAddress
+        : undefined;
+      if (!expectedChainId || !expectedVault) return null;
+      const checkpoint = await db.collection<{
+        _id: string;
+        safeBlockNumber?: unknown;
+        safeBlockHash?: unknown;
+        checkedAt?: unknown;
+      }>('chain_bsc_checkpoints').findOne({ _id: 'canonical-safe' }, options);
+      if (
+        !checkpoint
+        || !Number.isSafeInteger(checkpoint.safeBlockNumber)
+        || Number(checkpoint.safeBlockNumber) < 0
+        || typeof checkpoint.safeBlockHash !== 'string'
+        || !/^0x[0-9a-f]{64}$/i.test(checkpoint.safeBlockHash)
+        || !(checkpoint.checkedAt instanceof Date)
+        || Number.isNaN(checkpoint.checkedAt.getTime())
+      ) return null;
+      const filter: Record<string, unknown> = {
+        chain: 'BSC',
+        chainId: expectedChainId,
+        status: 'projected',
+        contractAlias: 'CUKIE_MASTER_NFT_VAULT',
+        eventName: { $in: ['CukieMasterDeposited', 'CukieMasterWithdrawn'] },
+        'normalized.beneficiaryNormalized': walletNormalized,
+        blockNumber: { $lte: Number(checkpoint.safeBlockNumber) },
+      };
+      filter.contractAddress = exactAddressRegex(expectedVault);
+      const event = await db.collection<{
+        _id: string;
+        blockNumber?: unknown;
+        blockHash?: unknown;
+        timestampMs?: unknown;
+      }>('chain_events').findOne(
+        filter,
+        { ...options, sort: { blockNumber: -1, logIndex: -1, _id: -1 } },
+      );
+      if (
+        !event
+        || !Number.isSafeInteger(event.blockNumber)
+        || Number(event.blockNumber) < 0
+        || typeof event.blockHash !== 'string'
+        || !/^0x[0-9a-f]{64}$/i.test(event.blockHash)
+        || !Number.isSafeInteger(event.timestampMs)
+        || Number(event.timestampMs) < 0
+      ) return null;
+      const blockTimestamp = new Date(Number(event.timestampMs));
+      if (Number.isNaN(blockTimestamp.getTime())) return null;
+      return {
+        eventId: event._id,
+        blockNumber: Number(event.blockNumber),
+        blockHash: event.blockHash.toLowerCase(),
+        blockTimestamp,
+      };
+    },
     findPresaleParticipant: (walletNormalized) => db
       .collection<PresaleParticipantRawDocument>('presale_participants')
       .findOne({ normalizedWalletAddress: walletNormalized }, options),
@@ -877,10 +968,10 @@ export function createMongoCukieMasterRepository(
         contractDeploymentBlock?: unknown;
         contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
-      }>('chain_cursors').find({
-          chain: 'BSC',
-          contractAlias: { $in: aliases },
-        }, { ...options, maxTimeMS: 2_000 }).limit(EXPECTED_UKI_CURSOR_IDS.length + 1).toArray();
+      }>('chain_cursors').find(
+        expectedBscCursorFilter(EXPECTED_UKI_CURSOR_IDS),
+        { ...options, maxTimeMS: 2_000 },
+      ).limit(EXPECTED_UKI_CURSOR_IDS.length + 1).toArray();
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
@@ -990,6 +1081,14 @@ export function createMongoCukieMasterRepository(
       const nftMode = ukiNftVaults.mode.cukieMaster;
       const scope = cukieMasterNftHealthScope(nftMode);
       const aliases = [...scope.aliases];
+      // In custodial mode Cukie Master slots are driven by vault events; only
+      // TOKEN_V2 Transfer ownership alarms are ancillary. Metadata and unknown
+      // TOKEN_V2 events can change entitlement inputs and remain blocking.
+      const blockingEventFilter = creditSourceBlockingEventFilter({
+        route: 'nft',
+        nftMode,
+        aliases,
+      });
       const chainId = expectedBscChainId();
       const expectedConfigs: Record<string, ExpectedIndexerContractConfig | undefined> = chainId
         ? expectedNftContractConfigs(chainId)
@@ -1020,12 +1119,15 @@ export function createMongoCukieMasterRepository(
         contractDeploymentBlock?: unknown;
         contractDeploymentTxHash?: unknown;
         contractConfigHash?: unknown;
-      }>('chain_cursors').find({
-        chain: 'BSC',
-        contractAlias: { $in: aliases },
-      }, { ...options, maxTimeMS: 2_000 }).limit(scope.cursorIds.length + 1).toArray();
+      }>('chain_cursors').find(
+        expectedBscCursorFilter(scope.cursorIds),
+        { ...options, maxTimeMS: 2_000 },
+      ).limit(scope.cursorIds.length + 1).toArray();
       const deadLetter = await db.collection('chain_dead_letters').findOne({
         contractAlias: { $in: aliases },
+      }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const blockingDeadLetter = await db.collection('chain_dead_letters').findOne({
+        ...blockingEventFilter,
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
       const legacyDeadLetterEvent = deadLetter ? null : await db.collection('chain_events').findOne({
         chain: 'BSC',
@@ -1033,10 +1135,47 @@ export function createMongoCukieMasterRepository(
         status: 'failed',
         attempts: { $gte: 5 },
       }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
+      const blockingLegacyDeadLetterEvent = blockingDeadLetter ? null : await db.collection('chain_events').findOne({
+        chain: 'BSC',
+        ...blockingEventFilter,
+        status: 'failed',
+        attempts: { $gte: 5 },
+      }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 });
       const pendingEvent = await db.collection('chain_events').findOne(
         pendingNftEventFilter({ aliases, mode: nftMode, walletNormalized }),
         { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 },
       );
+      const blockingPendingEvent = nftMode === 'custodial'
+        ? await db.collection('chain_events').findOne({
+            chain: 'BSC',
+            status: { $in: [...PENDING_CHAIN_EVENT_STATUSES] },
+            ...(walletNormalized
+              ? {
+                  $and: [
+                    blockingEventFilter,
+                    {
+                      $or: [
+                        // Metadata carries no beneficiary/from/to field; a
+                        // pending metadata event therefore blocks every
+                        // wallet's entitlement read.
+                        { contractAlias: 'TOKEN_V2' },
+                        {
+                          contractAlias: 'CUKIE_MASTER_NFT_VAULT',
+                          $or: [
+                            { 'normalized.beneficiaryNormalized': walletNormalized },
+                            // An event without a decoded beneficiary cannot
+                            // be proven unrelated to this wallet.
+                            { 'normalized.beneficiaryNormalized': { $exists: false } },
+                            { 'normalized.beneficiaryNormalized': null },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                }
+              : blockingEventFilter),
+          }, { ...options, projection: { _id: 1 }, maxTimeMS: 2_000 })
+        : pendingEvent;
       const commonCanonicalIncident = await db.collection('chain_integrity_incidents')
         .findOne({
           status: 'open',
@@ -1106,7 +1245,13 @@ export function createMongoCukieMasterRepository(
       if (commonCanonicalIncident) {
         warnings.push('Existe un incidente canonico BSC que afecta al pipeline NFT.');
       }
-      return { healthy: warnings.length === 0, warnings, checkedAt };
+      const blockingWarnings = warnings.filter((warning) => (
+        (warning !== 'Existen dead letters del pipeline NFT.'
+          || Boolean(blockingDeadLetter || blockingLegacyDeadLetterEvent))
+        && (warning !== 'Existen eventos NFT pendientes de proyeccion.'
+          || Boolean(blockingPendingEvent))
+      ));
+      return { healthy: blockingWarnings.length === 0, warnings, checkedAt };
     },
     getNftEntitlement: (walletAddress, now) => (
       ukiNftVaults.mode.cukieMaster === 'custodial'

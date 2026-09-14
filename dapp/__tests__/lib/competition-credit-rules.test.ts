@@ -3,12 +3,17 @@ import {
   buildCompetitionCreditRuleConfigHash,
   buildCompetitionCreditPeriod,
   computePoolConfigEffectiveCutoff,
+  firstEligibleCreditCutoff,
   stableCreditHash,
   validPoolCreditsPerSlot,
 } from "@/lib/uki-economy/credits/rules";
 import {
   buildCreditSourceHealthEvidenceHash,
+  classifyCreditSourceHealth,
+  creditSourceBlockingEventFilter,
+  creditSourceChainIntegrityIncidentFilter,
   creditSourceCursorIsHealthy,
+  isAncillaryNftCreditEvent,
 } from "@/lib/uki-economy/credits/source-health";
 import { testCompetitionCreditRule } from "@/lib/uki-economy/credits/testing";
 
@@ -43,6 +48,26 @@ describe("competition credit rules", () => {
         rule
       )
     ).toEqual(new Date("2026-07-11T12:00:00.000Z"));
+  });
+
+  it("computes the first inclusive eligible cutoff after the scaled maturity delay", () => {
+    const cutoff = new Date("2026-07-10T12:00:00.000Z");
+    const rule = testCompetitionCreditRule({
+      calendar: {
+        version: "cycle-v1",
+        chainId: 97,
+        cycleSeconds: 1_800,
+        anchorAt: cutoff.toISOString(),
+      },
+      expectedBscChainId: 97,
+      activeFrom: cutoff,
+    });
+
+    expect(firstEligibleCreditCutoff(new Date("2026-07-10T12:05:00.000Z"), rule))
+      .toEqual(new Date("2026-07-10T12:30:00.000Z"));
+    expect(firstEligibleCreditCutoff(new Date("2026-07-10T11:50:00.000Z"), rule))
+      .toEqual(cutoff);
+    expect(firstEligibleCreditCutoff(cutoff, rule)).toEqual(cutoff);
   });
 
   it("only accepts 0..100 pool credits in multiples of ten", () => {
@@ -151,6 +176,226 @@ describe("competition credit rules", () => {
         warnings: [...base.warnings].reverse(),
       })
     );
+  });
+
+  it.each([
+    {
+      name: 'clean custodial source',
+      nftMode: 'custodial' as const,
+      warnings: [],
+      deadLetters: 0,
+      pendingEvents: 0,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: true,
+      blockingWarnings: [],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'TOKEN_V2 ancillary alarms only',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN', 'CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 3,
+      pendingEvents: 3,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: true,
+      blockingWarnings: [],
+      ancillaryWarnings: ['CHAIN_DEAD_LETTERS_OPEN', 'CHAIN_EVENTS_NOT_PROJECTED'],
+    },
+    {
+      name: 'vault dead letter',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      deadLetters: 1,
+      pendingEvents: 0,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'vault pending event',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 0,
+      pendingEvents: 1,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 1,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'TOKEN_V2 metadata pending',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 1,
+      pendingEvents: 1,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 1,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'TOKEN_V2 metadata dead letter',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      deadLetters: 1,
+      pendingEvents: 0,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'TOKEN_V2 event without a known name',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 1,
+      pendingEvents: 1,
+      blockingDeadLetters: 1,
+      blockingPendingEvents: 1,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'incident or invalid cursor',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_INTEGRITY_INCIDENT_OPEN', 'CURSOR_UNHEALTHY:TOKEN_V2:Transfer'],
+      deadLetters: 0,
+      pendingEvents: 0,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_INTEGRITY_INCIDENT_OPEN', 'CURSOR_UNHEALTHY:TOKEN_V2:Transfer'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'ancillary alarm plus vault blocker',
+      nftMode: 'custodial' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN', 'CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 4,
+      pendingEvents: 2,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 2,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+    },
+    {
+      name: 'legacy mode never suppresses TOKEN_V2',
+      nftMode: 'legacy' as const,
+      warnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      deadLetters: 3,
+      pendingEvents: 0,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_DEAD_LETTERS_OPEN'],
+      ancillaryWarnings: [],
+    },
+    {
+      name: 'invalid mode never suppresses TOKEN_V2',
+      nftMode: 'invalid' as const,
+      warnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      deadLetters: 0,
+      pendingEvents: 3,
+      blockingDeadLetters: 0,
+      blockingPendingEvents: 0,
+      healthy: false,
+      blockingWarnings: ['CHAIN_EVENTS_NOT_PROJECTED'],
+      ancillaryWarnings: [],
+    },
+  ])('classifies $name from alias-specific evidence', (scenario) => {
+    const {
+      name: _name,
+      healthy,
+      blockingWarnings,
+      ancillaryWarnings,
+      ...input
+    } = scenario;
+    const result = classifyCreditSourceHealth({
+      route: 'nft',
+      ...input,
+    });
+    expect(result.healthy).toBe(healthy);
+    expect(result.blockingWarnings).toEqual(blockingWarnings);
+    expect(result.ancillaryWarnings).toEqual(ancillaryWarnings);
+  });
+
+  it.each([
+    ['custodial TOKEN_V2 Transfer', 'custodial', 'TOKEN_V2', 'Transfer', true],
+    ['custodial TOKEN_V2 metadata', 'custodial', 'TOKEN_V2', 'CukieMetadataConfigured', false],
+    ['custodial TOKEN_V2 unknown event', 'custodial', 'TOKEN_V2', undefined, false],
+    ['custodial vault event', 'custodial', 'CUKIE_MASTER_NFT_VAULT', 'CukieMasterDeposited', false],
+    ['legacy TOKEN_V2 Transfer', 'legacy', 'TOKEN_V2', 'Transfer', false],
+    ['invalid TOKEN_V2 Transfer', 'invalid', 'TOKEN_V2', 'Transfer', false],
+  ])('recognizes only %s as ancillary', (_name, nftMode, contractAlias, eventName, expected) => {
+    expect(isAncillaryNftCreditEvent({ nftMode: nftMode as 'custodial' | 'legacy' | 'invalid', contractAlias, eventName }))
+      .toBe(expected);
+  });
+
+  it('keeps metadata and unknown TOKEN_V2 events in the blocking Mongo predicate', () => {
+    expect(creditSourceBlockingEventFilter({
+      route: 'nft',
+      nftMode: 'custodial',
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+    })).toEqual({
+      $or: [
+        { contractAlias: 'CUKIE_MASTER_NFT_VAULT' },
+        { contractAlias: 'TOKEN_V2', eventName: { $ne: 'Transfer' } },
+      ],
+    });
+  });
+
+  it('scopes NFT lock incidents away from UKI while retaining global NFT blocks', () => {
+    const ukiFilter = creditSourceChainIntegrityIncidentFilter({
+      route: 'uki',
+      aliases: ['UKI_STAKING', 'VESTING_VAULT'],
+    });
+    const nftFilter = creditSourceChainIntegrityIncidentFilter({
+      route: 'nft',
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+    });
+
+    expect(ukiFilter).toEqual({
+      status: 'open',
+      $or: [
+        { route: 'uki' },
+        { scope: 'uki' },
+        { contractAlias: { $in: ['UKI_STAKING', 'VESTING_VAULT'] } },
+        {
+          chain: 'BSC',
+          route: { $exists: false },
+          scope: { $exists: false },
+          contractAlias: { $exists: false },
+          $and: [
+            { type: { $regex: /canonical|economy|vesting|staking|nft|cukie|credit/i } },
+            { type: { $not: /^nft_lock_/i } },
+          ],
+        },
+      ],
+    });
+    expect(nftFilter).toEqual({
+      status: 'open',
+      $or: [
+        { route: 'nft' },
+        { scope: 'nft' },
+        { contractAlias: { $in: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'] } },
+        {
+          chain: 'BSC',
+          route: { $exists: false },
+          scope: { $exists: false },
+          contractAlias: { $exists: false },
+          type: { $regex: /canonical|economy|vesting|staking|nft|cukie|credit/i },
+        },
+      ],
+    });
   });
 
   it("accepts a cursor at or ahead of the completed UKI watermark, never behind it", () => {

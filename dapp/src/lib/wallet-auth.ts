@@ -242,28 +242,50 @@ export function isValidEvmWalletAddress(walletAddress: string) {
   return isAddress(normalized, { strict: false }) && normalized !== zeroAddress;
 }
 
+function isValidTronWalletAddress(walletAddress: string) {
+  return /^T[1-9A-HJ-NP-Za-km-z]{25,40}$/.test(walletAddress);
+}
+
 /**
- * Sensitive EVM mutations and reads must be owned by the wallet that actually
- * signed the session. `walletAddress` can be the user's primary/profile wallet
- * and therefore is deliberately not considered here.
+ * Strict session restoration must be owned by the wallet and wallet type that
+ * actually signed the session. `walletAddress` can be the user's primary/profile
+ * wallet and therefore is deliberately not considered here.
  */
-export function evmWalletSessionMatchesSignedAddress(
+export function walletSessionMatchesSignedAddress(
   session: WalletSessionPayload,
   walletAddress: string,
+  walletType: WalletAuthType,
 ) {
   const requestedAddress = walletAddress.trim();
   const signedAddress = session.signedWalletAddress?.trim();
 
-  if (
-    session.walletType !== 'evm' ||
-    !signedAddress ||
-    !isValidEvmWalletAddress(requestedAddress) ||
-    !isValidEvmWalletAddress(signedAddress)
-  ) {
+  if (session.walletType !== walletType || !signedAddress) {
+    return false;
+  }
+
+  if (walletType === 'evm' && (
+    !isValidEvmWalletAddress(requestedAddress)
+    || !isValidEvmWalletAddress(signedAddress)
+  )) {
+    return false;
+  }
+
+  if (walletType === 'tron' && (
+    !isValidTronWalletAddress(requestedAddress)
+    || !isValidTronWalletAddress(signedAddress)
+  )) {
     return false;
   }
 
   return normalizeWalletAddress(signedAddress) === normalizeWalletAddress(requestedAddress);
+}
+
+/** Sensitive EVM mutations and reads use the generic strict matcher. */
+export function evmWalletSessionMatchesSignedAddress(
+  session: WalletSessionPayload,
+  walletAddress: string,
+) {
+  return walletSessionMatchesSignedAddress(session, walletAddress, 'evm');
 }
 
 export async function setWalletSessionCookie(params: {

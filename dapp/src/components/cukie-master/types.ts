@@ -3,4 +3,5 @@ export type UkiRoutePreview = {
   presaleLockedRaw: string;
   indexedStakedRaw: string;
   allocatedSlots: number;
+  synchronizing?: boolean;
 };

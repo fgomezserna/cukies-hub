@@ -38,6 +38,124 @@ export function creditSourceCursorIsHealthy(input: {
   );
 }
 
+export type CreditNftSourceMode = 'legacy' | 'custodial' | 'invalid';
+
+export function isAncillaryNftCreditEvent(input: {
+  nftMode?: CreditNftSourceMode;
+  contractAlias?: unknown;
+  eventName?: unknown;
+}) {
+  return input.nftMode === 'custodial'
+    && input.contractAlias === 'TOKEN_V2'
+    && input.eventName === 'Transfer';
+}
+
+/**
+ * Returns the event predicate that can mutate the NFT credit source. The
+ * custodial exception is deliberately limited to TOKEN_V2 Transfer events;
+ * metadata events remain blocking because entitlement reads rarity/generation
+ * from the `cukies` projection they materialize.
+ */
+export function creditSourceBlockingEventFilter(input: {
+  route: 'uki' | 'nft';
+  nftMode?: CreditNftSourceMode;
+  aliases: readonly string[];
+}) {
+  if (input.route === 'nft' && input.nftMode === 'custodial') {
+    return {
+      $or: [
+        { contractAlias: 'CUKIE_MASTER_NFT_VAULT' },
+        { contractAlias: 'TOKEN_V2', eventName: { $ne: 'Transfer' } },
+      ],
+    };
+  }
+  return { contractAlias: { $in: [...input.aliases] } };
+}
+
+/**
+ * Limits chain-integrity incidents to the route whose source they can affect.
+ *
+ * `nft_lock_*` incidents are emitted by the Cukie Master NFT ownership
+ * reconciler without a route field. They are still global to the NFT source,
+ * but they must not be inferred as UKI corruption merely because their type
+ * contains `nft`.
+ */
+export function creditSourceChainIntegrityIncidentFilter(input: {
+  route: 'uki' | 'nft';
+  aliases: readonly string[];
+}) {
+  const genericIncident = input.route === 'uki'
+    ? {
+        chain: 'BSC',
+        route: { $exists: false },
+        scope: { $exists: false },
+        contractAlias: { $exists: false },
+        $and: [
+          { type: { $regex: /canonical|economy|vesting|staking|nft|cukie|credit/i } },
+          { type: { $not: /^nft_lock_/i } },
+        ],
+      }
+    : {
+        chain: 'BSC',
+        route: { $exists: false },
+        scope: { $exists: false },
+        contractAlias: { $exists: false },
+        type: { $regex: /canonical|economy|vesting|staking|nft|cukie|credit/i },
+      };
+  return {
+    status: 'open',
+    $or: [
+      { route: input.route },
+      { scope: input.route },
+      { contractAlias: { $in: [...input.aliases] } },
+      genericIncident,
+    ],
+  };
+}
+
+export type CreditSourceHealthClassification = {
+  healthy: boolean;
+  blockingWarnings: string[];
+  ancillaryWarnings: string[];
+};
+
+/**
+ * Classifies source warnings without discarding any evidence. In custodial
+ * mode only TOKEN_V2 Transfer ownership alarms are ancillary to the
+ * vault-backed credit slots; metadata and unknown TOKEN_V2 events remain
+ * blocking because they can change entitlement inputs. Transfer alarms remain
+ * visible but do not block a new cut unless a blocking event is also present.
+ * Legacy and invalid modes keep every NFT warning blocking.
+ */
+export function classifyCreditSourceHealth(input: {
+  route: 'uki' | 'nft';
+  nftMode?: CreditNftSourceMode;
+  warnings: readonly string[];
+  deadLetters: number;
+  pendingEvents: number;
+  blockingDeadLetters: number;
+  blockingPendingEvents: number;
+}): CreditSourceHealthClassification {
+  const ancillaryWarnings = input.route === 'nft'
+    && input.nftMode === 'custodial'
+    ? [
+        ...(input.blockingDeadLetters === 0 && input.deadLetters > 0
+          ? ['CHAIN_DEAD_LETTERS_OPEN']
+          : []),
+        ...(input.blockingPendingEvents === 0 && input.pendingEvents > 0
+          ? ['CHAIN_EVENTS_NOT_PROJECTED']
+          : []),
+      ]
+    : [];
+  const ancillary = new Set(ancillaryWarnings);
+  const blockingWarnings = input.warnings.filter((warning) => !ancillary.has(warning));
+  return {
+    healthy: blockingWarnings.length === 0,
+    blockingWarnings,
+    ancillaryWarnings,
+  };
+}
+
 export type CreditSourceHealthEvidenceInput = {
   successAt: Date | null;
   errorAt: Date | null;
@@ -45,6 +163,10 @@ export type CreditSourceHealthEvidenceInput = {
   cursors: Array<Record<string, unknown>>;
   deadLetters: number;
   pendingEvents: number;
+  /** Counts for the aliases that can mutate the credit source itself. */
+  blockingDeadLetters?: number;
+  blockingPendingEvents?: number;
+  nftMode?: CreditNftSourceMode;
   incidents: number;
   sourceRuleVersions: Record<"uki" | "nft", string> | null;
   rounds: Array<Record<string, unknown>>;
