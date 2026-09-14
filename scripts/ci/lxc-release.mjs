@@ -86,9 +86,9 @@ export function createLxcReleaseEnv(manifest) {
   return `${lines.join('\n')}\n`;
 }
 
-async function ssh({ host, user, sshKey, knownHosts }, command, runImpl = run) {
+async function ssh({ host, user, sshKey, knownHosts }, command, runImpl = run, input = null) {
   const destination = `${user}@${host}`;
-  return runImpl('ssh', [...sshArgs({ sshKey, knownHosts }), destination, command]);
+  return runImpl('ssh', [...sshArgs({ sshKey, knownHosts }), destination, command], { input });
 }
 
 async function copy({ host, user, sshKey, knownHosts }, source, destination, runImpl = run) {
@@ -113,6 +113,9 @@ export async function deployToLxc({
   remoteDir = '/opt/cukies/prod',
   sshKey,
   knownHosts,
+  registry,
+  registryUsername,
+  registryPassword,
   runImpl = run,
 } = {}) {
   assertLxcManifest(manifest);
@@ -126,6 +129,17 @@ export async function deployToLxc({
     const connection = { host, user, sshKey, knownHosts };
     const quote = shellQuote;
     await ssh(connection, `set -eu; mkdir -p ${quote(releaseDir)}; test -f ${quote(`${root}/runtime.env`)}; docker network inspect coolify >/dev/null 2>&1 || docker network create coolify >/dev/null`, runImpl);
+    if (registry || registryUsername || registryPassword) {
+      if (!registry || !registryUsername || !registryPassword) {
+        throw new Error('registry, usuario y contraseña son obligatorios para autenticar el LXC.');
+      }
+      await ssh(
+        connection,
+        `set -eu; docker login ${quote(registry)} --username ${quote(registryUsername)} --password-stdin >/dev/null`,
+        runImpl,
+        `${registryPassword}\n`,
+      );
+    }
     await copy(connection, composePath, `${releaseDir}/docker-compose.images.yml`, runImpl);
     await copy(connection, overlayPath, `${releaseDir}/docker-compose.production.lxc.yml`, runImpl);
     await copy(connection, labelPath, `${releaseDir}/dapp-production.labels`, runImpl);
@@ -194,6 +208,9 @@ async function main() {
     remoteDir: requireValue(process.argv, '--remote-dir', { fallback: process.env.CUKIES_LXC_REMOTE_DIR || '/opt/cukies/prod' }),
     sshKey: process.env.CUKIES_LXC_SSH_KEY,
     knownHosts: process.env.CUKIES_LXC_KNOWN_HOSTS,
+    registry: process.env.CUKIES_REGISTRY,
+    registryUsername: process.env.CUKIES_REGISTRY_USERNAME,
+    registryPassword: process.env.CUKIES_REGISTRY_PASSWORD,
   });
   await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result));

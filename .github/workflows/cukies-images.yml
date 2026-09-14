@@ -230,6 +230,9 @@ jobs:
           chmod 600 "$key_file" "$known_hosts_file"
           CUKIES_LXC_SSH_KEY="$key_file" \
           CUKIES_LXC_KNOWN_HOSTS="$known_hosts_file" \
+          CUKIES_REGISTRY="$CUKIES_REGISTRY" \
+          CUKIES_REGISTRY_USERNAME="$CUKIES_REGISTRY_USERNAME" \
+          CUKIES_REGISTRY_PASSWORD="$CUKIES_REGISTRY_PASSWORD" \
           CUKIES_LXC_HOST="${{ vars.CUKIES_LXC_HOST }}" \
           CUKIES_LXC_USER="${{ vars.CUKIES_LXC_USER || 'root' }}" \
           CUKIES_LXC_REMOTE_DIR="${{ vars.CUKIES_LXC_REMOTE_DIR || '/opt/cukies/prod' }}" \
