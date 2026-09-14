@@ -319,6 +319,15 @@ si no puede verificar la cadena, no expone el anuncio como comprable. La colecci
 de metadata se reutiliza solo como enriquecimiento y no como fuente de verdad del
 estado de la orden.
 
+Las imagenes de Cukies legacy y de la coleccion reutilizada por V2 se sirven desde
+las cards inmutables ya publicadas en el gateway MinIO de staging
+(`https://assets-staging.cukies.world`, bucket `cukies-cards-staging`). El 14-09-2026
+se reconciliaron los 17.464 documentos legacy de las bases `cukies` y
+`cukieshub-new` con las 17.464 URLs existentes de Stage; no se regenero ni se
+subio ninguna imagen. En produccion el card worker sigue fuera del Compose y no
+tiene permiso de escritura sobre ese bucket; los nuevos registros V2 deben
+conservar `cardImageUrl`/`img` de la card publicada y el indexer los reutiliza.
+
 ### Publicador de rewards en staging
 
 `reward-batch-publisher` usa la misma imagen versionada que la Dapp, pero es un
