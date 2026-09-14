@@ -40,6 +40,10 @@ case "${service}" in
     pnpm --dir /app/packages/cuki-card-worker run setup:prod
     exec pnpm --dir /app/packages/cuki-card-worker run start
     ;;
+  cukies-bridge-relayer)
+    pnpm --dir /app/packages/cukies-bridge-relayer run setup:prod
+    exec pnpm --dir /app/packages/cukies-bridge-relayer run start
+    ;;
   *)
     echo "CUKIES_SERVICE no soportado: ${service}"
     exit 1

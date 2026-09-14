@@ -49,13 +49,15 @@ export function createSuccessfulState({ previous = null, head, configHash, compo
     commit: head,
     configHash,
     deploymentUuid: deploymentUuid ?? null,
-    ...(deliveryMode === 'rolling' ? {
+    ...(deliveryMode ? {
       deliveryMode,
-      workersComposeHash,
-      webResourceUuid,
-      workersResourceUuid,
-      gameResourceUuid: gameResourceUuid ?? previous?.gameResourceUuid ?? null,
-      gameDeploymentUuid: gameDeploymentUuid ?? previous?.gameDeploymentUuid ?? null,
+      ...(deliveryMode === 'rolling' ? {
+        workersComposeHash,
+        webResourceUuid,
+        workersResourceUuid,
+        gameResourceUuid: gameResourceUuid ?? previous?.gameResourceUuid ?? null,
+        gameDeploymentUuid: gameDeploymentUuid ?? previous?.gameDeploymentUuid ?? null,
+      } : {}),
     } : {}),
     components: normalizedComponents,
     webCommit: resolvedWebCommit,
@@ -84,7 +86,10 @@ async function main() {
   const deployment = resolveDeploymentEnvironment(environmentName);
   assertEnvironmentMetadata(manifest, deployment, { allowLegacy: deployment.environment === 'staging', context: 'release manifest' });
   const previous = await readReleaseState(statePath);
-  const state = createSuccessfulState({ previous, ...manifest, environment: deployment.environment, head: manifest.commit, healthSha });
+  const deliveryMode = process.argv.includes('--delivery-mode')
+    ? requireValue(process.argv, '--delivery-mode')
+    : process.env.CUKIES_DELIVERY_MODE;
+  const state = createSuccessfulState({ previous, ...manifest, environment: deployment.environment, head: manifest.commit, healthSha, deliveryMode });
   await writeReleaseStateAtomic(statePath, state);
 }
 

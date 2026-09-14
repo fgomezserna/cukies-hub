@@ -40,7 +40,7 @@ jobs:
     env:
       CUKIES_DEPLOY_ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
       CUKIES_GIT_BRANCH: ${{ github.ref_name }}
-      CUKIES_DELIVERY_MODE: ${{ vars.CUKIES_DELIVERY_MODE || 'legacy-images' }}
+      CUKIES_DELIVERY_MODE: ${{ vars.CUKIES_DELIVERY_MODE || (github.ref_name == 'main' && 'lxc' || 'legacy-images') }}
       CUKIES_REGISTRY: ${{ vars.CUKIES_REGISTRY }}
       CUKIES_REGISTRY_USERNAME: ${{ secrets.CUKIES_REGISTRY_USERNAME }}
       CUKIES_REGISTRY_PASSWORD: ${{ secrets.CUKIES_REGISTRY_PASSWORD }}
@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$CUKIES_DELIVERY_MODE" in
-            rolling) ;;
+            rolling|lxc) test "$CUKIES_DEPLOY_ENVIRONMENT" = production ;;
             legacy-images) test "$CUKIES_DEPLOY_ENVIRONMENT" = staging ;;
             *) echo "Unsupported CUKIES_DELIVERY_MODE"; exit 1 ;;
           esac
@@ -212,6 +212,44 @@ jobs:
             --state "$CUKIES_STATE_PATH" \
             --compose docker-compose.workers.yml \
             --result "$CUKIES_RUN_DIR/deploy-result.json"
+
+      - name: Deliver production to standalone LXC
+        if: env.CUKIES_IMAGE_DEPLOY_ENABLED == 'true' && env.CUKIES_DELIVERY_MODE == 'lxc' && env.CUKIES_DEPLOY_ENVIRONMENT == 'production'
+        shell: bash
+        env:
+          CUKIES_LXC_SSH_KEY_MATERIAL: ${{ secrets.CUKIES_LXC_SSH_KEY }}
+          CUKIES_LXC_KNOWN_HOSTS_MATERIAL: ${{ secrets.CUKIES_LXC_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          key_file="$RUNNER_TEMP/cukies-lxc-key"
+          known_hosts_file="$RUNNER_TEMP/cukies-lxc-known-hosts"
+          test -n "$CUKIES_LXC_SSH_KEY_MATERIAL"
+          test -n "$CUKIES_LXC_KNOWN_HOSTS_MATERIAL"
+          printf '%s\n' "$CUKIES_LXC_SSH_KEY_MATERIAL" > "$key_file"
+          printf '%s\n' "$CUKIES_LXC_KNOWN_HOSTS_MATERIAL" > "$known_hosts_file"
+          chmod 600 "$key_file" "$known_hosts_file"
+          CUKIES_LXC_SSH_KEY="$key_file" \
+          CUKIES_LXC_KNOWN_HOSTS="$known_hosts_file" \
+          CUKIES_LXC_HOST="${{ vars.CUKIES_LXC_HOST }}" \
+          CUKIES_LXC_USER="${{ vars.CUKIES_LXC_USER || 'root' }}" \
+          CUKIES_LXC_REMOTE_DIR="${{ vars.CUKIES_LXC_REMOTE_DIR || '/opt/cukies/prod' }}" \
+          node scripts/ci/lxc-release.mjs \
+            --manifest "$CUKIES_RUN_DIR/manifest.json" \
+            --compose docker-compose.images.yml \
+            --overlay docker-compose.production.lxc.yml \
+            --labels deploy/coolify/labels/dapp-production.labels \
+            --game-labels infrastructure/ci/production-game.labels \
+            --result "$CUKIES_RUN_DIR/deploy-result.json"
+
+      - name: Persist standalone LXC release state
+        if: env.CUKIES_IMAGE_DEPLOY_ENABLED == 'true' && env.CUKIES_DELIVERY_MODE == 'lxc' && env.CUKIES_DEPLOY_ENVIRONMENT == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/ci/release-state.mjs \
+            --state "$CUKIES_STATE_PATH" \
+            --manifest "$CUKIES_RUN_DIR/manifest.json" \
+            --health-sha "$GITHUB_SHA"
 
       - name: Upload deployment manifest
         if: always()

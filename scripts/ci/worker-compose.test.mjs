@@ -59,6 +59,8 @@ test('genera solo servicios worker y no conserva build, Mongo embebido ni exposi
   assert.doesNotMatch(workers, /^    ports:/m);
   assert.doesNotMatch(workers, /CUKIES_DAPP_TRAEFIK_LABEL_FILE/);
   assert.doesNotMatch(workers, /http:\/\/dapp-/);
+  assert.doesNotMatch(workers, /(^|\n)x-[a-z0-9-]+:|<<: \*/);
+  assert.match(workers, /(^|\n)  cukies-bridge-relayer:\n/);
 });
 
 test('conserva profiles, volumes, networks, healthchecks y dependencias no dapp', () => {

@@ -1,0 +1,86 @@
+# Production runtime for the standalone Cukies LXC.
+#
+# This file is an overlay for docker-compose.images.yml.  The base file remains
+# generated from the shared Coolify compose so staging keeps its own topology.
+# The LXC supplies the external `coolify` network name for compatibility, but
+# it is not managed by Coolify.  Cloudflare Tunnel terminates at Traefik on
+# this host and keeps the existing production hostnames.
+name: cukies-production
+
+services:
+  dapp:
+    # The public entry point is Traefik, not a random Docker host port.
+    # `!reset` clears the generated base mapping (`"3000"`) instead of
+    # appending an empty sequence during Compose's multi-file merge.
+    ports: !reset []
+    # The web image has its own production resource guard.  Workers keep the
+    # legacy app12 UUID from runtime.env, while this service reports app33's
+    # web UUID and retains both network aliases for internal health checks.
+    environment:
+      COOLIFY_RESOURCE_UUID: ${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID for the production web image}
+    labels:
+      traefik.docker.network: coolify
+    networks:
+      coolify:
+        aliases:
+          - dapp-${CUKIES_WEB_RESOURCE_UUID:?Set CUKIES_WEB_RESOURCE_UUID for the production web image}
+
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=coolify
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls=true
+      - --ping=true
+      - --api.dashboard=false
+      - --log.level=INFO
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - coolify
+
+  treasure-hunt:
+    image: "${CUKIES_IMAGE_TREASURE_HUNT:?Set CUKIES_IMAGE_TREASURE_HUNT to an immutable digest reference}"
+    environment:
+      CUKIES_SERVICE: treasure-hunt
+      APP_ENV: production
+      NEXT_PUBLIC_APP_ENV: production
+      STAGING_ONLY_GUARD: false
+      COOLIFY_BRANCH: main
+      COOLIFY_RESOURCE_UUID: tkkggwcosc4gksckcc480cwg
+      COOLIFY_APPLICATION_ID: "13"
+      NEXT_PUBLIC_GAME_BASE_PATH: ""
+      NEXT_PUBLIC_DAPP_ORIGIN: https://cukies.world,https://www.cukies.world
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      SOURCE_COMMIT: ${SOURCE_COMMIT:?Set SOURCE_COMMIT in release.env}
+      IMAGE_REVISION: ${IMAGE_REVISION:?Set IMAGE_REVISION in release.env}
+      CUKIES_BUILD_ENV_HASH: ${CUKIES_BUILD_ENV_HASH:?Set CUKIES_BUILD_ENV_HASH in release.env}
+    label_file:
+      - ${CUKIES_GAME_TRAEFIK_LABEL_FILE:?Set CUKIES_GAME_TRAEFIK_LABEL_FILE for the production game}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true

@@ -12,6 +12,7 @@ const TARGETS = Object.freeze({
   dapp: 'dapp',
   'chain-indexer': 'chain-indexer',
   'cuki-card-worker': 'cuki-card-worker',
+  'cukies-bridge-relayer': 'cukies-bridge-relayer',
   'treasure-hunt': 'treasure-hunt',
 });
 

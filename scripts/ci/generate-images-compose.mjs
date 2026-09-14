@@ -7,6 +7,7 @@ const SERVICE_IMAGES = Object.freeze({
   dapp: 'CUKIES_IMAGE_DAPP',
   'chain-indexer': 'CUKIES_IMAGE_CHAIN_INDEXER',
   'cuki-card-worker': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
+  'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
   'cukie-master-scheduler': 'CUKIES_IMAGE_DAPP',
   'competition-credit-scheduler': 'CUKIES_IMAGE_DAPP',
   'game-economy-scheduler': 'CUKIES_IMAGE_DAPP',
@@ -39,7 +40,33 @@ function removeBlock(lines, start, end) {
   return [...lines.slice(0, start), ...lines.slice(end)];
 }
 
-function transformService(lines, name, imageEnv) {
+function extensionAnchor(sourceLines, anchorName) {
+  const start = sourceLines.findIndex((line) => line.startsWith(`${anchorName}:`));
+  if (start === -1) return null;
+  const body = [];
+  for (let index = start + 1; index < sourceLines.length; index += 1) {
+    const line = sourceLines[index];
+    if (line && !line.startsWith('  ')) break;
+    if (line) body.push(line);
+  }
+  return body;
+}
+
+function expandAnchor(lines, anchorName, anchorBody, indentation = '      ') {
+  const marker = `${indentation}<<: *${anchorName}`;
+  const result = [];
+  for (const line of lines) {
+    if (line === marker) {
+      if (!anchorBody) throw new Error(`no se encuentra el ancla ${anchorName}.`);
+      result.push(...anchorBody.map((entry) => `${indentation}${entry.slice(2)}`));
+      continue;
+    }
+    result.push(line);
+  }
+  return result;
+}
+
+function transformService(lines, name, imageEnv, anchors = {}) {
   const result = [lines[0], `    image: "\${${imageEnv}:?Set ${imageEnv} to an immutable digest reference}"`];
   let skipBuild = false;
   for (const line of lines.slice(1)) {
@@ -55,18 +82,27 @@ function transformService(lines, name, imageEnv) {
     result.push(line);
   }
 
+  const expanded = expandAnchor(
+    result,
+    'staging-scheduler-environment',
+    anchors['staging-scheduler-environment'],
+  );
+
   if (name === 'dapp') {
-    const uuidIndex = result.findIndex((line) => line.startsWith('      COOLIFY_RESOURCE_UUID:'));
-    if (uuidIndex !== -1) result.splice(uuidIndex + 1, 0, '      GIT_COMMIT_SHA: ${IMAGE_REVISION:?Set IMAGE_REVISION to the deployed SHA}');
+    const uuidIndex = expanded.findIndex((line) => line.startsWith('      COOLIFY_RESOURCE_UUID:'));
+    if (uuidIndex !== -1) expanded.splice(uuidIndex + 1, 0, '      GIT_COMMIT_SHA: ${IMAGE_REVISION:?Set IMAGE_REVISION to the deployed SHA}');
   }
-  return result;
+  return expanded;
 }
 
 export function generateImagesCompose(source) {
-  let lines = String(source).replace(/\r\n/g, '\n').trimEnd().split('\n');
-  const servicesMarker = lines.findIndex((line) => line === 'services:');
+  const sourceLines = String(source).replace(/\r\n/g, '\n').trimEnd().split('\n');
+  const servicesMarker = sourceLines.findIndex((line) => line === 'services:');
   if (servicesMarker === -1) throw new Error('docker-compose.coolify.yml no contiene services.');
-  lines = lines.slice(servicesMarker);
+  const anchors = {
+    'staging-scheduler-environment': extensionAnchor(sourceLines, 'x-staging-scheduler-environment'),
+  };
+  let lines = sourceLines.slice(servicesMarker);
   for (const block of serviceBlocks(lines).reverse()) {
     if (block.name === 'staging-mongo') lines = removeBlock(lines, block.index, block.end);
   }
@@ -82,7 +118,7 @@ export function generateImagesCompose(source) {
       throw new Error(`service ${block.name} no tiene una imagen CI definida.`);
     }
     const body = serviceDocument.slice(block.index, block.end);
-    transformed.push(...transformService(body, block.name, SERVICE_IMAGES[block.name]));
+    transformed.push(...transformService(body, block.name, SERVICE_IMAGES[block.name], anchors));
   }
   lines = [...lines.slice(0, serviceStart + 1), ...transformed, ...lines.slice(servicesEnd)];
 
@@ -105,7 +141,7 @@ export function generateImagesCompose(source) {
   }
 
   const output = `${GENERATED_HEADER}${lines.join('\n').trimEnd()}\n`;
-  if (/^\s+build:/m.test(output) || /staging-mongo|staging-mongo-data|staging-mongo-config/.test(output)) {
+  if (/^\s+build:/m.test(output) || /staging-mongo|staging-mongo-data|staging-mongo-config/.test(output) || /<<: \*/.test(output) || /^x-[a-z0-9-]+:/m.test(output)) {
     throw new Error('el compose de imágenes conserva build o recursos staging-mongo.');
   }
   return output;
@@ -161,8 +197,13 @@ function rewriteWorkerService(lines) {
     .replaceAll(DAPP_INTERNAL_URL, WEB_URL)
     .replaceAll('process.env.COOLIFY_RESOURCE_UUID', 'process.env.CUKIES_WEB_RESOURCE_UUID'));
   const uuidIndex = result.findIndex((line) => line.startsWith('      COOLIFY_RESOURCE_UUID:'));
-  if (uuidIndex === -1) throw new Error('servicio worker con URL dapp sin COOLIFY_RESOURCE_UUID.');
-  result.splice(uuidIndex, 0, `      CUKIES_WEB_RESOURCE_UUID: ${WEB_RESOURCE_UUID}`);
+  if (uuidIndex !== -1) {
+    result.splice(uuidIndex, 0, `      CUKIES_WEB_RESOURCE_UUID: ${WEB_RESOURCE_UUID}`);
+  } else {
+    const anchorIndex = result.findIndex((line) => line === '      <<: *staging-scheduler-environment');
+    if (anchorIndex === -1) throw new Error('servicio worker con URL dapp sin COOLIFY_RESOURCE_UUID.');
+    result.splice(anchorIndex + 1, 0, `      CUKIES_WEB_RESOURCE_UUID: ${WEB_RESOURCE_UUID}`);
+  }
   return result;
 }
 

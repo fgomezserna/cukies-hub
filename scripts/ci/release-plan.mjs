@@ -12,6 +12,7 @@ const IMAGE_ENV = Object.freeze({
   dapp: 'CUKIES_IMAGE_DAPP',
   'chain-indexer': 'CUKIES_IMAGE_CHAIN_INDEXER',
   'cuki-card-worker': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
+  'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
   'treasure-hunt': 'CUKIES_IMAGE_TREASURE_HUNT',
 });
 
@@ -21,6 +22,8 @@ const PROJECT_COMPONENT = Object.freeze({
   'chain-indexer': 'chain-indexer',
   '@cukies/cuki-card-worker': 'cuki-card-worker',
   'cuki-card-worker': 'cuki-card-worker',
+  '@cukies/cukies-bridge-relayer': 'cukies-bridge-relayer',
+  'cukies-bridge-relayer': 'cukies-bridge-relayer',
   'sybil-slayer': 'treasure-hunt',
   '@cukies/sybil-slayer': 'treasure-hunt',
   'treasure-hunt': 'treasure-hunt',
@@ -43,6 +46,8 @@ const ORCHESTRATION_ONLY_PATHS = new Set([
   'scripts/ci/worker-compose.test.mjs',
   'scripts/ci/game-lane.test.mjs',
   'scripts/ci/game-cache-contract.test.mjs',
+  'scripts/ci/lxc-release.mjs',
+  'scripts/ci/lxc-release.test.mjs',
   'scripts/ci/image-ref.mjs',
 ]);
 
@@ -59,11 +64,13 @@ function unique(values) {
 export function componentForPath(path) {
   if (path === 'scripts/docker-dapp-server.mjs') return ['dapp', 'treasure-hunt'];
   if (path === 'scripts/docker-start-game-ci.mjs') return ['treasure-hunt'];
+  if (path === 'docker-compose.production.lxc.yml') return [...COMPONENTS];
   if (/^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|\.npmrc|\.dockerignore|Dockerfile\.ci|docker-compose\.coolify\.yml|docker-compose\.images\.yml|scripts\/docker-start(?:-ci)?\.sh|scripts\/assert-.*\.mjs)$/.test(path)) return [...COMPONENTS];
   if (path.startsWith('dapp/scripts/')) return ['dapp'];
   if (path.startsWith('dapp/')) return ['dapp'];
   if (path.startsWith('packages/chain-indexer/')) return ['chain-indexer'];
   if (path.startsWith('packages/cuki-card-worker/')) return ['cuki-card-worker'];
+  if (path.startsWith('packages/cukies-bridge-relayer/')) return ['cukies-bridge-relayer'];
   if (path.startsWith('games/sybil-slayer/')) return ['treasure-hunt'];
   if (path.startsWith('scripts/ci/')) return ORCHESTRATION_ONLY_PATHS.has(path) ? [] : [...COMPONENTS];
   return [];

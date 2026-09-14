@@ -117,6 +117,7 @@ export function buildImageEnvironment(manifest) {
       dapp: 'CUKIES_IMAGE_DAPP',
       'chain-indexer': 'CUKIES_IMAGE_CHAIN_INDEXER',
       'cuki-card-worker': 'CUKIES_IMAGE_CUKI_CARD_WORKER',
+      'cukies-bridge-relayer': 'CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER',
       'treasure-hunt': 'CUKIES_IMAGE_TREASURE_HUNT',
     }[component];
     return [{ key: env, value: value.image, is_literal: true, is_runtime: true, is_buildtime: true }];

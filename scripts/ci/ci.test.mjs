@@ -55,6 +55,7 @@ test('release plan construye todo en primera ejecución y con una base inválida
 test('los wrappers PID1 invalidan las imágenes web y game correspondientes', () => {
   assert.deepEqual(componentForPath('scripts/docker-dapp-server.mjs'), ['dapp', 'treasure-hunt']);
   assert.deepEqual(componentForPath('scripts/docker-start-game-ci.mjs'), ['treasure-hunt']);
+  assert.deepEqual(componentForPath('packages/cukies-bridge-relayer/src/worker.ts'), ['cukies-bridge-relayer']);
 });
 
 test('el comparador de Dockerfile limita el refinamiento al stage final dapp', () => {
@@ -80,7 +81,7 @@ test('el comparador de Dockerfile limita el refinamiento al stage final dapp', (
   assert.equal(isDappFinalStageOnlyChange(dependent, dependent.replace('COPY old /app', 'COPY new /app')), false);
 });
 
-test('Dockerfile solo en dapp descarta Nx global y conserva tres imágenes', () => {
+test('Dockerfile solo en dapp descarta Nx global y conserva el resto de imágenes', () => {
   const baseDockerfile = [
     'FROM node:22-bookworm-slim AS base',
     '',
@@ -113,7 +114,7 @@ test('Dockerfile solo en dapp descarta Nx global y conserva tres imágenes', () 
   });
 
   assert.deepEqual(plan.build, ['dapp']);
-  assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'treasure-hunt']);
+  assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'cukies-bridge-relayer', 'treasure-hunt']);
   assert.deepEqual(plan.nx.affected, []);
   assert.equal(plan.planReason, 'dockerfile-ci-final-dapp-stage-only');
   assert.equal(plan.refinement.reason, plan.planReason);
@@ -147,11 +148,11 @@ test('una fuente adicional fuera de la lista segura conserva el fallback global'
 test('release plan selecciona dapp por config nueva y reutiliza los demás digests', () => {
   const plan = chooseReleasePlan({ state: completeState, head: SHA_B, configHash: HASH_B, changedFiles: [], nxProjects: [], baseAncestor: true });
   assert.deepEqual(plan.build, ['dapp', 'treasure-hunt']);
-  assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker']);
+  assert.deepEqual(plan.reuse.map((entry) => entry.component), ['chain-indexer', 'cuki-card-worker', 'cukies-bridge-relayer']);
   assert.match(plan.reuse[0].image, /@sha256:/);
 });
 
-test('release plan reutiliza los tres digests para cambios de orquestación y documentación', () => {
+test('release plan reutiliza los digests para cambios de orquestación y documentación', () => {
   const plan = chooseReleasePlan({
     state: completeState,
     head: SHA_B,
@@ -188,7 +189,7 @@ test('dos releases sucesivas conservan workers construidos en un SHA anterior', 
   const plan = chooseReleasePlan({ state, head: 'c'.repeat(40), configHash: HASH_A,
     changedFiles: ['dapp/src/app/page.tsx'], baseAncestor: true });
   assert.deepEqual(plan.build, ['dapp']);
-  assert.equal(plan.reuse.length, 3);
+  assert.equal(plan.reuse.length, COMPONENTS.length - 1);
   assert.ok(plan.reuse.every((entry) => entry.sourceSha === SHA_A));
 });
 
@@ -245,7 +246,11 @@ test('generated image compose removes builds and Mongo while preserving card sha
   const generated = generateImagesCompose(source);
   assert.doesNotMatch(generated, /(^|\n)\s+build:/);
   assert.doesNotMatch(generated, /staging-mongo|staging-mongo-data|staging-mongo-config/);
+  assert.doesNotMatch(generated, /(^|\n)x-[a-z0-9-]+:|<<: \*/);
   assert.match(generated, /CUKIES_IMAGE_DAPP.*digest reference/);
+  assert.match(generated, /CUKIES_IMAGE_CUKIES_BRIDGE_RELAYER.*digest reference/);
+  assert.match(generated, /NEXT_PUBLIC_UKI_MARKETPLACE_USDC_PATH/);
+  assert.match(generated, /CHAIN_INDEXER_UKI_MARKETPLACE_DEPLOYMENT_TX_HASH/);
   const cardBlocks = generated.match(/^    image: "\$\{CUKIES_IMAGE_CUKI_CARD_WORKER/gm) ?? [];
   assert.equal(cardBlocks.length, 1);
   assert.match(generated, /coolify:\n    external: true/);
@@ -324,7 +329,7 @@ test('Coolify release patches image refs in bulk and verifies the served SHA', a
   assert.equal(calls[0][2].docker_compose_raw, 'services: {}\n');
   assert.equal(calls[1][2].find((entry) => entry.key === 'CUKIES_IMAGE_CUKI_CARD_WORKER').value, completeState.components['cuki-card-worker'].image);
   const environment = buildImageEnvironment(manifest);
-  assert.equal(environment.length, 6);
+  assert.equal(environment.length, COMPONENTS.length + 2);
   assert.ok(environment.every((entry) => entry.is_runtime && entry.is_buildtime));
 });
 

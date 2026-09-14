@@ -60,14 +60,26 @@ Variables del Environment:
   nombre anterior `CUKIES_STAGING_BUILD_ENV_JSON` sólo sirve para la transición.
 - `CUKIES_IMAGE_DEPLOY_ENABLED=true`: permite entregar. Staging conserva
   temporalmente compatibilidad con `CUKIES_STAGING_IMAGE_DEPLOY_ENABLED`.
-- `CUKIES_DELIVERY_MODE=rolling`: web gradual y workers independientes.
-- Registry y API Coolify conservan sus variables y secretos existentes.
+- `CUKIES_DELIVERY_MODE=lxc`: producción directa en el LXC preparado de
+  `pve-04`; `rolling` se conserva solo como fallback explícito durante la
+  transición.
+- `CUKIES_LXC_HOST`, `CUKIES_LXC_USER` y `CUKIES_LXC_REMOTE_DIR` identifican el
+  destino; `CUKIES_LXC_SSH_KEY` y `CUKIES_LXC_KNOWN_HOSTS` son secretos del
+  Environment y no se guardan en el repo.
+- Registry y API Coolify conservan sus variables y secretos existentes hasta
+  cerrar el rollback del cutover.
 
 `legacy-images` es únicamente el modo de bootstrap de staging: permite publicar
 la primera imagen que entiende app32 y contiene readiness antes de mover el
 tráfico. En el ensayo inicial se deshabilita temporalmente la entrega CI para
 construir ese candidato sin reiniciar el Compose que sigue atendiendo tráfico. No se admite en producción ni es el procedimiento de rollback del
 nuevo carril. Después de validar el cambio, staging debe usar `rolling`.
+
+El modo `lxc` copia únicamente Compose, labels y `release.env` (referencias de
+imagen por digest) a `/opt/cukies/prod/releases/<sha>`. El `runtime.env` con
+secretos debe existir previamente en el LXC. El Tunnel no cambia hasta que
+`cukies.world`, `treasurehunt.cukies.world`, indexer, relayer y marketplace hayan
+pasado sus smoke tests; Coolify queda como rollback durante la ventana.
 
 Nx selecciona componentes y BuildKit conserva las cachés `staging-*` y
 `production-*`. El manifest fija cada imagen por digest y distingue el commit
