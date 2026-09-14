@@ -70,6 +70,8 @@ export type NftAssetActiveLock = {
 export type NormalizedNftAsset = {
   assetId: string;
   tokenId: string | null;
+  /** URL publica inmutable de la card ya publicada (MinIO/S3-compatible). */
+  imageUrl?: string | null;
   network: NftAssetNetwork;
   ownerWallet: string | null;
   ownerNormalized: string | null;
@@ -99,6 +101,9 @@ export type CukiesInventoryDocument = {
   metadata?: unknown;
   attributes?: unknown;
   img?: unknown;
+  /** Campos emitidos por el indexer/card-worker. */
+  imageUrl?: unknown;
+  cardImageUrl?: unknown;
   timeStamp?: unknown;
   updatedAt?: unknown;
   /** Ultimo evento que cambio la tenencia, no el ultimo cambio de estado/listing. */
@@ -229,6 +234,15 @@ function normalizeObservedAt(value: unknown) {
 
 function uniqueBlockers(blockers: NftInventoryBlocker[]) {
   return Array.from(new Set(blockers));
+}
+
+function resolveImageUrl(document: CukiesInventoryDocument) {
+  for (const candidate of [document.cardImageUrl, document.imageUrl, document.img]) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+  return null;
 }
 
 export function normalizeNftNetwork(value: unknown): NftAssetNetwork {
@@ -523,6 +537,7 @@ export function normalizeCukiesInventoryDocument(
   return {
     assetId: buildCukiesAssetId(document),
     tokenId,
+    imageUrl: resolveImageUrl(document),
     network,
     ownerWallet,
     ownerNormalized,

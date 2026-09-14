@@ -21,8 +21,9 @@ function asset(
   rarity: string,
   canonicalState: string,
   rarityPoints: number,
+  imageUrl?: string,
 ) {
-  return { assetId, tokenId, rarity, canonicalState, rarityPoints } as never;
+  return { assetId, tokenId, rarity, canonicalState, rarityPoints, imageUrl } as never;
 }
 
 describe('getCukieMasterNftInventory', () => {
@@ -83,5 +84,21 @@ describe('getCukieMasterNftInventory', () => {
       contributionPoints: 0,
       blockers: ['listed'],
     }));
+  });
+
+  it('reutiliza la URL de card publicada por el indexer en vez de reconstruir S3', async () => {
+    const imageUrl = `https://assets-staging.cukies.world/OTgwMDAwMDE/${'b'.repeat(64)}.png`;
+    mockSummary.mockResolvedValue({
+      walletNormalized: wallet,
+      eligibleAssets: [asset('cukies:v2', '98000001', 'common', 'available', 1, imageUrl)],
+      rejectedAssets: [],
+    } as never);
+    mockDb.mockResolvedValue({
+      collection: () => ({ find: () => ({ toArray: async () => [] }) }),
+    } as never);
+
+    const inventory = await getCukieMasterNftInventory(wallet, new Date('2026-08-08T10:00:00.000Z'));
+
+    expect(inventory[0]?.imageUrl).toBe(imageUrl);
   });
 });

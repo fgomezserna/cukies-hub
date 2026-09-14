@@ -192,7 +192,9 @@ describe('Cukie Master custodial inventory identity', () => {
       walletAddress: wallet,
       now,
       documents: [
-        metadata('original', '10', collectionA),
+        metadata('original', '10', collectionA, {
+          cardImageUrl: `https://assets-staging.cukies.world/MTA/${'a'.repeat(64)}.png`,
+        }),
         metadata('second', '11', collectionA, { generation: 2 }),
         metadata('unknown', '12', collectionA, { generation: undefined }),
         metadata('legacy-rarity', '13', collectionA, { rarity: undefined, type: 'rare' }),
@@ -202,7 +204,10 @@ describe('Cukie Master custodial inventory identity', () => {
       config: config(),
     });
 
-    expect(inventory.find((item) => item.tokenId === '10')?.canDeposit).toBe(true);
+    expect(inventory.find((item) => item.tokenId === '10')).toMatchObject({
+      canDeposit: true,
+      imageUrl: `https://assets-staging.cukies.world/MTA/${'a'.repeat(64)}.png`,
+    });
     expect(inventory.find((item) => item.tokenId === '11')).toMatchObject({
       canDeposit: false,
       blockers: expect.arrayContaining(['second_generation']),

@@ -165,7 +165,9 @@ async function inventoryFromDb(
         canonicalAssetId: null,
         collectionAddress: null,
         tokenId: asset.tokenId,
-        imageUrl: asset.tokenId ? getLegacyMarketplaceNftImageUrl(asset.tokenId) : null,
+        imageUrl: asset.tokenId
+          ? asset.imageUrl ?? getLegacyMarketplaceNftImageUrl(asset.tokenId)
+          : null,
         rarity: asset.rarity,
         rarityPoints: potentialPoints,
         contributesToCukieMaster,
@@ -341,7 +343,7 @@ export function buildCukieMasterCustodialDepositInventory(input: {
       canonicalAssetId: candidate.assetId,
       collectionAddress: candidate.collectionAddress,
       tokenId: candidate.tokenId,
-      imageUrl: getLegacyMarketplaceNftImageUrl(candidate.tokenId),
+      imageUrl: normalizedAsset?.imageUrl ?? null,
       rarity: asset.rarity,
       rarityPoints: eligible?.rarityPoints ?? null,
       contributesToCukieMaster: false,
@@ -388,7 +390,7 @@ export async function custodialInventoryFromDb(
       canonicalAssetId: position.assetId,
       collectionAddress: position.collectionAddress,
       tokenId: position.tokenId,
-      imageUrl: getLegacyMarketplaceNftImageUrl(position.tokenId),
+      imageUrl: position.asset.imageUrl ?? null,
       rarity: position.asset.rarity,
       rarityPoints,
       contributesToCukieMaster: rarityPoints !== null,
