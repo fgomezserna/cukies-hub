@@ -11,6 +11,12 @@ Usamos dos carriles separados:
 - `staging` -> staging/integracion sobre BSC Testnet y bases staging.
 - `main` -> live actual sobre `cukies.world`.
 
+La migracion de produccion fuera de Coolify esta preparada pero aun no cortada:
+el destino objetivo es `pve-04`, LXC `2050` (`192.168.1.245`), con las mismas
+imagenes inmutables del registry. Hasta completar el runtime de secretos, el
+smoke y el cambio controlado del Tunnel, Coolify sigue siendo el live y el
+rollback.
+
 Los cambios se validan primero en `staging`. El paso a `main` requiere una promocion controlada y no debe arrastrar variables, contratos ni datos de testnet.
 
 La estrategia de tags recomendada es:
@@ -24,8 +30,12 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 
 - Staging/integracion: Coolify app `game-hub-staging`, application ID `28`, UUID `u4s804o4wwcckowgk0woo4wg`, rama `staging`, URL `https://cukieshub.eurekand.com`.
 - El iframe Treasure Hunt de staging se despliega como recurso Coolify independiente `game-treasurehunt-staging` (application ID `31`, UUID `lc04cw8gs4koo4swwws0c4ss`) desde la misma rama y se publica bajo `https://cukieshub.eurekand.com/treasurehunt-game`, con `NEXT_PUBLIC_GAME_BASE_PATH=/treasurehunt-game` y `NEXT_PUBLIC_DAPP_ORIGIN=https://cukieshub.eurekand.com`.
+- Treasure Hunt de producción tiene un recurso Coolify independiente `game-treasurehunt` (application ID `13`, UUID `tkkggwcosc4gksckcc480cwg`) sobre `main`, con destino `https://treasurehunt.cukies.world` y `NEXT_PUBLIC_GAME_BASE_PATH` vacío. El target de imagen está preparado; el recurso live conserva su configuración actual hasta completar snapshot, conversión y ensayo.
 - Live actual: Coolify app `game-hub`, application ID `12`, UUID `jookw8ow8woks088s44404ok`, rama `main`, URL `https://cukies.world`.
-- Ambos recursos usan `docker-compose.coolify.yml`; solo `dapp` se publica mediante Traefik.
+- Destino directo preparado: `pve-04` LXC `2050`, IP `192.168.1.245`, Docker
+  Compose + Traefik local; no recibe trafico publico ni secretos de produccion
+  hasta el cutover.
+- La topología fuente es `docker-compose.coolify.yml`. La entrega gradual separa web Docker Image (app33/app32) y `docker-compose.workers.yml` (app12/app28); consultar [el procedimiento y estado de bootstrap](deployment-rolling-transition.md).
 - Staging usa BSC Testnet (`97`) y la preventa `0xC0d7b04AC4DFCCc28790FD492FCB3CB16AcDfcdA`.
 - Staging usa `UKIStaking` `0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205` (bloque `123359165`, tx `0xc09b84077e97fe32b198ed99f1a56829ccc60c1dbe401e7bb20b66983ddc670e`) y `RewardsDistributor` `0xc2252D797Da294D16b84282d213604b4Bcf6EE09` (bloque `123359171`, tx `0x5ecf613df4c13ff7d918f072dd7a01e0256fa933a805c14e5074ff5230852639`). Ambos apuntan al UKI testnet existente y tienen source publico con coincidencia exacta en Sourcify y BscScan Testnet.
 - Verificacion publica: [UKIStaking en Sourcify](https://repo.sourcify.dev/97/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205), [RewardsDistributor en Sourcify](https://repo.sourcify.dev/97/0xc2252D797Da294D16b84282d213604b4Bcf6EE09), [UKIStaking en BscScan Testnet](https://testnet.bscscan.com/address/0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205#code) y [RewardsDistributor en BscScan Testnet](https://testnet.bscscan.com/address/0xc2252D797Da294D16b84282d213604b4Bcf6EE09#code). BscScan muestra `Source Code Verified`, `Exact Match`, Solidity `v0.8.28+commit.7893614a` y optimizacion de 200 runs para ambos contratos (comprobado el 6 de agosto de 2026).
@@ -45,7 +55,7 @@ Las ramas `release/staging-YYYY-MM-DD` son opcionales y se usan solo cuando `sta
 | Local | Cualquier rama local | Maquina local | Hardhat/local o testnet puntual | Dev/local | Implementacion rapida. |
 | Preview PR | Branch del PR | Coolify preview si se habilita | Sin valor real | Datos aislados o mocks | Revision visual/tecnica. |
 | Staging | `staging` | Coolify `game-hub-staging` | BSC testnet | DB staging | QA integrada. |
-| Production | `main` + tag `prod-*` | Coolify `game-hub` | BSC mainnet | DB production | Usuarios reales. |
+| Production | `main` + tag `prod-*` | Coolify `game-hub` (live actual) -> LXC `pve-04/2050` (objetivo) | BSC mainnet | DB production | Usuarios reales; cutover pendiente. |
 
 ### Validacion local antes de desplegar
 
@@ -110,14 +120,14 @@ Trabajo pendiente en Coolify:
 
 Nada de esto debe usar secrets en el repo.
 
-### Configuracion Coolify objetivo
+### Configuracion Coolify durante la transicion
 
 | Entorno | Coolify project | Coolify environment | Branch | Dominio |
 | --- | --- | --- | --- | --- |
 | Staging/integracion | `cukies.world` | `production` en Coolify | `staging` | `cukieshub.eurekand.com` |
-| Production/live | `cukies.world` | `production` en Coolify | `main` | `cukies.world` |
+| Production/live actual | `cukies.world` | `production` en Coolify | `main` | `cukies.world` |
 
-Reglas operativas:
+Reglas operativas mientras Coolify siga siendo el live:
 
 - staging debe tener `NEXTAUTH_URL` y callbacks OAuth propios,
 - staging debe usar base de datos y secrets separados,

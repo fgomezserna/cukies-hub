@@ -1,0 +1,31 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "cuki-card-worker",
+  "projectType": "library",
+  "sourceRoot": "packages/cuki-card-worker/src",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "pnpm exec tsc -p tsconfig.json",
+        "cwd": "packages/cuki-card-worker"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit",
+        "cwd": "packages/cuki-card-worker"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec node --import tsx --test src/*.test.ts",
+        "cwd": "packages/cuki-card-worker"
+      }
+    }
+  },
+  "tags": ["scope:cuki-card-worker"]
+}

@@ -27,6 +27,8 @@ type TronGridResponse = {
   };
 };
 
+const TRON_GRID_REQUEST_TIMEOUT_MS = 15_000;
+
 function stringField(value: unknown, label: string) {
   if (typeof value !== 'string' || !value.trim()) {
     throw new PermanentBridgeError(`JumpInBridge sin ${label}.`);
@@ -170,15 +172,38 @@ export class TronGridBridgeRequestSource implements TronBridgeRequestSource {
       url.searchParams.set('min_block_timestamp', String(cursor.nextTimestampMs));
     }
 
-    const response = await this.fetchImpl(url, {
-      headers: this.config.tronApiKey
-        ? { 'TRON-PRO-API-KEY': this.config.tronApiKey }
-        : undefined,
-    });
-    if (!response.ok) {
-      throw new Error(`TronGrid mainnet ${response.status} ${response.statusText}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TRON_GRID_REQUEST_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        headers: this.config.tronApiKey
+          ? { 'TRON-PRO-API-KEY': this.config.tronApiKey }
+          : undefined,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        // Release a possibly reusable response body before retrying on the
+        // next polling interval.  This is especially important for error
+        // pages returned by a proxy or rate limiter.
+        await response.body?.cancel().catch(() => undefined);
+        throw new Error(`TronGrid mainnet ${response.status} ${response.statusText}`);
+      }
+      const payload = await response.json() as TronGridResponse;
+      return this.parsePollPayload(payload, cursor);
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`TronGrid mainnet timeout after ${TRON_GRID_REQUEST_TIMEOUT_MS}ms`, {
+          cause: error,
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-    const payload = await response.json() as TronGridResponse;
+  }
+
+  private parsePollPayload(payload: TronGridResponse, cursor: TronPollCursor): TronPollResult {
     const requests: ConfirmedBridgeRequest[] = [];
     const invalidEvents: TronPollResult['invalidEvents'] = [];
     for (const event of payload.data ?? []) {

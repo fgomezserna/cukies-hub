@@ -29,15 +29,15 @@ async function withStore<T>(
   }
 }
 
-async function withRuntime<T>(
-  config: BridgeRelayerConfig,
-  task: (
-    store: MongoBridgeRelayerStore,
-    engine: BridgeRelayerEngine,
-    source: TronGridBridgeRequestSource,
-  ) => Promise<T>,
-) {
-  return withStore(config, async (store) => {
+type BridgeRelayerRuntime = Readonly<{
+  store: MongoBridgeRelayerStore;
+  engine: BridgeRelayerEngine;
+  source: TronGridBridgeRequestSource;
+}>;
+
+async function createRuntime(config: BridgeRelayerConfig): Promise<BridgeRelayerRuntime> {
+  const store = await new MongoBridgeRelayerStore(config).connect();
+  try {
     const source = new TronGridBridgeRequestSource(config);
     const destination = new ViemBscBridgeDestination(config);
     const engine = new BridgeRelayerEngine(store, store, destination, {
@@ -48,8 +48,53 @@ async function withRuntime<T>(
       maxAttempts: config.maxAttempts,
       submittedTimeoutMs: config.submittedTimeoutMs,
     });
-    return task(store, engine, source);
+    return { store, engine, source };
+  } catch (error) {
+    await store.close();
+    throw error;
+  }
+}
+
+async function withRuntime<T>(
+  config: BridgeRelayerConfig,
+  task: (runtime: BridgeRelayerRuntime) => Promise<T>,
+) {
+  const runtime = await createRuntime(config);
+  try {
+    return await task(runtime);
+  } finally {
+    await runtime.store.close();
+  }
+}
+
+async function runBridgeRelayerIteration(
+  config: BridgeRelayerConfig,
+  runtime: BridgeRelayerRuntime,
+) {
+  const { store, engine, source } = runtime;
+  const startedAt = new Date();
+  const cursor = await store.getSourceCursor(config.tronStartTimestampMs);
+  const poll = await source.poll(cursor);
+  const inserted = await store.upsertRequests(poll.requests, startedAt);
+  await store.recordSourceDeadLetters(poll.invalidEvents, new Date());
+  await store.updateSourceCursor(poll.nextCursor, new Date());
+  const processing = await engine.processNext(new Date());
+  await store.db.collection('cukies_bridge_relayer_runs').insertOne({
+    startedAt,
+    finishedAt: new Date(),
+    inserted,
+    fetched: poll.requests.length,
+    invalidEvents: poll.invalidEvents.length,
+    processing,
+    sourceCursor: poll.nextCursor,
+    direction: 'TRON_MAINNET_TO_BSC_MAINNET_LEGACY',
   });
+  return {
+    inserted,
+    fetched: poll.requests.length,
+    invalidEvents: poll.invalidEvents.length,
+    processing,
+  };
 }
 
 export async function setupBridgeRelayer(configInput = getBridgeRelayerConfig()) {
@@ -64,50 +109,34 @@ export async function setupBridgeRelayer(configInput = getBridgeRelayerConfig())
 
 export async function runBridgeRelayerOnce(configInput = getBridgeRelayerConfig()) {
   assertEnabled(configInput);
-  return withRuntime(configInput, async (store, engine, source) => {
-    await store.ensureIndexes();
-    const startedAt = new Date();
-    const cursor = await store.getSourceCursor(configInput.tronStartTimestampMs);
-    const poll = await source.poll(cursor);
-    const inserted = await store.upsertRequests(poll.requests, startedAt);
-    await store.recordSourceDeadLetters(poll.invalidEvents, new Date());
-    await store.updateSourceCursor(poll.nextCursor, new Date());
-    const processing = await engine.processNext(new Date());
-    await store.db.collection('cukies_bridge_relayer_runs').insertOne({
-      startedAt,
-      finishedAt: new Date(),
-      inserted,
-      fetched: poll.requests.length,
-      invalidEvents: poll.invalidEvents.length,
-      processing,
-      sourceCursor: poll.nextCursor,
-      direction: 'TRON_MAINNET_TO_BSC_MAINNET_LEGACY',
-    });
-    return {
-      inserted,
-      fetched: poll.requests.length,
-      invalidEvents: poll.invalidEvents.length,
-      processing,
-    };
+  return withRuntime(configInput, async (runtime) => {
+    await runtime.store.ensureIndexes();
+    return runBridgeRelayerIteration(configInput, runtime);
   });
 }
 
 export async function runBridgeRelayer(configInput = getBridgeRelayerConfig()) {
   assertEnabled(configInput);
+  const runtime = await createRuntime(configInput);
   let stopped = false;
   const stop = () => { stopped = true; };
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
 
-  while (!stopped) {
-    try {
-      await runBridgeRelayerOnce(configInput);
-    } catch (error) {
-      const text = error instanceof Error ? error.message : String(error);
-      process.stderr.write(`[cukies-bridge-relayer] ${text}\n`);
+  try {
+    await runtime.store.ensureIndexes();
+    while (!stopped) {
+      try {
+        await runBridgeRelayerIteration(configInput, runtime);
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`[cukies-bridge-relayer] ${text}\n`);
+      }
+      if (!stopped) {
+        await new Promise((resolve) => setTimeout(resolve, configInput.pollIntervalMs));
+      }
     }
-    if (!stopped) {
-      await new Promise((resolve) => setTimeout(resolve, configInput.pollIntervalMs));
-    }
+  } finally {
+    await runtime.store.close();
   }
 }

@@ -175,7 +175,12 @@ export class ViemBscBridgeDestination implements BscBridgeDestination {
         retryCount: 1,
         timeout: 8_000,
       })),
-      { rank: true },
+      // Do not enable viem's background ranking here.  `fallback({ rank: true })`
+      // starts an uncancellable timer/request loop for every transport.  The
+      // relayer used to create a destination on every poll, so those loops
+      // accumulated indefinitely and exhausted the production container.
+      // The configured RPC order is deliberately static and is enough for the
+      // small, sequential worker workload.
     );
     this.publicClient = createPublicClient({ chain: bsc, transport });
     this.walletClient = createWalletClient({
