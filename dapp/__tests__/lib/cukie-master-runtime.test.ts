@@ -101,6 +101,29 @@ describe('Cukie Master runtime cursor policy', () => {
     expect(cukiesAssetFilter(tokenLookup!)).not.toHaveProperty('$or');
   });
 
+  it('reads custodial assets by the canonical chain/collection/token document identity', () => {
+    const collectionAddress = '0xd4c7b16db234d7f62ba6a8f30153faf85feabec8';
+    const lookup = parseCukiesAssetLookup(
+      `cukies:97:${collectionAddress}:98000002`,
+    );
+    expect(lookup).toEqual({
+      kind: 'canonical',
+      documentId: `97:${collectionAddress}:98000002`,
+      chainId: 97,
+      collectionAddressNormalized: collectionAddress,
+      tokenId: '98000002',
+    });
+    expect(cukiesAssetFilter(lookup!)).toEqual({
+      _id: `97:${collectionAddress}:98000002`,
+      chainId: { $in: [97, '97'] },
+      collectionAddressNormalized: {
+        $regex: `^${collectionAddress}$`,
+        $options: 'i',
+      },
+      tokenId: { $in: ['98000002', 98000002] },
+    });
+  });
+
   it('fails closed for missing owner/asset and homonymous token candidates', () => {
     const lookup = parseCukiesAssetLookup('cukies:bsc:42')!;
     expect(evaluateNftOwnership({
@@ -121,6 +144,48 @@ describe('Cukie Master runtime cursor policy', () => {
       assets: [{ _id: 'bsc-42', network: 'BSC', tokenId: '42' }],
       lockOwnerNormalized: WALLET_A,
     })).toEqual({ action: 'invalidate_integrity', reason: 'nft_lock_owner_missing' });
+  });
+
+  it('keeps a canonical lock only for the same collection, chain and owner', () => {
+    const collectionAddress = '0xd4c7b16db234d7f62ba6a8f30153faf85feabec8';
+    const lookup = parseCukiesAssetLookup(
+      `cukies:97:${collectionAddress}:98000002`,
+    )!;
+    const canonicalAsset = {
+      _id: `97:${collectionAddress}:98000002`,
+      network: 'BSC',
+      chainId: 97,
+      collectionAddressNormalized: collectionAddress,
+      tokenId: '98000002',
+      ownerNormalized: WALLET_A,
+    };
+    expect(evaluateNftOwnership({
+      lookup,
+      assets: [canonicalAsset],
+      lockOwnerNormalized: WALLET_A,
+    })).toEqual({ action: 'keep' });
+    expect(evaluateNftOwnership({
+      lookup,
+      assets: [{ ...canonicalAsset, ownerNormalized: WALLET_B }],
+      lockOwnerNormalized: WALLET_A,
+    })).toEqual({
+      action: 'invalidate_ownership',
+      ownerNormalized: WALLET_B,
+    });
+    expect(evaluateNftOwnership({
+      lookup,
+      assets: [{
+        ...canonicalAsset,
+        _id: `97:0x1111111111111111111111111111111111111111:98000002`,
+        collectionAddressNormalized: '0x1111111111111111111111111111111111111111',
+      }],
+      lockOwnerNormalized: WALLET_A,
+    })).toEqual({ action: 'invalidate_integrity', reason: 'nft_lock_asset_missing' });
+    expect(evaluateNftOwnership({
+      lookup,
+      assets: [canonicalAsset, { ...canonicalAsset, _id: 'duplicate' }],
+      lockOwnerNormalized: WALLET_A,
+    })).toEqual({ action: 'invalidate_integrity', reason: 'nft_lock_asset_ambiguous' });
   });
 });
 

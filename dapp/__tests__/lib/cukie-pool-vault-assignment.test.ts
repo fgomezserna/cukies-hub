@@ -1,6 +1,7 @@
 jest.mock('@/lib/indexer-db/mongodb', () => ({ withEconomyTransaction: jest.fn() }));
 
 import { assertCukiePoolAssignmentIntegrity } from '@/lib/uki-economy/cukie-pool/service';
+import { SchemaNotReadyError } from '@/lib/uki-economy/errors';
 import {
   createCukiePoolVaultAssignmentService,
   type CukiePoolVaultAssetLease,
@@ -23,6 +24,21 @@ const PERIOD: CukiePoolVaultPeriod = {
   endsAt: new Date('2026-08-16T14:00:00.000Z'),
   calendarVersion: '2',
 };
+
+const QUOTA_CASES = [
+  { generation: 'original', rarity: 'common', gamesQuota: 2, poolPriority: 0 },
+  { generation: 'original', rarity: 'uncommon', gamesQuota: 4, poolPriority: 0 },
+  { generation: 'original', rarity: 'rare', gamesQuota: 6, poolPriority: 0 },
+  { generation: 'original', rarity: 'epic', gamesQuota: 8, poolPriority: 0 },
+  { generation: 'original', rarity: 'legendary', gamesQuota: 10, poolPriority: 0 },
+  { generation: 'original', rarity: 'goat', gamesQuota: 12, poolPriority: 0 },
+  { generation: 'second_generation', rarity: 'common', gamesQuota: 1, poolPriority: 1 },
+  { generation: 'second_generation', rarity: 'uncommon', gamesQuota: 2, poolPriority: 1 },
+  { generation: 'second_generation', rarity: 'rare', gamesQuota: 3, poolPriority: 1 },
+  { generation: 'second_generation', rarity: 'epic', gamesQuota: 4, poolPriority: 1 },
+  { generation: 'second_generation', rarity: 'legendary', gamesQuota: 5, poolPriority: 1 },
+  { generation: 'second_generation', rarity: 'goat', gamesQuota: 6, poolPriority: 1 },
+] as const;
 
 function candidate(
   tokenId: string,
@@ -139,12 +155,12 @@ function harness(initialCandidates: CukiePoolVaultCandidate[]) {
   };
 }
 
-function assignInput(sessionId: string) {
+function assignInput(sessionId: string, now = NOW) {
   return {
     sessionId,
-    expiresAt: new Date(NOW.getTime() + 10 * 60_000),
+    expiresAt: new Date(now.getTime() + 10 * 60_000),
     idempotencyKey: `assign:${sessionId}`,
-    now: NOW,
+    now,
   };
 }
 
@@ -157,7 +173,7 @@ describe('Cukie Pool custodial assignment', () => {
       poolPriority: 1,
     });
     const original = candidate('1');
-    const state = harness([original, second]);
+    const state = harness([second, original]);
 
     const first = await state.service.assignCukiePoolSession(assignInput('game:1'));
     expect(assertCukiePoolAssignmentIntegrity(first)).toMatchObject({
@@ -174,6 +190,98 @@ describe('Cukie Pool custodial assignment', () => {
     expect(secondGame.assetId).toBe(second.assetId);
     expect(state.leases.size).toBe(2);
     expect(await state.service.assignCukiePoolSession(assignInput('game:1'))).toEqual(first);
+  });
+
+  it.each(QUOTA_CASES)(
+    'enforces $gamesQuota games for $generation/$rarity before falling back to Seiku',
+    async ({ generation, rarity, gamesQuota, poolPriority: expectedPriority }) => {
+      const tokenId = `${generation === 'original' ? '1' : '2'}${String(gamesQuota).padStart(2, '0')}`;
+      const asset = candidate(tokenId, {
+        generation,
+        rarity,
+        gamesQuota,
+        poolPriority: expectedPriority,
+      });
+      const state = harness([asset]);
+
+      for (let game = 1; game <= gamesQuota; game += 1) {
+        const sessionId = `${generation}:${rarity}:${game}`;
+        const assigned = await state.service.assignCukiePoolSession(assignInput(sessionId));
+        expect(assigned).toMatchObject({
+          kind: 'pool_asset',
+          assetId: asset.assetId,
+          generation,
+          rarity,
+          gamesQuota,
+        });
+        await state.service.releaseCukiePoolAssignment({
+          sessionId,
+          expectedRevision: 0,
+          consumeGame: true,
+          reason: 'game_settled',
+          idempotencyKey: `finish:${sessionId}`,
+          now: new Date(NOW.getTime() + game * 1_000),
+        });
+      }
+
+      expect(state.leases.size).toBe(0);
+      expect(state.usages.get(`${asset.positionId}:period:${PERIOD.periodId}`)).toMatchObject({
+        gamesQuota,
+        consumedGames: gamesQuota,
+      });
+      await expect(state.service.assignCukiePoolSession(
+        assignInput(`${generation}:${rarity}:exhausted`),
+      )).resolves.toMatchObject({
+        kind: 'seiku',
+        generation: 'original',
+        rarity: 'common',
+        ownerRewardEligible: false,
+        gamesQuota: null,
+      });
+    },
+  );
+
+  it('releases an expired lease without consuming quota and makes the NFT lendable again', async () => {
+    const asset = candidate('expiry');
+    const state = harness([asset]);
+    const assigned = await state.service.assignCukiePoolSession(assignInput('expires'));
+    expect(state.leases.size).toBe(1);
+
+    await expect(state.service.expireCukiePoolAssignments({
+      now: assigned.expiresAt,
+      limit: 100,
+      actor: 'test-expirer',
+    })).resolves.toEqual({ scanned: 1, expired: 1, skipped: 0 });
+    expect(state.assignments.get(assigned.assignmentId)).toMatchObject({
+      status: 'expired',
+      releaseReason: 'assignment_expired:test-expirer',
+    });
+    expect(state.leases.size).toBe(0);
+    expect(state.usages.size).toBe(0);
+
+    const reassigned = await state.service.assignCukiePoolSession(assignInput(
+      'after-expiry',
+      new Date(assigned.expiresAt.getTime() + 1),
+    ));
+    expect(reassigned).toMatchObject({ kind: 'pool_asset', assetId: asset.assetId });
+  });
+
+  it('fails closed if repository metadata tries to alter priority or quota', async () => {
+    const state = harness([
+      candidate('corrupt-priority', { poolPriority: 1 }),
+    ]);
+    await expect(state.service.assignCukiePoolSession(
+      assignInput('corrupt-priority'),
+    )).rejects.toBeInstanceOf(SchemaNotReadyError);
+
+    state.setCandidates([
+      candidate('corrupt-quota', { gamesQuota: 12 }),
+    ]);
+    await expect(state.service.assignCukiePoolSession(
+      assignInput('corrupt-quota'),
+    )).rejects.toBeInstanceOf(SchemaNotReadyError);
+    expect(state.assignments.size).toBe(0);
+    expect(state.leases.size).toBe(0);
   });
 
   it('does not consume quota on release, consumes exactly once on completion and never restores it', async () => {

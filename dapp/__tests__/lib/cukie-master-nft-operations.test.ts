@@ -31,7 +31,7 @@ describe('getCukieMasterNftInventory', () => {
     mockSummary.mockResolvedValue({
       walletNormalized: wallet,
       eligibleAssets: [
-        asset('cukies:soft', '42', 'rare', 'soft_staked', 4),
+        asset('cukies:soft', '42', 'rare', 'soft_staked', 4, 'https://cdn.example/42.png'),
         asset('cukies:game', '43', 'epic', 'assigned_to_game', 7),
         asset('cukies:available', '44', 'common', 'available', 1),
       ],
@@ -60,7 +60,7 @@ describe('getCukieMasterNftInventory', () => {
     const byId = new Map(inventory.map((item) => [item.assetId, item]));
 
     expect(byId.get('cukies:soft')).toEqual(expect.objectContaining({
-      imageUrl: expect.stringContaining('/42.png'),
+      imageUrl: 'https://cdn.example/42.png',
       rarityPoints: 4,
       contributesToCukieMaster: true,
       contributionPoints: 4,
@@ -73,6 +73,7 @@ describe('getCukieMasterNftInventory', () => {
       canUnstake: false,
     }));
     expect(byId.get('cukies:available')).toEqual(expect.objectContaining({
+      imageUrl: expect.stringContaining('/44.png'),
       rarityPoints: 1,
       contributesToCukieMaster: false,
       contributionPoints: 0,
@@ -84,21 +85,5 @@ describe('getCukieMasterNftInventory', () => {
       contributionPoints: 0,
       blockers: ['listed'],
     }));
-  });
-
-  it('reutiliza la URL de card publicada por el indexer en vez de reconstruir S3', async () => {
-    const imageUrl = `https://assets-staging.cukies.world/OTgwMDAwMDE/${'b'.repeat(64)}.png`;
-    mockSummary.mockResolvedValue({
-      walletNormalized: wallet,
-      eligibleAssets: [asset('cukies:v2', '98000001', 'common', 'available', 1, imageUrl)],
-      rejectedAssets: [],
-    } as never);
-    mockDb.mockResolvedValue({
-      collection: () => ({ find: () => ({ toArray: async () => [] }) }),
-    } as never);
-
-    const inventory = await getCukieMasterNftInventory(wallet, new Date('2026-08-08T10:00:00.000Z'));
-
-    expect(inventory[0]?.imageUrl).toBe(imageUrl);
   });
 });

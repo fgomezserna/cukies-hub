@@ -1,27 +1,54 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 
 import { CompetitionCreditPanel } from '@/components/cukie-master/credit-panel';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { usePathname } from 'next/navigation';
 
 jest.mock('@/providers/auth-provider');
+jest.mock('wagmi', () => ({
+  useAccount: jest.fn(),
+  useSwitchChain: jest.fn(),
+}));
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('lucide-react', () => ({
-  AlertTriangle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
-  CheckCircle2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
-  Loader2: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
-  Save: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ArrowRight: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Lock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+}));
+jest.mock('@phosphor-icons/react', () => ({
+  CheckCircle: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ArrowCounterClockwise: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  ClockCountdown: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Coin: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Diamond: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  FloppyDisk: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  GameController: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Minus: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Plus: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  SpinnerGap: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Trophy: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Warning: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const fetchMock = jest.fn();
 const wallet = '0x1111111111111111111111111111111111111111';
+
+function setVisibilityState(value: 'visible' | 'hidden') {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value });
+}
 
 function authValue() {
   return {
     user: { walletAddress: wallet } as User,
     isLoading: false,
     isWaitingForApproval: false,
-    walletType: null,
+    walletType: 'evm' as const,
     fetchUser: jest.fn(),
   };
 }
@@ -43,29 +70,97 @@ function statusResponse() {
           reservedCredits: 10,
           spentCredits: 10,
           poolDepositedCredits: 20,
+          expiredCredits: 45,
           blocked: false,
         },
         pool: { availableCredits: 400, reservedCredits: 10, blocked: false },
+        routes: {
+          uki: {
+            balance: { blocked: false, materialization: { state: 'ready' } },
+            pool: { blocked: false, materialization: { state: 'ready' } },
+            grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
+          },
+          nft: {
+            balance: { blocked: false, materialization: { state: 'ready' } },
+            pool: { blocked: false, materialization: { state: 'ready' } },
+            grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
+          },
+        },
         configurations: [{
           slotId: 'slot-1',
           route: 'uki',
           ordinal: 1,
           status: 'active',
+          creditEligibleFrom: '2026-07-10T11:00:00.000Z',
+          firstEligibleCutoff: '2026-07-10T12:00:00.000Z',
           poolCreditsPerSlot: 20,
           effectiveCutoff: '2026-07-11T12:00:00.000Z',
         }],
         activeReservations: 1,
         grants: { healthy: true, sourceObservedThrough: '2026-07-10T12:01:00.000Z', openIncidents: 0 },
+        currentRun: {
+          periodCutoff: '2026-07-10T12:00:00.000Z',
+          routes: [{ route: 'uki', status: 'open' }, { route: 'nft', status: 'open' }],
+        },
+        history: {
+          available: true,
+          page: 0,
+          pageSize: 20,
+          hasMore: false,
+          totals: {
+            receivedCredits: 500,
+            spentCredits: 10,
+            poolContributedCredits: 100,
+            expiredCredits: 0,
+          },
+          nextExpiry: { credits: 80, at: '2026-07-11T12:00:00.000Z' },
+          entries: [{
+            eventId: 'grant:own:item-1',
+            operation: 'grant',
+            bucket: 'own',
+            amountCredits: 100,
+            route: 'uki',
+            slotOrdinal: 1,
+            occurredAt: '2026-07-10T12:01:00.000Z',
+            expiresAt: '2026-07-11T12:00:00.000Z',
+            periodId: 'period-1',
+          }, {
+            eventId: 'spend:own:reservation-1',
+            operation: 'spend',
+            bucket: 'own',
+            amountCredits: 10,
+            route: 'uki',
+            slotOrdinal: 1,
+            occurredAt: '2026-07-10T14:30:00.000Z',
+            expiresAt: '2026-07-11T12:00:00.000Z',
+            periodId: 'period-1',
+          }],
+        },
       },
     }),
   };
 }
 
+async function openCreditTab(tab: 'Reparto' | 'Historial') {
+  fireEvent.mouseDown(await screen.findByRole('tab', { name: tab }));
+}
+
 describe('CompetitionCreditPanel', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    setVisibilityState('visible');
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
+    window.history.replaceState(null, '', '/credits');
     mockUseAuth.mockReturnValue(authValue());
+    mockUseAccount.mockReturnValue({ address: wallet, isConnected: true, chainId: 97 } as unknown as ReturnType<typeof useAccount>);
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUsePathname.mockReturnValue('/credits');
     global.fetch = fetchMock;
+    setVisibilityState('visible');
   });
 
   it('renders persisted balances and saves a multiple-of-ten pool configuration', async () => {
@@ -76,11 +171,28 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
 
-    await waitFor(() => expect(screen.getByText('Disponibles')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Confirmado en este periodo')).toBeInTheDocument());
     expect(screen.getAllByText('80').length).toBeGreaterThan(0);
-    const select = screen.getByLabelText('Créditos al pool para slot-1');
-    fireEvent.change(select, { target: { value: '30' } });
-    fireEvent.click(screen.getByRole('button', { name: /Guardar/i }));
+    expect(screen.getByRole('tab', { name: 'Reparto' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Historial' })).toHaveAttribute('aria-selected', 'false');
+    await openCreditTab('Historial');
+    expect(screen.getByRole('heading', { name: 'Historial de créditos' })).toBeInTheDocument();
+    expect(screen.getByText('Créditos recibidos')).toBeInTheDocument();
+    expect(screen.getByText('Partida jugada')).toBeInTheDocument();
+    expect(screen.getByText('Próxima caducidad')).toBeInTheDocument();
+    await openCreditTab('Reparto');
+    const [currentPoolBalance] = screen.getAllByText('Aportados al pool');
+    expect(currentPoolBalance.parentElement).toHaveTextContent('20');
+    expect(screen.getAllByText('Caducados')[0].parentElement).toHaveTextContent('45');
+    expect(screen.queryByText('credits-v1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Aumentar aportación al pool de UKI, cupo 1',
+    }));
+    expect(screen.getByRole('status')).toHaveTextContent('1 cambio sin guardar');
+    await openCreditTab('Historial');
+    expect(screen.getByRole('status')).toHaveTextContent('1 cambio sin guardar');
+    await openCreditTab('Reparto');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar 1 cambio' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     const [, post] = fetchMock.mock.calls;
@@ -92,7 +204,103 @@ describe('CompetitionCreditPanel', () => {
       poolCreditsPerSlot: 30,
     });
     expect(post[1].headers['idempotency-key']).toMatch(/^credit-config:slot-1:/);
-    expect(await screen.findByText(/Configuración registrada/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Reparto guardado\. Se aplicará/i)).toBeInTheDocument();
+  });
+
+  it('abre el historial desde el hash y conserva el estado al navegar entre pestañas', async () => {
+    fetchMock.mockResolvedValueOnce(statusResponse());
+    window.history.replaceState({ marker: 'credits' }, '', '/credits#credit-history');
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByRole('tab', { name: 'Historial' })).toHaveAttribute('aria-selected', 'true');
+    const preservedState = window.history.state;
+    await openCreditTab('Reparto');
+    expect(window.history.state).toEqual(preservedState);
+    window.history.replaceState({ marker: 'credits-pop' }, '', '/credits#credit-history');
+    fireEvent(window, new Event('popstate'));
+    expect(screen.getByRole('tab', { name: 'Historial' })).toHaveAttribute('aria-selected', 'true');
+    window.history.replaceState({ marker: 'credits-initial' }, '', '/credits');
+    fireEvent(window, new Event('popstate'));
+    expect(screen.getByRole('tab', { name: 'Reparto' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('shows the exact first eligible cutoff and lets qualifying slots be configured in advance', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.configurations[0].status = 'qualifying';
+    body.data.configurations[0].creditEligibleFrom = '2026-07-10T12:35:00.000Z';
+    body.data.configurations[0].firstEligibleCutoff = '2026-07-10T13:00:00.000Z';
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/Primer corte elegible para recibir créditos: 10 jul 2026, 13:00 UTC/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/Configuración futura/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', {
+      name: 'Aumentar aportación al pool de UKI, cupo 1',
+    })).toBeEnabled();
+  });
+
+  it('groups qualifying slots by their own first eligible cutoff', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.configurations.push({
+      slotId: 'slot-2',
+      route: 'uki',
+      ordinal: 2,
+      status: 'qualifying',
+      creditEligibleFrom: '2026-07-11T12:35:00.000Z',
+      firstEligibleCutoff: '2026-07-12T12:00:00.000Z',
+      poolCreditsPerSlot: 40,
+      effectiveCutoff: '2026-07-12T12:00:00.000Z',
+    });
+    body.data.configurations[0].status = 'qualifying';
+    body.data.configurations[0].firstEligibleCutoff = '2026-07-11T12:00:00.000Z';
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/Primer corte elegible: 11 jul 2026, 12:00 UTC/i)).toBeInTheDocument();
+    expect(screen.getByText(/Primer corte elegible: 12 jul 2026, 12:00 UTC/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/100 créditos preparados/i)).toHaveLength(2);
+  });
+
+  it('keeps an open current-period run as final even when the confirmed balance is zero', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.balance.availableCredits = 0;
+    body.data.balance.reservedCredits = 0;
+    body.data.balance.spentCredits = 0;
+    body.data.balance.poolDepositedCredits = 0;
+    (body.data as { currentRun?: unknown }).currentRun = {
+      periodCutoff: '2026-07-10T12:00:00.000Z',
+      routes: [{ route: 'uki', status: 'open' }, { route: 'nft', status: 'open' }],
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText('Confirmado en este periodo')).toBeInTheDocument();
+    expect(screen.queryByText(/sigue en proceso/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0);
+  });
+
+  it('shows the current period as pending before either route has a run', async () => {
+    const response = statusResponse();
+    const body = await response.json();
+    body.data.balance.availableCredits = 0;
+    (body.data as { currentRun?: unknown }).currentRun = {
+      periodCutoff: '2026-07-10T12:00:00.000Z',
+      routes: [{ route: 'uki', status: 'missing' }, { route: 'nft', status: 'missing' }],
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/sigue en proceso/i)).toBeInTheDocument();
+    expect(screen.getByText(/último saldo confirmado/i)).toBeInTheDocument();
   });
 
   it('fails closed without balances or controls when the ledger is unavailable', async () => {
@@ -103,8 +311,281 @@ describe('CompetitionCreditPanel', () => {
 
     render(<CompetitionCreditPanel />);
 
-    expect(await screen.findByText(/no está disponible con garantías/i)).toBeInTheDocument();
-    expect(screen.queryByText('Disponibles')).not.toBeInTheDocument();
+    expect(await screen.findByText(/no están disponibles ahora/i)).toBeInTheDocument();
+    expect(screen.queryByText('Para jugar')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Guardar/i })).not.toBeInTheDocument();
+  });
+
+  it('permite configurar la ruta UKI aunque la ruta Cukies esté bloqueada', async () => {
+    const partialStatus = statusResponse();
+    const body = await partialStatus.json();
+    body.data.grants.healthy = false;
+    body.data.grants.openIncidents = 1;
+    body.data.routes.nft.grants.healthy = false;
+    body.data.routes.nft.grants.openIncidents = 1;
+    body.data.configurations.push({
+      slotId: 'slot-nft-1',
+      route: 'nft',
+      ordinal: 1,
+      status: 'active',
+      creditEligibleFrom: '2026-07-10T11:00:00.000Z',
+      firstEligibleCutoff: '2026-07-10T12:00:00.000Z',
+      poolCreditsPerSlot: 0,
+      effectiveCutoff: '2026-07-11T12:00:00.000Z',
+    });
+
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => body })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'ok' }) })
+      .mockResolvedValueOnce(statusResponse());
+
+    render(<CompetitionCreditPanel />);
+
+    const ukiIncrease = await screen.findByRole('button', {
+      name: 'Aumentar aportación al pool de UKI, cupo 1',
+    });
+    const nftIncrease = screen.getByLabelText('Aumentar aportación al pool de Cukies, cupo 1');
+    expect(ukiIncrease).toBeEnabled();
+    expect(nftIncrease).toBeDisabled();
+    expect(screen.getByText(/vigencia actual de tus cupos de Cukies está pendiente/i)).toBeInTheDocument();
+
+    fireEvent.click(ukiIncrease);
+    const saveButton = screen.getByRole('button', { name: 'Guardar 1 cambio' });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      slotId: 'slot-1',
+      poolCreditsPerSlot: 30,
+    });
+  });
+
+  it('mantiene el último estado confirmado como pendiente cuando ninguna fuente está actualizada', async () => {
+    const staleStatus = statusResponse();
+    const body = await staleStatus.json();
+    body.data.grants.healthy = false;
+    body.data.routes.uki.grants.healthy = false;
+    body.data.routes.nft.grants.healthy = false;
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => body });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findAllByText('Pendiente')).toHaveLength(2);
+    expect(screen.getByText(/vigencia actual de tus cupos UKI y tus cupos de Cukies está pendiente/i)).toBeInTheDocument();
+    expect(screen.queryByText('Repartes 100 créditos entre tus cupos activos.')).not.toBeInTheDocument();
+  });
+
+  it('refresca al recuperar el foco y cada 30 segundos sin pisar un draft', async () => {
+    jest.useFakeTimers();
+    const refreshedResponse = statusResponse();
+    const refreshed = await refreshedResponse.json();
+    refreshed.data.balance.expiredCredits = 99;
+    fetchMock
+      .mockResolvedValueOnce(statusResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => refreshed })
+      .mockResolvedValueOnce({ ok: true, json: async () => refreshed });
+
+    render(<CompetitionCreditPanel />);
+    await screen.findByText('Confirmado en este periodo');
+    fireEvent.click(screen.getByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' }));
+
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: 'Guardar 1 cambio' })).toBeEnabled();
+    await waitFor(() => expect(screen.getAllByText('99')[0]).toBeInTheDocument());
+
+    await act(async () => {
+      jest.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('conserva la página abierta del historial durante un refresco en foco', async () => {
+    jest.useFakeTimers();
+    const initialResponse = statusResponse();
+    const initial = await initialResponse.json();
+    initial.data.history.hasMore = true;
+    const olderResponse = statusResponse();
+    const older = await olderResponse.json();
+    older.data.history.page = 1;
+    older.data.history.hasMore = false;
+    older.data.history.entries = [{
+      ...older.data.history.entries[0],
+      eventId: 'grant:own:older',
+      amountCredits: 40,
+    }];
+    const refreshedResponse = statusResponse();
+    const refreshed = await refreshedResponse.json();
+    refreshed.data.history.hasMore = true;
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => initial })
+      .mockResolvedValueOnce({ ok: true, json: async () => older })
+      .mockResolvedValueOnce({ ok: true, json: async () => refreshed });
+
+    render(<CompetitionCreditPanel />);
+    await openCreditTab('Historial');
+    await screen.findByRole('button', { name: 'Cargar movimientos anteriores' });
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar movimientos anteriores' }));
+    expect(await screen.findByText('+40')).toBeInTheDocument();
+
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(screen.getByText('+40')).toBeInTheDocument();
+  });
+
+  it('no solapa refrescos de foco mientras la petición anterior sigue abierta', async () => {
+    jest.useFakeTimers();
+    let resolveRefresh: ((value: unknown) => void) | undefined;
+    fetchMock
+      .mockResolvedValueOnce(statusResponse())
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }));
+
+    render(<CompetitionCreditPanel />);
+    await screen.findByText('Confirmado en este periodo');
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveRefresh?.(statusResponse());
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByText('Tu reparto está guardado.')).toBeInTheDocument());
+  });
+
+  it('fuerza una lectura posterior al guardado aunque haya un GET de foco en vuelo', async () => {
+    jest.useFakeTimers();
+    let resolveRefresh: ((value: unknown) => void) | undefined;
+    const savedResponse = statusResponse();
+    const saved = await savedResponse.json();
+    saved.data.configurations[0].poolCreditsPerSlot = 30;
+    fetchMock
+      .mockResolvedValueOnce(statusResponse())
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveRefresh = resolve;
+      }))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: 'ok' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => saved });
+
+    render(<CompetitionCreditPanel />);
+    await screen.findByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' });
+    await act(async () => { jest.advanceTimersByTime(30_000); });
+    fireEvent.click(screen.getByRole('button', { name: 'Aumentar aportación al pool de UKI, cupo 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar 1 cambio' }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      resolveRefresh?.(statusResponse());
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(screen.getByText(/Reparto guardado\. Se aplicará/i)).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Guardar 1 cambio' })).not.toBeInTheDocument();
+  });
+
+  it('descarta una respuesta tardía al cambiar de wallet y reinicia operaciones locales', async () => {
+    let resolveFirst: ((value: unknown) => void) | undefined;
+    const newWalletResponse = statusResponse();
+    const newWalletBody = await newWalletResponse.json();
+    newWalletBody.data.walletNormalized = '0x2222222222222222222222222222222222222222';
+    fetchMock
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveFirst = resolve;
+      }))
+      .mockResolvedValueOnce({ ok: true, json: async () => newWalletBody });
+
+    const view = render(<CompetitionCreditPanel />);
+    mockUseAuth.mockReturnValue({
+      ...authValue(),
+      user: { walletAddress: '0x2222222222222222222222222222222222222222' } as User,
+    });
+    mockUseAccount.mockReturnValue({
+      address: '0x2222222222222222222222222222222222222222',
+      isConnected: true,
+      chainId: 97,
+    } as unknown as ReturnType<typeof useAccount>);
+    view.rerender(<CompetitionCreditPanel />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await screen.findByText('Confirmado en este periodo');
+    resolveFirst?.(statusResponse());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getAllByText('80').length).toBeGreaterThan(0);
+  });
+
+  it('muestra asignación parcial por fuente cuando una ruta es desconocida', async () => {
+    const partialResponse = statusResponse();
+    const partial = await partialResponse.json();
+    const partialRoutes = partial.data.routes as Partial<typeof partial.data.routes>;
+    delete partialRoutes.nft;
+    partial.data.routes = partialRoutes as typeof partial.data.routes;
+    partial.data.configurations.push({
+      slotId: 'slot-nft-1',
+      route: 'nft',
+      ordinal: 1,
+      status: 'active',
+      creditEligibleFrom: '2026-07-10T11:00:00.000Z',
+      firstEligibleCutoff: '2026-07-10T12:00:00.000Z',
+      poolCreditsPerSlot: 0,
+      effectiveCutoff: '2026-07-11T12:00:00.000Z',
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => partial });
+
+    render(<CompetitionCreditPanel />);
+
+    await screen.findByText(/Cukies sin confirmar; mostramos solo la parte confirmada/i);
+    expect(screen.queryByText('Repartes 200 créditos entre tus cupos activos.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Aumentar aportación al pool de UKI, cupo 1')).toBeEnabled();
+    expect(screen.getByLabelText('Aumentar aportación al pool de Cukies, cupo 1')).toBeDisabled();
+  });
+
+  it('no presenta ausencia de cupos mientras ambas fuentes siguen desconocidas', async () => {
+    const pendingResponse = statusResponse();
+    const original = await pendingResponse.json();
+    const pending = {
+      ...original,
+      data: { ...original.data, routes: {}, configurations: [] },
+    };
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => pending });
+
+    render(<CompetitionCreditPanel />);
+
+    expect(await screen.findByText(/Todavía no podemos confirmar tus cupos/i)).toBeInTheDocument();
+    expect(screen.getByText(/sigue pendiente/i)).toBeInTheDocument();
+    expect(screen.queryByText('Todavía no tienes cupos configurables')).not.toBeInTheDocument();
+  });
+
+  it('aplica un reparto visual a todos los cupos sin desplegables', async () => {
+    fetchMock.mockResolvedValueOnce(statusResponse());
+
+    render(<CompetitionCreditPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Todo al pool/i }));
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar 1 cambio' })).toBeEnabled();
+    expect(screen.getAllByText('100').length).toBeGreaterThan(0);
+  });
+
+  it('filters the ledger without exposing technical operation names', async () => {
+    fetchMock.mockResolvedValueOnce(statusResponse());
+
+    render(<CompetitionCreditPanel />);
+
+    await openCreditTab('Historial');
+    fireEvent.click(await screen.findByRole('button', { name: 'Gastados' }));
+
+    expect(screen.getByText('Partida jugada')).toBeInTheDocument();
+    expect(screen.queryByText('Créditos recibidos')).not.toBeInTheDocument();
+    expect(screen.queryByText('grant')).not.toBeInTheDocument();
+    expect(screen.queryByText('spend')).not.toBeInTheDocument();
   });
 });

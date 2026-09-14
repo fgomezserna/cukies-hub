@@ -10,11 +10,18 @@ import {
   type CompetitionCreditRuntimeServices,
 } from '@/lib/uki-economy/credits/runtime';
 import { currentCompetitionCreditPeriod } from '@/lib/uki-economy/credits/rules';
+import { createCompetitionCreditService } from '@/lib/uki-economy/credits/service';
 import {
+  createMemoryCompetitionCreditRunner,
+  MemoryCompetitionCreditRepository,
   testCompetitionCreditRule,
   testCreditSourceWatermark,
 } from '@/lib/uki-economy/credits/testing';
-import type { CompetitionCreditRun } from '@/lib/uki-economy/credits/types';
+import type {
+  CompetitionCreditRun,
+  CreditSnapshotSlot,
+} from '@/lib/uki-economy/credits/types';
+import { DomainConflictError } from '@/lib/uki-economy/errors';
 
 const now = new Date('2026-07-10T12:05:00.000Z');
 const rule = testCompetitionCreditRule();
@@ -62,6 +69,7 @@ function creditRun(status: CompetitionCreditRun['status'] = 'snapshotted'): Comp
 class MemoryCoordinator implements CompetitionCreditRuntimeCoordinator {
   busy = false;
   failed: string[] = [];
+  failedRoutes: CompetitionCreditRuntimeResult['routeResults'][] = [];
   finished: CompetitionCreditRuntimeResult[] = [];
   released = 0;
   lease: CompetitionCreditRuntimeLease = {
@@ -100,8 +108,10 @@ class MemoryCoordinator implements CompetitionCreditRuntimeCoordinator {
     _lease: CompetitionCreditRuntimeLease,
     _now: Date,
     errorCode: string,
+    routeResults: CompetitionCreditRuntimeResult['routeResults'] = [],
   ) {
     this.failed.push(errorCode);
+    this.failedRoutes.push(routeResults);
   }
 }
 
@@ -132,13 +142,37 @@ function services(overrides: Partial<CompetitionCreditRuntimeServices> = {}) {
 
 describe('competition credit runtime', () => {
   it('is disabled by default and requires an explicit pinned rule when enabled', () => {
-    expect(loadCompetitionCreditRuntimeConfig({}).enabled).toBe(false);
+    expect(loadCompetitionCreditRuntimeConfig({})).toMatchObject({
+      enabled: false,
+      batchLimit: 50,
+    });
     expect(() => loadCompetitionCreditRuntimeConfig({
       COMPETITION_CREDITS_RUNTIME_ENABLED: 'true',
     })).toThrow(CompetitionCreditRuntimeConfigurationError);
     expect(() => loadCompetitionCreditRuntimeConfig({
       COMPETITION_CREDITS_RUNTIME_ENABLED: 'yes',
     })).toThrow(/true o false/);
+    expect(() => loadCompetitionCreditRuntimeConfig({
+      COMPETITION_CREDITS_BATCH_LIMIT: '101',
+    })).toThrow(/entre 1 y 100/);
+  });
+
+  it('caps the configured batch limit to the active rule contract', async () => {
+    const runtimeServices = services();
+
+    await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config: { ...config, batchLimit: 100 },
+      clock: () => now,
+      coordinator: new MemoryCoordinator(),
+      services: runtimeServices,
+      loadActiveRule: async () => ({ ...rule, maxBatchSize: 50 }),
+    });
+
+    expect(runtimeServices.processRunBatch).toHaveBeenCalledTimes(2);
+    expect(runtimeServices.processRunBatch).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 50 }),
+    );
   });
 
   it('refreshes, snapshots, fences, applies, opens and expires in one bounded tick', async () => {
@@ -204,7 +238,7 @@ describe('competition credit runtime', () => {
     expect(runtimeServices.openRun).not.toHaveBeenCalled();
   });
 
-  it('reports a healthy waiting tick before the first eligible settlement', async () => {
+  it('refreshes both source watermarks while waiting without creating credit runs', async () => {
     const coordinator = new MemoryCoordinator();
     const runtimeServices = services({
       findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(null),
@@ -224,10 +258,131 @@ describe('competition credit runtime', () => {
       expect.objectContaining({ route: 'uki', status: 'waiting', creditRunId: '' }),
       expect.objectContaining({ route: 'nft', status: 'waiting', creditRunId: '' }),
     ]);
-    expect(runtimeServices.refreshSourceWatermark).not.toHaveBeenCalled();
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenCalledTimes(2);
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenNthCalledWith(1, {
+      route: 'uki',
+      expectedRuleVersion: rule.version,
+      ruleAt: period.cutoff,
+      now,
+    });
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenNthCalledWith(2, {
+      route: 'nft',
+      expectedRuleVersion: rule.version,
+      ruleAt: period.cutoff,
+      now,
+    });
     expect(runtimeServices.createDailyRun).not.toHaveBeenCalled();
     expect(coordinator.failed).toHaveLength(0);
     expect(coordinator.finished).toHaveLength(1);
+  });
+
+  it('uses a clock reading after watermark refresh before creating a run', async () => {
+    let observedNow = now;
+    const runtimeServices = services({
+      refreshSourceWatermark: jest.fn().mockImplementation(async ({ route }) => {
+        observedNow = new Date(observedNow.getTime() + 1_000);
+        return testCreditSourceWatermark({
+          route,
+          _id: `cukie-master-slots:${route}`,
+          observedThrough: observedNow,
+          updatedAt: observedNow,
+        });
+      }),
+    });
+
+    await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => observedNow,
+      coordinator: new MemoryCoordinator(),
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(runtimeServices.createDailyRun).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      now: new Date(now.getTime() + 1_000),
+    }));
+  });
+
+  it('rechecks a transient watermark race once and keeps a persistent conflict blocked', async () => {
+    const transientConflict = new DomainConflictError('source changed during snapshot', {
+      reasonCode: 'CREDIT_SOURCE_CHANGED_AFTER_WATERMARK',
+    });
+    const runtimeServices = services({
+      createDailyRun: jest.fn()
+        .mockRejectedValueOnce(transientConflict)
+        .mockResolvedValueOnce(creditRun())
+        .mockRejectedValue(new DomainConflictError('source still changing', {
+          reasonCode: 'CREDIT_SOURCE_CHANGED_AFTER_WATERMARK',
+        })),
+    });
+    const coordinator = new MemoryCoordinator();
+
+    const result = await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(runtimeServices.createDailyRun).toHaveBeenCalledTimes(4);
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenCalledTimes(4);
+    expect(result.routeResults).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'open' }),
+      expect.objectContaining({
+        route: 'nft',
+        status: 'blocked',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['CREDIT_SOURCE_CHANGED_AFTER_WATERMARK'],
+      }),
+    ]);
+    expect(coordinator.finished).toHaveLength(1);
+  });
+
+  it('blocks unhealthy waiting sources while still expiring reservations and lots', async () => {
+    const coordinator = new MemoryCoordinator();
+    const repository = new MemoryCompetitionCreditRepository({ rule });
+    repository.state.sourceHealth.healthy = false;
+    repository.state.sourceHealth.warnings = ['CHAIN_EVENTS_NOT_PROJECTED'];
+    const creditService = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    const watermarkBefore = repository.state.watermark;
+    const runtimeServices = services({
+      findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(null),
+      refreshSourceWatermark: jest.fn(creditService.refreshSourceWatermark),
+    });
+
+    await expect(runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    })).rejects.toThrow('No se puede publicar watermark con fuentes no saludables');
+
+    expect(runtimeServices.refreshSourceWatermark).toHaveBeenCalledTimes(2);
+    expect(repository.state.watermark).toEqual(watermarkBefore);
+    expect(runtimeServices.createDailyRun).not.toHaveBeenCalled();
+    expect(runtimeServices.openRun).not.toHaveBeenCalled();
+    expect(runtimeServices.expireReservationsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
+    expect(runtimeServices.expireAvailableLotsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
+    expect(coordinator.failedRoutes[0]).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'blocked', errorCode: 'DOMAIN_CONFLICT' }),
+      expect.objectContaining({ route: 'nft', status: 'blocked', errorCode: 'DOMAIN_CONFLICT' }),
+    ]);
+    expect(coordinator.finished).toHaveLength(0);
+    expect(coordinator.released).toBe(1);
   });
 
   it('rejects an overlapping tick before mutating the economy', async () => {
@@ -262,5 +417,167 @@ describe('competition credit runtime', () => {
     })).rejects.toThrow('sensitive upstream detail');
     expect(coordinator.failed).toEqual(['TICK_FAILED']);
     expect(coordinator.released).toBe(1);
+  });
+
+  it('opens a healthy route even when the other route remains blocked', async () => {
+    const coordinator = new MemoryCoordinator();
+    const runtimeServices = services({
+      refreshSourceWatermark: jest.fn().mockImplementation(({ route }) =>
+        route === 'nft'
+          ? Promise.reject(new DomainConflictError('nft blocked', {
+              reasonCode: 'SOURCE_UNHEALTHY',
+            }))
+          : Promise.resolve(testCreditSourceWatermark()),
+      ),
+    });
+
+    const result = await runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    });
+
+    expect(result.status).toBe('blocked');
+    expect(result.routeResults).toEqual([
+      expect.objectContaining({ route: 'uki', status: 'open' }),
+      expect.objectContaining({
+        route: 'nft',
+        status: 'blocked',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['SOURCE_UNHEALTHY'],
+      }),
+    ]);
+    expect(coordinator.failed).toHaveLength(0);
+    expect(coordinator.finished).toHaveLength(1);
+  });
+
+  it('persists route-specific domain blockers before keeping the scheduler failure visible', async () => {
+    const coordinator = new MemoryCoordinator();
+    const runtimeServices = services({
+      refreshSourceWatermark: jest.fn().mockImplementation(({ route }) =>
+        Promise.reject(new DomainConflictError('blocked source', {
+          reasonCode: 'SOURCE_UNHEALTHY',
+          warnings: [`CHAIN_EVENTS_NOT_PROJECTED:${route.toUpperCase()}`],
+        })),
+      ),
+    });
+
+    await expect(runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator,
+      services: runtimeServices,
+      loadActiveRule: async () => rule,
+    })).rejects.toThrow('blocked source');
+
+    expect(coordinator.failed).toEqual(['DOMAIN_CONFLICT']);
+    expect(coordinator.failedRoutes[0]).toEqual([
+      expect.objectContaining({
+        route: 'uki',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['SOURCE_UNHEALTHY', 'CHAIN_EVENTS_NOT_PROJECTED:UKI'],
+      }),
+      expect.objectContaining({
+        route: 'nft',
+        errorCode: 'DOMAIN_CONFLICT',
+        reasonCodes: ['SOURCE_UNHEALTHY', 'CHAIN_EVENTS_NOT_PROJECTED:NFT'],
+      }),
+    ]);
+    expect(runtimeServices.expireReservationsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
+    expect(runtimeServices.expireAvailableLotsBatch).toHaveBeenCalledWith({
+      now,
+      limit: config.expiryLimit,
+    });
+    expect(coordinator.finished).toHaveLength(0);
+    expect(coordinator.released).toBe(1);
+  });
+
+  it('materializes the daily expiry even when both grant sources are blocked', async () => {
+    const previousCutoff = new Date('2026-07-09T12:00:00.000Z');
+    const wallet = `0x${'7'.repeat(40)}`;
+    const sourceSlot: CreditSnapshotSlot = {
+      _id: 'uki-slot-expiry',
+      walletNormalized: wallet,
+      route: 'uki',
+      ordinal: 1,
+      eligibilityEpoch: 1,
+      status: 'active',
+      qualifiedSince: new Date('2026-07-08T12:00:00.000Z'),
+      creditEligibleFrom: previousCutoff,
+      roundId: 'uki-round-expiry',
+      ruleVersion: 'cukie-master-v1',
+      sourceHash: 'c'.repeat(64),
+      revision: 1,
+      createdAt: new Date('2026-07-08T12:00:00.000Z'),
+      updatedAt: previousCutoff,
+    };
+    const repository = new MemoryCompetitionCreditRepository({ rule, slots: [sourceSlot] });
+    const creditService = createCompetitionCreditService(
+      createMemoryCompetitionCreditRunner(repository),
+    );
+    const dailyRun = await creditService.createDailyRun({
+      route: 'uki',
+      cutoff: previousCutoff,
+      expectedRuleVersion: rule.version,
+      now: new Date('2026-07-09T16:01:00.000Z'),
+    });
+    const claimed = await creditService.claimRun({
+      runId: dailyRun.runId,
+      workerId: 'credit-worker',
+      now: new Date('2026-07-09T16:01:01.000Z'),
+    });
+    await creditService.processRunBatch({
+      runId: dailyRun.runId,
+      workerId: 'credit-worker',
+      fenceToken: claimed.fenceToken,
+      now: new Date('2026-07-09T16:01:02.000Z'),
+    });
+    await creditService.openRun({
+      runId: dailyRun.runId,
+      workerId: 'credit-worker',
+      fenceToken: claimed.fenceToken,
+      now: new Date('2026-07-09T16:01:03.000Z'),
+    });
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 100,
+      expiredCredits: 0,
+      expiresAt: new Date('2026-07-10T12:00:00.000Z'),
+    });
+
+    const blockedServices: CompetitionCreditRuntimeServices = {
+      ...creditService,
+      findOldestPendingRoutePeriod: jest.fn().mockResolvedValue(period),
+      refreshSourceWatermark: jest.fn().mockRejectedValue(
+        new DomainConflictError('blocked source', { reasonCode: 'SOURCE_UNHEALTHY' }),
+      ),
+    };
+
+    await expect(runCompetitionCreditRuntimeTick({
+      workerId: 'credit-worker',
+      config,
+      clock: () => now,
+      coordinator: new MemoryCoordinator(),
+      services: blockedServices,
+      loadActiveRule: async () => rule,
+    })).rejects.toThrow('blocked source');
+
+    expect(repository.state.ownLots[0]).toMatchObject({
+      availableCredits: 0,
+      expiredCredits: 100,
+    });
+    expect(repository.state.ledger).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        operation: 'expire',
+        amountCredits: 100,
+        walletNormalized: wallet,
+      }),
+    ]));
   });
 });

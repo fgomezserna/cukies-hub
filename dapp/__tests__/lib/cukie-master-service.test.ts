@@ -16,8 +16,10 @@ import {
 import {
   EXPECTED_CUSTODIAL_NFT_CURSOR_IDS,
   EXPECTED_NFT_CURSOR_IDS,
+  EXPECTED_UKI_CURSOR_IDS,
   cukieMasterNftHealthScope,
   expectedBscChainId,
+  expectedBscCursorFilter,
   operationalIndexerHealthWarnings,
   pendingNftEventFilter,
   pendingUkiWalletEventFilter,
@@ -66,6 +68,7 @@ type MemoryState = {
   nftSummaries: Map<string, CukieMasterNftRouteSummary>;
   ukiIndexerHealthy: boolean;
   nftIndexerHealthy: boolean;
+  nftIndexerWarnings: string[];
   fenceRoundHook?: (route: CukieMasterRoute) => void;
 };
 
@@ -125,6 +128,7 @@ function memoryRepository() {
     nftSummaries: new Map(),
     ukiIndexerHealthy: true,
     nftIndexerHealthy: true,
+    nftIndexerWarnings: [],
   };
   const positionKey = (wallet: string, route: CukieMasterRoute) => `${wallet}:${route}`;
   const repo: CukieMasterRepository = {
@@ -228,7 +232,7 @@ function memoryRepository() {
     async getNftIndexerHealth(checkedAt) {
       return {
         healthy: state.nftIndexerHealthy,
-        warnings: state.nftIndexerHealthy ? [] : ['NFT pipeline stale'],
+        warnings: state.nftIndexerHealthy ? state.nftIndexerWarnings : ['NFT pipeline stale'],
         checkedAt,
       };
     },
@@ -377,11 +381,41 @@ describe('Cukie Master canonical sources', () => {
       status: { $in: ['ingested', 'projecting', 'failed'] },
       $or: expect.arrayContaining([
         expect.objectContaining({
+          contractAlias: 'TOKEN_V2',
+          eventName: 'Transfer',
+          $or: expect.arrayContaining([
+            { 'normalized.fromNormalized': '0xabc' },
+            { 'normalized.toNormalized': '0xabc' },
+          ]),
+        }),
+        expect.objectContaining({
+          contractAlias: 'TOKEN_V2',
+          eventName: { $ne: 'Transfer' },
+        }),
+        expect.objectContaining({
           contractAlias: 'CUKIE_MASTER_NFT_VAULT',
-          'normalized.beneficiaryNormalized': '0xabc',
+          $or: expect.arrayContaining([
+            { 'normalized.beneficiaryNormalized': '0xabc' },
+            { 'normalized.beneficiaryNormalized': { $exists: false } },
+            { 'normalized.beneficiaryNormalized': null },
+          ]),
         }),
       ]),
     }));
+  });
+
+  it('mantiene bloqueante un evento vault custodial sin beneficiario decodificado', () => {
+    const filter = pendingNftEventFilter({
+      aliases: ['TOKEN_V2', 'CUKIE_MASTER_NFT_VAULT'],
+      mode: 'custodial',
+      walletNormalized: '0xabc',
+    });
+    const vaultBranch = ((filter as Record<string, unknown>).$or as Array<Record<string, unknown>>)
+      .find((item) => item.contractAlias === 'CUKIE_MASTER_NFT_VAULT');
+    expect(vaultBranch?.$or).toEqual(expect.arrayContaining([
+      { 'normalized.beneficiaryNormalized': { $exists: false } },
+      { 'normalized.beneficiaryNormalized': null },
+    ]));
   });
 
   it('rejects a corrupt vesting aggregate even when lastEventId still matches', () => {
@@ -471,6 +505,25 @@ describe('Cukie Master canonical sources', () => {
     expect(restaked.uki.presaleLockedRaw).toBe('0');
   });
 
+  it('binds an NFT route reduction to the latest confirmed withdrawal evidence', async () => {
+    const { repo, state } = memoryRepository();
+    state.nftPoints.set('0xabc', 2);
+    repo.findLatestNftChainEvidence = async () => ({
+      eventId: 'withdrawal:confirmed',
+      blockNumber: 250,
+      blockHash: `0x${'b'.repeat(64)}`,
+      blockTimestamp: new Date(now.getTime() + 250_000),
+    });
+
+    const sources = await readCukieMasterSources(repo, '0xABC', '0xabc', now);
+
+    expect(sources.nft.originalCukiePoints).toBe(2);
+    expect(sources.nft.effectiveChainEvidence).toMatchObject({
+      eventId: 'withdrawal:confirmed',
+      blockNumber: 250,
+    });
+  });
+
   it('does not require vesting for referral-only rows but fails closed for a direct buyer', async () => {
     const { repo, state } = memoryRepository();
     state.presale.set('0xsponsor', { _id: 'sponsor-row' });
@@ -555,6 +608,21 @@ describe('Cukie Master canonical sources', () => {
     expect(nftFailure.uki.completeness.indexerHealth).toBe(true);
     expect(nftFailure.nft.completeness).toMatchObject({ complete: false, indexerHealth: false });
     expect(nftFailure.nft.completeness.warnings).toContain('NFT pipeline stale');
+  });
+
+  it('keeps ancillary NFT alarms visible without invalidating custodial source completeness', async () => {
+    const { repo, state } = memoryRepository();
+    state.nftIndexerWarnings = ['Existen dead letters del pipeline NFT.'];
+
+    const sources = await readCukieMasterSources(repo, '0xABC', '0xabc', now);
+
+    expect(sources.nft.completeness).toMatchObject({
+      complete: true,
+      indexerHealth: true,
+    });
+    expect(sources.nft.completeness.warnings).toContain(
+      'Existen dead letters del pipeline NFT.',
+    );
   });
 
   it('marks a newer loop error, backlog, or pending future bootstrap unhealthy', () => {
@@ -678,6 +746,46 @@ describe('Cukie Master canonical sources', () => {
       cursors,
       ...expectedIdentity,
     })).toEqual([]);
+
+    const cursorFilter = expectedBscCursorFilter(EXPECTED_UKI_CURSOR_IDS);
+    const interleaved = [
+      {
+        chain: 'BSC',
+        contractAlias: 'UKI_STAKING',
+        eventName: 'Approval',
+        updatedAt: now,
+      },
+      ...cursors,
+    ];
+    const selected = interleaved
+      .filter((cursor) => (
+        cursor.chain === cursorFilter.chain
+        && cursorFilter.$or.some((expected) => (
+          expected.contractAlias === cursor.contractAlias
+          && expected.eventName === cursor.eventName
+        ))
+      ))
+      .slice(0, EXPECTED_UKI_CURSOR_IDS.length);
+    expect(selected.map((cursor) => `${cursor.contractAlias}:${cursor.eventName}`))
+      .toEqual(EXPECTED_UKI_CURSOR_IDS);
+    expect(selected).toHaveLength(EXPECTED_UKI_CURSOR_IDS.length);
+
+    const staleAndMissing = selected
+      .filter((cursor) => cursor.eventName !== 'TokensReleased')
+      .map((cursor) => ({ ...cursor }));
+    staleAndMissing[0].updatedAt = new Date(now.getTime() - 16 * 60 * 1000);
+    const warnings = operationalIndexerHealthWarnings({
+      checkedAt: now,
+      latestSuccessEndedAt: now,
+      latestErrorEndedAt: null,
+      checkpoint,
+      cursors: staleAndMissing,
+      ...expectedIdentity,
+    });
+    expect(warnings).toEqual(expect.arrayContaining([
+      'Cursor BSC UKI_STAKING:Staked ausente, stale, sin verificacion o con backlog.',
+      'Cursor BSC VESTING_VAULT:TokensReleased ausente, stale, sin verificacion o con backlog.',
+    ]));
   });
 
   it('marks a brand-new NFT database unhealthy until every verified history cursor exists', () => {

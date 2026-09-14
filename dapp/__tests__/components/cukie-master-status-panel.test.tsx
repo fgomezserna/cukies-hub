@@ -1,13 +1,21 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderWithRuntime as render } from '../../test-utils/runtime-test-wrapper';
 
 import { CukieMasterStatusPanel } from '@/components/cukie-master/status-panel';
 import { useAuth } from '@/providers/auth-provider';
 import type { User } from '@/types';
+import { useAccount, useSwitchChain } from 'wagmi';
+import { usePathname } from 'next/navigation';
 
 jest.mock('@/providers/auth-provider');
+jest.mock('wagmi', () => ({
+  useAccount: jest.fn(),
+  useSwitchChain: jest.fn(),
+}));
+jest.mock('next/navigation', () => ({ usePathname: jest.fn() }));
 jest.mock('@/components/landing/wallet-connect-dynamic', () => ({
-  LandingWalletConnectButton: ({ evmOnly }: { evmOnly?: boolean }) => (
-    <button type="button" data-evm-only={String(Boolean(evmOnly))}>Conectar wallet EVM</button>
+  LandingWalletConnectButton: ({ evmOnly, label }: { evmOnly?: boolean; label?: string }) => (
+    <button type="button" data-evm-only={String(Boolean(evmOnly))}>{label}</button>
   ),
 }));
 jest.mock('@/components/legacy-marketplace/cuki-image', () => ({
@@ -27,8 +35,15 @@ jest.mock('lucide-react', () => ({
   Sparkles: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
   Unlock: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
 }));
+jest.mock('@phosphor-icons/react', () => ({
+  Coins: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+  Diamond: (props: React.HTMLAttributes<HTMLSpanElement>) => <span {...props} />,
+}));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseAccount = useAccount as jest.MockedFunction<typeof useAccount>;
+const mockUseSwitchChain = useSwitchChain as jest.MockedFunction<typeof useSwitchChain>;
+const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const fetchMock = jest.fn();
 
 const walletAddress = '0x1111111111111111111111111111111111111111';
@@ -39,24 +54,151 @@ function authValue(currentUser: User | null, isLoading = false) {
     user: currentUser,
     isLoading,
     isWaitingForApproval: false,
-    walletType: null,
+    walletType: currentUser ? 'evm' as const : null,
     fetchUser: jest.fn(),
+  };
+}
+
+function ukiOnlyStatusData(slots: number) {
+  const requirementRaw = BigInt(20_000) * (BigInt(10) ** BigInt(18));
+  const totalRaw = requirementRaw * BigInt(slots);
+  return {
+    walletNormalized: walletAddress,
+    totals: { desiredSlots: slots, allocatedSlots: slots, maxPotentialSlots: 10 },
+    routes: {
+      uki: {
+        position: slots > 0
+          ? { status: 'active', desiredSlots: slots, allocatedSlots: slots, protectedSlots: 0, graceEndsAt: null }
+          : null,
+        balanceQualifiedSlots: slots,
+        currentRequirement: { route: 'uki', ukiRaw: requirementRaw.toString() },
+        pendingRequirement: null,
+        requirementGraceEndsAt: null,
+        deficitToNextSlot: slots < 5 ? { route: 'uki', ukiRaw: requirementRaw.toString() } : null,
+        deficitToPreserveSlots: null,
+        slots: [],
+        source: {
+          complete: true,
+          status: 'available',
+          route: 'uki',
+          totalUkiRaw: totalRaw.toString(),
+          presaleLockedRaw: '0',
+          stakedUkiRaw: totalRaw.toString(),
+        },
+      },
+      nft: {
+        position: null,
+        currentRequirement: { route: 'nft', nftPoints: 3 },
+        pendingRequirement: null,
+        requirementGraceEndsAt: null,
+        deficitToNextSlot: { route: 'nft', nftPoints: 3 },
+        deficitToPreserveSlots: null,
+        slots: [],
+        source: { complete: false, status: 'unavailable' },
+      },
+    },
+    nftInventory: [],
   };
 }
 
 describe('CukieMasterStatusPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    fetchMock.mockReset();
     global.fetch = fetchMock;
+    mockUseAccount.mockReturnValue({ address: walletAddress, chainId: 97, isConnected: true } as unknown as ReturnType<typeof useAccount>);
+    mockUseSwitchChain.mockReturnValue({ switchChainAsync: jest.fn() } as unknown as ReturnType<typeof useSwitchChain>);
+    mockUsePathname.mockReturnValue('/cukie-master');
   });
 
   it('does not query or estimate slots without an authenticated wallet', () => {
     mockUseAuth.mockReturnValue(authValue(null));
+    mockUseAccount.mockReturnValue({ address: undefined, chainId: undefined, isConnected: false } as unknown as ReturnType<typeof useAccount>);
 
-    render(<CukieMasterStatusPanel />);
+    render(<CukieMasterStatusPanel overview />);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText(/Conecta una wallet EVM/i)).toBeInTheDocument();
+    expect(screen.getByText(/Conecta tu wallet/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Conectar wallet' })).toHaveLength(1);
+  });
+
+  it('resume cupos, estado, créditos diarios y siguiente acción entre las dos vías', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    const baseStatus = ukiOnlyStatusData(2);
+    const status = {
+      ...baseStatus,
+      routes: {
+        ...baseStatus.routes,
+        nft: {
+          position: {
+            status: 'qualifying',
+            desiredSlots: 1,
+            allocatedSlots: 1,
+            protectedSlots: 0,
+            graceEndsAt: null,
+          },
+          currentRequirement: { route: 'nft', nftPoints: 3 },
+          pendingRequirement: null,
+          requirementGraceEndsAt: null,
+          deficitToNextSlot: { route: 'nft', nftPoints: 2 },
+          deficitToPreserveSlots: null,
+          slots: [],
+          source: { complete: true, status: 'available' },
+        },
+      },
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', data: status }),
+    });
+
+    render(<CukieMasterStatusPanel overview />);
+
+    expect(await screen.findByRole('heading', { name: 'Tienes 3 cupos Cukie Master' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'De dónde vienen tus cupos' })).toHaveTextContent('3de 10');
+    expect(screen.getByRole('progressbar', { name: 'Con UKI: 2 de 5 cupos' })).toHaveAttribute('aria-valuenow', '2');
+    expect(screen.getByRole('progressbar', { name: 'Con Cukies Originales: 1 de 5 cupos' })).toHaveAttribute('aria-valuenow', '1');
+    expect(screen.getByText('Con UKI').parentElement?.parentElement).toHaveTextContent('2de 5');
+    expect(screen.getByText('Con Cukies Originales').parentElement?.parentElement).toHaveTextContent('1de 5');
+    expect(screen.getByText('Estado actual').parentElement).toHaveTextContent('2 activos');
+    expect(screen.getByText('Estado actual').parentElement).toHaveTextContent('1 validando · 0 en gracia');
+    expect(screen.getByText('Créditos diarios').parentElement).toHaveTextContent('200');
+    expect(screen.getByText('Créditos diarios').parentElement).toHaveTextContent('100 por cada cupo activo');
+    expect(screen.getByRole('link', { name: 'Gestionar staking UKI' })).toHaveAttribute('href', '#uki-staking');
+    expect(screen.getByRole('link', { name: 'Gestionar créditos' })).toHaveAttribute('href', '/credits');
+  });
+
+  it('no convierte una fuente incompleta en un saldo de cero cupos', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    const status = ukiOnlyStatusData(0);
+    status.routes.uki = {
+      ...status.routes.uki,
+      position: null,
+      balanceQualifiedSlots: 0,
+      source: {
+        complete: false,
+        status: 'unavailable',
+        route: 'uki',
+        totalUkiRaw: '0',
+        presaleLockedRaw: '0',
+        stakedUkiRaw: '0',
+      },
+    };
+    status.routes.nft = {
+      ...status.routes.nft,
+      source: { complete: false, status: 'unavailable' },
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', data: status }),
+    });
+
+    render(<CukieMasterStatusPanel overview />);
+
+    expect((await screen.findAllByRole('heading', { name: 'No podemos confirmar tus cupos todavía' })).length).toBe(2);
+    expect(screen.getAllByText('No disponible').length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByText('0 de 5')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/No hemos podido actualizar tus cupos/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it('simplifica la vista a vesting, staking y cinco plazas de la ruta UKI', async () => {
@@ -183,6 +325,7 @@ describe('CukieMasterStatusPanel', () => {
 
   it('renders only the persisted public slot status returned by the API', async () => {
     mockUseAuth.mockReturnValue(authValue(user));
+    const onUkiRouteData = jest.fn();
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -227,7 +370,7 @@ describe('CukieMasterStatusPanel', () => {
       }),
     });
 
-    render(<CukieMasterStatusPanel />);
+    render(<CukieMasterStatusPanel onUkiRouteData={onUkiRouteData} />);
 
     await waitFor(() => expect(screen.getByText('Cupos activos')).toBeInTheDocument());
     expect(screen.getByText('1/10')).toBeInTheDocument();
@@ -247,17 +390,19 @@ describe('CukieMasterStatusPanel', () => {
     window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
 
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }),
-    });
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }) });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Actualizar estado' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
-    await waitFor(() => expect(screen.getByText(/No podemos verificar tu estado económico/i)).toBeInTheDocument());
-    expect(screen.queryByText('Cupos activos')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/La última actualización no respondió/i)).toBeInTheDocument());
+    expect(screen.getByText('Cupos activos')).toBeInTheDocument();
+    expect(screen.getByText('1/10')).toBeInTheDocument();
+    expect(onUkiRouteData).toHaveBeenLastCalledWith(null);
   });
 
-  it('muestra cupos detectados sin reutilizar slots viejos y sigue consultando mientras sincroniza', async () => {
+  it('oculta los cupos anteriores y sigue consultando mientras actualiza', async () => {
     jest.useFakeTimers();
     try {
       mockUseAuth.mockReturnValue(authValue(user));
@@ -266,16 +411,19 @@ describe('CukieMasterStatusPanel', () => {
         totals: { desiredSlots: 0, allocatedSlots: 0, maxPotentialSlots: 10 },
         routes: {
           uki: {
-            position: null,
+            position: { status: 'active', desiredSlots: 1, allocatedSlots: 1, protectedSlots: 1, graceEndsAt: '2026-09-12T00:00:00.000Z' },
             projectionFresh: false,
             synchronizing: true,
             previewSlots: 1,
             currentRequirement: { route: 'uki', ukiRaw: '20000000000000000000000' },
-            pendingRequirement: null,
+            pendingRequirement: { route: 'uki', ukiRaw: '30000000000000000000000' },
             requirementGraceEndsAt: null,
             deficitToNextSlot: { route: 'uki', ukiRaw: '19700000000000000000000' },
-            deficitToPreserveSlots: null,
-            slots: [],
+            deficitToPreserveSlots: { route: 'uki', ukiRaw: '29000000000000000000000' },
+            slots: [{
+              route: 'uki', ordinal: 1, eligibilityEpoch: 1, status: 'active',
+              creditEligibleFrom: '2026-08-01T00:00:00.000Z', graceEndsAt: null,
+            }],
             source: {
               complete: true,
               status: 'available',
@@ -314,14 +462,15 @@ describe('CukieMasterStatusPanel', () => {
 
       render(<CukieMasterStatusPanel />);
 
-      expect(await screen.findByText('1/5')).toBeInTheDocument();
-      expect(screen.getByText('3/5')).toBeInTheDocument();
-      expect(screen.getAllByText(/detectados · sincronizando/i)).toHaveLength(2);
+      expect((await screen.findAllByText('No disponible')).length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText(/Actualizando tus cupos/i).length).toBeGreaterThanOrEqual(2);
       expect(screen.queryByText('Cupos conservados en gracia')).not.toBeInTheDocument();
+      expect(screen.queryByText('Cupo 1')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Próximo requisito:/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/Elige qué Cukies usar/i)).not.toBeInTheDocument();
 
       await act(async () => {
-        jest.advanceTimersByTime(10_000);
+        jest.advanceTimersByTime(30_000);
         await Promise.resolve();
       });
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -339,9 +488,117 @@ describe('CukieMasterStatusPanel', () => {
 
     render(<CukieMasterStatusPanel />);
 
-    await waitFor(() => expect(screen.getByText(/No podemos verificar tu estado económico/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No podemos actualizar tus cupos ahora mismo/i)).toBeInTheDocument());
     expect(screen.queryByText('Cupos activos')).not.toBeInTheDocument();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+  });
+
+  it('recupera automáticamente una carga inicial transitoria sin exigir refrescar la página', async () => {
+    jest.useFakeTimers();
+    try {
+      mockUseAuth.mockReturnValue(authValue(user));
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({ status: 'error', code: 'CUKIE_MASTER_UNAVAILABLE' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            status: 'ok',
+            data: {
+              walletNormalized: walletAddress,
+              totals: { desiredSlots: 1, allocatedSlots: 1, maxPotentialSlots: 10 },
+              routes: {
+                uki: {
+                  position: { status: 'active', desiredSlots: 1, allocatedSlots: 1, protectedSlots: 0, graceEndsAt: null },
+                  balanceQualifiedSlots: 1,
+                  currentRequirement: { route: 'uki', ukiRaw: '20000000000000000000000' },
+                  pendingRequirement: null,
+                  requirementGraceEndsAt: null,
+                  deficitToNextSlot: { route: 'uki', ukiRaw: '20000000000000000000000' },
+                  deficitToPreserveSlots: null,
+                  slots: [],
+                  source: {
+                    complete: true,
+                    status: 'available',
+                    route: 'uki',
+                    totalUkiRaw: '20000000000000000000000',
+                    presaleLockedRaw: '0',
+                    stakedUkiRaw: '20000000000000000000000',
+                  },
+                },
+                nft: {
+                  position: null,
+                  currentRequirement: { route: 'nft', nftPoints: 3 },
+                  pendingRequirement: null,
+                  requirementGraceEndsAt: null,
+                  deficitToNextSlot: { route: 'nft', nftPoints: 3 },
+                  deficitToPreserveSlots: null,
+                  slots: [],
+                  source: { complete: false, status: 'unavailable' },
+                },
+              },
+              nftInventory: [],
+            },
+          }),
+        });
+
+      render(<CukieMasterStatusPanel ukiOnly />);
+      await act(async () => { await Promise.resolve(); });
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      expect(await screen.findByText('UKI en staking')).toBeInTheDocument();
+      expect(screen.getByText('Tus Cukie Masters').parentElement).toHaveTextContent('1/5');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('evita solapar refrescos mientras uno sigue en vuelo', async () => {
+    mockUseAuth.mockReturnValue(authValue(user));
+    let resolveOlderRefresh!: (value: {
+      ok: boolean;
+      json: () => Promise<{ status: string; data: ReturnType<typeof ukiOnlyStatusData> }>;
+    }) => void;
+    const olderRefresh = new Promise<{
+      ok: boolean;
+      json: () => Promise<{ status: string; data: ReturnType<typeof ukiOnlyStatusData> }>;
+    }>((resolve) => { resolveOlderRefresh = resolve; });
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'ok', data: ukiOnlyStatusData(1) }),
+      })
+      .mockReturnValueOnce(olderRefresh);
+
+    render(<CukieMasterStatusPanel ukiOnly />);
+    expect(await screen.findByText('Tus Cukie Masters').then((node) => node.parentElement))
+      .toHaveTextContent('1/5');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    window.dispatchEvent(new Event('cukies:cukie-master:refresh'));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    resolveOlderRefresh({
+      ok: true,
+      json: async () => ({ status: 'ok', data: ukiOnlyStatusData(3) }),
+    });
+    await waitFor(() => expect(screen.getByText('Tus Cukie Masters').parentElement).toHaveTextContent('3/5'));
+
+    await act(async () => {
+      resolveOlderRefresh({
+        ok: true,
+        json: async () => ({ status: 'ok', data: ukiOnlyStatusData(2) }),
+      });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Tus Cukie Masters').parentElement).toHaveTextContent('3/5');
   });
 
   it('shows NFT contribution separately from potential points and exposes contextual actions', async () => {

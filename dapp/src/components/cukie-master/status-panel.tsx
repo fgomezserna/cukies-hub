@@ -11,6 +11,7 @@ import {
   Sparkles,
   Unlock,
 } from 'lucide-react';
+import { Coins, Diamond } from '@phosphor-icons/react';
 import { formatUnits } from 'viem';
 
 import { CukiImage } from '@/components/legacy-marketplace/cuki-image';
@@ -19,22 +20,10 @@ import { LandingWalletConnectButton } from '@/components/landing/wallet-connect-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { UkiRoutePreview } from '@/components/cukie-master/types';
 import { useAuth } from '@/providers/auth-provider';
+import { useAppRuntime, useAppRuntimeResource, useGuardedOperation } from '@/providers/app-runtime-provider';
+import { CUKIE_MASTER_DAILY_CREDITS_PER_SLOT } from '@/lib/uki-economy/rules';
 
 const MAX_ROUTE_SLOTS = 5;
-const CUKIE_MASTER_REFRESH_EVENT = 'cukies:cukie-master:refresh';
-const STAKING_REFRESH_DELAYS_MS = [
-  0,
-  3_000,
-  8_000,
-  15_000,
-  30_000,
-  60_000,
-  90_000,
-  120_000,
-  180_000,
-] as const;
-const SYNCHRONIZATION_POLL_MS = 10_000;
-const SYNCHRONIZATION_POLL_WINDOW_MS = 180_000;
 
 type RouteKey = 'uki' | 'nft';
 
@@ -123,117 +112,57 @@ function slotCounts(route: PublicRoute) {
   );
 }
 
+function visibleRouteSlots(route: PublicRoute): number | null {
+  if (route.synchronizing) return null;
+  if (route.source.complete) {
+    return route.balanceQualifiedSlots
+      ?? route.previewSlots
+      ?? route.position?.allocatedSlots
+      ?? null;
+  }
+  // An incomplete source is not a zero balance. The API deliberately hides
+  // stale projections until the chain/indexer evidence is complete.
+  return null;
+}
+
+function summarySlotCounts(route: PublicRoute) {
+  const counts = slotCounts(route);
+  const knownSlots = counts.active + counts.qualifying + counts.grace + counts.inactive;
+  if (knownSlots > 0 || !route.position?.allocatedSlots) return counts;
+
+  const fallback = { ...counts };
+  if (route.position.status === 'active') fallback.active = route.position.allocatedSlots;
+  else if (route.position.status === 'qualifying') fallback.qualifying = route.position.allocatedSlots;
+  else if (route.position.status === 'grace') fallback.grace = route.position.allocatedSlots;
+  return fallback;
+}
+
 export function CukieMasterStatusPanel({
   onUkiRouteData,
+  overview = false,
   ukiOnly = false,
 }: {
   onUkiRouteData?: (preview: UkiRoutePreview | null) => void;
+  overview?: boolean;
   ukiOnly?: boolean;
 } = {}) {
   const { user, isLoading: authLoading } = useAuth();
-  const [status, setStatus] = useState<PublicStatus | null>(null);
-  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  const runtime = useAppRuntime();
+  const operationGuard = useGuardedOperation('master-write');
+  const operationGuardRef = useRef(operationGuard);
+  operationGuardRef.current = operationGuard;
+  const runtimeIdentityRef = useRef<string | null>(null);
+  runtimeIdentityRef.current = runtime.sessionReady ? runtime.address : null;
   const [activeRoute, setActiveRoute] = useState<RouteKey>('uki');
-  const [reloadNonce, setReloadNonce] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [mutatingAsset, setMutatingAsset] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const hasReadyStatusRef = useRef(false);
-  const loadedWalletRef = useRef<string | null>(null);
-  const requestIdRef = useRef(0);
-  const refreshTimersRef = useRef<number[]>([]);
-  const synchronizationStartedAtRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user?.walletAddress) {
-      requestIdRef.current += 1;
-      hasReadyStatusRef.current = false;
-      loadedWalletRef.current = null;
-      setStatus(null);
-      setState('idle');
-      setIsRefreshing(false);
-      return;
-    }
-    const walletNormalized = user.walletAddress.toLowerCase();
-    const backgroundRefresh = hasReadyStatusRef.current
-      && loadedWalletRef.current === walletNormalized;
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    const controller = new AbortController();
-    if (backgroundRefresh) setIsRefreshing(true);
-    else {
-      setStatus(null);
-      setState('loading');
-    }
-    fetch(
-      `/api/economy/v1/cukie-master?walletAddress=${encodeURIComponent(user.walletAddress)}`,
-      { cache: 'no-store', credentials: 'same-origin', signal: controller.signal },
-    )
-      .then(async (response) => {
-        const body = await response.json() as { data?: PublicStatus };
-        if (!response.ok || !body.data) throw new Error('CUKIE_MASTER_UNAVAILABLE');
-        if (requestIdRef.current !== requestId) return;
-        hasReadyStatusRef.current = true;
-        loadedWalletRef.current = walletNormalized;
-        setStatus(body.data);
-        setState('ready');
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        if (requestIdRef.current !== requestId) return;
-        hasReadyStatusRef.current = false;
-        loadedWalletRef.current = null;
-        setStatus(null);
-        setState('unavailable');
-      })
-      .finally(() => {
-        if (requestIdRef.current === requestId) setIsRefreshing(false);
-      });
-    return () => controller.abort();
-  }, [authLoading, reloadNonce, user?.walletAddress]);
-
-  useEffect(() => {
-    const clearRefreshTimers = () => {
-      refreshTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      refreshTimersRef.current = [];
-    };
-    const refresh = () => {
-      clearRefreshTimers();
-      refreshTimersRef.current = STAKING_REFRESH_DELAYS_MS.map((delay) => window.setTimeout(
-        () => setReloadNonce((value) => value + 1),
-        delay,
-      ));
-    };
-    window.addEventListener(CUKIE_MASTER_REFRESH_EVENT, refresh);
-    return () => {
-      window.removeEventListener(CUKIE_MASTER_REFRESH_EVENT, refresh);
-      clearRefreshTimers();
-    };
-  }, []);
-
-  useEffect(() => {
-    const needsSynchronization = state === 'ready' && Boolean(status) && (
-      status!.routes.uki.synchronizing
-      || !status!.routes.uki.source.complete
-      || (!ukiOnly && (
-        status!.routes.nft.synchronizing
-        || !status!.routes.nft.source.complete
-      ))
-    );
-    if (!needsSynchronization) {
-      synchronizationStartedAtRef.current = null;
-      return;
-    }
-    const startedAt = synchronizationStartedAtRef.current ?? Date.now();
-    synchronizationStartedAtRef.current = startedAt;
-    if (Date.now() - startedAt >= SYNCHRONIZATION_POLL_WINDOW_MS) return;
-    const timer = window.setTimeout(
-      () => setReloadNonce((value) => value + 1),
-      SYNCHRONIZATION_POLL_MS,
-    );
-    return () => window.clearTimeout(timer);
-  }, [state, status, ukiOnly]);
+  const statusResource = useAppRuntimeResource<PublicStatus>('master', {
+    enabled: Boolean(user?.walletAddress) && !authLoading,
+  });
+  const status = statusResource.data ?? null;
+  const state = statusResource.state;
+  const refreshStatus = statusResource.refresh;
+  const isRefreshing = statusResource.isFetching;
 
   useEffect(() => {
     const route = status?.routes.uki;
@@ -252,6 +181,7 @@ export function CukieMasterStatusPanel({
       presaleLockedRaw: route.source.presaleLockedRaw,
       indexedStakedRaw: route.source.stakedUkiRaw,
       allocatedSlots: route.position?.allocatedSlots ?? 0,
+      ...(route.synchronizing ? { synchronizing: true } : {}),
     });
   }, [onUkiRouteData, state, status]);
 
@@ -265,17 +195,23 @@ export function CukieMasterStatusPanel({
   }), [status?.nftInventory]);
 
   async function mutateNft(asset: PublicNft, operation: 'soft_stake' | 'unstake') {
-    if (!user?.walletAddress || mutatingAsset) return;
+    const requestedIdentity = user?.walletAddress?.toLowerCase() ?? null;
+    if (
+      !requestedIdentity
+      || mutatingAsset
+      || !operationGuardRef.current.ready
+      || runtimeIdentityRef.current !== requestedIdentity
+    ) return;
     setMutatingAsset(asset.assetId);
     setMutationError(null);
     try {
-      const idempotencyKey = `cukie-master-ui:${user.walletAddress.toLowerCase()}:${operation}:${asset.assetId}:${crypto.randomUUID()}`;
+      const idempotencyKey = `cukie-master-ui:${requestedIdentity}:${operation}:${asset.assetId}:${crypto.randomUUID()}`;
       const response = await fetch('/api/economy/v1/cukie-master', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          walletAddress: user.walletAddress,
+          walletAddress: requestedIdentity,
           operation,
           assetId: asset.assetId,
           ...(operation === 'unstake' && asset.lock ? {
@@ -286,7 +222,8 @@ export function CukieMasterStatusPanel({
         }),
       });
       if (!response.ok) throw new Error('NFT_OPERATION_FAILED');
-      setReloadNonce((value) => value + 1);
+      if (runtimeIdentityRef.current !== requestedIdentity) return;
+      await runtime.refreshAfterTransaction('master');
     } catch {
       setMutationError('No se pudo completar la operación. El estado del NFT no ha cambiado; inténtalo de nuevo.');
     } finally {
@@ -299,22 +236,60 @@ export function CukieMasterStatusPanel({
     qualifying: slotCounts(status.routes.uki).qualifying + slotCounts(status.routes.nft).qualifying,
     grace: slotCounts(status.routes.uki).grace + slotCounts(status.routes.nft).grace,
   } : null;
+  const sourcesComplete = Boolean(
+    status?.routes.uki.source.complete && status?.routes.nft.source.complete,
+  );
+  const projectionsMaterialized = Boolean(
+    sourcesComplete
+    && !status?.routes.uki.synchronizing
+    && !status?.routes.nft.synchronizing,
+  );
   const visibleAllocatedSlots = status
     ? (status.routes.uki.position?.allocatedSlots ?? 0)
       + (status.routes.nft.position?.allocatedSlots ?? 0)
     : 0;
+  const visibleRouteSlotValues = status
+    ? [visibleRouteSlots(status.routes.uki), visibleRouteSlots(status.routes.nft)]
+    : [];
+  const visibleOverviewSlots = visibleRouteSlotValues.every((value) => value !== null)
+    ? visibleRouteSlotValues.reduce((total, value) => total + (value ?? 0), 0)
+    : null;
+  const overviewHeading = state === 'ready' || state === 'stale'
+    ? sourcesComplete && !projectionsMaterialized
+      ? visibleOverviewSlots === null
+        ? 'Estamos confirmando tus cupos'
+        : `${visibleOverviewSlots} ${visibleOverviewSlots === 1 ? 'cupo potencial' : 'cupos potenciales'} detectados`
+      : visibleOverviewSlots === null
+      ? 'No podemos confirmar tus cupos todavía'
+      : visibleOverviewSlots > 0
+      ? `Tienes ${visibleOverviewSlots} ${visibleOverviewSlots === 1 ? 'cupo' : 'cupos'} Cukie Master`
+      : 'Consigue tu primer cupo'
+    : state === 'loading'
+      ? 'Estamos comprobando tu posición'
+      : 'Comprueba tu posición';
+  const overviewDescription = state === 'ready' || state === 'stale'
+    ? sourcesComplete && !projectionsMaterialized
+      ? 'Tus UKI han cambiado y estamos actualizando tus cupos. El resumen se actualizará automáticamente.'
+      : visibleOverviewSlots === null
+      ? 'No hemos podido actualizar tus cupos. Puedes consultar tu staking mientras recuperamos los datos. Volveremos a intentarlo automáticamente.'
+      : visibleOverviewSlots > 0
+      ? 'Aquí ves qué cupos ya cuentan, cuáles están validándose y qué puedes hacer ahora.'
+      : 'Puedes conseguir cupos depositando UKI o usando tus Cukies Originales.'
+    : 'Conecta y firma tu wallet para ver tus cupos, créditos y siguiente acción.';
 
   return (
-    <section id="mi-estado" className="uki-container relative z-[2] min-w-0 scroll-mt-28 pb-8">
+    <section id="mi-estado" className="relative z-[2] w-full min-w-0 scroll-mt-24 pb-8">
       <Panel className="min-w-0" innerClassName="min-w-0 p-5 sm:p-7">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tu estado personal</p>
             <h2 className="mt-2 break-words font-headline text-2xl font-black uppercase text-[var(--uki-cream)] sm:text-3xl">
-              Tu posición Cukie Master
+              {overview ? overviewHeading : 'Tu posición Cukie Master'}
             </h2>
             <p className="mt-2 max-w-2xl text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              {ukiOnly
+              {overview
+                ? overviewDescription
+                : ukiOnly
                 ? 'Tus UKI de preventa pendientes y tus UKI en staking se suman automáticamente.'
                 : 'Revisamos vesting, staking e inventario antes de recomendarte ninguna acción.'}
             </p>
@@ -327,8 +302,8 @@ export function CukieMasterStatusPanel({
               <button
                 type="button"
                 disabled={isRefreshing}
-                onClick={() => setReloadNonce((value) => value + 1)}
-                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-[7px] border border-white/10 px-3 text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-cyan-border)] hover:text-[var(--uki-cyan)] disabled:cursor-wait disabled:opacity-60"
+                onClick={() => void refreshStatus()}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-[7px] border border-white/10 px-3 text-xs font-black uppercase text-[var(--uki-text)] hover:border-[var(--uki-lilac-border)] hover:text-[var(--uki-lilac)] disabled:cursor-wait disabled:opacity-60"
               >
                 {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                 {isRefreshing ? 'Actualizando' : 'Actualizar estado'}
@@ -338,24 +313,26 @@ export function CukieMasterStatusPanel({
         </div>
 
         {authLoading || state === 'loading' ? (
-          <div role="status" aria-live="polite" className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
-            <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
-            Verificando tus UKI…
-          </div>
+          overview ? <CukieMasterOverviewSkeleton /> : (
+            <div role="status" aria-live="polite" className="mt-6 flex items-center gap-3 text-sm font-semibold text-[var(--uki-text)]">
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+              Verificando tus UKI…
+            </div>
+          )
         ) : null}
 
         {!authLoading && state === 'idle' ? (
-          <div className="mt-6 grid min-w-0 gap-4 rounded-[10px] border border-[var(--uki-cyan-border)] bg-black/20 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="mt-6 grid min-w-0 gap-4 rounded-[10px] border border-[var(--uki-lilac-border)] bg-black/20 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="min-w-0">
-              <p className="font-headline text-lg font-black uppercase text-[var(--uki-cream)]">Conecta una wallet EVM</p>
+              <p className="font-headline text-lg font-black text-[var(--uki-cream)]">Conecta tu wallet</p>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-                Firma el acceso para consultar tu posición y tus saldos.
+                Usa una wallet EVM y firma el acceso para consultar tu posición y tus saldos.
               </p>
             </div>
             <LandingWalletConnectButton
               className="min-h-11 justify-center"
               evmOnly
-              label="Conectar wallet EVM"
+              label="Conectar wallet"
               compactLabel="Conectar"
               showCompactText={false}
             />
@@ -363,36 +340,58 @@ export function CukieMasterStatusPanel({
         ) : null}
 
         {state === 'unavailable' ? (
+          <div role="alert" className="mt-6 flex flex-col gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4 sm:flex-row sm:items-center">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+                No podemos actualizar tus cupos ahora mismo. Puedes consultar tu staking mientras recuperamos los datos. Volveremos a intentarlo automáticamente.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void refreshStatus();
+              }}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-[7px] border border-amber-200/30 px-3 text-xs font-black uppercase text-amber-100"
+            >
+              Reintentar ahora
+            </button>
+          </div>
+        ) : null}
+
+        {state === 'stale' && status ? (
           <div role="alert" className="mt-6 flex gap-3 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-4">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />
             <p className="text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
-              No podemos verificar tu estado económico ahora mismo. No mostramos cifras antiguas ni cambiamos tus cupos; vuelve a intentarlo en unos minutos.
+              La última actualización no respondió. Conservamos tu última lectura confirmada mientras reintentamos; las estimaciones sensibles permanecen desactivadas hasta recuperar la conexión.
             </p>
           </div>
         ) : null}
 
-        {state === 'ready' && status && totalCounts ? (
-          ukiOnly ? (
+        {(state === 'ready' || state === 'stale') && status && totalCounts ? (
+          overview ? (
+            <CukieMasterOverview status={status} />
+          ) : ukiOnly ? (
             <UkiOnlyStatus route={status.routes.uki} />
           ) : (
             <>
             <div className="mt-6 grid min-w-0 gap-3 sm:grid-cols-3">
               <StatusMetric
                 label="Cupos activos"
-                value={`${totalCounts.active}/${status.totals.maxPotentialSlots}`}
-                helper={`${visibleAllocatedSlots} asignados entre las dos rutas`}
-                tone="cyan"
+                value={projectionsMaterialized ? `${totalCounts.active}/${status.totals.maxPotentialSlots}` : 'No disponible'}
+                helper={projectionsMaterialized ? `${visibleAllocatedSlots} asignados entre las dos rutas` : 'Esperando la actualización de tus cupos'}
+                tone="lilac"
               />
               <StatusMetric
                 label="En validación"
-                value={String(totalCounts.qualifying)}
-                helper="Pendientes del siguiente periodo elegible"
+                value={projectionsMaterialized ? String(totalCounts.qualifying) : 'No disponible'}
+                helper={projectionsMaterialized ? 'Pendientes del siguiente periodo elegible' : 'Esperando la actualización de tus cupos'}
               />
               <StatusMetric
                 label="En gracia"
-                value={String(totalCounts.grace)}
-                helper="Cupos que aún puedes conservar ajustando activos"
-                tone={totalCounts.grace > 0 ? 'warning' : 'neutral'}
+                value={projectionsMaterialized ? String(totalCounts.grace) : 'No disponible'}
+                helper={projectionsMaterialized ? 'Cupos que aún puedes conservar ajustando activos' : 'Esperando la actualización de tus cupos'}
+                tone={projectionsMaterialized && totalCounts.grace > 0 ? 'warning' : 'neutral'}
               />
             </div>
 
@@ -411,7 +410,7 @@ export function CukieMasterStatusPanel({
 
               <TabsContent value="uki" className="mt-4 min-w-0">
                 <RouteDetail label="Ruta UKI" route={status.routes.uki} />
-                <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-black text-[var(--uki-cream)]">¿Te faltan UKI para el siguiente cupo?</p>
                     <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">El vesting ya está incluido. Deposita únicamente el déficit que quieras cubrir.</p>
@@ -423,9 +422,9 @@ export function CukieMasterStatusPanel({
               <TabsContent value="nft" className="mt-4 min-w-0">
                 <RouteDetail label="Ruta Cukies" route={status.routes.nft} />
                 {status.nftCustody?.mode === 'custodial' ? (
-                  <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mt-4 flex flex-col gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-black text-[var(--uki-cream)]">El staking NFT se gestiona en el vault custodial</p>
+                      <p className="text-sm font-black text-[var(--uki-cream)]">Gestiona tus Cukies depositados desde esta misma página</p>
                       <p className="mt-1 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">
                         Elige y deposita tus Cukies Originales en el apartado siguiente. Los de Segunda Generación no aparecen como disponibles; una posición ya custodiada seguirá visible para que puedas retirarla.
                       </p>
@@ -451,16 +450,263 @@ export function CukieMasterStatusPanel({
   );
 }
 
+function CukieMasterOverviewSkeleton() {
+  return (
+    <div role="status" aria-live="polite" aria-label="Cargando tu resumen Cukie Master" className="mt-6 space-y-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
+        <div className="h-44 animate-pulse rounded-[10px] bg-white/[0.06]" />
+        <div className="h-44 animate-pulse rounded-[10px] bg-white/[0.05]" />
+      </div>
+      <div className="h-32 animate-pulse rounded-[10px] bg-white/[0.06]" />
+    </div>
+  );
+}
+
+function CukieMasterOverview({ status }: { status: PublicStatus }) {
+  const ukiSlots = visibleRouteSlots(status.routes.uki);
+  const nftSlots = visibleRouteSlots(status.routes.nft);
+  const totalSlots = ukiSlots !== null && nftSlots !== null ? ukiSlots + nftSlots : null;
+  const sourcesComplete = status.routes.uki.source.complete && status.routes.nft.source.complete;
+  const ukiCounts = summarySlotCounts(status.routes.uki);
+  const nftCounts = summarySlotCounts(status.routes.nft);
+  const counts = {
+    active: ukiCounts.active + nftCounts.active,
+    qualifying: ukiCounts.qualifying + nftCounts.qualifying,
+    grace: ukiCounts.grace + nftCounts.grace,
+  };
+  const isSynchronizing = Boolean(
+    status.routes.uki.synchronizing || status.routes.nft.synchronizing,
+  );
+  const projectionsMaterialized = sourcesComplete && !isSynchronizing;
+  const dailyCredits = projectionsMaterialized ? counts.active * CUKIE_MASTER_DAILY_CREDITS_PER_SLOT : null;
+  const preserveDeficit = status.routes.uki.deficitToPreserveSlots
+    ?? status.routes.nft.deficitToPreserveSlots;
+  const nextUkiDeficit = status.routes.uki.deficitToNextSlot;
+
+  const nextAction = (() => {
+    if (!sourcesComplete) {
+      return {
+        eyebrow: 'Comprobación pendiente',
+        title: 'No podemos confirmar tus cupos todavía',
+        description: 'No hemos podido actualizar tus cupos. Puedes consultar tu staking mientras recuperamos los datos. Volveremos a intentarlo automáticamente.',
+        primary: { href: '#uki-staking', label: 'Ver staking UKI' },
+        secondary: { href: '#cukie-master-nft-staking', label: 'Ver mis Cukies' },
+        warning: true,
+      };
+    }
+    if (isSynchronizing) {
+      return {
+        eyebrow: 'Actualizando',
+        title: 'Estamos confirmando tus últimos cambios',
+        description: 'Tus UKI han cambiado y estamos actualizando tus cupos. No repitas ninguna operación; el resumen se actualizará automáticamente.',
+        primary: { href: '#uki-staking', label: 'Ver staking UKI' },
+        secondary: { href: '#cukie-master-nft-staking', label: 'Ver mis Cukies' },
+        warning: false,
+      };
+    }
+    if (counts.grace > 0) {
+      return {
+        eyebrow: 'Necesita atención',
+        title: `Protege ${counts.grace === 1 ? 'tu cupo' : 'tus cupos'} en gracia`,
+        description: preserveDeficit
+          ? `Añade ${requirementLabel(preserveDeficit)} antes de que termine el periodo de gracia.`
+          : 'Revisa la vía afectada y ajusta tus activos antes de que termine el periodo de gracia.',
+        primary: preserveDeficit?.route === 'nft'
+          ? { href: '#cukie-master-nft-staking', label: 'Gestionar Cukies' }
+          : { href: '#uki-staking', label: 'Gestionar staking UKI' },
+        secondary: { href: '/credits', label: 'Ver mis créditos' },
+        warning: true,
+      };
+    }
+    if (totalSlots === 0) {
+      return {
+        eyebrow: 'Siguiente paso',
+        title: 'Consigue tu primer cupo',
+        description: 'Deposita UKI o usa puntos de rareza de tus Cukies Originales. Puedes combinar ambas vías sin perder sus límites independientes.',
+        primary: { href: '#uki-staking', label: 'Conseguirlo con UKI' },
+        secondary: { href: '#cukie-master-nft-staking', label: 'Usar mis Cukies' },
+        warning: false,
+      };
+    }
+    if (counts.active === 0 && counts.qualifying > 0) {
+      return {
+        eyebrow: 'En validación',
+        title: `${counts.qualifying === 1 ? 'Tu cupo está' : 'Tus cupos están'} madurando`,
+        description: 'Cada cupo empieza a generar créditos cuando completa su espera inicial y llega el siguiente reparto. Consulta la fecha indicada en tu cupo.',
+        primary: { href: '/credits', label: 'Ver mis créditos' },
+        secondary: { href: '#uki-staking', label: 'Revisar staking' },
+        warning: false,
+      };
+    }
+    if (totalSlots !== null && totalSlots >= status.totals.maxPotentialSlots) {
+      return {
+        eyebrow: 'Máximo alcanzado',
+        title: 'Ya tienes todos tus cupos disponibles',
+        description: 'Revisa tus créditos y decide cuánto quieres conservar para jugar y cuánto aportar al pool.',
+        primary: { href: '/credits', label: 'Gestionar créditos' },
+        secondary: { href: '#uki-staking', label: 'Revisar staking' },
+        warning: false,
+      };
+    }
+    return {
+      eyebrow: 'Siguiente paso',
+      title: nextUkiDeficit?.route === 'uki'
+        ? `Te faltan ${requirementLabel(nextUkiDeficit)} para otro cupo`
+        : 'Puedes aumentar tus cupos',
+      description: 'Tu vesting ya está incluido. Deposita únicamente la cantidad que quieras añadir a tu posición.',
+      primary: { href: '#uki-staking', label: 'Gestionar staking UKI' },
+      secondary: { href: '/credits', label: 'Gestionar créditos' },
+      warning: false,
+    };
+  })();
+
+  return (
+    <div className="mt-6 min-w-0" data-cukie-master-overview>
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
+        <section
+          aria-labelledby="slot-origin-title"
+          className="min-w-0 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4 sm:p-5"
+        >
+          <div className="flex min-w-0 items-end justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--uki-muted)]">Tus cupos</p>
+              <h3 id="slot-origin-title" className="mt-1 text-sm font-bold text-[var(--uki-cream)]">
+                De dónde vienen tus cupos
+              </h3>
+            </div>
+            <p className="min-w-0 max-w-[48%] text-right font-headline text-xl font-black tabular-nums text-[var(--uki-lilac)] sm:max-w-none sm:text-3xl">
+              {totalSlots === null ? 'No disponible' : totalSlots}
+              {totalSlots !== null ? <span className="ml-1.5 text-sm font-bold text-[var(--uki-muted)]">de {status.totals.maxPotentialSlots}</span> : null}
+            </p>
+          </div>
+
+          <div className="mt-4 grid min-w-0 divide-y divide-white/10 border-y border-white/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            <SlotSource source="uki" value={ukiSlots} />
+            <SlotSource source="nft" value={nftSlots} />
+          </div>
+        </section>
+
+        <div className="grid min-w-0 divide-y divide-white/10 overflow-hidden rounded-[10px] border border-white/10 bg-black/20 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-1 lg:divide-x-0 lg:divide-y">
+          <OverviewMetric
+            label="Estado actual"
+            value={projectionsMaterialized ? `${counts.active} activos` : 'No disponible'}
+            helper={projectionsMaterialized ? `${counts.qualifying} validando · ${counts.grace} en gracia` : 'Esperando la actualización de tus cupos'}
+          />
+          <OverviewMetric
+            label="Créditos diarios"
+            value={dailyCredits === null ? 'No disponible' : dailyCredits.toLocaleString('es-ES')}
+            helper={dailyCredits === null ? 'Se mostrará cuando las fuentes estén disponibles' : `${CUKIE_MASTER_DAILY_CREDITS_PER_SLOT} por cada cupo activo`}
+          />
+        </div>
+      </div>
+
+      <div className={`mt-4 grid min-w-0 gap-5 rounded-[10px] border p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-center ${
+        nextAction.warning
+          ? 'border-amber-300/30 bg-amber-300/10'
+          : 'border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)]'
+      }`}>
+        <div className="min-w-0">
+          <p className={`text-xs font-black tracking-[0.08em] ${nextAction.warning ? 'text-amber-200' : 'text-[var(--uki-lilac)]'}`}>
+            {nextAction.eyebrow}
+          </p>
+          <h3 className="mt-2 text-balance font-headline text-xl font-black text-[var(--uki-cream)] sm:text-2xl">
+            {nextAction.title}
+          </h3>
+          <p className="mt-2 max-w-2xl text-pretty text-sm font-semibold leading-relaxed text-[var(--uki-text)]">
+            {nextAction.description}
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row lg:flex-col lg:items-stretch">
+          <LandingButton href={nextAction.primary.href} className="justify-center">
+            {nextAction.primary.label}
+          </LandingButton>
+          <LandingButton href={nextAction.secondary.href} variant="secondary" className="justify-center">
+            {nextAction.secondary.label}
+          </LandingButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SlotSource({ source, value }: { source: RouteKey; value: number | null }) {
+  const maxSlots = MAX_ROUTE_SLOTS;
+  const normalizedValue = value === null ? null : Math.min(maxSlots, Math.max(0, value));
+  const isUki = source === 'uki';
+  const Icon = isUki ? Coins : Diamond;
+  const label = isUki ? 'Con UKI' : 'Con Cukies Originales';
+
+  return (
+    <div className="min-w-0 py-4 first:pt-3 last:pb-3 sm:px-5 sm:py-3 sm:first:pl-0 sm:last:pr-0" data-slot-source={source}>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--uki-lilac-border)] bg-black/20 text-[var(--uki-lilac)]">
+            <Icon aria-hidden="true" size={19} weight="duotone" />
+          </span>
+          <p className="truncate text-sm font-black text-[var(--uki-cream)]">{label}</p>
+        </div>
+        <p className="min-w-0 text-right font-headline text-lg font-black tabular-nums text-[var(--uki-cream)] sm:text-xl">
+          {normalizedValue === null ? 'No disponible' : normalizedValue}<span className="ml-1 text-xs font-bold text-[var(--uki-muted)]">{normalizedValue === null ? '' : `de ${maxSlots}`}</span>
+        </p>
+      </div>
+      {normalizedValue === null ? (
+        <p className="mt-3 text-xs font-semibold text-amber-200">Esperando confirmación de la fuente</p>
+      ) : (
+        <span
+          role="progressbar"
+          aria-label={`${label}: ${normalizedValue} de ${maxSlots} cupos`}
+          aria-valuemin={0}
+          aria-valuemax={maxSlots}
+          aria-valuenow={normalizedValue}
+          className="mt-3 grid grid-cols-5 gap-1.5"
+        >
+          {Array.from({ length: maxSlots }, (_, index) => (
+            <span
+              key={index}
+              aria-hidden="true"
+              className={`h-1.5 rounded-full ${index < normalizedValue ? 'bg-[var(--uki-lilac)]' : 'bg-white/10'}`}
+            />
+          ))}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function OverviewMetric({
+  helper,
+  label,
+  value,
+}: {
+  helper: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col justify-center p-4 sm:p-5">
+      <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">{label}</p>
+      <p className="mt-1.5 font-headline text-2xl font-black tabular-nums text-[var(--uki-cream)]">{value}</p>
+      <p className="mt-2 text-xs font-semibold leading-relaxed text-[var(--uki-muted)]">{helper}</p>
+    </div>
+  );
+}
+
 function UkiOnlyStatus({ route }: { route: PublicRoute }) {
   const breakdown = getUkiBreakdown(route);
-  const displayedSlots = route.source.complete
+  const displayedSlots = route.source.complete && !route.synchronizing
     ? route.balanceQualifiedSlots
       ?? route.previewSlots
       ?? route.position?.allocatedSlots
-      ?? 0
-    : 0;
-  const deficit = route.deficitToPreserveSlots ?? route.deficitToNextSlot;
-  const nextStep = displayedSlots >= MAX_ROUTE_SLOTS
+      ?? null
+    : null;
+  const deficit = route.source.complete && !route.synchronizing
+    ? route.deficitToPreserveSlots ?? route.deficitToNextSlot
+    : null;
+  const nextStep = route.synchronizing
+    ? 'Hemos detectado el cambio de UKI y estamos actualizando tus cupos. No repitas la operación.'
+    : displayedSlots === null
+    ? 'No podemos confirmar tus cupos hasta recuperar la fuente de UKI.'
+    : displayedSlots >= MAX_ROUTE_SLOTS
     ? 'Has alcanzado el máximo de 5 Cukie Masters mediante UKI.'
     : deficit
       ? `Te faltan ${requirementLabel(deficit)} para desbloquear tu próximo Cukie Master.`
@@ -468,6 +714,14 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
 
   return (
     <div className="mt-6 min-w-0">
+      {route.synchronizing ? (
+        <div role="status" className="mb-4 flex gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-3">
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+          <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
+            Tus UKI han cambiado y estamos actualizando tus cupos; el resultado anterior no se muestra como vigente hasta terminar.
+          </p>
+        </div>
+      ) : null}
       <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatusMetric
           label="UKI en vesting"
@@ -483,32 +737,32 @@ function UkiOnlyStatus({ route }: { route: PublicRoute }) {
           label="Total computable"
           value={breakdown?.total ?? 'No disponible'}
           helper="Vesting y staking"
-          tone="cyan"
+          tone="lilac"
         />
         <StatusMetric
           label="Tus Cukie Masters"
-          value={`${displayedSlots}/${MAX_ROUTE_SLOTS}`}
+          value={displayedSlots === null ? 'No disponible' : `${displayedSlots}/${MAX_ROUTE_SLOTS}`}
           helper="Preventa pendiente + staking · máximo 5"
-          tone="cyan"
+          tone="lilac"
         />
       </div>
 
       <div className="mt-4 rounded-[8px] border border-white/10 bg-black/20 p-4">
         <div className="flex items-center justify-between gap-4 text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
           <span>Tu progreso</span>
-          <span>{displayedSlots} de {MAX_ROUTE_SLOTS}</span>
+          <span>{displayedSlots === null ? 'No disponible' : `${displayedSlots} de ${MAX_ROUTE_SLOTS}`}</span>
         </div>
         <span
           role="progressbar"
           aria-label="Progreso Cukie Master por UKI"
           aria-valuemin={0}
           aria-valuemax={MAX_ROUTE_SLOTS}
-          aria-valuenow={displayedSlots}
+          {...(displayedSlots === null ? {} : { 'aria-valuenow': displayedSlots })}
           className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
         >
           <span
-            className="block h-full rounded-full bg-[var(--uki-cyan)]"
-            style={{ width: `${Math.min(100, displayedSlots * 20)}%` }}
+            className="block h-full rounded-full bg-[var(--uki-lilac)]"
+            style={{ width: displayedSlots === null ? '0%' : `${Math.min(100, displayedSlots * 20)}%` }}
           />
         </span>
         <p className="mt-3 text-sm font-semibold text-[var(--uki-text)]">{nextStep}</p>
@@ -526,10 +780,10 @@ function StatusMetric({
   label: string;
   value: string;
   helper: string;
-  tone?: 'cyan' | 'warning' | 'neutral';
+  tone?: 'lilac' | 'warning' | 'neutral';
 }) {
-  const valueClass = tone === 'cyan'
-    ? 'text-[var(--uki-cyan)]'
+  const valueClass = tone === 'lilac'
+    ? 'text-[var(--uki-lilac)]'
     : tone === 'warning'
       ? 'text-amber-300'
       : 'text-[var(--uki-cream)]';
@@ -544,27 +798,31 @@ function StatusMetric({
 
 function RouteTab({ value, label, route }: { value: RouteKey; label: string; route: PublicRoute }) {
   const allocated = route.position?.allocatedSlots ?? 0;
-  const displayed = route.synchronizing ? route.previewSlots ?? 0 : allocated;
+  const displayed = !route.source.complete || route.synchronizing
+    ? null
+    : allocated;
   const counts = slotCounts(route);
   return (
     <TabsTrigger
       value={value}
-      className="group min-h-[7.5rem] min-w-0 whitespace-normal rounded-[10px] border border-white/10 bg-black/20 p-4 text-left text-[var(--uki-text)] shadow-none data-[state=active]:border-[var(--uki-cyan)] data-[state=active]:bg-[var(--uki-cyan-soft)] data-[state=active]:text-[var(--uki-cream)]"
+      className="group min-h-[7.5rem] min-w-0 whitespace-normal rounded-[10px] border border-white/10 bg-black/20 p-4 text-left text-[var(--uki-text)] shadow-none data-[state=active]:border-[var(--uki-lilac)] data-[state=active]:bg-[var(--uki-lilac-soft)] data-[state=active]:text-[var(--uki-cream)]"
     >
       <span className="block min-w-0 w-full">
         <span className="flex items-center justify-between gap-3">
           <span className="font-headline text-lg font-black uppercase">{label}</span>
           {route.source.complete
             ? route.synchronizing
-              ? <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
-              : <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--uki-cyan)]" aria-hidden="true" />
+              ? <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
+              : <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
             : <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" aria-hidden="true" />}
         </span>
         <span className="mt-2 flex items-end justify-between gap-3">
-          <span className="font-headline text-2xl font-black text-[var(--uki-gold)]">{displayed}/{MAX_ROUTE_SLOTS}</span>
+          <span className="font-headline text-2xl font-black text-[var(--uki-gold)]">{displayed === null ? 'No disponible' : `${displayed}/${MAX_ROUTE_SLOTS}`}</span>
           <span className="text-xs font-semibold text-[var(--uki-muted)]">
-            {route.synchronizing
-              ? `${displayed} detectados · sincronizando`
+            {!route.source.complete
+              ? 'Esperando confirmación'
+              : route.synchronizing
+              ? 'Actualizando tus cupos'
               : `${counts.active} activos · ${counts.qualifying} validando`}
           </span>
         </span>
@@ -573,11 +831,13 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
           aria-label={`Progreso ${label}`}
           aria-valuemin={0}
           aria-valuemax={MAX_ROUTE_SLOTS}
-          aria-valuenow={displayed}
-          aria-valuetext={`${displayed} de ${MAX_ROUTE_SLOTS} cupos${route.synchronizing ? ' detectados, sincronizando' : ''}`}
+          {...(displayed === null ? {} : { 'aria-valuenow': displayed })}
+          aria-valuetext={displayed === null
+            ? 'Cupos no disponibles; esperando confirmación'
+            : `${displayed} de ${MAX_ROUTE_SLOTS} cupos${route.synchronizing ? ', actualizando' : ''}`}
           className="mt-3 block h-2 overflow-hidden rounded-full bg-white/10"
         >
-          <span className="block h-full rounded-full bg-[var(--uki-cyan)]" style={{ width: `${Math.min(100, displayed * 20)}%` }} />
+          <span className="block h-full rounded-full bg-[var(--uki-lilac)]" style={{ width: displayed === null ? '0%' : `${Math.min(100, displayed * 20)}%` }} />
         </span>
       </span>
     </TabsTrigger>
@@ -587,7 +847,10 @@ function RouteTab({ value, label, route }: { value: RouteKey; label: string; rou
 function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
   const ukiBreakdown = getUkiBreakdown(route);
   const counts = slotCounts(route);
-  const deficit = route.deficitToPreserveSlots ?? route.deficitToNextSlot;
+  const visibleSlots = route.synchronizing ? [] : route.slots;
+  const deficit = route.synchronizing
+    ? null
+    : route.deficitToPreserveSlots ?? route.deficitToNextSlot;
   return (
     <div className="min-w-0 rounded-[10px] border border-white/10 bg-black/20 p-4 sm:p-5">
       <div className="grid min-w-0 gap-5 lg:grid-cols-[1.1fr_0.9fr]">
@@ -595,7 +858,11 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h4 className="font-headline text-xl font-black uppercase text-[var(--uki-cream)]">{label}</h4>
             <span className="w-fit rounded-full border border-white/10 px-3 py-1 text-xs font-black uppercase text-[var(--uki-muted)]">
-              {counts.active} activos · {counts.qualifying} en validación · {counts.grace} en gracia
+              {!route.source.complete
+                ? 'Estado pendiente de confirmación'
+                : route.synchronizing
+                  ? 'Actualizando tus cupos'
+                  : `${counts.active} activos · ${counts.qualifying} en validación · ${counts.grace} en gracia`}
             </span>
           </div>
 
@@ -607,46 +874,57 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
           ) : (
             <>
               {route.synchronizing ? (
-                <div role="status" className="mt-4 flex gap-3 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-3">
-                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-cyan)]" aria-hidden="true" />
+                <div role="status" className="mt-4 flex gap-3 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-3">
+                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[var(--uki-lilac)]" aria-hidden="true" />
                   <p className="text-xs font-semibold leading-relaxed text-[var(--uki-text)]">
-                    Hemos detectado el cambio on-chain. Estamos asignando los cupos y su periodo de validación; no repitas la operación.
+                    Hemos detectado el cambio. Estamos actualizando tus cupos; no repitas la operación.
                   </p>
                 </div>
               ) : null}
               {ukiBreakdown ? (
-                <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+                <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">UKI que ya cuentan</p>
                   <p className="mt-2 break-words text-base font-black text-[var(--uki-cream)]">
-                    {ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
+                    {route.synchronizing ? 'UKI consultados: ' : ''}{ukiBreakdown.total} = {ukiBreakdown.locked} en vesting + {ukiBreakdown.staked} en staking
                   </p>
                 </div>
               ) : (
-                <div className="mt-4 rounded-[8px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] p-4">
+                <div className="mt-4 rounded-[8px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] p-4">
                   <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Puntos que ya cuentan</p>
-                  <p className="mt-2 text-2xl font-black text-[var(--uki-gold)]">{route.source.originalCukiePoints ?? 0} puntos</p>
+                  <p className="mt-2 text-2xl font-black text-[var(--uki-gold)]">
+                    {typeof route.source.originalCukiePoints === 'number'
+                      ? `${route.source.originalCukiePoints} puntos`
+                      : 'No disponible'}
+                  </p>
                 </div>
               )}
             </>
           )}
 
           <dl className="mt-4 grid min-w-0 gap-3 text-sm font-semibold sm:grid-cols-2">
-            <RouteMetric label="Requisito vigente" value={requirementLabel(route.currentRequirement)} />
             <RouteMetric
-              label={route.deficitToPreserveSlots ? 'Déficit para conservar' : 'Déficit siguiente cupo'}
-              value={deficit
+              label={route.synchronizing ? 'Requisito Cukie Master' : 'Requisito vigente'}
+              value={route.synchronizing ? 'Actualizando…' : requirementLabel(route.currentRequirement)}
+            />
+            <RouteMetric
+              label={route.synchronizing
+                ? 'Siguiente cupo'
+                : route.deficitToPreserveSlots ? 'Déficit para conservar' : 'Déficit siguiente cupo'}
+              value={route.synchronizing
+                ? 'Actualizando…'
+                : deficit
                 ? requirementLabel(deficit)
                 : route.source.complete ? 'Máximo alcanzado' : 'No disponible'}
             />
-            {(route.position?.protectedSlots ?? 0) > 0 || counts.grace > 0 ? (
+            {!route.synchronizing && ((route.position?.protectedSlots ?? 0) > 0 || counts.grace > 0) ? (
               <RouteMetric label="Cupos conservados en gracia" value={String(route.position?.protectedSlots ?? 0)} />
             ) : null}
-            {ukiBreakdown ? <RouteMetric label="Margen tras cupos" value={ukiBreakdown.excess} /> : null}
+            {!route.synchronizing && ukiBreakdown ? <RouteMetric label="Margen tras cupos" value={ukiBreakdown.excess} /> : null}
           </dl>
 
-          {route.pendingRequirement ? (
+          {!route.synchronizing && route.pendingRequirement ? (
             <div className="mt-4 rounded-[8px] border border-amber-300/30 bg-amber-300/10 p-3 text-xs font-semibold leading-relaxed text-amber-100">
-              Próximo requisito: {requirementLabel(route.pendingRequirement)}. Puedes ajustarte hasta {dateLabel(route.requirementGraceEndsAt) ?? 'el final de la ventana de 48 horas'}.
+              Próximo requisito: {requirementLabel(route.pendingRequirement)}. Puedes ajustarte hasta {dateLabel(route.requirementGraceEndsAt) ?? 'el final del periodo de gracia'}.
             </div>
           ) : null}
         </div>
@@ -654,13 +932,13 @@ function RouteDetail({ label, route }: { label: string; route: PublicRoute }) {
         <div className="min-w-0 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
           <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Estado de cada cupo</p>
           <div className="mt-3 space-y-2">
-            {route.slots.length === 0 ? (
+            {visibleSlots.length === 0 ? (
               <p className="text-sm font-semibold text-[var(--uki-muted)]">
                 {route.synchronizing
-                  ? 'Los cupos aparecerán aquí cuando termine la sincronización.'
+                  ? 'Los cupos aparecerán aquí cuando termine la actualización.'
                   : 'Todavía no hay cupos asignados en esta ruta.'}
               </p>
-            ) : route.slots.map((slot) => (
+            ) : visibleSlots.map((slot) => (
               <div key={`${slot.route}:${slot.ordinal}:${slot.eligibilityEpoch}`} className="flex min-w-0 items-start justify-between gap-3 rounded-[7px] border border-white/10 px-3 py-2.5 text-xs font-semibold">
                 <span className="shrink-0 text-[var(--uki-text)]">Cupo {slot.ordinal}</span>
                 <span className="flex min-w-0 items-start gap-1.5 text-right text-[var(--uki-muted)]">
@@ -719,7 +997,7 @@ function NftInventory({
       </div>
 
       {mutationError ? <p role="alert" className="mt-4 text-sm font-semibold text-amber-300">{mutationError}</p> : null}
-      {mutatingAsset ? <p role="status" aria-live="polite" className="mt-3 text-xs font-semibold text-[var(--uki-cyan)]">Actualizando el inventario de forma segura…</p> : null}
+      {mutatingAsset ? <p role="status" aria-live="polite" className="mt-3 text-xs font-semibold text-[var(--uki-lilac)]">Actualizando el inventario de forma segura…</p> : null}
 
       <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {assets.length === 0 ? (
@@ -736,7 +1014,7 @@ function NftInventory({
                   {rarityLabel(asset.rarity)}
                 </span>
                 {asset.contributesToCukieMaster ? (
-                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-[var(--uki-cyan-border)] bg-[#160a22]/90 px-2.5 py-1 text-xs font-black text-[var(--uki-cyan)]">
+                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-[var(--uki-lilac-border)] bg-[#160a22]/90 px-2.5 py-1 text-xs font-black text-[var(--uki-lilac)]">
                     <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> En uso
                   </span>
                 ) : null}
@@ -754,10 +1032,10 @@ function NftInventory({
 
                 <div className={`mt-3 flex min-h-11 items-center gap-2 rounded-[7px] border p-3 text-xs font-semibold ${
                   asset.contributesToCukieMaster
-                    ? 'border-[var(--uki-cyan-border)] bg-[var(--uki-cyan-soft)] text-[var(--uki-text)]'
+                    ? 'border-[var(--uki-lilac-border)] bg-[var(--uki-lilac-soft)] text-[var(--uki-text)]'
                     : 'border-white/10 text-[var(--uki-muted)]'
                 }`}>
-                  <Sparkles className="h-4 w-4 shrink-0 text-[var(--uki-cyan)]" aria-hidden="true" />
+                  <Sparkles className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" aria-hidden="true" />
                   {asset.contributesToCukieMaster
                     ? `Aporta ${pointsLabel(asset.contributionPoints)} a tu ruta`
                     : points === null
@@ -773,7 +1051,7 @@ function NftInventory({
                     disabled={Boolean(mutatingAsset)}
                     onClick={() => void onMutate(asset, 'soft_stake')}
                     aria-label={`Usar ${name} para Cukie Master`}
-                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-cyan-border)] px-3 py-2 text-center text-xs font-black uppercase text-[var(--uki-cyan)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[7px] border border-[var(--uki-lilac-border)] px-3 py-2 text-center text-xs font-black uppercase text-[var(--uki-lilac)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isMutating ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Lock className="h-4 w-4" aria-hidden="true" />}
                     Usar para Cukie Master
@@ -867,7 +1145,7 @@ function rarityClass(rarity: string) {
   return ({
     common: 'border-white/20 bg-black/70 text-[var(--uki-text)]',
     uncommon: 'border-emerald-300/30 bg-emerald-950/80 text-emerald-200',
-    rare: 'border-cyan-300/30 bg-cyan-950/80 text-cyan-200',
+    rare: 'border-lilac-300/30 bg-lilac-950/80 text-lilac-200',
     epic: 'border-purple-300/30 bg-purple-950/80 text-purple-200',
     legendary: 'border-amber-300/30 bg-amber-950/80 text-amber-200',
     goat: 'border-pink-300/30 bg-pink-950/80 text-pink-200',

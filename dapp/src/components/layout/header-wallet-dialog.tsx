@@ -12,6 +12,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { MobileWalletId } from '@/lib/wallet-connectors';
+import {
+  getConnectorDescription,
+  getConnectorDisplayName,
+  getConnectorLogoSrc,
+} from '@/lib/wallet-connectors';
 
 interface HeaderWalletDialogProps {
   connectors: readonly Connector[];
@@ -19,6 +24,7 @@ interface HeaderWalletDialogProps {
   onOpenChange: (open: boolean) => void;
   onSelectMobileWallet: (walletId: MobileWalletId) => void;
   onSelectConnector: (connector: Connector) => void;
+  walletKind?: 'evm' | 'tron' | 'any';
   tronLink: {
     error: string | null;
     isInstalled: boolean;
@@ -63,6 +69,10 @@ export function HeaderWalletDialog({
   open,
   onOpenChange,
   onSelectMobileWallet,
+  connectors,
+  onSelectConnector,
+  tronLink,
+  walletKind = 'any',
 }: HeaderWalletDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,7 +90,7 @@ export function HeaderWalletDialog({
           data-testid="header-wallet-dialog-options"
           className="grid min-h-0 min-w-0 gap-3 overflow-x-hidden overflow-y-auto py-1 pr-1"
         >
-          <div data-testid="mobile-wallet-options" className="grid gap-2">
+          {walletKind !== 'tron' ? <div data-testid="mobile-wallet-options" className="grid gap-2">
             {MOBILE_WALLETS.map((wallet) => (
               <Button
                 key={wallet.id}
@@ -109,7 +119,67 @@ export function HeaderWalletDialog({
                 </span>
               </Button>
             ))}
-          </div>
+          </div> : null}
+
+          {walletKind !== 'tron' && connectors.length > 0 ? (
+            <div data-testid="evm-wallet-options" className="grid gap-2 border-t border-white/10 pt-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                Otras opciones EVM
+              </p>
+              {connectors.map((connector) => {
+                const logoSrc = getConnectorLogoSrc(connector);
+                return (
+                  <Button
+                    key={connector.id}
+                    type="button"
+                    onClick={() => onSelectConnector(connector)}
+                    className="h-auto w-full min-w-0 whitespace-normal rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left hover:border-lilac-300/45 hover:bg-lilac-400/10"
+                  >
+                    <span className="flex w-full min-w-0 items-start gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-lilac-300/20 bg-white">
+                        {logoSrc ? <Image src={logoSrc} alt="" width={24} height={24} unoptimized className="h-5 w-5 object-contain" /> : null}
+                      </span>
+                      <span className="min-w-0 flex-1 text-left">
+                        <span className="block text-sm font-bold leading-tight text-foreground">
+                          {getConnectorDisplayName(connector)}
+                        </span>
+                        <span className="mt-1 block text-xs leading-snug text-muted-foreground">
+                          {getConnectorDescription(connector)}
+                        </span>
+                      </span>
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {walletKind !== 'evm' ? (
+            <div data-testid="tron-wallet-options" className="grid gap-2 border-t border-white/10 pt-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
+                Wallet TRON
+              </p>
+              <Button
+                type="button"
+                disabled={!tronLink.isInstalled || tronLink.isLoading}
+                onClick={tronLink.onSelect}
+                className="h-auto w-full min-w-0 whitespace-normal rounded-xl border border-white/10 bg-white/[0.035] p-3 text-left hover:border-lilac-300/45 hover:bg-lilac-400/10"
+              >
+                <span className="flex w-full min-w-0 items-start gap-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-lilac-300/20 bg-white">
+                    <Image src="/brand/wallets/tronlink.png" alt="" width={24} height={24} unoptimized className="h-5 w-5 object-contain" />
+                  </span>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block text-sm font-bold leading-tight text-foreground">TronLink TRON</span>
+                    <span className="mt-1 block text-xs leading-snug text-muted-foreground">
+                      {tronLink.isInstalled ? 'Conexión nativa para operar en TRON Mainnet.' : 'Instala o activa TronLink.'}
+                    </span>
+                  </span>
+                </span>
+              </Button>
+              {tronLink.error ? <p role="alert" className="text-xs font-semibold text-red-200">{tronLink.error}</p> : null}
+            </div>
+          ) : null}
 
         </div>
       </DialogContent>

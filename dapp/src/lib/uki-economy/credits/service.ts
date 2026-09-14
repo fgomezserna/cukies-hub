@@ -7,6 +7,7 @@ import {
   StaleFenceError,
 } from "../errors";
 import { assertCreditAmount } from "../money";
+import { economyCycleDurationMs } from "../cycle-calendar";
 import { reconcileCompetitionCreditSnapshot } from "./reconciliation";
 import {
   mapCreditPersistenceError,
@@ -624,7 +625,6 @@ function validateExistingCreditRun(
     cutoff.getTime() !== period.cutoff.getTime() ||
     nextCutoff.getTime() !== period.nextCutoff.getTime() ||
     settlementTarget.getTime() !== period.settlementTarget.getTime() ||
-    settlementNextCutoff.getTime() !== settlementCutoff.getTime() + 24 * 60 * 60 * 1000 ||
     run.settlementPeriod.periodId !== expectedSettlementPeriod.periodId ||
     settlementCutoff.getTime() !== expectedSettlementPeriod.cutoff.getTime() ||
     settlementNextCutoff.getTime() !== expectedSettlementPeriod.nextCutoff.getTime() ||
@@ -947,9 +947,12 @@ export function createCompetitionCreditService(
         );
       }
       for (const sourceSlot of sourceSlots) validSourceSlotShape(sourceSlot);
+      // `health.healthy` is the source gate. `warnings` may also contain
+      // non-blocking ancillary alarms (for example, historical TOKEN_V2
+      // ownership dead letters) that must remain visible without stopping a
+      // new Cukie Master credit cut.
       if (
         !health.healthy ||
-        health.warnings.length > 0 ||
         !health.observedThrough ||
         !(health.observedThrough instanceof Date) ||
         Number.isNaN(health.observedThrough.getTime()) ||
@@ -964,10 +967,17 @@ export function createCompetitionCreditService(
         throw new DomainConflictError(
           "No se puede publicar watermark con fuentes no saludables.",
           {
+            reasonCode: "SOURCE_UNHEALTHY",
+            route,
             warnings: health.warnings.slice(0, 20),
           }
         );
       }
+      await repository.ensureVerifiedHistoryCoverage(
+        route,
+        rule.maxSnapshotSlots,
+        now
+      );
       for (const route of ["uki", "nft"] as const) {
         if (
           validCreditText(
@@ -1112,13 +1122,17 @@ export function createCompetitionCreditService(
         const rule = await repository.findRuleAt(cutoff, expectedRuleVersion);
         if (!rule)
           throw new DomainConflictError(
-            "La regla esperada no esta activa en el corte."
+            "La regla esperada no esta activa en el corte.",
+            { reasonCode: "CREDIT_RULE_NOT_ACTIVE_AT_CUTOFF" },
           );
         assertRuleActiveAt(rule, cutoff);
         const period = buildCompetitionCreditPeriod(cutoff, rule);
         const activeSettlementRule = await repository.findRuleAt(now);
         if (!activeSettlementRule) {
-          throw new DomainConflictError("No existe una regla activa para liquidar compensaciones.");
+          throw new DomainConflictError(
+            "No existe una regla activa para liquidar compensaciones.",
+            { reasonCode: "CREDIT_SETTLEMENT_RULE_MISSING" },
+          );
         }
         const settlementPeriod =
           now.getTime() >= period.nextCutoff.getTime()
@@ -1131,7 +1145,10 @@ export function createCompetitionCreditService(
             existing.settlementPeriod.ruleVersion
           );
           if (!existingSettlementRule) {
-            throw new DomainConflictError("La regla de liquidacion del run no existe.");
+            throw new DomainConflictError(
+              "La regla de liquidacion del run no existe.",
+              { reasonCode: "CREDIT_SETTLEMENT_RULE_MISSING" },
+            );
           }
           return validateExistingCreditRun(
             existing,
@@ -1144,19 +1161,24 @@ export function createCompetitionCreditService(
         }
         const gate = await repository.readSnapshotGate(rule, cutoff, route);
         if (!gate.schemaReady)
-          throw new DomainConflictError("El schema de economia no esta listo.");
+          throw new DomainConflictError("El schema de economia no esta listo.", {
+            reasonCode: "CREDIT_SCHEMA_NOT_READY",
+          });
         if (!gate.activeRuleMatches)
           throw new DomainConflictError(
-            "La regla activa cambio durante el snapshot."
+            "La regla activa cambio durante el snapshot.",
+            { reasonCode: "CREDIT_RULE_CHANGED_DURING_SNAPSHOT" },
           );
         if (gate.openIntegrityIncidents > 0) {
           throw new DomainConflictError(
-            "Hay incidentes de integridad abiertos."
+            "Hay incidentes de integridad abiertos.",
+            { reasonCode: "CREDIT_INTEGRITY_INCIDENT_OPEN" },
           );
         }
         if (gate.maturedQualifyingSlots > 0) {
           throw new DomainConflictError(
-            "Hay slots qualifying ya maduros; debe cerrarse su transicion antes del snapshot."
+            "Hay slots qualifying ya maduros; debe cerrarse su transicion antes del snapshot.",
+            { reasonCode: "CREDIT_MATURED_QUALIFYING_SLOTS" },
           );
         }
         const watermark = gate.sourceWatermark;
@@ -1182,7 +1204,6 @@ export function createCompetitionCreditService(
           watermark._id !== CREDIT_SOURCE_WATERMARK_IDS[route] ||
           watermark.status !== "healthy" ||
           !liveHealth.healthy ||
-          liveHealth.warnings.length > 0 ||
           !liveObservedThrough ||
           !liveHealth.sourceRuleVersions ||
           !watermarkObservedThrough ||
@@ -1202,7 +1223,8 @@ export function createCompetitionCreditService(
           !/^[0-9a-f]{64}$/.test(watermark.healthEvidenceHash)
         )
           throw new DomainConflictError(
-            "El watermark de Cukie Master no es saludable o no cubre el corte."
+            "El watermark de Cukie Master no es saludable o no cubre el corte.",
+            { reasonCode: "CREDIT_WATERMARK_UNHEALTHY_OR_STALE" },
           );
         if (
           validCreditText(
@@ -1215,7 +1237,8 @@ export function createCompetitionCreditService(
           ) !== watermark.sourceRuleVersions.nft
         ) {
           throw new DomainConflictError(
-            "Las versiones del watermark no son canonicas."
+            "Las versiones del watermark no son canonicas.",
+            { reasonCode: "CREDIT_WATERMARK_RULE_MISMATCH" },
           );
         }
 
@@ -1234,17 +1257,20 @@ export function createCompetitionCreditService(
           buildCreditSourceSlotsHash(currentSourceSlots) !== watermark.sourceHash
         )
           throw new DomainConflictError(
-            "Los slots cambiaron despues de publicar el watermark."
+            "Los slots cambiaron despues de publicar el watermark.",
+            { reasonCode: "CREDIT_SOURCE_CHANGED_AFTER_WATERMARK" },
           );
         const cutoffBlock = await repository.findCanonicalCutoffBlock(cutoff);
         if (!cutoffBlock) {
           throw new DomainConflictError(
-            `No existe evidencia de bloque canonico anterior a ${cutoff.toISOString()}.`
+            `No existe evidencia de bloque canonico anterior a ${cutoff.toISOString()}.`,
+            { reasonCode: "CREDIT_CUTOFF_BLOCK_MISSING" },
           );
         }
         if (cutoffBlock.blockNumber > watermark.canonicalSafeBlock) {
           throw new DomainConflictError(
-            "El bloque efectivo del cutoff excede el checkpoint canonico saludable."
+            "El bloque efectivo del cutoff excede el checkpoint canonico saludable.",
+            { reasonCode: "CREDIT_CUTOFF_BLOCK_AHEAD_OF_SAFE_CHECKPOINT" },
           );
         }
         const sourceSlots = await repository.listSourceSlotsAtCutoff(
@@ -1705,7 +1731,7 @@ export function createCompetitionCreditService(
             `La session ${sessionId} ya tiene una reserva.`
           );
         }
-        if (await repository.hasOpenCreditBlock(walletNormalized)) {
+        if (await repository.hasOpenCreditBlock(walletNormalized, period.cutoff)) {
           throw new DomainConflictError(
             "La wallet o el ledger de creditos estan bloqueados."
           );
@@ -1948,14 +1974,30 @@ export function createCompetitionCreditService(
     const latest = await mappedTransaction(runner, (repository) =>
       repository.findLatestRunByRoute(input.route)
     );
-    if (latest && latest.status !== "open" && latest.status !== "open_with_holds") {
-      return latest.period;
-    }
     let candidateCutoff: Date;
     if (latest) {
-      candidateCutoff = new Date(
-        latest.period.cutoff.getTime() + 24 * 60 * 60 * 1000
-      );
+      const latestCutoff = new Date(latest.period.cutoff);
+      const latestNextCutoff = new Date(latest.period.nextCutoff);
+      const acceleratedRunIsBehindCurrent = Boolean(input.rule.calendar) &&
+        Number.isFinite(latestCutoff.getTime()) &&
+        Number.isFinite(latestNextCutoff.getTime()) &&
+        latestCutoff.getTime() < current.cutoff.getTime() &&
+        latestNextCutoff.getTime() <= current.cutoff.getTime();
+
+      if (acceleratedRunIsBehindCurrent) {
+        // Staging is disposable: once the persisted run is behind the
+        // current accelerated period, start from that period instead of
+        // replaying missed historical cuts. This keeps a blocked/stale run
+        // from pinning new test cycles without changing production catch-up.
+        candidateCutoff = new Date(current.cutoff);
+      } else if (
+        latest.status !== "open" &&
+        latest.status !== "open_with_holds"
+      ) {
+        return latest.period;
+      } else {
+        candidateCutoff = latestNextCutoff;
+      }
     } else {
       const oldestRule = await mappedTransaction(runner, (repository) =>
         repository.findOldestRule()
@@ -1963,25 +2005,15 @@ export function createCompetitionCreditService(
       if (!oldestRule) {
         throw new DomainConflictError("No existe ninguna regla historica de creditos.");
       }
-      candidateCutoff = new Date(
-        Date.UTC(
-          oldestRule.activeFrom.getUTCFullYear(),
-          oldestRule.activeFrom.getUTCMonth(),
-          oldestRule.activeFrom.getUTCDate(),
-          oldestRule.cutoffHourUtc,
-          oldestRule.cutoffMinuteUtc,
-          0,
-          0
-        )
-      );
+      candidateCutoff = currentCompetitionCreditPeriod(oldestRule.activeFrom, oldestRule).cutoff;
       if (candidateCutoff.getTime() < oldestRule.activeFrom.getTime()) {
-        candidateCutoff = new Date(candidateCutoff.getTime() + 24 * 60 * 60 * 1000);
+        candidateCutoff = new Date(candidateCutoff.getTime() + economyCycleDurationMs(oldestRule.calendar));
       }
     }
     const eligibleCutoff =
       now.getTime() >= current.settlementTarget.getTime()
         ? current.cutoff
-        : new Date(current.cutoff.getTime() - 24 * 60 * 60 * 1000);
+        : new Date(current.cutoff.getTime() - economyCycleDurationMs(input.rule.calendar));
     if (candidateCutoff.getTime() > eligibleCutoff.getTime()) {
       return null;
     }

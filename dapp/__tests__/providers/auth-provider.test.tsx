@@ -51,9 +51,6 @@ describe('providers/AuthProvider', () => {
     twitterHandle: null,
     discordUsername: null,
     telegramUsername: null,
-    referralCode: null,
-    referredById: null,
-    referralRewards: 0,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     lastCheckIn: null,
@@ -62,6 +59,10 @@ describe('providers/AuthProvider', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    mockUseAccount.mockReturnValue({
+      address: undefined,
+      isConnected: false,
+    } as any)
     mockUseDisconnect.mockReturnValue({
       disconnect: mockDisconnect,
     } as any)
@@ -118,7 +119,12 @@ describe('providers/AuthProvider', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress }),
+      body: JSON.stringify({
+        walletAddress,
+        walletType: 'evm',
+        restoreSession: true,
+        requireSignedWallet: true,
+      }),
     })
   })
 
@@ -138,7 +144,7 @@ describe('providers/AuthProvider', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('no-user')
   })
 
-  it('should handle fetch errors and disconnect wallet', async () => {
+  it('should handle initial restore errors without disconnecting the wallet', async () => {
     const walletAddress = '0x123456789'
     mockUseAccount.mockReturnValue({
       address: walletAddress,
@@ -157,13 +163,14 @@ describe('providers/AuthProvider', () => {
     )
 
     await waitFor(() => {
-      expect(mockDisconnect).toHaveBeenCalled()
+      expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
     })
 
     expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    expect(mockDisconnect).not.toHaveBeenCalled()
   })
 
-  it('should handle network errors and disconnect wallet', async () => {
+  it('should handle initial restore network errors without disconnecting the wallet', async () => {
     const walletAddress = '0x123456789'
     mockUseAccount.mockReturnValue({
       address: walletAddress,
@@ -179,10 +186,11 @@ describe('providers/AuthProvider', () => {
     )
 
     await waitFor(() => {
-      expect(mockDisconnect).toHaveBeenCalled()
+      expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
     })
 
     expect(screen.getByTestId('user')).toHaveTextContent('no-user')
+    expect(mockDisconnect).not.toHaveBeenCalled()
   })
 
   it('should set loading state correctly during fetch', async () => {
@@ -399,7 +407,12 @@ describe('providers/AuthProvider', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress }),
+      body: JSON.stringify({
+        walletAddress,
+        walletType: 'evm',
+        restoreSession: true,
+        requireSignedWallet: true,
+      }),
     })
     expect(mockFetch).not.toHaveBeenCalledWith(
       '/api/auth/challenge',
