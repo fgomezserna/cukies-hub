@@ -17,15 +17,18 @@ jest.mock('@/components/layout/header', () => ({
   default: () => <header>Cabecera</header>,
 }));
 
-jest.mock('lucide-react', () => ({
-  PanelLeft: () => null,
-  Home: () => null,
-  Gamepad2: () => null,
-  Trophy: () => null,
-  LockKeyhole: () => null,
-  Crown: () => null,
-  UsersRound: () => null,
-}));
+jest.mock('lucide-react', () => {
+  const Icon = () => null;
+  return {
+    Crown: Icon,
+    Gamepad2: Icon,
+    Layers3: Icon,
+    LayoutDashboard: Icon,
+    LockKeyhole: Icon,
+    PanelLeft: Icon,
+    Trophy: Icon,
+  };
+});
 
 const mockUsePathname = usePathname as jest.MockedFunction<typeof usePathname>;
 const mockUseMobileGameShell = useMobileGameShell as jest.MockedFunction<
@@ -34,55 +37,40 @@ const mockUseMobileGameShell = useMobileGameShell as jest.MockedFunction<
 
 describe('AppLayout launch navigation', () => {
   beforeEach(() => {
-    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'true';
-    mockUsePathname.mockReturnValue('/games/treasure-hunt');
+    mockUsePathname.mockReturnValue('/marketplace');
     mockUseMobileGameShell.mockReturnValue(false);
   });
 
-  afterEach(() => {
-    delete process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE;
-  });
-
-  it('shows the launch destinations including Ambassadors and hides community links', () => {
+  it('keeps the core navigation while hiding Cukies and Marketplace from the sidebar', () => {
     render(<AppLayout><div>Contenido</div></AppLayout>);
 
-    expect(screen.getByRole('link', { name: 'Preventa UKI' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    );
     expect(screen.getByRole('link', { name: 'Jugar' })).toHaveAttribute(
       'href',
       '/games/treasure-hunt',
     );
-    expect(screen.getByRole('link', { name: 'Vesting' })).toHaveAttribute('href', '/vesting');
-    expect(screen.getByRole('link', { name: 'Premios' })).toHaveAttribute('href', '/premios');
     expect(screen.getByRole('link', { name: 'Cukie Master' })).toHaveAttribute(
       'href',
       '/cukie-master',
     );
-    expect(screen.getByRole('link', { name: 'Embajadores' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Pool de Cukies' })).toHaveAttribute(
       'href',
-      '/embajadores',
+      '/cukie-hodler#mi-cukie-pool',
+    );
+    expect(screen.getByRole('link', { name: 'Ranking' })).toHaveAttribute(
+      'href',
+      '/games/treasure-hunt/rankings',
+    );
+    expect(screen.getByRole('link', { name: 'Vesting' })).toHaveAttribute(
+      'href',
+      '/vesting',
     );
 
-    for (const hiddenLabel of [
-      'Inicio',
-      'Juegos',
-      'Ranking',
-      'Misiones',
-      'Puntos',
-      'Cukies',
-      'Indexer',
-      'Twitter',
-      'Telegram',
-      'Discord',
-    ]) {
-      expect(screen.queryByText(hiddenLabel)).not.toBeInTheDocument();
-    }
-  });
-
-  it('hides Ambassadors when public listing is disabled', () => {
-    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'false';
-
-    render(<AppLayout><div>Contenido</div></AppLayout>);
-
-    expect(screen.queryByRole('link', { name: 'Embajadores' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Cukies' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Marketplace' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Activos')).not.toBeInTheDocument();
   });
 });
