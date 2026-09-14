@@ -86,6 +86,27 @@ describe('readWalletVestingStatus', () => {
       .rejects.toBeInstanceOf(VestingOnChainUnavailableError);
   });
 
+  it('acepta el sentinel uint64.max de una asignación pendiente de congelar', async () => {
+    const runtime = dependencies({
+      readSchedule: jest.fn().mockResolvedValue({
+        totalAmount: BigInt(10_000),
+        releasedAmount: BigInt(0),
+        start: (BigInt(1) << BigInt(64)) - BigInt(1),
+        cliff: (BigInt(1) << BigInt(64)) - BigInt(1),
+        duration: BigInt(23_328_000),
+      }),
+      readReleasable: jest.fn().mockResolvedValue(BigInt(0)),
+      readConfigFrozen: jest.fn().mockResolvedValue(false),
+    });
+
+    await expect(readWalletVestingStatus(wallet, runtime)).resolves.toMatchObject({
+      configFrozen: false,
+      hasPosition: true,
+      lockedAmountRaw: '10000',
+      schedule: { start: 0, cliff: 0, duration: 23_328_000, end: null },
+    });
+  });
+
   it('no degrada un fallo RPC a un calendario vacío', async () => {
     const runtime = dependencies({
       readSchedule: jest.fn().mockRejectedValue(new Error('rpc unavailable')),

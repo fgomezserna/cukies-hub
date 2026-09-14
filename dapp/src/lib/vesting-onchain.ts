@@ -100,7 +100,13 @@ function productionDependencies(): WalletVestingDependencies {
   };
 }
 
-function safeTimestamp(value: bigint, label: string) {
+const UINT64_MAX = (BigInt(1) << BigInt(64)) - BigInt(1);
+
+function safeTimestamp(value: bigint, label: string, allowUnset = false) {
+  // VestingVault uses uint64.max for a presale allocation while its global
+  // schedule is still editable. It is a valid pending state, not a timestamp
+  // that should make the whole wallet read unavailable.
+  if (allowUnset && value === UINT64_MAX) return 0;
   if (value < BigInt(0) || value > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new VestingOnChainUnavailableError(`${label} is outside the supported timestamp range`);
   }
@@ -153,8 +159,8 @@ export async function readWalletVestingStatus(
     const progressBps = schedule.totalAmount === BigInt(0)
       ? 0
       : Number((vestedAmount * BigInt(10_000)) / schedule.totalAmount);
-    const start = safeTimestamp(schedule.start, 'start');
-    const cliff = safeTimestamp(schedule.cliff, 'cliff');
+    const start = safeTimestamp(schedule.start, 'start', true);
+    const cliff = safeTimestamp(schedule.cliff, 'cliff', true);
     const duration = safeTimestamp(schedule.duration, 'duration');
     const end = start > 0 && duration > 0 && start <= Number.MAX_SAFE_INTEGER - duration
       ? start + duration
