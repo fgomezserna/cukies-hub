@@ -131,6 +131,8 @@ function cuki(
   return {
     id,
     tokenId,
+    chainId: null,
+    collectionAddress: null,
     cukiNumber,
     owner: 'T111111111111111111111111111111111',
     network: 'TRON',

@@ -11,38 +11,33 @@ import {
 } from 'lucide-react';
 
 import type { PublicLocale } from '@/lib/public-locale';
+import {
+  getLandingExplorerUrl,
+  type LandingNetworkConfig,
+} from '@/lib/landing-network';
 
 export type LandingIcon = LucideIcon;
 
-export const UKI_MAINNET_ADDRESSES = Object.freeze({
-  token: '0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA',
-  asm: '0x707F0f4a39a4a26239F7D00463B15AB5656861f9',
-  pair: '0x40b315f31421b5D31DE018055Cb30f78265024Be',
-  staking: '0xaD18ff665E99d0033c3BB9d73182c2B03Df59696',
-  locker: '0xb3E43944DF782EEeD9A99f0CFA4301c72b9629E6',
-});
+type ParticipationStep = {
+  icon: LandingIcon;
+  number: string;
+  title: string;
+  text: string;
+  href: string | null;
+  action: string;
+  external?: boolean;
+};
 
-export const UKI_LIQUIDITY_UNLOCK_LABEL = '23 feb 2027 · 15:33 UTC';
-
-export const PANCAKESWAP_UKI_URL =
-  `https://pancakeswap.finance/swap?chain=bsc&inputCurrency=${UKI_MAINNET_ADDRESSES.asm}&outputCurrency=${UKI_MAINNET_ADDRESSES.token}`;
-
-export const bscScanAddressUrl = (address: string) =>
-  `https://bscscan.com/address/${address}`;
-
-export const bscScanTokenUrl = (address: string) =>
-  `https://bscscan.com/token/${address}`;
-
-export const participationStepsByLocale: Record<
+const participationStepsByLocale: Record<
   PublicLocale,
-  Array<{ icon: LandingIcon; number: string; title: string; text: string; href: string; action: string; external?: boolean }>
+  ParticipationStep[]
 > = {
   es: [
     {
       icon: Coins,
       number: '01',
       title: 'Consigue UKI',
-      text: 'Compra UKI con BNB, USDT, USDC o ASM desde el formulario directo de la portada.',
+      text: 'Compra UKI con las monedas disponibles en el formulario directo de la portada.',
       href: '/#comprar-uki',
       action: 'Comprar UKI',
     },
@@ -68,7 +63,7 @@ export const participationStepsByLocale: Record<
       icon: Coins,
       number: '01',
       title: 'Get UKI',
-      text: 'Buy UKI with BNB, USDT, USDC, or ASM through the direct form on the home page.',
+      text: 'Buy UKI with the currencies available in the direct form on the home page.',
       href: '/#comprar-uki',
       action: 'Buy UKI',
     },
@@ -91,6 +86,36 @@ export const participationStepsByLocale: Record<
   ],
 };
 
+export function getParticipationSteps(
+  locale: PublicLocale,
+  network: LandingNetworkConfig,
+): ParticipationStep[] {
+  const swapIsConfigured = Boolean(
+    (network.chainId === 56 || network.chainId === 97)
+    && network.asmTokenAddress
+    && network.ukiTokenAddress
+    && network.liquidityPairAddress,
+  );
+
+  return participationStepsByLocale[locale].map((step, index) => index === 0
+    ? {
+        ...step,
+        href: swapIsConfigured ? '/#comprar-uki' : null,
+        external: false,
+        action: swapIsConfigured
+          ? step.action
+          : locale === 'es'
+            ? 'Compra no disponible ahora'
+            : 'Purchase unavailable right now',
+        text: swapIsConfigured
+          ? step.text
+          : locale === 'es'
+            ? 'No hay un pool de compra confirmado para la red configurada. No se abrirá ningún enlace de otra red.'
+            : 'There is no confirmed purchase pool for the configured network. No link from another network will be opened.',
+      }
+    : step);
+}
+
 export const utilityCardsByLocale: Record<
   PublicLocale,
   Array<{ icon: LandingIcon; title: string; text: string; tone: string }>
@@ -100,7 +125,7 @@ export const utilityCardsByLocale: Record<
       icon: WalletCards,
       title: 'Staking verificable',
       text: 'Tus depósitos y retiradas quedan registrados en BNB Smart Chain.',
-      tone: 'text-[var(--uki-cyan)]',
+      tone: 'text-[var(--uki-lilac)]',
     },
     {
       icon: Gamepad2,
@@ -126,7 +151,7 @@ export const utilityCardsByLocale: Record<
       icon: WalletCards,
       title: 'Verifiable staking',
       text: 'Your deposits and withdrawals are recorded on BNB Smart Chain.',
-      tone: 'text-[var(--uki-cyan)]',
+      tone: 'text-[var(--uki-lilac)]',
     },
     {
       icon: Gamepad2,
@@ -149,71 +174,67 @@ export const utilityCardsByLocale: Record<
   ],
 };
 
-export const transparencyItemsByLocale: Record<
-  PublicLocale,
-  Array<{ icon: LandingIcon; label: string; value: string; helper: string; href: string }>
-> = {
-  es: [
-    {
-      icon: Coins,
-      label: 'Token UKI',
-      value: `${UKI_MAINNET_ADDRESSES.token.slice(0, 8)}…${UKI_MAINNET_ADDRESSES.token.slice(-6)}`,
-      helper: 'Contrato BEP-20',
-      href: bscScanTokenUrl(UKI_MAINNET_ADDRESSES.token),
-    },
-    {
-      icon: ShieldCheck,
-      label: 'Pool ASM / UKI',
-      value: `${UKI_MAINNET_ADDRESSES.pair.slice(0, 8)}…${UKI_MAINNET_ADDRESSES.pair.slice(-6)}`,
-      helper: 'PancakeSwap V2',
-      href: bscScanAddressUrl(UKI_MAINNET_ADDRESSES.pair),
-    },
-    {
-      icon: Crown,
-      label: 'Staking UKI',
-      value: `${UKI_MAINNET_ADDRESSES.staking.slice(0, 8)}…${UKI_MAINNET_ADDRESSES.staking.slice(-6)}`,
-      helper: 'Contrato operativo',
-      href: bscScanAddressUrl(UKI_MAINNET_ADDRESSES.staking),
-    },
-    {
-      icon: LockKeyhole,
-      label: 'Liquidez bloqueada',
-      value: UKI_LIQUIDITY_UNLOCK_LABEL,
-      helper: 'Locker sin comisión',
-      href: bscScanAddressUrl(UKI_MAINNET_ADDRESSES.locker),
-    },
-  ],
-  en: [
-    {
-      icon: Coins,
-      label: 'UKI token',
-      value: `${UKI_MAINNET_ADDRESSES.token.slice(0, 8)}…${UKI_MAINNET_ADDRESSES.token.slice(-6)}`,
-      helper: 'BEP-20 contract',
-      href: bscScanTokenUrl(UKI_MAINNET_ADDRESSES.token),
-    },
-    {
-      icon: ShieldCheck,
-      label: 'ASM / UKI pool',
-      value: `${UKI_MAINNET_ADDRESSES.pair.slice(0, 8)}…${UKI_MAINNET_ADDRESSES.pair.slice(-6)}`,
-      helper: 'PancakeSwap V2',
-      href: bscScanAddressUrl(UKI_MAINNET_ADDRESSES.pair),
-    },
-    {
-      icon: Crown,
-      label: 'UKI staking',
-      value: `${UKI_MAINNET_ADDRESSES.staking.slice(0, 8)}…${UKI_MAINNET_ADDRESSES.staking.slice(-6)}`,
-      helper: 'Live contract',
-      href: bscScanAddressUrl(UKI_MAINNET_ADDRESSES.staking),
-    },
-    {
-      icon: LockKeyhole,
-      label: 'Locked liquidity',
-      value: UKI_LIQUIDITY_UNLOCK_LABEL,
-      helper: 'Fee-free locker',
-      href: bscScanAddressUrl(UKI_MAINNET_ADDRESSES.locker),
-    },
-  ],
+export type TransparencyItem = {
+  icon: LandingIcon;
+  label: string;
+  value: string;
+  helper: string;
+  href: string;
 };
+
+function compactAddress(address: string) {
+  return `${address.slice(0, 8)}…${address.slice(-6)}`;
+}
+
+export function getTransparencyItems(
+  locale: PublicLocale,
+  network: LandingNetworkConfig,
+): TransparencyItem[] {
+  const items: TransparencyItem[] = [];
+  const tokenUrl = getLandingExplorerUrl(network, 'token', network.ukiTokenAddress);
+  const pairUrl = getLandingExplorerUrl(network, 'address', network.liquidityPairAddress);
+  const stakingUrl = getLandingExplorerUrl(network, 'address', network.stakingAddress);
+  const lockerUrl = getLandingExplorerUrl(network, 'address', network.liquidityLockerAddress);
+
+  if (tokenUrl && network.ukiTokenAddress) {
+    items.push({
+      icon: Coins,
+      label: locale === 'es' ? 'Token UKI' : 'UKI token',
+      value: compactAddress(network.ukiTokenAddress),
+      helper: locale === 'es' ? 'Contrato BEP-20' : 'BEP-20 contract',
+      href: tokenUrl,
+    });
+  }
+  if (pairUrl && network.liquidityPairAddress) {
+    items.push({
+      icon: ShieldCheck,
+      label: locale === 'es' ? 'Pool ASM / UKI' : 'ASM / UKI pool',
+      value: compactAddress(network.liquidityPairAddress),
+      helper: 'PancakeSwap V2',
+      href: pairUrl,
+    });
+  }
+  if (stakingUrl && network.stakingAddress) {
+    items.push({
+      icon: Crown,
+      label: locale === 'es' ? 'Staking UKI' : 'UKI staking',
+      value: compactAddress(network.stakingAddress),
+      helper: locale === 'es' ? 'Contrato operativo' : 'Live contract',
+      href: stakingUrl,
+    });
+  }
+  if (lockerUrl && network.liquidityLockerAddress) {
+    items.push({
+      icon: LockKeyhole,
+      label: locale === 'es' ? 'Liquidez bloqueada' : 'Locked liquidity',
+      value: network.liquidityUnlockLabel ?? compactAddress(network.liquidityLockerAddress),
+      helper: locale === 'es' ? 'Locker sin comisión' : 'Fee-free locker',
+      href: lockerUrl,
+    });
+  }
+
+  return items;
+}
 
 export const landingCopyByLocale = {
   es: {
@@ -221,15 +242,18 @@ export const landingCopyByLocale = {
       badge: 'UKI · BNB Smart Chain',
       title: 'UKI ya está activo',
       lead: 'Compra UKI, haz staking y participa en el Torneo Lanzamiento de Treasure Hunt.',
+      leadUnavailable: 'La compra no está disponible ahora. Puedes gestionar el staking y entrar al torneo.',
       play: 'Entrar al torneo',
       stake: 'Hacer staking',
       buy: 'Comprar UKI',
+      buyUnavailable: 'Compra no disponible ahora',
       live: 'Ecosistema operativo',
       pool: 'Pool oficial V2',
       staking: 'Staking activo',
       lock: 'LP bloqueados',
       lockValue: 'Hasta 23 feb 2027',
       network: 'BNB Smart Chain',
+      unavailable: 'No disponible ahora',
     },
     flow: {
       eyebrow: 'Empieza aquí',
@@ -241,11 +265,14 @@ export const landingCopyByLocale = {
       eyebrow: 'Competición oficial · Lanzamiento UKI',
       title: 'Torneo Lanzamiento UKI',
       text: 'Deposita UKI, consigue intentos y compite con tus mejores resultados en Treasure Hunt.',
+      closedText: 'La edición de lanzamiento ha finalizado. Las próximas partidas usan créditos y su disponibilidad se comprueba al entrar en Treasure Hunt.',
       prize: 'Premio acumulado',
       attempts: 'Intentos disponibles',
+      historicalAttempts: 'Intentos históricos',
       counted: 'Resultados que cuentan',
       connect: 'Conecta wallet',
       play: 'Jugar ahora',
+      closedPlay: 'Jugar con créditos',
       rankings: 'Ver rankings',
       active: 'En curso',
       scheduled: 'Próximamente',
@@ -271,17 +298,6 @@ export const landingCopyByLocale = {
       bullets: ['Depósitos y retiradas on-chain', 'Estado actualizado tras las confirmaciones', 'Acceso directo desde Treasure Hunt'],
       action: 'Gestionar staking UKI',
       helper: 'Necesitas BNB para pagar el gas de la red.',
-    },
-    ambassadors: {
-      badge: 'Programa de embajadores',
-      title: 'Invita hoy. Recibe una parte adicional de sus futuros premios.',
-      text: 'Comparte un enlace privado y crea una relación directa y permanente. Tus invitados conservan íntegramente sus premios y tú recibes un 5% adicional cuando generan una recompensa elegible.',
-      commission: '5%',
-      commissionLabel: 'adicional para ti',
-      relation: '1 nivel',
-      relationLabel: 'directo y sin cadenas',
-      presale: 'Los referidos confirmados durante la preventa aparecen automáticamente.',
-      action: 'Abrir mi programa',
     },
     community: {
       badge: 'Economía centrada en la comunidad',
@@ -309,6 +325,7 @@ export const landingCopyByLocale = {
       title: 'Comprueba cada pieza del lanzamiento',
       subtitle: 'Direcciones oficiales en BNB Smart Chain. Verifica siempre el contrato antes de firmar una operación.',
       open: 'Abrir en BscScan',
+      empty: 'No hay contratos públicos verificados para la red configurada.',
     },
     faq: {
       eyebrow: 'Preguntas frecuentes',
@@ -324,15 +341,18 @@ export const landingCopyByLocale = {
       badge: 'UKI · BNB Smart Chain',
       title: 'UKI is now live',
       lead: 'Buy UKI, stake it, and join the Treasure Hunt Launch Tournament.',
+      leadUnavailable: 'Purchases are unavailable right now. You can manage staking and enter the tournament.',
       play: 'Enter tournament',
       stake: 'Stake UKI',
       buy: 'Buy UKI',
+      buyUnavailable: 'Purchase unavailable right now',
       live: 'Ecosystem live',
       pool: 'Official V2 pool',
       staking: 'Staking live',
       lock: 'LP locked',
       lockValue: 'Until 23 Feb 2027',
       network: 'BNB Smart Chain',
+      unavailable: 'Unavailable right now',
     },
     flow: {
       eyebrow: 'Start here',
@@ -344,11 +364,14 @@ export const landingCopyByLocale = {
       eyebrow: 'Official competition · UKI launch',
       title: 'UKI Launch Tournament',
       text: 'Stake UKI, get attempts, and compete with your best Treasure Hunt results.',
+      closedText: 'The launch edition has ended. Upcoming games use credits, and availability is checked when you enter Treasure Hunt.',
       prize: 'Prize pool',
       attempts: 'Available attempts',
+      historicalAttempts: 'Historical attempts',
       counted: 'Counted results',
       connect: 'Connect wallet',
       play: 'Play now',
+      closedPlay: 'Play with credits',
       rankings: 'View rankings',
       active: 'Live',
       scheduled: 'Coming soon',
@@ -374,17 +397,6 @@ export const landingCopyByLocale = {
       bullets: ['On-chain deposits and withdrawals', 'Status updated after confirmations', 'Direct access from Treasure Hunt'],
       action: 'Manage UKI staking',
       helper: 'You need BNB to pay network gas.',
-    },
-    ambassadors: {
-      badge: 'Ambassador program',
-      title: 'Invite today. Receive an additional share of their future rewards.',
-      text: 'Share a private link and create one direct, permanent relationship. Your guests keep their full rewards and you receive an additional 5% when they generate an eligible reward.',
-      commission: '5%',
-      commissionLabel: 'additional for you',
-      relation: '1 level',
-      relationLabel: 'direct, without chains',
-      presale: 'Confirmed presale referrals are included automatically.',
-      action: 'Open my program',
     },
     community: {
       badge: 'Community-centered economy',
@@ -412,6 +424,7 @@ export const landingCopyByLocale = {
       title: 'Verify every part of the launch',
       subtitle: 'Official BNB Smart Chain addresses. Always verify the contract before signing a transaction.',
       open: 'Open in BscScan',
+      empty: 'There are no verified public contracts for the configured network.',
     },
     faq: {
       eyebrow: 'Frequently asked questions',
@@ -428,7 +441,7 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
   es: [
     {
       question: '¿Dónde puedo comprar UKI?',
-      answer: 'Puedes comprar UKI directamente desde el formulario de la portada con BNB, USDT, USDC o ASM. La operación se ejecuta en PancakeSwap V2.',
+      answer: 'Puedes comprar UKI directamente desde el formulario de la portada con las monedas que estén disponibles para la red objetivo. La operación se ejecuta en PancakeSwap V2.',
     },
     {
       question: '¿Puedo indicar cuántos UKI quiero comprar?',
@@ -436,7 +449,7 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
     },
     {
       question: '¿Cómo consigo intentos para el torneo?',
-      answer: 'Cada 2.000 UKI completos en staking conceden un intento. El saldo debe estar confirmado e indexado antes de que aparezca en Treasure Hunt.',
+      answer: 'Cada 2.000 UKI completos en staking conceden un intento. El saldo debe quedar confirmado antes de que aparezca en Treasure Hunt.',
     },
     {
       question: '¿Qué resultados entran en el ranking?',
@@ -454,7 +467,7 @@ export const faqsByLocale: Record<PublicLocale, Array<{ question: string; answer
   en: [
     {
       question: 'Where can I buy UKI?',
-      answer: 'You can buy UKI directly from the home-page form with BNB, USDT, USDC, or ASM. The transaction executes through PancakeSwap V2.',
+      answer: 'You can buy UKI directly from the home-page form with the currencies available for the target network. The transaction executes through PancakeSwap V2.',
     },
     {
       question: 'Can I choose how much UKI I want to buy?',

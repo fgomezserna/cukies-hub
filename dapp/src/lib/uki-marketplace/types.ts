@@ -5,6 +5,9 @@ export type IndexedUkiMarketplaceStatus =
   | 'expired'
   | 'invalid';
 
+/** Ordenes soportadas por el feed publico del marketplace UKI. */
+export type UkiMarketplaceSort = 'newest' | 'price-asc' | 'price-desc';
+
 export type UkiMarketplaceDisplayStatus =
   | IndexedUkiMarketplaceStatus
   | 'requires_attention';
@@ -133,7 +136,6 @@ export type UkiMarketplaceRuntime = {
   ready: boolean;
   chainId: 56 | 97 | null;
   marketplaceAddress: `0x${string}` | null;
-  /** The first validated BSC endpoint. The indexer itself keeps its own RPC fallback list. */
-  rpcUrl: string | null;
+  rpcUrls: string[];
   issues: string[];
 };

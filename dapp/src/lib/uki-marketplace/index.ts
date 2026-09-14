@@ -1,5 +1,6 @@
 export {
   listPublicUkiMarketplaceOrders,
+  listPublicUkiMarketplacePage,
   listSellerUkiMarketplaceOrders,
   type UkiMarketplaceServiceDependencies,
 } from './service';
@@ -40,4 +41,5 @@ export type {
   UkiMarketplaceInventoryItem,
   UkiMarketplaceInventoryResponse,
   UkiMarketplaceRuntime,
+  UkiMarketplaceSort,
 } from './types';

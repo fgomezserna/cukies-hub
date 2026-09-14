@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { Connector } from 'wagmi';
 
 export type { Connector } from 'wagmi';
+
 export type WalletKind = 'evm' | 'tron';
 export type WalletDialogKind = WalletKind | 'any';
 

@@ -66,7 +66,7 @@ export function HeaderWalletDialog({
 }: HeaderWalletDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="grid max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden rounded-xl border-2 border-teal-400/20 bg-gradient-to-br from-card to-card/50 p-4 shadow-xl shadow-teal-400/10 backdrop-blur-sm sm:p-5">
+      <DialogContent className="grid max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden rounded-xl border-2 border-lilac-400/20 bg-gradient-to-br from-card to-card/50 p-4 shadow-xl shadow-lilac-400/10 backdrop-blur-sm sm:p-5">
         <DialogHeader className="min-w-0 pr-8 text-left">
           <DialogTitle className="break-words text-xl font-bold leading-tight text-foreground sm:text-2xl">
             Elige tipo de wallet
@@ -85,10 +85,10 @@ export function HeaderWalletDialog({
               <Button
                 key={wallet.id}
                 onClick={() => onSelectMobileWallet(wallet.id)}
-                className="h-auto w-full min-w-0 whitespace-normal rounded-xl border-2 border-cyan-300/30 bg-gradient-to-r from-teal-400/10 to-cyan-400/10 p-3 text-left transition-all duration-300 hover:border-cyan-300/50 hover:from-teal-400/20 hover:to-cyan-400/20 sm:p-4"
+                className="h-auto w-full min-w-0 whitespace-normal rounded-xl border-2 border-lilac-300/30 bg-gradient-to-r from-lilac-400/10 to-lilac-400/10 p-3 text-left transition-all duration-300 hover:border-lilac-300/50 hover:from-lilac-400/20 hover:to-lilac-400/20 sm:p-4"
               >
                 <span className="flex w-full min-w-0 items-start gap-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-cyan-300/20 bg-white">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-lilac-300/20 bg-white">
                     <Image
                       src={wallet.logoSrc}
                       alt=""

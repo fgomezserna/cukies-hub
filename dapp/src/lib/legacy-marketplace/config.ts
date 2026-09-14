@@ -35,6 +35,7 @@ export const legacyMarketplaceContracts = {
   tron: {
     chainName: 'TRON mainnet',
     rpcUrl: 'https://api.trongrid.io',
+    readRpcUrl: 'https://tron-rpc.publicnode.com',
     contracts: {
       mint: 'TUrjiyFSa1pq8TGZJnsTAHcgyxnnRmZjN7',
       token: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
@@ -82,6 +83,13 @@ export const legacyMarketplaceRoutes = [
     path: '/breeding/completed-breeds',
     label: 'Completed breeds',
     status: 'active',
+  },
+  { path: '/bridges/cukies', label: 'Cukies bridge', status: 'active' },
+  { path: '/bridges/gems', label: 'Gems bridge', status: 'coming-soon' },
+  {
+    path: '/bridges/resources',
+    label: 'Resources bridge',
+    status: 'coming-soon',
   },
   { path: '/users/profile', label: 'Profile', status: 'active' },
   { path: '/users/cukies', label: 'Owned Cukies', status: 'active' },

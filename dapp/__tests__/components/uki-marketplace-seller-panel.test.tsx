@@ -19,6 +19,10 @@ let cancelled = false;
 let existingActiveOrder = false;
 let approved = false;
 let requiresApproval = false;
+let connectedWallet = wallet;
+let authWallet = wallet;
+let holdApprovalRead = false;
+let resolveApprovalRead: ((value: unknown) => void) | undefined;
 
 const readContract = jest.fn(async (input: { functionName: string }) => {
   switch (input.functionName) {
@@ -29,6 +33,11 @@ const readContract = jest.fn(async (input: { functionName: string }) => {
     case 'collectionAllowed':
       return true;
     case 'getApproved':
+      if (holdApprovalRead && approved) {
+        return new Promise((resolve) => {
+          resolveApprovalRead = resolve;
+        });
+      }
       return approved ? marketplace : '0x0000000000000000000000000000000000000000';
     case 'isApprovedForAll':
       return false;
@@ -70,7 +79,7 @@ const writeContractAsync = jest.fn(async (input: { functionName: string }) => {
 
 jest.mock('wagmi', () => ({
   useAccount: () => ({
-    address: '0x00000000000000000000000000000000000000aa',
+    address: connectedWallet,
     chainId: 97,
     connector: { id: 'mock' },
     isConnected: true,
@@ -82,7 +91,7 @@ jest.mock('wagmi', () => ({
 jest.mock('@/hooks/use-has-mounted', () => ({ useHasMounted: () => true }));
 jest.mock('@/providers/auth-provider', () => ({
   useAuth: () => ({
-    user: { walletAddress: '0x00000000000000000000000000000000000000aa' },
+    user: { walletAddress: authWallet },
     walletType: 'evm',
     isLoading: false,
     fetchUser: jest.fn(),
@@ -174,8 +183,17 @@ describe('zona vendedor marketplace UKI', () => {
     existingActiveOrder = false;
     approved = false;
     requiresApproval = false;
+    connectedWallet = wallet;
+    authWallet = wallet;
+    holdApprovalRead = false;
+    resolveApprovalRead = undefined;
     jest.clearAllMocks();
     global.fetch = fetchMock as never;
+    window.history.replaceState({}, '', '/');
+  });
+
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
   });
 
   it('aprueba por token y crea la orden solo tras verificar chain, owner y colección', async () => {
@@ -210,7 +228,8 @@ describe('zona vendedor marketplace UKI', () => {
     existingActiveOrder = true;
     render(<UkiMarketplaceSellerPanel />);
 
-    const cancelButton = await screen.findByRole('button', { name: 'Cancelar on-chain' });
+    const cancelButton = await screen.findByRole('button', { name: 'Cancelar anuncio' });
+    expect(screen.getByText('Para cambiar el precio, cancela y vuelve a publicar.')).toBeInTheDocument();
     fireEvent.click(cancelButton);
     fireEvent.click(await screen.findByRole('button', { name: 'Confirmar cancelación' }));
 
@@ -222,7 +241,10 @@ describe('zona vendedor marketplace UKI', () => {
         args: [orderId],
       }));
     });
-    expect(waitForTransactionReceipt).toHaveBeenCalledWith({ hash: cancelHash });
+    expect(waitForTransactionReceipt).toHaveBeenCalledWith({
+      hash: cancelHash,
+      onReplaced: expect.any(Function),
+    });
     await waitFor(() => {
       expect(screen.getByText('Anuncio cancelado y reflejado en tu historial.')).toBeInTheDocument();
     });
@@ -250,5 +272,92 @@ describe('zona vendedor marketplace UKI', () => {
     await waitFor(() => {
       expect(screen.getByText('Aprobación restaurada; el anuncio vuelve a estar activo.')).toBeInTheDocument();
     });
+  });
+
+  it('preselecciona el activo solicitado por identidad completa y no otro token homónimo', async () => {
+    const otherCollection = '0x3333333333333333333333333333333333333333';
+    const targetInventory = {
+      ...inventoryItem,
+      assetId: `97:${collection}:73`,
+    };
+    const wrongInventory = {
+      ...inventoryItem,
+      assetId: `97:${otherCollection}:73`,
+      collectionAddress: otherCollection,
+    };
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/inventory')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ status: 'ok', data: { items: [wrongInventory, targetInventory] } }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ status: 'ok', data: { orders: [] } }) };
+    }) as never;
+    window.history.pushState({}, '', `/marketplace?tokenId=73&collection=${collection}&chainId=97#mis-anuncios`);
+
+    render(<UkiMarketplaceSellerPanel />);
+
+    await waitFor(() => expect(screen.getAllByText('Cukie #73')).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText('Precio del vendedor en UKI'), {
+      target: { value: '1250' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y publicar' }));
+
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      address: collection,
+      functionName: 'approve',
+    })));
+    expect(writeContractAsync).not.toHaveBeenCalledWith(expect.objectContaining({
+      address: otherCollection,
+      functionName: 'approve',
+    }));
+    window.history.pushState({}, '', '/');
+  });
+
+  it('falla cerrado cuando la identidad de destino no coincide con el inventario', async () => {
+    window.history.pushState({}, '', `/marketplace?tokenId=999&collection=${collection}&chainId=97#mis-anuncios`);
+    render(<UkiMarketplaceSellerPanel />);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('no está disponible para publicar'));
+    expect(writeContractAsync).not.toHaveBeenCalled();
+    window.history.pushState({}, '', '/');
+  });
+
+  it('falla cerrado con parámetros de destino incompletos o malformados', async () => {
+    window.history.pushState({}, '', '/marketplace?tokenId=73&collection=invalid&chainId=97#mis-anuncios');
+    render(<UkiMarketplaceSellerPanel />);
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('no se puede identificar'));
+    expect(writeContractAsync).not.toHaveBeenCalled();
+  });
+
+  it('separa la aprobación confirmada de la publicación si cambia la wallet entre ambas', async () => {
+    holdApprovalRead = true;
+    const otherWallet = '0x00000000000000000000000000000000000000cc';
+    const view = render(<UkiMarketplaceSellerPanel />);
+
+    await waitFor(() => expect(screen.getByText('Cukie #73')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Precio del vendedor en UKI'), {
+      target: { value: '1250' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar y publicar' }));
+    await waitFor(() => expect(writeContractAsync).toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'approve',
+    })));
+    await waitFor(() => expect(resolveApprovalRead).toBeDefined());
+
+    connectedWallet = otherWallet;
+    authWallet = otherWallet;
+    view.rerender(<UkiMarketplaceSellerPanel />);
+    resolveApprovalRead?.(marketplace);
+
+    await waitFor(() => expect(screen.getByText(/Aprobación confirmada/)).toBeInTheDocument());
+    expect(screen.queryByText(/Anuncio .*confirmado/)).not.toBeInTheDocument();
+    expect(writeContractAsync).not.toHaveBeenCalledWith(expect.objectContaining({
+      functionName: 'createOrder',
+    }));
   });
 });

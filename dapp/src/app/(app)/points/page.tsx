@@ -451,13 +451,13 @@ function PointsView() {
 
                   {/* Position Card */}
                   <Card className="relative overflow-hidden border border-pink-600/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-primary/10 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-primary/20 hover:border-pink-500/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-cyan-500 opacity-5" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-lilac-500 opacity-5" />
                     
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         📈 Position
                       </CardTitle>
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-blue-400 to-cyan-500 bg-opacity-10">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-blue-400 to-lilac-500 bg-opacity-10">
                         <TrendingUp className="h-5 w-5 text-blue-400" />
                       </div>
                     </CardHeader>
@@ -514,7 +514,7 @@ function PointsView() {
                         </TabsTrigger>
                         <TabsTrigger 
                           value="leaderboard"
-                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
+                          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-lilac-600 data-[state=active]:text-white font-semibold rounded-xl transition-all duration-300"
                         >
                           🏆 Global Ranking
                         </TabsTrigger>
@@ -574,7 +574,7 @@ function PointsView() {
                     
                     <TabsContent value="leaderboard" className="mt-6">
                         <Card className="border-2 border-blue-500/20 bg-gradient-to-br from-card to-card/50 backdrop-blur-sm shadow-lg shadow-blue-500/10">
-                            <CardHeader className="bg-gradient-to-r from-blue-500/5 to-cyan-500/5">
+                            <CardHeader className="bg-gradient-to-r from-blue-500/5 to-lilac-500/5">
                                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                                     <div>
                                         <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">

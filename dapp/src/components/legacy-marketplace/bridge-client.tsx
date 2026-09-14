@@ -315,7 +315,7 @@ function BridgeCukiCard({
           <p className="truncate font-headline text-lg font-bold text-white">
             {getCukiDisplayName(cuki)}
           </p>
-          {selected && <Check className="h-4 w-4 shrink-0 text-cyan-100" />}
+          {selected && <Check className="h-4 w-4 shrink-0 text-lilac-100" />}
         </div>
         <p className="mt-1 text-xs text-slate-400">
           {getTypeLabel(cuki.type)} · {cuki.network} · Gen{' '}
@@ -340,7 +340,7 @@ function BridgeCukiCard({
     return (
       <Link
         href={`/marketplace/${encodeURIComponent(cuki.id)}`}
-        className="group grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-cyan-300/35 hover:bg-cyan-300/10"
+        className="group grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-lilac-300/35 hover:bg-lilac-300/10"
       >
         {content}
       </Link>
@@ -354,8 +354,8 @@ function BridgeCukiCard({
       onClick={onSelect}
       className={`group grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[8px] border p-3 text-left transition ${
         selected
-          ? 'border-cyan-300/70 bg-cyan-300/15'
-          : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/35 hover:bg-cyan-300/10'
+          ? 'border-lilac-300/70 bg-lilac-300/15'
+          : 'border-white/10 bg-white/[0.03] hover:border-lilac-300/35 hover:bg-lilac-300/10'
       } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
     >
       {content}
@@ -411,7 +411,7 @@ function statusTone(status: BridgeTransferStatus) {
     return 'border-amber-300/30 bg-amber-300/10 text-amber-100';
   }
   if (status === 'minted') return 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100';
-  return 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100';
+  return 'border-lilac-300/25 bg-lilac-300/10 text-lilac-100';
 }
 
 function mapApiStatus(value: unknown): BridgeTransferStatus | null {
@@ -916,7 +916,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
                 Flujo de produccion unidireccional con contratos legacy mainnet.
               </p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-[8px] border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+            <div className="inline-flex items-center gap-2 rounded-[8px] border border-lilac-300/30 bg-lilac-300/10 px-4 py-2 text-sm font-semibold text-lilac-100">
               <Wallet className="h-4 w-4" />
               TRON Mainnet → BSC Mainnet
             </div>
@@ -933,7 +933,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
                 key={String(label)}
                 className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3"
               >
-                <Icon className="mb-3 h-4 w-4 text-cyan-200" />
+                <Icon className="mb-3 h-4 w-4 text-lilac-200" />
                 <p className="text-xs uppercase tracking-wide text-slate-500">
                   {label as string}
                 </p>
@@ -947,7 +947,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
 
         <aside className="grid gap-3 rounded-[8px] border border-white/10 bg-black/30 p-4">
           <div className="flex items-center gap-3">
-            <ArrowRight className="h-5 w-5 text-cyan-200" />
+            <ArrowRight className="h-5 w-5 text-lilac-200" />
             <div>
               <h2 className="font-headline text-xl font-bold text-white">
                 Wallet destino BSC
@@ -970,7 +970,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               onBlur={() => setDestinationTouched(true)}
               placeholder="0x... wallet BSC"
               aria-invalid={destinationTouched && Boolean(destinationError)}
-              className="h-11 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/50"
+              className="h-11 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-lilac-300/50"
             />
           </label>
           {destinationTouched && destinationError && (
@@ -1007,7 +1007,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               variant="outline"
               disabled={isLoadingCandidates}
               onClick={() => void refreshCandidates()}
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               {isLoadingCandidates ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1039,7 +1039,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
           </div>
         </div>
 
-        <aside className="grid content-start gap-4 rounded-[8px] border border-cyan-300/20 bg-black/35 p-5">
+        <aside className="grid content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
           <div>
             <h2 className="font-headline text-2xl font-bold text-white">
               Bridge desk
@@ -1103,7 +1103,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               onClick={() => void approveBridge()}
               disabled={disabled || !tronReady || !selectedCuki}
               variant="outline"
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               <Check className="mr-2 h-4 w-4" />
               Aprobar bridge en TRON
@@ -1159,7 +1159,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
                 variant="outline"
                 disabled={disabled || !tronReady}
                 onClick={() => void waitForSubmittedTransfer(transfer)}
-                className="border-cyan-300/30 text-cyan-50"
+                className="border-lilac-300/30 text-lilac-50"
               >
                 Consultar receipt TRON
               </Button>
@@ -1187,7 +1187,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             variant="outline"
             disabled={isLoadingBridging}
             onClick={() => void refreshBridgingCukies()}
-            className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+            className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
           >
             {isLoadingBridging ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1212,7 +1212,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
       </section>
 
       {status && (
-        <div className="rounded-[8px] border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-100">
+        <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-3 text-sm text-lilac-100">
           {status}
         </div>
       )}

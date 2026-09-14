@@ -59,7 +59,7 @@ export default function StatsCards() {
             title: 'My Rank',
             value: loading ? '--' : (platformStats?.userStats?.rank ? `#${platformStats.userStats.rank.toLocaleString()}` : '--'),
             icon: TrendingUp,
-            gradient: 'from-blue-400 to-cyan-500',
+            gradient: 'from-blue-400 to-lilac-500',
             iconColor: 'text-white',
             backgroundImage: '/my_rank.jpg'
         },

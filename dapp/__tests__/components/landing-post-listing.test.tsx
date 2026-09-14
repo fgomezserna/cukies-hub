@@ -1,7 +1,31 @@
 import { cleanup, render, screen } from '@testing-library/react';
 
 import { CukiesLanding } from '@/components/landing/sections';
-import { UKI_MAINNET_ADDRESSES } from '@/components/landing/data';
+import { buildLandingNetworkConfig } from '@/lib/landing-network';
+
+const PRODUCTION_NETWORK = buildLandingNetworkConfig({
+  APP_ENV: 'production',
+  NEXT_PUBLIC_UKI_CHAIN_ID: '56',
+  NEXT_PUBLIC_ASM_TOKEN_ADDRESS: '0x707F0f4a39a4a26239F7D00463B15AB5656861f9',
+  NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x51646bc7A6359f88A79FDC8d7ACB735f1AbF67fA',
+  NEXT_PUBLIC_UKI_STAKING_ADDRESS: '0xaD18ff665E99d0033c3BB9d73182c2B03Df59696',
+  NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: '0x40b315f31421b5D31DE018055Cb30f78265024Be',
+  NEXT_PUBLIC_UKI_LIQUIDITY_LOCKER_ADDRESS: '0xb3E43944DF782EEeD9A99f0CFA4301c72b9629E6',
+  NEXT_PUBLIC_UKI_LIQUIDITY_UNLOCK_LABEL: '23 feb 2027 · 15:33 UTC',
+  NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://bscscan.com',
+});
+
+const STAGING_NETWORK = buildLandingNetworkConfig({
+  APP_ENV: 'staging',
+  NEXT_PUBLIC_UKI_CHAIN_ID: '97',
+  NEXT_PUBLIC_ASM_TOKEN_ADDRESS: '0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C',
+  NEXT_PUBLIC_UKI_TOKEN_ADDRESS: '0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+  NEXT_PUBLIC_UKI_STAKING_ADDRESS: '0x551bd243eE4C5d68BA53A27fd9aE09339d5C2205',
+  NEXT_PUBLIC_UKI_LIQUIDITY_PAIR_ADDRESS: '0x8fa397B4E1DED911161f13C128DF369cE9a95B3A',
+  NEXT_PUBLIC_BSCSCAN_BASE_URL: 'https://testnet.bscscan.com',
+  NEXT_PUBLIC_UKI_SWAP_URL:
+    'https://pancakeswap.finance/swap?chain=bscTestnet&inputCurrency=0xf93dd40Bf8bD8dDf7C785AA87dc13C3c3FeB6c8C&outputCurrency=0x42895bBEc6A6EC1b4aF0B11E144Cd2777589C23c',
+});
 
 let mockLocale: 'es' | 'en' = 'es';
 let mockCompetitionError: string | null = null;
@@ -27,7 +51,6 @@ jest.mock('lucide-react', () => {
     Crown: Icon,
     ExternalLink: Icon,
     Gamepad2: Icon,
-    Handshake: Icon,
     Lock: Icon,
     LockKeyhole: Icon,
     ShieldCheck: Icon,
@@ -121,8 +144,11 @@ jest.mock('@/hooks/use-treasure-hunt-competition-overview', () => ({
 }));
 
 describe('home post-listing de UKI', () => {
+  const renderLanding = (network = PRODUCTION_NETWORK) => render(
+    <CukiesLanding network={network} />,
+  );
+
   beforeEach(() => {
-    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'true';
     mockLocale = 'es';
     mockCompetitionError = null;
     mockWalletConnected = true;
@@ -130,13 +156,12 @@ describe('home post-listing de UKI', () => {
   });
 
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE;
     cleanup();
     jest.clearAllMocks();
   });
 
   it('presenta el recorrido operativo y elimina la preventa activa', () => {
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByRole('heading', { level: 1, name: 'UKI ya está activo' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Entrar al torneo' }).length).toBeGreaterThan(0);
@@ -153,8 +178,6 @@ describe('home post-listing de UKI', () => {
     expect(screen.getByText('9', { selector: 'dd' })).toBeInTheDocument();
     expect(screen.getByText('1/10')).toBeInTheDocument();
     expect(screen.getByText('Preventa finalizada')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Invita hoy. Recibe una parte adicional de sus futuros premios.' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Abrir mi programa' })).toHaveAttribute('href', '/embajadores');
 
     expect(screen.queryByRole('heading', { name: 'Preventa UKI' })).not.toBeInTheDocument();
     expect(screen.queryByText('Aprobar ASM')).not.toBeInTheDocument();
@@ -162,34 +185,24 @@ describe('home post-listing de UKI', () => {
     expect(screen.queryByText('10 créditos')).not.toBeInTheDocument();
   });
 
-  it('oculta el bloque de Embajadores sin alterar el resto de la home', () => {
-    process.env.NEXT_PUBLIC_AMBASSADORS_VISIBLE = 'false';
-
-    render(<CukiesLanding />);
-
-    expect(screen.queryByRole('heading', { name: 'Invita hoy. Recibe una parte adicional de sus futuros premios.' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Abrir mi programa' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'UKI ya está activo' })).toBeInTheDocument();
-  });
-
   it('publica las direcciones oficiales y el acceso específico de participantes', () => {
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByRole('link', { name: 'Token UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/token/${UKI_MAINNET_ADDRESSES.token}`,
+      `https://bscscan.com/token/${PRODUCTION_NETWORK.ukiTokenAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Pool ASM / UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/address/${UKI_MAINNET_ADDRESSES.pair}`,
+      `https://bscscan.com/address/${PRODUCTION_NETWORK.liquidityPairAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Staking UKI: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/address/${UKI_MAINNET_ADDRESSES.staking}`,
+      `https://bscscan.com/address/${PRODUCTION_NETWORK.stakingAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Liquidez bloqueada: Abrir en BscScan' })).toHaveAttribute(
       'href',
-      `https://bscscan.com/address/${UKI_MAINNET_ADDRESSES.locker}`,
+      `https://bscscan.com/address/${PRODUCTION_NETWORK.liquidityLockerAddress}`,
     );
     expect(screen.getByRole('link', { name: 'Consultar vesting' })).toHaveAttribute('href', '/vesting');
     expect(screen.getByRole('link', { name: 'Ver premios' })).toHaveAttribute('href', '/premios');
@@ -197,7 +210,7 @@ describe('home post-listing de UKI', () => {
 
   it('mantiene copy equivalente en inglés', () => {
     mockLocale = 'en';
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByRole('heading', { level: 1, name: 'UKI is now live' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'From UKI to competition' })).toBeInTheDocument();
@@ -208,7 +221,7 @@ describe('home post-listing de UKI', () => {
 
   it('mantiene acciones útiles cuando el estado en directo no está disponible', () => {
     mockCompetitionError = 'offline';
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByText(/Los datos en directo se están actualizando/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Jugar ahora' })).toHaveAttribute(
@@ -225,7 +238,7 @@ describe('home post-listing de UKI', () => {
     mockWalletConnected = false;
     mockWalletDisqualified = true;
 
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(screen.getByText('Conecta wallet', { selector: 'dd' })).toBeInTheDocument();
     expect(screen.getByText('—/10')).toBeInTheDocument();
@@ -237,11 +250,39 @@ describe('home post-listing de UKI', () => {
   it('mantiene visible la descalificación cuando la wallet afectada está conectada', () => {
     mockWalletDisqualified = true;
 
-    render(<CukiesLanding />);
+    renderLanding();
 
     expect(
       screen.getByText('Esta wallet está descalificada para la edición actual.'),
     ).toBeInTheDocument();
     expect(screen.getByText('0/10')).toBeInTheDocument();
+  });
+
+  it('emula Stage con el pool ASM/UKI verificado y sin enlaces de mainnet', () => {
+    renderLanding(STAGING_NETWORK);
+    if (!STAGING_NETWORK.swapUrl) throw new Error('Stage debe tener un swap ASM/UKI verificado.');
+
+    expect(screen.getByText('UKI · BNB Smart Chain')).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: 'Comprar UKI' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Comprar UKI' })[0]).toHaveAttribute('href', '#comprar-uki');
+    expect(screen.getByRole('link', { name: 'Pool ASM / UKI: Abrir en BscScan' })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/address/${STAGING_NETWORK.liquidityPairAddress}`,
+    );
+    expect(screen.queryByRole('link', { name: 'Liquidez bloqueada: Abrir en BscScan' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Token UKI: Abrir en BscScan' })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/token/${STAGING_NETWORK.ukiTokenAddress}`,
+    );
+    expect(screen.getByRole('link', { name: 'Staking UKI: Abrir en BscScan' })).toHaveAttribute(
+      'href',
+      `https://testnet.bscscan.com/address/${STAGING_NETWORK.stakingAddress}`,
+    );
+
+    for (const link of screen.getAllByRole('link')) {
+      const href = link.getAttribute('href') ?? '';
+      expect(href).not.toMatch(/^https:\/\/bscscan\.com/);
+      expect(href).not.toContain('chain=bsc&');
+    }
   });
 });

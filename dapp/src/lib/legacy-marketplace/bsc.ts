@@ -1,4 +1,4 @@
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, fallback, http } from 'viem';
 import { bsc as bscChain } from 'viem/chains';
 
 import { legacyMarketplaceBscAbis } from './abis';
@@ -9,7 +9,11 @@ import {
 
 export const legacyBscPublicClient = createPublicClient({
   chain: bscChain,
-  transport: http(legacyMarketplaceContracts.bsc.rpcUrl),
+  transport: fallback([
+    http(legacyMarketplaceContracts.bsc.rpcUrl, { retryCount: 0, timeout: 4_000 }),
+    http('https://bsc-dataseed-public.bnbchain.org', { retryCount: 0, timeout: 4_000 }),
+    http('https://rpc-bnb.blockmachine.io', { retryCount: 0, timeout: 4_000 }),
+  ]),
 });
 
 export function getLegacyBscContractConfig(contractName: LegacyBscContractName) {

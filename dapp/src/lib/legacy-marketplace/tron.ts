@@ -1,3 +1,9 @@
+import { TronWeb } from 'tronweb';
+
+import {
+  isTronWebWalletSignerReady,
+  resolveTronWeb,
+} from '@/lib/tronlink-provider';
 import { legacyMarketplaceTronAbis } from './abis';
 import {
   legacyMarketplaceContracts,
@@ -16,24 +22,93 @@ type LegacyTronContractInstance = Record<
 
 type LegacyTrxLike = {
   getTransactionInfo?: (transactionId: string) => Promise<unknown>;
+  sign?: (message: unknown) => Promise<unknown>;
 };
 
 export type LegacyTronWebLike = {
   ready?: boolean;
+  fullNode?: { host?: string };
+  address?: {
+    toHex?: (address: string) => string;
+  };
   defaultAddress?: {
     base58?: string;
+    hex?: string;
   };
+  setAddress?: (address: string) => unknown;
   trx?: LegacyTrxLike;
-  contract: (
-    abi: unknown,
-    address: string,
-  ) => LegacyTronContractInstance | Promise<LegacyTronContractInstance>;
+  contract?: (...args: unknown[]) => unknown;
 };
 
 export type LegacyTronReceipt = Readonly<{
   transactionId: string;
   info: Record<string, unknown>;
 }>;
+
+export const LEGACY_TRON_MAINNET_RPC_URL = 'https://api.trongrid.io';
+
+function rpcOrigin(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve the injected TronLink instance without creating a read-only signer. */
+export function getLegacyTronWeb(): LegacyTronWebLike | null {
+  return resolveTronWeb() as LegacyTronWebLike | null;
+}
+
+export function getLegacyTronWalletRpcOrigin(
+  tronWeb?: LegacyTronWebLike | null,
+) {
+  return rpcOrigin(tronWeb?.fullNode?.host);
+}
+
+export function isLegacyTronWalletOnRpc(
+  tronWeb: LegacyTronWebLike | null | undefined,
+  expectedRpcUrl: string,
+) {
+  return Boolean(
+    getLegacyTronWalletRpcOrigin(tronWeb)
+    && getLegacyTronWalletRpcOrigin(tronWeb) === rpcOrigin(expectedRpcUrl),
+  );
+}
+
+let legacyTronReadWeb: LegacyTronWebLike | null = null;
+let legacyTronReadRpcUrl: string | null = null;
+
+/**
+ * Returns a browser-safe TronWeb reader backed by the configured public RPC.
+ * It is intentionally separate from the wallet instance used for writes.
+ */
+export function getLegacyTronReadWeb(address?: string | null) {
+  const readRpcUrl = legacyMarketplaceContracts.tron.readRpcUrl;
+  if (!readRpcUrl) return null;
+
+  if (!legacyTronReadWeb || legacyTronReadRpcUrl !== readRpcUrl) {
+    try {
+      legacyTronReadWeb = new TronWeb({ fullHost: readRpcUrl }) as unknown as LegacyTronWebLike;
+      legacyTronReadRpcUrl = readRpcUrl;
+    } catch {
+      legacyTronReadWeb = null;
+      legacyTronReadRpcUrl = null;
+      return null;
+    }
+  }
+
+  if (address && typeof legacyTronReadWeb.setAddress === 'function') {
+    try {
+      legacyTronReadWeb.setAddress(address);
+    } catch {
+      return null;
+    }
+  }
+
+  return legacyTronReadWeb;
+}
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object'
@@ -152,7 +227,11 @@ export async function getTronContractAt(
   abi: unknown,
   address: string,
 ) {
-  return tronWeb.contract(abi, address);
+  if (typeof tronWeb.contract !== 'function') {
+    throw new Error('TronLink no permite acceder a contratos TRON.');
+  }
+
+  return await tronWeb.contract(abi, address) as LegacyTronContractInstance;
 }
 
 export async function readTronContractAt<TValue = unknown>(
@@ -184,6 +263,7 @@ export async function sendTronContractAt(
   functionName: string,
   args: readonly unknown[] = [],
   options?: Record<string, unknown>,
+  beforeSend?: () => void,
 ) {
   const contract = await getTronContractAt(tronWeb, abi, address);
   const method = contract[functionName];
@@ -197,6 +277,10 @@ export async function sendTronContractAt(
     throw new Error(`TRON contract ${address}.${functionName} is not writable`);
   }
 
+  beforeSend?.();
+  if (!isLegacyTronWalletSignerReady(tronWeb)) {
+    throw new Error('TRON_SIGNER_UNAVAILABLE');
+  }
   return call.send(options);
 }
 
@@ -250,6 +334,7 @@ export async function sendLegacyTronContract(
   functionName: string,
   args: readonly unknown[] = [],
   options?: Record<string, unknown>,
+  beforeSend?: () => void,
 ) {
   const contract = await getLegacyTronContract(tronWeb, contractName);
   const method = contract[functionName];
@@ -268,9 +353,19 @@ export async function sendLegacyTronContract(
     );
   }
 
+  beforeSend?.();
+  if (!isLegacyTronWalletSignerReady(tronWeb)) {
+    throw new Error('TRON_SIGNER_UNAVAILABLE');
+  }
   return call.send(options);
 }
 
 export function isLegacyTronWalletReady(tronWeb?: LegacyTronWebLike | null) {
   return Boolean(tronWeb?.ready && tronWeb.defaultAddress?.base58);
+}
+
+export function isLegacyTronWalletSignerReady(tronWeb?: LegacyTronWebLike | null) {
+  return isTronWebWalletSignerReady(
+    tronWeb as Parameters<typeof isTronWebWalletSignerReady>[0],
+  );
 }

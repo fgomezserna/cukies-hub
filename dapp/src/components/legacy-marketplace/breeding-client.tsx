@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Baby,
@@ -16,22 +16,52 @@ import {
 } from 'lucide-react';
 import {
   useAccount,
+  useConfig,
   useReadContract,
-  useSwitchChain,
   useWriteContract,
 } from 'wagmi';
+import { getAccount, getChainId } from 'wagmi/actions';
 
 import { Button } from '@/components/ui/button';
+import { useWalletCoordinator } from '@/providers/wallet-coordinator-context';
+import {
+  assertEvmActionContext,
+  assertTronActionContext,
+  captureTronActionContext,
+  isSameTronWallet,
+} from '@/lib/legacy-marketplace/action-safety';
 import { legacyMarketplaceBscAbis } from '@/lib/legacy-marketplace/abis';
 import {
   legacyBscPublicClient,
   readLegacyBscContract,
 } from '@/lib/legacy-marketplace/bsc';
 import { legacyMarketplaceContracts } from '@/lib/legacy-marketplace/config';
+import { legacyMarketplaceRuntime } from '@/lib/legacy-marketplace/runtime';
 import {
+  isLegacyBreedingCandidate,
+  isLegacyCompletedBreed,
+} from '@/lib/legacy-marketplace/breeding-identity';
+import {
+  LEGACY_TRON_MAINNET_RPC_URL,
+  getLegacyTronWeb,
+  getLegacyTronWalletRpcOrigin,
+  isLegacyTronWalletOnRpc,
   readLegacyTronContract,
   sendLegacyTronContract,
 } from '@/lib/legacy-marketplace/tron';
+import {
+  assertTronSendResult,
+  tronTransactionId,
+  waitForLegacyTronReceipt,
+} from '@/lib/legacy-marketplace/transaction';
+import {
+  isTransactionRefreshAborted,
+  retryTransactionRefresh,
+  TransactionReplacementError,
+  TransactionReplacementPendingError,
+  throwIfTransactionRefreshAborted,
+  waitForConfirmedEvmTransaction,
+} from '@/lib/transaction-refresh';
 import type {
   LegacyBreedingCandidatesResponse,
   LegacyCompletedBreedsResponse,
@@ -49,6 +79,8 @@ import {
 
 type BreedingNetwork = 'BSC' | 'TRON';
 export type BreedingTab = 'start' | 'active' | 'completed';
+type BscReadStatus = 'disabled' | 'loading' | 'verified' | 'unknown';
+type BreedingReadStatus = 'idle' | 'loading' | 'verified' | 'partial' | 'unknown';
 
 type OnChainBreed = {
   id: string;
@@ -60,9 +92,14 @@ type OnChainBreed = {
   birthNetwork: BreedingNetwork;
 };
 
+function completedCukiIdentity(cuki: LegacyMarketplaceCukiItem) {
+  return `${cuki.network}:${cuki.collectionAddress?.toLowerCase() ?? ''}:${cuki.tokenId}`;
+}
+
 const bscTokenAddress = legacyMarketplaceContracts.bsc.contracts.token;
 const bscPointsAddress = legacyMarketplaceContracts.bsc.contracts.points;
-const bscBreedingAddress = legacyMarketplaceContracts.bsc.contracts.breedingPoints;
+const bscBreedingAddress =
+  legacyMarketplaceContracts.bsc.contracts.breedingPoints;
 const tronBreedingAddress =
   legacyMarketplaceContracts.tron.contracts.breedingPoints;
 
@@ -82,7 +119,9 @@ function formatPoints(value?: bigint | number | string | null) {
   if (typeof value === 'bigint') return value.toLocaleString('en-US');
 
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric.toLocaleString('en-US') : String(value);
+  return Number.isFinite(numeric)
+    ? numeric.toLocaleString('en-US')
+    : String(value);
 }
 
 function normalizeBreedTuple(
@@ -138,11 +177,11 @@ function CandidateCard({
       onClick={onSelect}
       className={`group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] gap-3 rounded-[8px] border p-3 text-left transition ${
         selected
-          ? 'border-cyan-300/70 bg-cyan-300/15'
-          : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/35 hover:bg-cyan-300/10'
+          ? 'border-lilac-300/70 bg-lilac-300/15'
+          : 'border-white/10 bg-white/[0.03] hover:border-lilac-300/35 hover:bg-lilac-300/10'
       } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#071211]">
+      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
         <CukiImage
           src={cuki.imageUrl}
           alt={getCukiDisplayName(cuki)}
@@ -155,20 +194,20 @@ function CandidateCard({
           <p className="truncate font-headline text-lg font-bold text-white">
             {getCukiDisplayName(cuki)}
           </p>
-          {selected && <Check className="h-4 w-4 shrink-0 text-cyan-100" />}
+          {selected && <Check className="h-4 w-4 shrink-0 text-lilac-100" />}
         </div>
         <p className="mt-1 text-xs text-slate-400">
           {getTypeLabel(cuki.type)} · {cuki.network}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
           <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
-            Breed {cuki.skills.breeder ?? 0}
+            Cría {cuki.skills.breeder ?? 0}
           </span>
           <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
-            Life {cuki.skills.life ?? 0}
+            Vida {cuki.skills.life ?? 0}
           </span>
           <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
-            Kids {cuki.childrenCount ?? 0}
+            Hijos {cuki.childrenCount ?? 0}
           </span>
         </div>
       </div>
@@ -196,24 +235,26 @@ function BreedCard({
             Breed #{breed.id}
           </p>
           <p className="mt-1 text-sm text-slate-400">
-            {breed.birthNetwork} · parents #{breed.parents[0]} and #
+            {breed.birthNetwork} · padres #{breed.parents[0]} y #
             {breed.parents[1]}
           </p>
         </div>
-        <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-          {breed.completed ? 'Completed' : canOpen ? 'Ready' : 'Active'}
+        <span className="rounded-full border border-lilac-300/25 bg-lilac-300/10 px-3 py-1 text-xs font-semibold text-lilac-100">
+          {breed.completed ? 'Completada' : canOpen ? 'Lista' : 'Activa'}
         </span>
       </div>
 
       <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
         <div className="rounded-[8px] border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Start</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">
+            Inicio
+          </p>
           <p className="mt-1 font-semibold text-white">
             {formatLegacyDate(breed.breedStart)}
           </p>
         </div>
         <div className="rounded-[8px] border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Finish</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Fin</p>
           <p className="mt-1 font-semibold text-white">
             {formatLegacyDate(breed.breedFinish)}
           </p>
@@ -224,13 +265,13 @@ function BreedCard({
         <div className="mt-4">
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-cyan-300"
+              className="h-full rounded-full bg-lilac-300"
               style={{ width: `${progress}%` }}
             />
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
             <p className="text-xs text-slate-400">
-              {Math.round(progress)}% breeding progress
+              {Math.round(progress)}% de progreso
             </p>
             {canOpen && onOpen && (
               <Button
@@ -239,7 +280,7 @@ function BreedCard({
                 className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
               >
                 <Baby className="mr-2 h-4 w-4" />
-                Open Cukie
+                Abrir Cukie
               </Button>
             )}
           </div>
@@ -253,20 +294,27 @@ function CompletedCukiCard({ cuki }: { cuki: LegacyMarketplaceCukiItem }) {
   return (
     <Link
       href={`/marketplace/${cuki.tokenId}`}
-      className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-cyan-300/35 hover:bg-cyan-300/10"
+      className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-lilac-300/35 hover:bg-lilac-300/10"
     >
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#071211]">
-        <CukiImage src={cuki.imageUrl} alt={getCukiDisplayName(cuki)} sizes="96px" />
+      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
+        <CukiImage
+          src={cuki.imageUrl}
+          alt={getCukiDisplayName(cuki)}
+          sizes="96px"
+        />
       </div>
       <div className="min-w-0">
         <p className="truncate font-headline text-lg font-bold text-white">
           {getCukiDisplayName(cuki)}
         </p>
         <p className="mt-1 text-xs text-slate-400">
-          {cuki.birthNetwork ?? cuki.network} · Gen {cuki.skills.generation ?? '-'}
+          {cuki.birthNetwork ?? cuki.network} · Gen{' '}
+          {cuki.skills.generation ?? '-'}
         </p>
         <p className="mt-3 text-xs text-slate-500">
-          Parents {cuki.parents.map((parent) => `#${parent.tokenId}`).join(' · ') || '-'}
+          Padres{' '}
+          {cuki.parents.map((parent) => `#${parent.tokenId}`).join(' · ') ||
+            '-'}
         </p>
       </div>
     </Link>
@@ -279,21 +327,33 @@ export function BreedingClient({
   initialTab?: BreedingTab;
 }) {
   const { address, chainId, isConnected } = useAccount();
-  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
-  const { writeContract, isPending: isWriting } = useWriteContract();
+  const wagmiConfig = useConfig();
+  const { writeContractAsync, isPending: isWriting } = useWriteContract();
   const {
     address: tronAddress,
-    connect: connectTron,
     isConnected: isTronConnected,
     isInstalled: isTronInstalled,
+    isLoading: isTronLoading,
   } = useTronLink();
+  const { requestWallet } = useWalletCoordinator();
   const [network, setNetwork] = useState<BreedingNetwork>('BSC');
   const [tab, setTab] = useState<BreedingTab>(initialTab);
   const [candidates, setCandidates] = useState<LegacyMarketplaceCukiItem[]>([]);
-  const [completedCukies, setCompletedCukies] = useState<LegacyMarketplaceCukiItem[]>([]);
+  const [completedCukies, setCompletedCukies] = useState<
+    LegacyMarketplaceCukiItem[]
+  >([]);
   const [activeBreeds, setActiveBreeds] = useState<OnChainBreed[]>([]);
-  const [parent1, setParent1] = useState<LegacyMarketplaceCukiItem | null>(null);
-  const [parent2, setParent2] = useState<LegacyMarketplaceCukiItem | null>(null);
+  const [candidatesReadError, setCandidatesReadError] = useState(false);
+  const [candidatesReadStatus, setCandidatesReadStatus] =
+    useState<BreedingReadStatus>('idle');
+  const [completedReadStatus, setCompletedReadStatus] =
+    useState<BreedingReadStatus>('idle');
+  const [parent1, setParent1] = useState<LegacyMarketplaceCukiItem | null>(
+    null,
+  );
+  const [parent2, setParent2] = useState<LegacyMarketplaceCukiItem | null>(
+    null,
+  );
   const [tronMaxBreeds, setTronMaxBreeds] = useState<number | null>(null);
   const [tronPoints, setTronPoints] = useState<string | null>(null);
   const [tronCost, setTronCost] = useState<string | null>(null);
@@ -301,31 +361,77 @@ export function BreedingClient({
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isLoadingBreeds, setIsLoadingBreeds] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const activeBreedsRequestRef = useRef(0);
+  const tronSnapshotRequestRef = useRef(0);
+  const candidatesRequestRef = useRef(0);
+  const completedRequestRef = useRef(0);
+  const candidatesAbortRef = useRef<AbortController | null>(null);
+  const activeBreedsAbortRef = useRef<AbortController | null>(null);
+  const completedAbortRef = useRef<AbortController | null>(null);
+  const transactionRefreshAbortRef = useRef<AbortController | null>(null);
+  const operationLockRef = useRef(false);
+  const operationAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(false);
+  const [operationBusy, setOperationBusy] = useState(false);
+  const [approvalPending, setApprovalPending] = useState<string | null>(null);
+  const [bscApprovalOverride, setBscApprovalOverride] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<{
+    action: 'start' | 'open';
+    hash: string;
+    network: BreedingNetwork;
+    wallet: string;
+    parents?: [string, string];
+    breedId?: string;
+    baselineActiveBreedIds?: string[];
+    baselineCompletedCukiIds?: string[];
+    phase: 'source-pending' | 'syncing';
+  } | null>(null);
 
   const owner = network === 'BSC' ? address : tronAddress;
-  const bscReady = network === 'BSC' && isConnected && chainId === 56;
-  const tronReady = network === 'TRON' && isTronConnected;
-  const ready = network === 'BSC' ? bscReady : tronReady;
+  const sourceChainId = network === 'BSC' ? chainId : null;
+  const tronWeb = getLegacyTronWeb();
+  const tronWalletRpcOrigin = getLegacyTronWalletRpcOrigin(tronWeb);
+  const readEnabled = legacyMarketplaceRuntime.legacyMainnetReadEnabled;
+  const operationsEnabled = legacyMarketplaceRuntime.legacyMainnetOperationsEnabled;
+  const bscWriteReady = network === 'BSC' && isConnected && chainId === 56;
+  const bscReadAvailable =
+    network === 'BSC' && readEnabled && Boolean(address);
+  const tronReady =
+    network === 'TRON'
+    && isTronConnected
+    && isLegacyTronWalletOnRpc(tronWeb, LEGACY_TRON_MAINNET_RPC_URL);
   const parentsSelected = Boolean(
     parent1 && parent2 && !sameToken(parent1, parent2),
   );
 
-  const { data: bscMaxBreeds } = useReadContract({
+  const {
+    data: bscMaxBreeds,
+    isLoading: isLoadingBscMaxBreeds,
+    isError: isBscMaxBreedsError,
+    refetch: refetchBscMaxBreeds,
+  } = useReadContract({
     address: bscBreedingAddress,
     abi: legacyMarketplaceBscAbis.breedingPoints,
     functionName: 'getMaxBreedsByCukie',
     query: {
-      enabled: network === 'BSC',
+      enabled: bscReadAvailable,
     },
+    chainId: 56,
   });
-  const { data: bscPoints } = useReadContract({
+  const {
+    data: bscPoints,
+    isLoading: isLoadingBscPoints,
+    isError: isBscPointsError,
+    refetch: refetchBscPoints,
+  } = useReadContract({
     address: bscPointsAddress,
     abi: legacyMarketplaceBscAbis.points,
     functionName: 'getPoints',
     args: address ? [address] : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(address),
+      enabled: bscReadAvailable,
     },
+    chainId: 56,
   });
   const { data: bscApproved } = useReadContract({
     address: bscTokenAddress,
@@ -333,8 +439,9 @@ export function BreedingClient({
     functionName: 'isApprovedForAll',
     args: address ? [address, bscBreedingAddress] : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(address),
+      enabled: bscReadAvailable,
     },
+    chainId: 56,
   });
   const { data: bscCost } = useReadContract({
     address: bscBreedingAddress,
@@ -345,25 +452,75 @@ export function BreedingClient({
         ? [BigInt(parent1.tokenId), BigInt(parent2.tokenId)]
         : undefined,
     query: {
-      enabled: network === 'BSC' && Boolean(parent1 && parent2),
+      enabled: bscReadAvailable && Boolean(parent1 && parent2),
     },
+    chainId: 56,
   });
 
+  const bscReadStatus: BscReadStatus = useMemo(() => {
+    if (network !== 'BSC' || !readEnabled) return 'disabled';
+    if (!address) return 'unknown';
+
+    const hasLoadingRead =
+      isLoadingBscMaxBreeds
+      || isLoadingBscPoints;
+    if (hasLoadingRead) return 'loading';
+
+    const hasReadError =
+      isBscMaxBreedsError
+      || isBscPointsError;
+    if (hasReadError) return 'unknown';
+
+    const hasRequiredValues =
+      bscMaxBreeds !== undefined && bscPoints !== undefined;
+    return hasRequiredValues ? 'verified' : 'unknown';
+  }, [
+    address,
+    bscMaxBreeds,
+    bscPoints,
+    isBscMaxBreedsError,
+    isBscPointsError,
+    isLoadingBscMaxBreeds,
+    isLoadingBscPoints,
+    network,
+    readEnabled,
+  ]);
+
+  const bscReadVerified = bscReadAvailable && bscReadStatus === 'verified';
+  const readReady = network === 'BSC' ? bscReadAvailable : tronReady;
+  const candidateReadReady =
+    (network === 'BSC' ? bscReadVerified : tronReady)
+    && (candidatesReadStatus === 'verified' || candidatesReadStatus === 'partial');
+  const ready = network === 'BSC' ? bscWriteReady : tronReady;
+
   const maxBreeds = useMemo(() => {
-    if (network === 'BSC' && bscMaxBreeds !== undefined) {
+    if (
+      network === 'BSC'
+      && bscReadStatus === 'verified'
+      && bscMaxBreeds !== undefined
+    ) {
       return Number(bscMaxBreeds);
     }
 
-    return tronMaxBreeds;
-  }, [bscMaxBreeds, network, tronMaxBreeds]);
+    return network === 'BSC' ? null : tronMaxBreeds;
+  }, [bscMaxBreeds, bscReadStatus, network, tronMaxBreeds]);
 
   const cost =
     network === 'BSC'
-      ? formatPoints(bscCost as bigint | undefined)
-      : (tronCost ?? '-');
+      ? bscReadStatus === 'verified'
+        ? formatPoints(bscCost as bigint | undefined)
+        : '-'
+      : tronCost ?? '-';
   const points =
-    network === 'BSC' ? formatPoints(bscPoints as bigint | undefined) : (tronPoints ?? '-');
-  const approved = network === 'BSC' ? Boolean(bscApproved) : tronApproved === true;
+    network === 'BSC'
+      ? bscReadStatus === 'verified'
+        ? formatPoints(bscPoints as bigint | undefined)
+        : '-'
+      : tronPoints ?? '-';
+  const approved =
+    network === 'BSC'
+      ? bscApprovalOverride || (bscReadStatus === 'verified' && bscApproved === true)
+      : tronApproved === true;
   const summaryCards: Array<{
     label: string;
     value: string | number;
@@ -371,85 +528,181 @@ export function BreedingClient({
   }> = [
     {
       label: 'Wallet',
-      value: owner ? shortWallet(owner) : 'Not connected',
+      value: owner ? shortWallet(owner) : 'Sin conexión',
       Icon: Wallet,
     },
-    { label: 'Network', value: network, Icon: Network },
-    { label: 'Points', value: points, Icon: Sparkles },
-    { label: 'Max breeds', value: maxBreeds ?? '-', Icon: Dna },
+    { label: 'Red', value: network, Icon: Network },
+    { label: 'Puntos', value: points, Icon: Sparkles },
+    { label: 'Máximo de crías', value: maxBreeds ?? '-', Icon: Dna },
   ];
 
-  const refreshCandidates = useCallback(async () => {
-    if (!owner || maxBreeds === null) {
+  const retryBscRead = useCallback(async () => {
+    if (!bscReadAvailable) return;
+
+    const refetches = [refetchBscMaxBreeds, refetchBscPoints]
+      .filter((refetch) => typeof refetch === 'function')
+      .map((refetch) => refetch());
+
+    await Promise.allSettled(refetches);
+  }, [bscReadAvailable, refetchBscMaxBreeds, refetchBscPoints]);
+
+  const refreshCandidates = useCallback(async (options: { preserve?: boolean } = {}) => {
+    const requestId = candidatesRequestRef.current + 1;
+    candidatesRequestRef.current = requestId;
+    const contextIsCurrent = () => requestId === candidatesRequestRef.current;
+    candidatesAbortRef.current?.abort();
+    const controller = new AbortController();
+    candidatesAbortRef.current = controller;
+
+    if (!options.preserve) {
+      setParent1(null);
+      setParent2(null);
       setCandidates([]);
-      return;
+    }
+    setCandidatesReadStatus('loading');
+    setCandidatesReadError(false);
+
+    if (!owner || (network === 'BSC' && !bscReadAvailable)) {
+      if (contextIsCurrent()) {
+        setCandidatesReadStatus('unknown');
+        setIsLoadingCandidates(false);
+      }
+      return [];
     }
 
     setIsLoadingCandidates(true);
     try {
+      if (maxBreeds === null) {
+        if (network === 'BSC') await retryBscRead();
+        if (!contextIsCurrent()) return [];
+        setCandidatesReadStatus('unknown');
+        setCandidatesReadError(true);
+        return [];
+      }
+
       const query = new URLSearchParams({
         owner,
         network,
         maxBreeds: String(maxBreeds),
         limit: '60',
       });
-      const response = await fetch(
-        `/api/cukies/breeding/candidates?${query}`,
-        { cache: 'no-store' },
-      );
+      const response = await fetch(`/api/cukies/breeding/candidates?${query}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
       if (!response.ok) {
         throw new Error('No se han podido cargar candidatos de breeding.');
       }
-      const payload = (await response.json()) as LegacyBreedingCandidatesResponse;
-      setCandidates(payload.items);
+      const payload =
+        (await response.json()) as LegacyBreedingCandidatesResponse;
+      if (!contextIsCurrent() || controller.signal.aborted) return [];
+      const payloadStatus = payload.status ?? 'unknown';
+      const rawItems = Array.isArray(payload.items) ? payload.items : [];
+      const verifiedItems = rawItems.filter((item) =>
+        isLegacyBreedingCandidate(item, network, owner, maxBreeds),
+      );
+      const hasRejectedItems = verifiedItems.length !== rawItems.length;
+      const resolvedStatus: BreedingReadStatus =
+        payloadStatus === 'verified' && hasRejectedItems
+          ? 'partial'
+          : payloadStatus;
+      setCandidates(verifiedItems);
+      setCandidatesReadStatus(resolvedStatus);
+      setCandidatesReadError(resolvedStatus === 'unknown');
+      if (resolvedStatus === 'unknown') {
+        setStatus('No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.');
+      } else if (resolvedStatus === 'partial') {
+        setStatus('Solo se muestran candidatos con identidad y elegibilidad Legacy verificables.');
+      }
+      return verifiedItems;
     } catch (error) {
-      setStatus(getErrorMessage(error));
-      setCandidates([]);
+      if (!contextIsCurrent() || controller.signal.aborted || isTransactionRefreshAborted(error)) return [];
+      setCandidatesReadError(true);
+      setCandidatesReadStatus('unknown');
+      setStatus('No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.');
+      if (!options.preserve) setCandidates([]);
+      return [];
     } finally {
-      setIsLoadingCandidates(false);
+      if (contextIsCurrent()) {
+        setIsLoadingCandidates(false);
+        if (candidatesAbortRef.current === controller) candidatesAbortRef.current = null;
+      }
     }
-  }, [maxBreeds, network, owner]);
+  }, [bscReadAvailable, maxBreeds, network, owner, retryBscRead]);
 
-  const refreshCompleted = useCallback(async () => {
-    const wallets = [address, tronAddress].filter(
-      (wallet): wallet is string => Boolean(wallet),
-    );
+  const refreshCompleted = useCallback(async (options: { preserve?: boolean } = {}): Promise<LegacyMarketplaceCukiItem[]> => {
+    const requestId = completedRequestRef.current + 1;
+    completedRequestRef.current = requestId;
+    const contextIsCurrent = () => requestId === completedRequestRef.current;
+    completedAbortRef.current?.abort();
+    const controller = new AbortController();
+    completedAbortRef.current = controller;
+    const requestOwner = network === 'BSC' ? address : tronAddress;
+    const wallets = requestOwner ? [requestOwner] : [];
+
+    if (!options.preserve) setCompletedCukies([]);
+    setCompletedReadStatus('loading');
 
     if (wallets.length === 0) {
-      setCompletedCukies([]);
-      return;
+      if (contextIsCurrent()) setCompletedReadStatus('unknown');
+      return [];
     }
 
     const query = new URLSearchParams({
       limit: '24',
       offset: '0',
+      network,
     });
     for (const wallet of wallets) query.append('wallet', wallet);
 
     try {
-      const response = await fetch(
-        `/api/cukies/breeding/completed?${query}`,
-        { cache: 'no-store' },
-      );
+      const response = await fetch(`/api/cukies/breeding/completed?${query}`, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
       if (!response.ok) {
         throw new Error('No se han podido cargar los bred Cukies.');
       }
       const payload = (await response.json()) as LegacyCompletedBreedsResponse;
-      setCompletedCukies(payload.items);
+      if (!contextIsCurrent() || controller.signal.aborted) return [];
+      const payloadStatus = payload.status ?? 'unknown';
+      const rawItems = Array.isArray(payload.items) ? payload.items : [];
+      const verifiedItems = rawItems.filter((item) =>
+        isLegacyCompletedBreed(item, requestOwner),
+      );
+      const hasRejectedItems = verifiedItems.length !== rawItems.length;
+      const resolvedStatus: BreedingReadStatus =
+        payloadStatus === 'verified' && hasRejectedItems
+          ? 'partial'
+          : payloadStatus;
+      setCompletedCukies(verifiedItems);
+      setCompletedReadStatus(resolvedStatus);
+      if (resolvedStatus === 'partial') {
+        setStatus('Solo se muestran crías completadas con identidad Legacy verificable.');
+      } else if (resolvedStatus === 'unknown') {
+        setStatus('No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.');
+      }
+      return verifiedItems;
     } catch (error) {
-      setStatus(getErrorMessage(error));
-      setCompletedCukies([]);
+      if (!contextIsCurrent() || controller.signal.aborted || isTransactionRefreshAborted(error)) return [];
+      setStatus('No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.');
+      setCompletedReadStatus('unknown');
+      if (!options.preserve) setCompletedCukies([]);
+      return [];
+    } finally {
+      if (contextIsCurrent() && completedAbortRef.current === controller) completedAbortRef.current = null;
     }
-  }, [address, tronAddress]);
+  }, [address, network, tronAddress]);
 
   const fetchBscActiveBreeds = useCallback(async () => {
-    if (!address) return [];
+    if (!bscReadAvailable) return [];
 
-    const ids = (await readLegacyBscContract<readonly bigint[]>(
-      'breedingPoints',
-      'getAllBreedsOwner',
-      [address],
-    )) ?? [];
+    const ids =
+      (await readLegacyBscContract<readonly bigint[]>(
+        'breedingPoints',
+        'getAllBreedsOwner',
+        [address],
+      )) ?? [];
 
     const breeds = await Promise.all(
       ids.map(async (id) =>
@@ -467,24 +720,45 @@ export function BreedingClient({
     );
 
     return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
-  }, [address]);
+  }, [address, bscReadAvailable]);
 
   const fetchTronActiveBreeds = useCallback(async () => {
-    if (!tronAddress || !window.tronWeb) return [];
+    const currentTronWeb = getLegacyTronWeb();
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        Boolean(latestTronWeb && requestAddress && latestTronWeb.defaultAddress?.base58
+          && isSameTronWallet(latestTronWeb, requestAddress, latestTronWeb.defaultAddress.base58))
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+      );
+    };
+    if (!requestAddress || !currentTronWeb) return [];
+    if (tronWalletRpcOrigin !== LEGACY_TRON_MAINNET_RPC_URL) {
+      setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      return [];
+    }
+    if (!isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)) {
+      setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      return [];
+    }
 
     const ids =
       (await readLegacyTronContract<unknown[]>(
-        window.tronWeb,
+        currentTronWeb,
         'breedingPoints',
         'getAllBreedsOwner',
-        [tronAddress],
+        [requestAddress],
       )) ?? [];
+    if (!contextIsCurrent()) return [];
     const breeds = await Promise.all(
       ids.map(async (id) =>
         normalizeBreedTuple(
           id,
           await readLegacyTronContract(
-            window.tronWeb,
+            currentTronWeb,
             'breedingPoints',
             'getBreed',
             [id],
@@ -494,61 +768,155 @@ export function BreedingClient({
       ),
     );
 
-    return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
-  }, [tronAddress]);
+    if (!contextIsCurrent()) return [];
 
-  const refreshActiveBreeds = useCallback(async () => {
+    return breeds.filter((breed): breed is OnChainBreed => Boolean(breed));
+  }, [tronAddress, tronWalletRpcOrigin]);
+
+  const refreshActiveBreeds = useCallback(async (options: { preserve?: boolean } = {}) => {
+    const requestId = activeBreedsRequestRef.current + 1;
+    activeBreedsRequestRef.current = requestId;
+    activeBreedsAbortRef.current?.abort();
+    const controller = new AbortController();
+    activeBreedsAbortRef.current = controller;
+    if (!options.preserve) setActiveBreeds([]);
     setIsLoadingBreeds(true);
     try {
       const breeds =
         network === 'BSC'
           ? await fetchBscActiveBreeds()
           : await fetchTronActiveBreeds();
-      setActiveBreeds(breeds.filter((breed) => !breed.completed));
+      if (requestId !== activeBreedsRequestRef.current || controller.signal.aborted) return [];
+      const visibleBreeds = breeds.filter((breed) => !breed.completed);
+      setActiveBreeds(visibleBreeds);
+      return visibleBreeds;
     } catch (error) {
-      setStatus(getErrorMessage(error));
-      setActiveBreeds([]);
+      if (requestId !== activeBreedsRequestRef.current || controller.signal.aborted || isTransactionRefreshAborted(error)) return [];
+      setStatus(
+        network === 'BSC'
+          ? 'No se han podido cargar tus crías activas. Pulsa Actualizar para reintentar.'
+          : getErrorMessage(error),
+      );
+      if (!options.preserve) setActiveBreeds([]);
+      return [];
     } finally {
-      setIsLoadingBreeds(false);
+      if (requestId === activeBreedsRequestRef.current && !controller.signal.aborted) {
+        setIsLoadingBreeds(false);
+        if (activeBreedsAbortRef.current === controller) activeBreedsAbortRef.current = null;
+      }
     }
   }, [fetchBscActiveBreeds, fetchTronActiveBreeds, network]);
 
   const refreshTronSnapshot = useCallback(async () => {
-    if (network !== 'TRON' || !tronAddress || !window.tronWeb) return;
+    const requestId = tronSnapshotRequestRef.current + 1;
+    tronSnapshotRequestRef.current = requestId;
+    const currentTronWeb = getLegacyTronWeb();
+    const requestAddress = tronAddress;
+    const requestRpcOrigin = getLegacyTronWalletRpcOrigin(currentTronWeb);
+    const clearSnapshot = () => {
+      setTronMaxBreeds(null);
+      setTronPoints(null);
+      setTronApproved(null);
+    };
+    const contextIsCurrent = () => {
+      const latestTronWeb = getLegacyTronWeb();
+      return (
+        requestId === tronSnapshotRequestRef.current
+        && Boolean(latestTronWeb && requestAddress && latestTronWeb.defaultAddress?.base58
+          && isSameTronWallet(latestTronWeb, requestAddress, latestTronWeb.defaultAddress.base58))
+        && requestRpcOrigin === getLegacyTronWalletRpcOrigin(latestTronWeb)
+        && isLegacyTronWalletOnRpc(latestTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+      );
+    };
+    if (
+      network !== 'TRON'
+      || !requestAddress
+      || !currentTronWeb
+      || !isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+    ) {
+      clearSnapshot();
+      if (
+        network === 'TRON'
+        && tronAddress
+        && currentTronWeb
+        && tronWalletRpcOrigin !== LEGACY_TRON_MAINNET_RPC_URL
+      ) {
+        setStatus('Cambia TronLink a TRON Mainnet para consultar tus crías.');
+      }
+      return;
+    }
+    clearSnapshot();
 
     try {
       const [max, userPoints, approval] = await Promise.all([
         readLegacyTronContract<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           'breedingPoints',
           'getMaxBreedsByCukie',
         ),
+        readLegacyTronContract<unknown>(currentTronWeb, 'points', 'getPoints', [
+          requestAddress,
+        ]),
         readLegacyTronContract<unknown>(
-          window.tronWeb,
-          'points',
-          'getPoints',
-          [tronAddress],
-        ),
-        readLegacyTronContract<unknown>(
-          window.tronWeb,
+          currentTronWeb,
           'token',
           'isApprovedForAll',
-          [tronAddress, tronBreedingAddress],
+          [requestAddress, tronBreedingAddress],
         ),
       ]);
+      if (!contextIsCurrent()) {
+        return;
+      }
       setTronMaxBreeds(Number(max));
       setTronPoints(formatPoints(String(userPoints)));
       setTronApproved(Boolean(approval));
     } catch (error) {
+      if (!contextIsCurrent()) return;
+      clearSnapshot();
       setStatus(getErrorMessage(error));
     }
-  }, [network, tronAddress]);
+  }, [network, tronAddress, tronWalletRpcOrigin]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      candidatesAbortRef.current?.abort();
+      activeBreedsAbortRef.current?.abort();
+      completedAbortRef.current?.abort();
+      operationAbortRef.current?.abort();
+      transactionRefreshAbortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     setParent1(null);
     setParent2(null);
+  }, [sourceChainId]);
+
+  useEffect(() => {
+    const activeOperation = operationAbortRef.current;
+    activeOperation?.abort();
+    if (activeOperation) {
+      operationAbortRef.current = null;
+      operationLockRef.current = false;
+      setOperationBusy(false);
+    }
+    transactionRefreshAbortRef.current?.abort();
+    candidatesAbortRef.current?.abort();
+    activeBreedsAbortRef.current?.abort();
+    completedAbortRef.current?.abort();
+    setPendingOperation(null);
+    setApprovalPending(null);
+    setBscApprovalOverride(false);
+    setCandidates([]);
+    setCandidatesReadError(false);
+    setCandidatesReadStatus('idle');
+    setCompletedCukies([]);
+    setCompletedReadStatus('idle');
+    setActiveBreeds([]);
     setStatus(null);
-  }, [network]);
+  }, [network, owner, tronWalletRpcOrigin]);
 
   useEffect(() => {
     setTab(initialTab);
@@ -570,7 +938,8 @@ export function BreedingClient({
   useEffect(() => {
     if (
       network !== 'TRON' ||
-      !window.tronWeb ||
+      !tronWeb ||
+      !isLegacyTronWalletOnRpc(tronWeb, LEGACY_TRON_MAINNET_RPC_URL) ||
       !parent1 ||
       !parent2 ||
       sameToken(parent1, parent2)
@@ -581,13 +950,23 @@ export function BreedingClient({
 
     let cancelled = false;
     readLegacyTronContract<unknown>(
-      window.tronWeb,
+      tronWeb,
       'breedingPoints',
       'getCostPoints',
       [parent1.tokenId, parent2.tokenId],
     )
       .then((value) => {
-        if (!cancelled) setTronCost(formatPoints(String(value)));
+        if (
+          !cancelled
+          && isLegacyTronWalletOnRpc(
+            getLegacyTronWeb(),
+            LEGACY_TRON_MAINNET_RPC_URL,
+          )
+        ) {
+          setTronCost(formatPoints(String(value)));
+        } else if (!cancelled) {
+          setTronCost(null);
+        }
       })
       .catch((error) => {
         if (!cancelled) setStatus(getErrorMessage(error));
@@ -596,132 +975,749 @@ export function BreedingClient({
     return () => {
       cancelled = true;
     };
-  }, [network, parent1, parent2]);
+  }, [network, parent1, parent2, tronWalletRpcOrigin, tronWeb]);
+
+  function assertCurrentBscContext(expectedWallet: string) {
+    const current = getAccount(wagmiConfig);
+    assertEvmActionContext({
+      expectedAddress: expectedWallet,
+      expectedChainId: 56,
+      currentAddress: current.address,
+      currentChainId: getChainId(wagmiConfig),
+    });
+  }
+
+  function captureCurrentTronContext() {
+    const current = getLegacyTronWeb();
+    if (!current) throw new Error('TRON_NOT_READY');
+    return captureTronActionContext(current, LEGACY_TRON_MAINNET_RPC_URL);
+  }
+
+  function assertCurrentTronContext(expected: ReturnType<typeof captureCurrentTronContext>) {
+    const current = getLegacyTronWeb();
+    if (!current) throw new Error('TRON_NOT_READY');
+    assertTronActionContext(current, expected);
+  }
+
+  function dispatchBreedingRefresh(hash: string, tokenId?: string) {
+    window.dispatchEvent(new CustomEvent('cukies:legacy-marketplace:refresh', {
+      detail: {
+        hash,
+        tokenId,
+        collectionAddress: network === 'BSC' ? bscTokenAddress : undefined,
+      },
+    }));
+  }
+
+  function beginOperation() {
+    operationAbortRef.current?.abort();
+    const controller = new AbortController();
+    operationAbortRef.current = controller;
+    return controller;
+  }
+
+  function ownsOperation(controller: AbortController) {
+    return mountedRef.current
+      && operationAbortRef.current === controller
+      && !controller.signal.aborted;
+  }
+
+  function retainPendingOperation(input: {
+    action: 'start' | 'open';
+    hash: string;
+    wallet: string;
+    parents?: [string, string];
+    breedId?: string;
+    baselineActiveBreedIds?: string[];
+    baselineCompletedCukiIds?: string[];
+    phase: 'source-pending' | 'syncing';
+  }) {
+    setPendingOperation({
+      ...input,
+      network,
+    });
+  }
+
+  function sameParentPair(breed: OnChainBreed, parents: [string, string]) {
+    const expected = parents.map(String).sort();
+    const actual = breed.parents.map(String).sort();
+    return actual[0] === expected[0] && actual[1] === expected[1];
+  }
+
+  function breedingOperationContextMatches(
+    pending: NonNullable<typeof pendingOperation>,
+  ) {
+    const currentWallet = pending.network === 'BSC'
+      ? getAccount(wagmiConfig).address
+      : getLegacyTronWeb()?.defaultAddress?.base58;
+    const currentTronWeb = pending.network === 'TRON' ? getLegacyTronWeb() : null;
+    const walletMatches = pending.network === 'BSC'
+      ? Boolean(currentWallet) && currentWallet!.toLowerCase() === pending.wallet.toLowerCase()
+      : Boolean(currentTronWeb && currentWallet
+        && isSameTronWallet(currentTronWeb, pending.wallet, currentWallet));
+    return pending.network === network
+      && walletMatches
+      && (pending.network !== 'TRON'
+        || isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL));
+  }
+
+  function startBreedingProjectionRefresh(pending: NonNullable<typeof pendingOperation>) {
+    transactionRefreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    transactionRefreshAbortRef.current = controller;
+    const ownsProjection = () => mountedRef.current
+      && transactionRefreshAbortRef.current === controller
+      && !controller.signal.aborted;
+    void retryTransactionRefresh(
+      async () => {
+        if (!ownsProjection()) return true;
+        try {
+          if (!breedingOperationContextMatches(pending)) throw new Error('WALLET_CONTEXT_CHANGED');
+          if (pending.action === 'start' && pending.parents) {
+            const [active] = await Promise.all([
+              refreshActiveBreeds({ preserve: true }),
+              refreshCandidates({ preserve: true }),
+            ]);
+            if (!ownsProjection()) return true;
+            if (!breedingOperationContextMatches(pending)) throw new Error('WALLET_CONTEXT_CHANGED');
+            const baselineIds = new Set(pending.baselineActiveBreedIds ?? []);
+            const found = active.some((breed) => (
+              !baselineIds.has(breed.id)
+              && sameParentPair(breed, pending.parents!)
+            ));
+            if (found) {
+              setPendingOperation(null);
+              setParent1(null);
+              setParent2(null);
+              setStatus(`Cría iniciada en ${pending.network}. Tus crías activas ya están actualizadas.`);
+              dispatchBreedingRefresh(pending.hash);
+              return true;
+            }
+            setStatus(`Cría confirmada en ${pending.network}. Estamos actualizando tus crías activas; no repitas la operación.`);
+            return false;
+          }
+          const [active, completed] = await Promise.all([
+            refreshActiveBreeds({ preserve: true }),
+            refreshCompleted({ preserve: true }),
+          ]);
+          if (!ownsProjection()) return true;
+          if (!breedingOperationContextMatches(pending)) throw new Error('WALLET_CONTEXT_CHANGED');
+          const activeBreedIds = new Set(active.map((breed) => breed.id));
+          const baselineCompletedIds = new Set(pending.baselineCompletedCukiIds ?? []);
+          const completedProjection = Boolean(
+            pending.breedId
+            && !activeBreedIds.has(pending.breedId)
+            && pending.parents
+            && pending.baselineCompletedCukiIds
+            && completed.some((cuki) => {
+              const parentIds = new Set(cuki.parents.map((parent) => parent.tokenId));
+              return pending.parents!.every((parentId) => parentIds.has(parentId))
+                && !baselineCompletedIds.has(completedCukiIdentity(cuki));
+            }),
+          );
+          if (completedProjection) {
+            setPendingOperation(null);
+            setStatus(`Cría abierta en ${pending.network}. La colección se actualizará cuando la nueva cría esté disponible.`);
+            dispatchBreedingRefresh(pending.hash);
+            return true;
+          }
+          setStatus(`Apertura confirmada en ${pending.network}. La cría sigue sincronizándose; no repitas la operación.`);
+          return false;
+        } catch (reason) {
+          if (isTransactionRefreshAborted(reason)) throw reason;
+          if (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED') throw reason;
+          return false;
+        }
+      },
+      { signal: controller.signal },
+    ).then((reconciled) => {
+      if (!ownsProjection() || reconciled) return;
+      setStatus(`La operación fue confirmada en ${pending.network}. Estamos actualizando el estado; puedes comprobarlo de nuevo sin firmar otra vez.`);
+    }).catch((reason) => {
+      if (!ownsProjection() || isTransactionRefreshAborted(reason)) return;
+      if (reason instanceof Error && reason.message === 'WALLET_CONTEXT_CHANGED') {
+        setStatus('La operación ya fue confirmada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original para seguirla.');
+      }
+    }).finally(() => {
+      if (transactionRefreshAbortRef.current === controller) transactionRefreshAbortRef.current = null;
+    });
+  }
 
   function ensureBsc() {
     if (network !== 'BSC') return false;
-    if (!isConnected) {
-      setStatus('Conecta una wallet EVM desde el header.');
+    if (!operationsEnabled) {
+      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
       return false;
     }
-    if (chainId !== 56) {
-      switchChain({ chainId: 56 });
-      return false;
-    }
-    return true;
+    const current = getAccount(wagmiConfig);
+    const currentChainId = getChainId(wagmiConfig);
+    if (current.address && currentChainId === 56) return true;
+    void requestWallet({
+      kind: 'evm',
+      targetChainId: 56,
+      reason: 'Conecta una wallet EVM en BNB Smart Chain para operar breeding.',
+    }).catch((error) => setStatus(getErrorMessage(error)));
+    return false;
   }
 
   async function ensureTron() {
     if (network !== 'TRON') return false;
+    if (!operationsEnabled) {
+      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
+      return false;
+    }
     if (!isTronInstalled) {
       setStatus('Instala o activa TronLink para operar breeding en TRON.');
       return false;
     }
-    if (!isTronConnected) {
-      await connectTron();
+    try {
+      await requestWallet({
+        kind: 'tron',
+        targetTronNetwork: 'mainnet',
+        reason: 'Conecta TronLink en TRON Mainnet para operar breeding.',
+      });
+    } catch (error) {
+      setStatus(getErrorMessage(error));
       return false;
     }
-    if (!window.tronWeb) {
+    const currentTronWeb = getLegacyTronWeb();
+    if (!currentTronWeb) {
       setStatus('TronLink no ha expuesto tronWeb todavia.');
+      return false;
+    }
+    if (!isLegacyTronWalletOnRpc(currentTronWeb, LEGACY_TRON_MAINNET_RPC_URL)) {
+      setStatus('Cambia TronLink a TRON Mainnet antes de continuar.');
       return false;
     }
     return true;
   }
 
   async function approveBreeding() {
-    if (network === 'BSC') {
-      if (!ensureBsc()) return;
-      setStatus('Enviando approval de breeding en BSC...');
-      writeContract({
-        address: bscTokenAddress,
-        abi: legacyMarketplaceBscAbis.token,
-        functionName: 'setApprovalForAll',
-        args: [bscBreedingAddress, true],
-      });
-      return;
-    }
-
-    if (!(await ensureTron()) || !window.tronWeb) return;
-    setStatus('Enviando approval de breeding en TRON...');
+    if (operationLockRef.current || approvalPending || pendingOperation) return;
+    operationLockRef.current = true;
+    setOperationBusy(true);
+    const operationController = beginOperation();
+    let pendingHash: string | null = null;
+    let receiptConfirmed = false;
     try {
-      await sendLegacyTronContract(
-        window.tronWeb,
+      if (network === 'BSC') {
+        if (!ensureBsc()) return;
+        const owner = getAccount(wagmiConfig).address;
+        if (!owner) throw new Error('WALLET_CONTEXT_CHANGED');
+        setStatus('Enviando approval de breeding en BSC...');
+        const hash = await writeContractAsync({
+          address: bscTokenAddress,
+          abi: legacyMarketplaceBscAbis.token,
+          functionName: 'setApprovalForAll',
+          args: [bscBreedingAddress, true],
+          chainId: 56,
+        });
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        assertCurrentBscContext(owner);
+        pendingHash = hash;
+        setApprovalPending(hash);
+        setStatus('Approval enviada. Esperando confirmación en BNB Smart Chain…');
+        let confirmed;
+        try {
+          confirmed = await waitForConfirmedEvmTransaction(legacyBscPublicClient, hash);
+        } catch (reason) {
+          if (reason instanceof TransactionReplacementPendingError && ownsOperation(operationController)) {
+            pendingHash = reason.hash;
+            setApprovalPending(reason.hash);
+          }
+          throw reason;
+        }
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        if (confirmed.receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+        assertCurrentBscContext(owner);
+        receiptConfirmed = true;
+        setApprovalPending(null);
+        setBscApprovalOverride(true);
+        setStatus('Approval de breeding confirmada en BNB Smart Chain.');
+        return;
+      }
+
+      if (!(await ensureTron())) return;
+      throwIfTransactionRefreshAborted(operationController.signal);
+      const currentTronWeb = getLegacyTronWeb();
+      if (!currentTronWeb) throw new Error('TRON_NOT_READY');
+      const actionContext = captureCurrentTronContext();
+      setStatus('Enviando approval de breeding en TRON...');
+      const result = await sendLegacyTronContract(
+        currentTronWeb,
         'token',
         'setApprovalForAll',
         [tronBreedingAddress, true],
         { feeLimit: 800_000_000, shouldPollResponse: false },
+        () => assertCurrentTronContext(actionContext),
       );
+      throwIfTransactionRefreshAborted(operationController.signal);
+      if (!ownsOperation(operationController)) return;
+      assertCurrentTronContext(actionContext);
+      assertTronSendResult(result);
+      pendingHash = tronTransactionId(result);
+      if (!pendingHash) throw new Error('TRANSACTION_ID_UNAVAILABLE');
+      setApprovalPending(pendingHash);
+      setStatus('Approval enviada. Esperando confirmación en TRON…');
+      await waitForLegacyTronReceipt(pendingHash, { signal: operationController.signal });
+      if (!ownsOperation(operationController)) return;
+      assertCurrentTronContext(actionContext);
+      receiptConfirmed = true;
+      setApprovalPending(null);
       setTronApproved(true);
-      setStatus('Approval de breeding enviado.');
+      setStatus('Approval de breeding confirmada en TRON.');
     } catch (error) {
-      setStatus(getErrorMessage(error));
+      if (!ownsOperation(operationController) || isTransactionRefreshAborted(error)) return;
+      if (error instanceof Error && error.message === 'WALLET_CONTEXT_CHANGED') return;
+      if (error instanceof TransactionReplacementPendingError) {
+        setStatus('La wallet actualizó la transacción; sigue pendiente. Puedes comprobarla sin firmar otra vez.');
+      } else if (error instanceof TransactionReplacementError || (error instanceof Error && error.message === 'TRANSACTION_REVERTED')) {
+        setApprovalPending(null);
+        setStatus(getErrorMessage(error));
+      } else if (pendingHash && !receiptConfirmed) {
+        setApprovalPending(pendingHash);
+        setStatus('La aprobación sigue pendiente. No la repitas; vuelve a comprobarla más tarde.');
+      } else if (receiptConfirmed) {
+        setStatus('La aprobación ya fue confirmada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original.');
+      } else {
+        setApprovalPending(null);
+        setStatus(getErrorMessage(error));
+      }
+    } finally {
+      if (operationAbortRef.current === operationController) {
+        operationAbortRef.current = null;
+        operationLockRef.current = false;
+        if (mountedRef.current) setOperationBusy(false);
+      }
+    }
+  }
+
+  async function checkPendingApproval() {
+    const hash = approvalPending;
+    if (!hash || operationLockRef.current) return;
+    operationLockRef.current = true;
+    setOperationBusy(true);
+    const operationController = beginOperation();
+    try {
+      if (network === 'BSC') {
+        const owner = getAccount(wagmiConfig).address;
+        if (!owner) throw new Error('WALLET_CONTEXT_CHANGED');
+        const result = await waitForConfirmedEvmTransaction(
+          legacyBscPublicClient,
+          hash as `0x${string}`,
+        );
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        if (result.receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+        assertCurrentBscContext(owner);
+        setApprovalPending(null);
+        setBscApprovalOverride(true);
+        setStatus('Approval de breeding confirmada en BNB Smart Chain.');
+        return;
+      }
+
+      const context = captureCurrentTronContext();
+      await waitForLegacyTronReceipt(hash, { signal: operationController.signal });
+      if (!ownsOperation(operationController)) return;
+      assertCurrentTronContext(context);
+      setApprovalPending(null);
+      setTronApproved(true);
+      setStatus('Approval de breeding confirmada en TRON.');
+    } catch (error) {
+      if (!ownsOperation(operationController) || isTransactionRefreshAborted(error)) return;
+      if (error instanceof Error && error.message === 'WALLET_CONTEXT_CHANGED') return;
+      if (error instanceof TransactionReplacementPendingError) {
+        setApprovalPending(error.hash);
+        setStatus('La wallet actualizó la transacción; sigue pendiente. Puedes comprobarla sin firmar otra vez.');
+      } else if (error instanceof TransactionReplacementError || (error instanceof Error && error.message === 'TRANSACTION_REVERTED')) {
+        setApprovalPending(null);
+        setStatus(getErrorMessage(error));
+      } else {
+        setStatus('La aprobación sigue pendiente. No la repitas; vuelve a comprobarla más tarde.');
+      }
+    } finally {
+      if (operationAbortRef.current === operationController) {
+        operationAbortRef.current = null;
+        operationLockRef.current = false;
+        if (mountedRef.current) setOperationBusy(false);
+      }
+    }
+  }
+
+  async function checkPendingOperation() {
+    const pending = pendingOperation;
+    if (!pending || operationLockRef.current) return;
+    // A confirmed source transaction can outlive the bounded projection
+    // window. Re-run only the read-side reconciliation so a delayed Legacy
+    // indexer can release the lock without asking the user to sign again.
+    if (pending.phase === 'syncing') {
+      setStatus(`Comprobando el estado de la operación en ${pending.network}…`);
+      startBreedingProjectionRefresh(pending);
+      return;
+    }
+    operationLockRef.current = true;
+    setOperationBusy(true);
+    const operationController = beginOperation();
+    try {
+      if (pending.network === 'BSC') {
+        const owner = getAccount(wagmiConfig).address;
+        if (!owner) throw new Error('WALLET_CONTEXT_CHANGED');
+        const result = await waitForConfirmedEvmTransaction(
+          legacyBscPublicClient,
+          pending.hash as `0x${string}`,
+        );
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        if (result.receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+        assertCurrentBscContext(owner);
+        const promoted = { ...pending, hash: result.hash, phase: 'syncing' as const };
+        setPendingOperation(promoted);
+        setStatus(`Cría confirmada en ${pending.network}. Estamos actualizando el estado; no repitas la operación.`);
+        dispatchBreedingRefresh(result.hash);
+        startBreedingProjectionRefresh(promoted);
+        return;
+      }
+
+      const context = captureCurrentTronContext();
+      await waitForLegacyTronReceipt(pending.hash, { signal: operationController.signal });
+      if (!ownsOperation(operationController)) return;
+      assertCurrentTronContext(context);
+      const promoted = { ...pending, phase: 'syncing' as const };
+      setPendingOperation(promoted);
+      setStatus(`Cría confirmada en ${pending.network}. Estamos actualizando el estado; no repitas la operación.`);
+      dispatchBreedingRefresh(pending.hash);
+      startBreedingProjectionRefresh(promoted);
+    } catch (error) {
+      if (!ownsOperation(operationController) || isTransactionRefreshAborted(error)) return;
+      if (error instanceof Error && error.message === 'WALLET_CONTEXT_CHANGED') return;
+      if (error instanceof TransactionReplacementPendingError) {
+        setPendingOperation((current) => current?.hash === pending.hash
+          ? { ...current, hash: error.hash }
+          : current);
+        setStatus('La wallet actualizó la transacción; sigue pendiente. Puedes comprobarla sin firmar otra vez.');
+      } else if (error instanceof TransactionReplacementError || (error instanceof Error && error.message === 'TRANSACTION_REVERTED')) {
+        setPendingOperation(null);
+        setStatus(getErrorMessage(error));
+      } else {
+        setStatus(`La operación sigue pendiente de confirmación en ${pending.network}. No la repitas; vuelve a comprobarla más tarde.`);
+      }
+    } finally {
+      if (operationAbortRef.current === operationController) {
+        operationAbortRef.current = null;
+        operationLockRef.current = false;
+        if (mountedRef.current) setOperationBusy(false);
+      }
     }
   }
 
   async function startBreeding() {
-    if (!parent1 || !parent2 || sameToken(parent1, parent2)) {
+    const firstParent = parent1;
+    const secondParent = parent2;
+    if (!firstParent || !secondParent || sameToken(firstParent, secondParent)) {
       setStatus('Selecciona dos Cukies distintos.');
       return;
     }
-
-    if (network === 'BSC') {
-      if (!ensureBsc()) return;
-      setStatus('Iniciando breeding en BSC...');
-      writeContract({
-        address: bscBreedingAddress,
-        abi: legacyMarketplaceBscAbis.breedingPoints,
-        functionName: 'start',
-        args: [BigInt(parent1.tokenId), BigInt(parent2.tokenId)],
-      });
-      return;
-    }
-
-    if (!(await ensureTron()) || !window.tronWeb) return;
-    setStatus('Iniciando breeding en TRON...');
+    if (operationLockRef.current || approvalPending || pendingOperation) return;
+    operationLockRef.current = true;
+    setOperationBusy(true);
+    const operationController = beginOperation();
+    let pendingHash: string | null = null;
+    let receiptConfirmed = false;
+    let actionContext: ReturnType<typeof captureCurrentTronContext> | null = null;
+    let wallet: string | null = null;
+    let baselineActiveBreedIds = activeBreeds.map((breed) => breed.id);
     try {
-      await sendLegacyTronContract(
-        window.tronWeb,
-        'breedingPoints',
-        'start',
-        [parent1.tokenId, parent2.tokenId],
-        { feeLimit: 800_000_000, shouldPollResponse: false },
-      );
+      if (baselineActiveBreedIds.length === 0) {
+        const baselineActiveBreeds = await refreshActiveBreeds({ preserve: true });
+        if (!ownsOperation(operationController)) return;
+        baselineActiveBreedIds = baselineActiveBreeds.map((breed) => breed.id);
+      }
+      if (network === 'BSC') {
+        if (!ensureBsc()) return;
+        wallet = getAccount(wagmiConfig).address ?? null;
+        if (!wallet) throw new Error('WALLET_CONTEXT_CHANGED');
+        setStatus('Iniciando breeding en BSC...');
+        const hash = await writeContractAsync({
+          address: bscBreedingAddress,
+          abi: legacyMarketplaceBscAbis.breedingPoints,
+          functionName: 'start',
+          args: [BigInt(firstParent.tokenId), BigInt(secondParent.tokenId)],
+          chainId: 56,
+        });
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        assertCurrentBscContext(wallet);
+        pendingHash = hash;
+        retainPendingOperation({
+          action: 'start',
+          hash,
+          wallet,
+          parents: [firstParent.tokenId, secondParent.tokenId],
+          baselineActiveBreedIds,
+          phase: 'source-pending',
+        });
+        setStatus('Cría enviada. Esperando confirmación en BNB Smart Chain…');
+        let confirmed;
+        try {
+          confirmed = await waitForConfirmedEvmTransaction(legacyBscPublicClient, hash);
+        } catch (reason) {
+          if (reason instanceof TransactionReplacementPendingError && ownsOperation(operationController)) {
+            pendingHash = reason.hash;
+            retainPendingOperation({
+              action: 'start',
+              hash: reason.hash,
+              wallet,
+              parents: [firstParent.tokenId, secondParent.tokenId],
+              baselineActiveBreedIds,
+              phase: 'source-pending',
+            });
+          }
+          throw reason;
+        }
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        if (confirmed.receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+        assertCurrentBscContext(wallet);
+        pendingHash = confirmed.hash;
+        receiptConfirmed = true;
+      } else {
+        if (!(await ensureTron())) return;
+        throwIfTransactionRefreshAborted(operationController.signal);
+        const currentTronWeb = getLegacyTronWeb();
+        if (!currentTronWeb) throw new Error('TRON_NOT_READY');
+        actionContext = captureCurrentTronContext();
+        wallet = actionContext.address;
+        setStatus('Iniciando breeding en TRON...');
+        const result = await sendLegacyTronContract(
+          currentTronWeb,
+          'breedingPoints',
+          'start',
+          [firstParent.tokenId, secondParent.tokenId],
+          { feeLimit: 800_000_000, shouldPollResponse: false },
+          () => assertCurrentTronContext(actionContext!),
+        );
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        assertCurrentTronContext(actionContext);
+        assertTronSendResult(result);
+        pendingHash = tronTransactionId(result);
+        if (!pendingHash) throw new Error('TRANSACTION_ID_UNAVAILABLE');
+        retainPendingOperation({
+          action: 'start',
+          hash: pendingHash,
+          wallet,
+          parents: [firstParent.tokenId, secondParent.tokenId],
+          baselineActiveBreedIds,
+          phase: 'source-pending',
+        });
+        setStatus('Cría enviada. Esperando confirmación en TRON…');
+        await waitForLegacyTronReceipt(pendingHash, { signal: operationController.signal });
+        if (!ownsOperation(operationController)) return;
+        assertCurrentTronContext(actionContext);
+        receiptConfirmed = true;
+      }
+
+      if (!pendingHash || !wallet) throw new Error('TRANSACTION_ID_UNAVAILABLE');
+      const pending = {
+        action: 'start' as const,
+        hash: pendingHash,
+        wallet,
+        parents: [firstParent.tokenId, secondParent.tokenId] as [string, string],
+        baselineActiveBreedIds,
+        phase: 'syncing' as const,
+      };
+      retainPendingOperation(pending);
       setParent1(null);
       setParent2(null);
-      setStatus('Breeding iniciado. Refresca Active breeds en unos segundos.');
-      void refreshCandidates();
+      setOperationBusy(false);
+      setStatus(`Cría confirmada en ${network}. Estamos actualizando tus crías activas; no repitas la operación.`);
+      dispatchBreedingRefresh(pendingHash);
+      startBreedingProjectionRefresh({ ...pending, network });
     } catch (error) {
-      setStatus(getErrorMessage(error));
+      if (!ownsOperation(operationController) || isTransactionRefreshAborted(error)) return;
+      if (error instanceof Error && error.message === 'WALLET_CONTEXT_CHANGED') return;
+      if (error instanceof TransactionReplacementPendingError) {
+        setStatus('La wallet actualizó la transacción; la cría sigue pendiente. Puedes comprobarla sin firmar otra vez.');
+      } else if (error instanceof TransactionReplacementError || (error instanceof Error && error.message === 'TRANSACTION_REVERTED')) {
+        setPendingOperation(null);
+        setStatus(getErrorMessage(error));
+      } else if (pendingHash && !receiptConfirmed && wallet) {
+        retainPendingOperation({
+          action: 'start',
+          hash: pendingHash,
+          wallet,
+          parents: [firstParent.tokenId, secondParent.tokenId],
+          baselineActiveBreedIds,
+          phase: 'source-pending',
+        });
+        setStatus('La cría sigue pendiente de confirmación. No la repitas; vuelve a comprobarla más tarde.');
+      } else if (receiptConfirmed) {
+        setStatus('La cría ya fue confirmada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original.');
+      } else {
+        setPendingOperation(null);
+        setStatus(getErrorMessage(error));
+      }
+    } finally {
+      if (operationAbortRef.current === operationController) {
+        operationAbortRef.current = null;
+        operationLockRef.current = false;
+        if (mountedRef.current) setOperationBusy(false);
+      }
     }
   }
 
   async function openBreed(breed: OnChainBreed) {
-    if (network === 'BSC') {
-      if (!ensureBsc()) return;
-      setStatus('Abriendo Cukie en BSC...');
-      writeContract({
-        address: bscBreedingAddress,
-        abi: legacyMarketplaceBscAbis.breedingPoints,
-        functionName: 'breed',
-        args: [BigInt(breed.id)],
-      });
-      return;
-    }
-
-    if (!(await ensureTron()) || !window.tronWeb) return;
-    setStatus('Abriendo Cukie en TRON...');
+    if (operationLockRef.current || approvalPending || pendingOperation) return;
+    operationLockRef.current = true;
+    setOperationBusy(true);
+    const operationController = beginOperation();
+    let pendingHash: string | null = null;
+    let receiptConfirmed = false;
+    let actionContext: ReturnType<typeof captureCurrentTronContext> | null = null;
+    let wallet: string | null = null;
+    let baselineCompletedCukiIds = completedCukies.map(completedCukiIdentity);
     try {
-      await sendLegacyTronContract(
-        window.tronWeb,
-        'breedingPoints',
-        'breed',
-        [breed.id],
-        { feeLimit: 800_000_000, shouldPollResponse: false },
-      );
-      setStatus('Cukie abierto. Refresca completed breeds en unos segundos.');
-      void refreshActiveBreeds();
+      if (baselineCompletedCukiIds.length === 0) {
+        const baselineCompleted = await refreshCompleted({ preserve: true });
+        if (!ownsOperation(operationController)) return;
+        baselineCompletedCukiIds = baselineCompleted.map(completedCukiIdentity);
+      }
+      if (network === 'BSC') {
+        if (!ensureBsc()) return;
+        wallet = getAccount(wagmiConfig).address ?? null;
+        if (!wallet) throw new Error('WALLET_CONTEXT_CHANGED');
+        setStatus('Abriendo Cukie en BSC...');
+        const hash = await writeContractAsync({
+          address: bscBreedingAddress,
+          abi: legacyMarketplaceBscAbis.breedingPoints,
+          functionName: 'breed',
+          args: [BigInt(breed.id)],
+          chainId: 56,
+        });
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        assertCurrentBscContext(wallet);
+        pendingHash = hash;
+        retainPendingOperation({
+          action: 'open',
+          hash,
+          wallet,
+          parents: breed.parents,
+          breedId: breed.id,
+          baselineCompletedCukiIds,
+          phase: 'source-pending',
+        });
+        setStatus('Apertura enviada. Esperando confirmación en BNB Smart Chain…');
+        let confirmed;
+        try {
+          confirmed = await waitForConfirmedEvmTransaction(legacyBscPublicClient, hash);
+        } catch (reason) {
+          if (reason instanceof TransactionReplacementPendingError && ownsOperation(operationController)) {
+            pendingHash = reason.hash;
+            retainPendingOperation({
+              action: 'open',
+              hash: reason.hash,
+              wallet,
+              parents: breed.parents,
+              breedId: breed.id,
+              baselineCompletedCukiIds,
+              phase: 'source-pending',
+            });
+          }
+          throw reason;
+        }
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        if (confirmed.receipt.status !== 'success') throw new Error('TRANSACTION_REVERTED');
+        assertCurrentBscContext(wallet);
+        pendingHash = confirmed.hash;
+        receiptConfirmed = true;
+      } else {
+        if (!(await ensureTron())) return;
+        throwIfTransactionRefreshAborted(operationController.signal);
+        const currentTronWeb = getLegacyTronWeb();
+        if (!currentTronWeb) throw new Error('TRON_NOT_READY');
+        actionContext = captureCurrentTronContext();
+        wallet = actionContext.address;
+        setStatus('Abriendo Cukie en TRON...');
+        const result = await sendLegacyTronContract(
+          currentTronWeb,
+          'breedingPoints',
+          'breed',
+          [breed.id],
+          { feeLimit: 800_000_000, shouldPollResponse: false },
+          () => assertCurrentTronContext(actionContext!),
+        );
+        throwIfTransactionRefreshAborted(operationController.signal);
+        if (!ownsOperation(operationController)) return;
+        assertCurrentTronContext(actionContext);
+        assertTronSendResult(result);
+        pendingHash = tronTransactionId(result);
+        if (!pendingHash) throw new Error('TRANSACTION_ID_UNAVAILABLE');
+        retainPendingOperation({
+          action: 'open',
+          hash: pendingHash,
+          wallet,
+          parents: breed.parents,
+          breedId: breed.id,
+          baselineCompletedCukiIds,
+          phase: 'source-pending',
+        });
+        setStatus('Apertura enviada. Esperando confirmación en TRON…');
+        await waitForLegacyTronReceipt(pendingHash, { signal: operationController.signal });
+        if (!ownsOperation(operationController)) return;
+        assertCurrentTronContext(actionContext);
+        receiptConfirmed = true;
+      }
+
+      if (!pendingHash || !wallet) throw new Error('TRANSACTION_ID_UNAVAILABLE');
+      const pending = {
+        action: 'open' as const,
+        hash: pendingHash,
+        wallet,
+        parents: breed.parents,
+        breedId: breed.id,
+        baselineCompletedCukiIds,
+        phase: 'syncing' as const,
+      };
+      retainPendingOperation(pending);
+      setOperationBusy(false);
+      setStatus(`Apertura confirmada en ${network}. Estamos actualizando la nueva cría; no repitas la operación.`);
+      dispatchBreedingRefresh(pendingHash);
+      startBreedingProjectionRefresh({ ...pending, network });
     } catch (error) {
-      setStatus(getErrorMessage(error));
+      if (!ownsOperation(operationController) || isTransactionRefreshAborted(error)) return;
+      if (error instanceof Error && error.message === 'WALLET_CONTEXT_CHANGED') return;
+      if (error instanceof TransactionReplacementPendingError) {
+        setStatus('La wallet actualizó la transacción; la apertura sigue pendiente. Puedes comprobarla sin firmar otra vez.');
+      } else if (error instanceof TransactionReplacementError || (error instanceof Error && error.message === 'TRANSACTION_REVERTED')) {
+        setPendingOperation(null);
+        setStatus(getErrorMessage(error));
+      } else if (pendingHash && !receiptConfirmed && wallet) {
+        retainPendingOperation({
+          action: 'open',
+          hash: pendingHash,
+          wallet,
+          parents: breed.parents,
+          breedId: breed.id,
+          baselineCompletedCukiIds,
+          phase: 'source-pending',
+        });
+        setStatus('La apertura sigue pendiente de confirmación. No la repitas; vuelve a comprobarla más tarde.');
+      } else if (receiptConfirmed) {
+        setStatus('La apertura ya fue confirmada, pero la cuenta o la red cambió. Vuelve a conectar la wallet original.');
+      } else {
+        setPendingOperation(null);
+        setStatus(getErrorMessage(error));
+      }
+    } finally {
+      if (operationAbortRef.current === operationController) {
+        operationAbortRef.current = null;
+        operationLockRef.current = false;
+        if (mountedRef.current) setOperationBusy(false);
+      }
     }
   }
 
@@ -749,10 +1745,35 @@ export function BreedingClient({
     setParent2(cuki);
   }
 
-  const disabled = isWriting || isSwitchingChain;
+  const disabled = isWriting || isTronLoading || !operationsEnabled || operationBusy || Boolean(approvalPending) || Boolean(pendingOperation);
+  const showConnectionWarning =
+    network === 'BSC'
+      ? !isConnected || (operationsEnabled && chainId !== 56)
+      : !tronReady;
 
   return (
     <div className="grid gap-6">
+      {readEnabled && !operationsEnabled && (
+        <div
+          role="status"
+          className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
+        >
+          Puedes consultar el estado de tus Crías Legacy. Las acciones para
+          aprobar, iniciar y abrir una cría estarán disponibles cuando finalice la revisión.
+        </div>
+      )}
+      {network === 'BSC' && readEnabled && (
+        <div
+          role="status"
+          className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-4 text-sm text-lilac-100"
+        >
+          {bscReadStatus === 'loading'
+            ? 'Verificando lectura Legacy BSC…'
+            : bscReadStatus === 'verified'
+            ? 'Lectura Legacy BSC verificada. Puedes consultar estos datos aunque la wallet esté en otra red.'
+            : 'Lectura Legacy BSC no disponible ahora. Pulsa Actualizar para reintentar.'}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-white/10 bg-black/30 p-3">
         <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
           {(['BSC', 'TRON'] as const).map((item) => (
@@ -762,7 +1783,7 @@ export function BreedingClient({
               onClick={() => setNetwork(item)}
               className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
                 network === item
-                  ? 'bg-cyan-300 text-slate-950'
+                  ? 'bg-lilac-300 text-slate-950'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
@@ -773,9 +1794,9 @@ export function BreedingClient({
 
         <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
           {[
-            ['start', 'Start'],
-            ['active', 'Active'],
-            ['completed', 'Completed'],
+            ['start', 'Iniciar'],
+            ['active', 'Activas'],
+            ['completed', 'Completadas'],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -799,36 +1820,68 @@ export function BreedingClient({
             key={label}
             className="rounded-[8px] border border-white/10 bg-black/30 p-4"
           >
-            <Icon className="mb-3 h-4 w-4 text-cyan-200" />
+            <Icon className="mb-3 h-4 w-4 text-lilac-200" />
             <p className="text-xs uppercase tracking-wide text-slate-500">
               {label}
             </p>
-            <p className="mt-1 truncate font-semibold text-white">
-              {value}
-            </p>
+            <p className="mt-1 truncate font-semibold text-white">{value}</p>
           </div>
         ))}
       </div>
 
-      {!ready && (
+      {showConnectionWarning && (
         <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
           {network === 'BSC' ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span>
-                Conecta una wallet EVM y usa BNB Smart Chain para breeding.
+                {!isConnected
+                  ? 'Conecta una wallet EVM para cargar tus padres.'
+                  : bscReadStatus === 'verified'
+                  ? 'La lectura Legacy está verificada. Cambia la red de la wallet para operar.'
+                  : operationsEnabled && chainId !== 56
+                  ? 'Cambia la red de la wallet a BNB Smart Chain para operar. La lectura Legacy se puede reintentar desde aquí.'
+                  : 'La lectura Legacy BSC no está disponible ahora. Pulsa Actualizar para reintentar.'}
               </span>
-              {isConnected && chainId !== 56 && (
-                <Button onClick={() => switchChain({ chainId: 56 })}>
-                  Switch to BSC
+              {operationsEnabled && isConnected && chainId !== 56 && (
+                <Button onClick={() => void ensureBsc()}>
+                  Cambiar a BSC
                 </Button>
               )}
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>Conecta TronLink para breeding en TRON.</span>
-              <Button onClick={() => void ensureTron()}>Connect TronLink</Button>
+              <span>
+                {!isTronInstalled
+                  ? 'TronLink no está disponible en este navegador.'
+                  : !isTronConnected
+                  ? 'Conecta TronLink para cargar tus padres en TRON.'
+                  : !tronWeb || !isLegacyTronWalletOnRpc(tronWeb, LEGACY_TRON_MAINNET_RPC_URL)
+                  ? 'Cambia TronLink a TRON Mainnet para cargar tus padres.'
+                  : 'La fuente de candidatos TRON no está disponible ahora.'}
+              </span>
+              <Button onClick={() => void ensureTron()}>
+                Conectar TronLink
+              </Button>
             </div>
           )}
+        </div>
+      )}
+
+      {pendingOperation && (
+        <div className="grid gap-3 rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+          <p>
+            {pendingOperation.phase === 'source-pending'
+              ? 'La operación está pendiente de confirmación. No firmes otra vez.'
+              : 'La operación está confirmada y el estado Legacy sigue sincronizándose. No repitas la operación.'}
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => void checkPendingOperation()}
+            disabled={isWriting || isTronLoading || operationBusy}
+            className="border-amber-200/30 bg-amber-200/10 text-amber-50 hover:bg-amber-200/20"
+          >
+            Comprobar operación
+          </Button>
         </div>
       )}
 
@@ -838,24 +1891,29 @@ export function BreedingClient({
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-headline text-2xl font-bold text-white">
-                  Select parents
+                  Selecciona los padres
                 </h2>
-              <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-slate-400">
                   Elige dos Cukies disponibles de tu wallet.
                 </p>
+                {candidatesReadStatus === 'partial' && (
+                  <p role="status" className="mt-2 text-xs text-amber-200">
+                    Solo se muestran candidatos con identidad y elegibilidad Legacy verificables.
+                  </p>
+                )}
               </div>
               <Button
                 variant="outline"
                 disabled={isLoadingCandidates}
                 onClick={() => void refreshCandidates()}
-                className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+                className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
               >
                 {isLoadingCandidates ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <RefreshCcw className="mr-2 h-4 w-4" />
                 )}
-                Refresh
+                Actualizar
               </Button>
             </div>
 
@@ -869,24 +1927,32 @@ export function BreedingClient({
                       parent1?.tokenId === cuki.tokenId ||
                       parent2?.tokenId === cuki.tokenId
                     }
-                    disabled={!ready}
+                    disabled={!candidateReadReady}
                     onSelect={() => selectParent(cuki)}
                   />
                 ))
               ) : (
                 <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                  {owner
-                    ? 'No hay Cukies disponibles para breeding en esta wallet/red.'
-                    : 'Conecta una wallet para cargar candidatos.'}
+                  {!owner
+                    ? 'Conecta una wallet para cargar candidatos.'
+                    : candidatesReadError
+                    ? 'No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.'
+                    : network === 'BSC' && !bscReadVerified
+                    ? 'No se ha podido verificar la lectura Legacy BSC. Pulsa Actualizar para reintentar.'
+                    : network === 'TRON' && !candidateReadReady
+                    ? 'La fuente de candidatos no está disponible hasta conectar la red seleccionada.'
+                    : candidatesReadStatus === 'partial'
+                    ? 'No hay candidatos con identidad y elegibilidad Legacy verificables en esta wallet.'
+                    : 'No hay Cukies disponibles para cría en esta wallet.'}
                 </div>
               )}
             </div>
           </section>
 
-          <aside className="grid content-start gap-4 rounded-[8px] border border-cyan-300/20 bg-black/35 p-5">
+          <aside className="grid content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
             <div>
               <h2 className="font-headline text-2xl font-bold text-white">
-                Breeding desk
+                Resumen de cría
               </h2>
               <p className="mt-1 text-sm text-slate-400">
                 Revisa padres, coste y confirma el breeding.
@@ -899,32 +1965,46 @@ export function BreedingClient({
                 className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3"
               >
                 <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Parent {index + 1}
+                  Padre {index + 1}
                 </p>
                 <p className="mt-1 font-semibold text-white">
-                  {parent ? getCukiDisplayName(parent) : 'Not selected'}
+                  {parent ? getCukiDisplayName(parent) : 'Sin seleccionar'}
                 </p>
               </div>
             ))}
 
             <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">
-                Required points
+                Puntos necesarios
               </p>
               <p className="mt-1 font-mono text-lg font-semibold text-white">
                 {parentsSelected ? cost : '-'}
               </p>
             </div>
 
+            {approvalPending && (
+              <div className="grid gap-3 rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+                <p>La aprobación está pendiente. No firmes otra vez mientras comprobamos su resultado.</p>
+                <Button
+                  variant="outline"
+                  onClick={() => void checkPendingApproval()}
+                  disabled={isWriting || isTronLoading || operationBusy}
+                  className="border-amber-200/30 bg-amber-200/10 text-amber-50 hover:bg-amber-200/20"
+                >
+                  Comprobar aprobación
+                </Button>
+              </div>
+            )}
+
             {!approved && (
               <Button
                 onClick={() => void approveBreeding()}
                 disabled={disabled || !ready}
                 variant="outline"
-                className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+                className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
               >
                 <Check className="mr-2 h-4 w-4" />
-                Approve breeding
+                Aprobar cría
               </Button>
             )}
 
@@ -934,7 +2014,7 @@ export function BreedingClient({
               className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
             >
               <Heart className="mr-2 h-4 w-4" />
-              Start breeding
+              Iniciar cría
             </Button>
           </aside>
         </div>
@@ -944,20 +2024,20 @@ export function BreedingClient({
         <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-headline text-2xl font-bold text-white">
-              Active breeds
+              Crías activas
             </h2>
             <Button
               variant="outline"
-              disabled={isLoadingBreeds || !ready}
+              disabled={isLoadingBreeds || !readReady}
               onClick={() => void refreshActiveBreeds()}
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               {isLoadingBreeds ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <RefreshCcw className="mr-2 h-4 w-4" />
               )}
-              Refresh
+              Actualizar
             </Button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -972,7 +2052,11 @@ export function BreedingClient({
               ))
             ) : (
               <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                No active breeds loaded for this network.
+                {network === 'BSC' && !address
+                  ? 'Conecta una wallet para consultar tus crías activas.'
+                  : network === 'BSC' && bscReadStatus !== 'verified'
+                  ? 'No se ha podido verificar la lectura Legacy BSC. Pulsa Actualizar para reintentar.'
+                  : 'No hay crías activas verificadas para esta wallet.'}
               </div>
             )}
           </div>
@@ -982,16 +2066,23 @@ export function BreedingClient({
       {tab === 'completed' && (
         <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-headline text-2xl font-bold text-white">
-              Completed breeds
-            </h2>
+            <div>
+              <h2 className="font-headline text-2xl font-bold text-white">
+                Crías completadas
+              </h2>
+              {completedReadStatus === 'partial' && (
+                <p role="status" className="mt-2 text-xs text-amber-200">
+                  Solo se muestran crías con identidad Legacy verificable.
+                </p>
+              )}
+            </div>
             <Button
               variant="outline"
               onClick={() => void refreshCompleted()}
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-lilac-300/25 bg-lilac-300/10 text-lilac-100 hover:bg-lilac-300/20"
             >
               <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh
+              Actualizar
             </Button>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -1001,7 +2092,11 @@ export function BreedingClient({
               ))
             ) : (
               <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
-                No completed breeds loaded for connected wallets.
+                {completedReadStatus === 'unknown'
+                  ? 'No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.'
+                  : completedReadStatus === 'partial'
+                  ? 'No hay crías completadas con identidad Legacy verificable en esta wallet.'
+                  : 'No hay crías completadas para esta wallet.'}
               </div>
             )}
           </div>
@@ -1009,11 +2104,10 @@ export function BreedingClient({
       )}
 
       {status && (
-        <div className="rounded-[8px] border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-100">
+        <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-3 text-sm text-lilac-100">
           {status}
         </div>
       )}
-
     </div>
   );
 }

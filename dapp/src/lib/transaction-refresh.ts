@@ -28,7 +28,11 @@ export class TransactionReplacementError extends Error {
   }
 }
 
-/** A repriced transaction remains pending under its replacement hash. */
+/**
+ * A repriced transaction has a new hash but may still be waiting for a
+ * receipt.  Keep it pending instead of treating a timeout after repricing as
+ * a cancellation/replacement failure.
+ */
 export class TransactionReplacementPendingError extends Error {
   readonly replacement: TransactionReplacement;
   readonly hash: TransactionRefreshHash;
@@ -43,7 +47,9 @@ export class TransactionReplacementPendingError extends Error {
 }
 
 function hashValue(value: unknown): string | null {
-  return typeof value === 'string' && /^0x[0-9a-f]{64}$/i.test(value) ? value : null;
+  return typeof value === 'string' && /^0x[0-9a-f]{64}$/i.test(value)
+    ? value
+    : null;
 }
 
 function replacementReason(value: unknown): TransactionReplacementReason | null {
@@ -88,41 +94,50 @@ type EvmWaitClient<TReceipt extends TransactionRefreshReceipt> = {
   waitForTransactionReceipt: (...args: never[]) => Promise<TReceipt>;
 };
 
+/**
+ * Waits for an EVM receipt while retaining the hash that was actually mined.
+ * Viem resolves replacements through `onReplaced`; callers receive the receipt
+ * hash that was actually mined, so repriced submissions remain traceable while
+ * cancelled/replaced submissions never look like a confirmed operation.
+ */
 export async function waitForConfirmedEvmTransaction<TReceipt extends TransactionRefreshReceipt>(
   client: EvmWaitClient<TReceipt>,
   hash: TransactionRefreshHash,
 ) {
   const replacementState: { current: TransactionReplacement | null } = { current: null };
+  const input: EvmWaitInput = {
+    hash,
+    onReplaced: (response: unknown) => {
+      replacementState.current = replacementFromUnknown(response, hash);
+    },
+  };
+
   let receipt: TReceipt;
   try {
-    const waitForTransactionReceipt = client.waitForTransactionReceipt as unknown as (request: {
-      hash: TransactionRefreshHash;
-      onReplaced?: (response: unknown) => void;
-    }) => Promise<TReceipt>;
-    // Keep the callback non-enumerable so legacy test doubles (and logging
-    // wrappers) that compare the public request shape still see `{ hash }`,
-    // while viem can read the optional callback normally.
-    const waitRequest: EvmWaitInput = { hash };
-    Object.defineProperty(waitRequest, 'onReplaced', {
-      value: (response: unknown) => {
-        replacementState.current = replacementFromUnknown(response, hash);
-      },
-      enumerable: false,
-    });
-    receipt = await waitForTransactionReceipt(waitRequest);
+    const waitForTransactionReceipt = client.waitForTransactionReceipt as unknown as (
+      request: EvmWaitInput,
+    ) => Promise<TReceipt>;
+    receipt = await waitForTransactionReceipt(input);
   } catch (reason) {
     const detected = replacementState.current ?? replacementFromUnknown(reason, hash);
     if (detected) {
-      if (detected.reason === 'repriced') throw new TransactionReplacementPendingError(detected, reason);
+      if (detected.reason === 'repriced') {
+        throw new TransactionReplacementPendingError(detected, reason);
+      }
       throw new TransactionReplacementError(detected, reason);
     }
     throw reason;
   }
 
   const replacement = replacementState.current;
-  const actualHash = hashValue(receipt.transactionHash) ?? replacement?.replacementHash ?? hash;
+  const actualHash = hashValue(receipt.transactionHash)
+    ?? replacement?.replacementHash
+    ?? hash;
   if (replacement && replacement.reason !== 'repriced') {
-    throw new TransactionReplacementError({ ...replacement, replacementHash: actualHash }, undefined);
+    throw new TransactionReplacementError({
+      ...replacement,
+      replacementHash: actualHash,
+    });
   }
   if (actualHash.toLowerCase() !== hash.toLowerCase() && !replacement) {
     throw new TransactionReplacementError({
@@ -131,12 +146,26 @@ export async function waitForConfirmedEvmTransaction<TReceipt extends Transactio
       replacementHash: actualHash,
     });
   }
+
   return { receipt, hash: actualHash as TransactionRefreshHash, replacement };
 }
 
-export const TRANSACTION_REFRESH_RETRY_DELAYS_MS = [0, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 15_000, 20_000] as const;
+export const TRANSACTION_REFRESH_RETRY_DELAYS_MS = [
+  0,
+  500,
+  1_000,
+  2_000,
+  4_000,
+  8_000,
+  12_000,
+  15_000,
+  20_000,
+] as const;
 
-export type RetryOptions = { signal?: AbortSignal; delays?: readonly number[] };
+export type RetryOptions = {
+  signal?: AbortSignal;
+  delays?: readonly number[];
+};
 
 function abortError(signal?: AbortSignal) {
   if (signal?.reason instanceof Error) return signal.reason;
@@ -150,12 +179,17 @@ export function throwIfTransactionRefreshAborted(signal?: AbortSignal) {
 }
 
 export function isTransactionRefreshAborted(reason: unknown) {
-  return reason instanceof Error && (reason.name === 'AbortError' || reason.message === 'TRANSACTION_REFRESH_ABORTED');
+  return reason instanceof Error
+    && (reason.name === 'AbortError' || reason.message === 'TRANSACTION_REFRESH_ABORTED');
 }
 
-export function waitForTransactionRefresh(delayMs: number, signal?: AbortSignal) {
+export function waitForTransactionRefresh(
+  delayMs: number,
+  signal?: AbortSignal,
+) {
   throwIfTransactionRefreshAborted(signal);
   if (delayMs <= 0) return Promise.resolve();
+
   return new Promise<void>((resolve, reject) => {
     let settled = false;
     const timeout = globalThis.setTimeout(() => {
@@ -175,7 +209,15 @@ export function waitForTransactionRefresh(delayMs: number, signal?: AbortSignal)
   });
 }
 
-export async function retryTransactionRefresh(attempt: () => Promise<boolean>, options: RetryOptions = {}) {
+/**
+ * Runs a post-receipt refresh until the caller observes the expected state or
+ * the bounded retry window expires. The callback owns transient error
+ * handling; context changes should be thrown so they cannot be swallowed.
+ */
+export async function retryTransactionRefresh(
+  attempt: () => Promise<boolean>,
+  options: RetryOptions = {},
+) {
   const delays = options.delays ?? TRANSACTION_REFRESH_RETRY_DELAYS_MS;
   for (const delay of delays) {
     await waitForTransactionRefresh(delay, options.signal);

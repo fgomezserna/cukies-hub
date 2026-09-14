@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
   const response = await listLegacyCukiePoints({
     wallets,
     network: searchParams.get('network') ?? undefined,
+    chainId: searchParams.get('chainId') ?? undefined,
+    collection: searchParams.get('collection') ?? undefined,
     type: searchParams.get('type') ?? undefined,
     limit: Number(searchParams.get('limit') ?? 24),
     offset: Number(searchParams.get('offset') ?? 0),

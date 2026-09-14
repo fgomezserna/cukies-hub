@@ -7,6 +7,7 @@ jest.mock('@/lib/uki-marketplace/live', () => ({
 }));
 
 import {
+  listPublicUkiMarketplacePage,
   listPublicUkiMarketplaceOrders,
   listSellerUkiMarketplaceOrders,
   UkiMarketplaceUnavailableError,
@@ -82,12 +83,12 @@ function dependencies(input: {
     inspectOrders: jest.fn().mockResolvedValue(input.inspections ?? new Map()),
   };
   const runtime = input.ready === false
-    ? { ready: false, chainId: null, marketplaceAddress: null, rpcUrl: null, issues: ['missing'] }
+    ? { ready: false, chainId: null, marketplaceAddress: null, rpcUrls: [], issues: ['missing'] }
     : {
         ready: true,
         chainId: 97 as const,
         marketplaceAddress: marketplace as `0x${string}`,
-        rpcUrl: 'https://rpc.test.invalid/',
+        rpcUrls: ['https://rpc.test.invalid/'],
         issues: [],
       };
   return {
@@ -249,6 +250,187 @@ describe('UKI marketplace Stage service', () => {
     ).rejects.toBeInstanceOf(UkiMarketplaceUnavailableError);
   });
 
+  it('avanza el cursor después de candidatos live inválidos sin duplicar la página', async () => {
+    const invalid = order('b');
+    const validOne = order('c', { listedAt: new Date('2026-08-30T09:00:00.000Z') });
+    const validTwo = order('d', { listedAt: new Date('2026-08-30T08:00:00.000Z') });
+    const context = dependencies({
+      publicOrders: [invalid, validOne, validTwo],
+      inspections: new Map([
+        [invalid.orderId, inspection({ contractState: 5, ownerNormalized: buyer })],
+        [validOne.orderId, inspection()],
+        [validTwo.orderId, inspection()],
+      ]),
+    });
+    context.repository.listPublicCandidates
+      .mockImplementationOnce(async () => [invalid, validOne])
+      .mockImplementationOnce(async () => [validTwo]);
+
+    const result = await listPublicUkiMarketplacePage({ limit: 2 }, context.dependencies);
+
+    expect(result.orders.map(({ orderId }) => orderId)).toEqual([validOne.orderId, validTwo.orderId]);
+    expect(result.nextCursor).toBeTruthy();
+    expect(context.repository.listPublicCandidates).toHaveBeenCalledTimes(2);
+  });
+
+  it('propaga el orden por precio UKI y conserva la clave numérica en el cursor', async () => {
+    const cheap = order('1', { ukiPriceRaw: '9' });
+    const expensive = order('2', { ukiPriceRaw: '100' });
+    const context = dependencies({
+      publicOrders: [cheap, expensive],
+      inspections: new Map([
+        [cheap.orderId, inspection()],
+        [expensive.orderId, inspection()],
+      ]),
+    });
+    context.repository.listPublicCandidates.mockImplementation(
+      async ({ after }: { after?: { priceRaw?: string } }) => {
+        if (!after) return [cheap];
+        return after.priceRaw === '9' ? [expensive] : [];
+      },
+    );
+
+    const first = await listPublicUkiMarketplacePage(
+      { limit: 1, sort: 'price-asc' },
+      context.dependencies,
+    );
+
+    expect(first.orders.map(({ orderId }) => orderId)).toEqual([cheap.orderId]);
+    expect(first.nextCursor).toBeTruthy();
+    expect(context.repository.listPublicCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'price-asc' }),
+    );
+    const encoded = first.nextCursor as string;
+    const decoded = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as {
+      priceRaw?: string;
+    };
+    expect(decoded.priceRaw).toBe('9');
+
+    const second = await listPublicUkiMarketplacePage(
+      { limit: 1, cursor: first.nextCursor ?? undefined, sort: 'price-asc' },
+      context.dependencies,
+    );
+    expect(second.orders.map(({ orderId }) => orderId)).toEqual([expensive.orderId]);
+  });
+
+  it('aplica los filtros de tipo y generación UKI solo cuando la metadata los confirma', async () => {
+    const matching = order('3', { tokenId: '73' });
+    const unknown = order('4', { tokenId: '74' });
+    const context = dependencies({
+      publicOrders: [matching, unknown],
+      inspections: new Map([
+        [matching.orderId, inspection()],
+        [unknown.orderId, inspection()],
+      ]),
+      metadata: [{
+        chainId: 97,
+        collectionAddress: collection,
+        tokenId: '73',
+        imageUrl: null,
+        rarity: 'rare',
+        generation: 'second_generation',
+      }],
+    });
+
+    const result = await listPublicUkiMarketplacePage(
+      { limit: 10, type: 'rare', generation: 'second_generation' },
+      context.dependencies,
+    );
+
+    expect(result.orders.map(({ tokenId }) => tokenId)).toEqual(['73']);
+    expect(result.orders).not.toContainEqual(expect.objectContaining({ tokenId: '74' }));
+  });
+
+  it('continúa con el cursor cuando agota el presupuesto de lotes antes de un anuncio válido', async () => {
+    const invalid = Array.from({ length: 193 }, (_, index) =>
+      order((index + 1).toString(16).padStart(2, '0')),
+    );
+    const valid = order('fff', { listedAt: new Date('2026-08-29T08:00:00.000Z') });
+    const context = dependencies({
+      inspections: new Map([
+        ...invalid.map((candidate) => [candidate.orderId, inspection({ contractState: 5, ownerNormalized: buyer })] as const),
+        [valid.orderId, inspection()],
+      ]),
+    });
+    let call = 0;
+    context.repository.listPublicCandidates.mockImplementation(async ({ limit }: { limit: number }) => {
+      if (call < 8) {
+        const batch = invalid.slice(call * limit, (call + 1) * limit);
+        call += 1;
+        return batch;
+      }
+      call += 1;
+      return [valid];
+    });
+
+    const first = await listPublicUkiMarketplacePage({ limit: 24 }, context.dependencies);
+    expect(first.orders).toEqual([]);
+    expect(first.hasMore).toBe(true);
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await listPublicUkiMarketplacePage(
+      { limit: 24, cursor: first.nextCursor ?? undefined },
+      context.dependencies,
+    );
+    expect(second.orders.map(({ orderId }) => orderId)).toEqual([valid.orderId]);
+    expect(second.hasMore).toBe(false);
+    expect(call).toBe(9);
+  });
+
+  it('conserva la continuación después de más de ocho candidatos inválidos entre páginas', async () => {
+    const first = order('10');
+    const invalid = Array.from({ length: 8 }, (_, index) =>
+      order((0x20 + index).toString(16)),
+    );
+    const second = order('30', {
+      listedAt: new Date('2026-08-30T09:00:00.000Z'),
+    });
+    const context = dependencies({
+      inspections: new Map([
+        [first.orderId, inspection()],
+        ...invalid.map((candidate) => [
+          candidate.orderId,
+          inspection({ contractState: 5, ownerNormalized: buyer }),
+        ] as const),
+        [second.orderId, inspection()],
+      ]),
+    });
+    let call = 0;
+    context.repository.listPublicCandidates.mockImplementation(async () => {
+      if (call === 0) {
+        call += 1;
+        return [first];
+      }
+      if (call <= invalid.length) {
+        const candidate = invalid[call - 1];
+        call += 1;
+        return [candidate];
+      }
+      if (call === 10) {
+        call += 1;
+        return [];
+      }
+      call += 1;
+      return [second];
+    });
+
+    const firstPage = await listPublicUkiMarketplacePage(
+      { limit: 1 },
+      context.dependencies,
+    );
+    expect(firstPage.orders.map(({ orderId }) => orderId)).toEqual([first.orderId]);
+    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.nextCursor).toBeTruthy();
+
+    const secondPage = await listPublicUkiMarketplacePage(
+      { limit: 1, cursor: firstPage.nextCursor ?? undefined },
+      context.dependencies,
+    );
+    expect(secondPage.orders.map(({ orderId }) => orderId)).toEqual([second.orderId]);
+    expect(secondPage.hasMore).toBe(false);
+    expect(context.repository.listPublicCandidates).toHaveBeenCalledTimes(11);
+  });
+
   it('shows approval loss as requires_attention only in the authenticated seller view', async () => {
     const revoked = order('6');
     const transferred = order('7');
@@ -325,8 +507,18 @@ describe('UKI marketplace runtime boundary', () => {
       ready: true,
       chainId: 97,
       marketplaceAddress: marketplace,
-      rpcUrl: 'https://rpc.test.invalid/',
+      rpcUrls: ['https://rpc.test.invalid/'],
       issues: [],
+    });
+  });
+
+  it('preserves the fallback endpoints when the first RPC is unavailable', () => {
+    expect(resolveUkiMarketplaceRuntime({
+      ...base,
+      CHAIN_INDEXER_BSC_RPC_URLS: 'https://primary.invalid,https://secondary.invalid',
+    })).toMatchObject({
+      ready: true,
+      rpcUrls: ['https://primary.invalid/', 'https://secondary.invalid/'],
     });
   });
 

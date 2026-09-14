@@ -11,16 +11,15 @@ import {
   Crown,
   ExternalLink,
   Gamepad2,
-  Handshake,
   Trophy,
   Users,
 } from 'lucide-react';
 
 import {
   faqsByLocale,
+  getParticipationSteps,
+  getTransparencyItems,
   landingCopyByLocale,
-  participationStepsByLocale,
-  transparencyItemsByLocale,
   utilityCardsByLocale,
 } from './data';
 import { LandingFooter } from './footer';
@@ -35,11 +34,18 @@ import {
   useTreasureHuntCompetitionOverview,
 } from '@/hooks/use-treasure-hunt-competition-overview';
 import { TOKENOMICS_URL_BY_LOCALE } from '@/lib/public-locale';
+import {
+  landingNetworkConfig,
+  type LandingNetworkConfig,
+} from '@/lib/landing-network';
 import { formatTreasureHuntUkiRaw } from '@/lib/treasure-hunt-prize-pool';
 import { usePublicLocale } from '@/providers/public-locale-provider';
-import { isAmbassadorsPubliclyListed } from '@/lib/public-features';
 
-export function CukiesLanding() {
+export function CukiesLanding({
+  network = landingNetworkConfig,
+}: {
+  network?: LandingNetworkConfig;
+} = {}) {
   return (
     <main
       id="contenido-principal"
@@ -49,10 +55,10 @@ export function CukiesLanding() {
       <div className="uki-noise" />
       <div className="uki-grid-bg" />
       <LandingHeader />
-      <HeroSection />
-      <LaunchStatusStrip />
+      <HeroSection network={network} />
+      <LaunchStatusStrip network={network} />
       <div className="uki-section-divider" />
-      <ParticipationFlow />
+      <ParticipationFlow network={network} />
       <div className="uki-section-divider" />
       <CompetitionSpotlight />
       <div className="uki-section-divider" />
@@ -60,17 +66,11 @@ export function CukiesLanding() {
       <div className="uki-section-divider" />
       <StakingSection />
       <div className="uki-section-divider" />
-      {isAmbassadorsPubliclyListed() ? (
-        <>
-          <AmbassadorSection />
-          <div className="uki-section-divider" />
-        </>
-      ) : null}
       <CommunityOwnership />
       <div className="uki-section-divider" />
       <PresaleParticipants />
       <div className="uki-section-divider" />
-      <TransparencySection />
+      <TransparencySection network={network} />
       <div className="uki-section-divider" />
       <FaqAndCta />
       <LandingFooter />
@@ -78,7 +78,7 @@ export function CukiesLanding() {
   );
 }
 
-function HeroSection() {
+function HeroSection({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].hero;
 
@@ -96,27 +96,36 @@ function HeroSection() {
       <div className="uki-hero-vignette" />
       <div className="uki-container uki-hero-layout">
         <ScrollReveal animation="left" duration={900} className="uki-hero-content">
-          <p className="uki-launch-badge">{copy.badge}</p>
+          <p className="uki-launch-badge">
+            {copy.badge}
+          </p>
           <h1 className="uki-hero-title max-w-[13ch] text-balance">
             <span className="uki-hero-title-line">{copy.title}</span>
           </h1>
           <p className="mt-5 max-w-[34rem] text-lg font-semibold leading-relaxed text-[var(--uki-text)] sm:text-xl">
-            {copy.lead}
+            {network.swapUrl ? copy.lead : copy.leadUnavailable}
           </p>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <LandingButton href="/games/treasure-hunt">{copy.play}</LandingButton>
+            <LandingButton href="/games">{copy.play}</LandingButton>
             <LandingButton href="/cukie-master" variant="secondary">
               {copy.stake}
             </LandingButton>
           </div>
-          <a
-            href="#comprar-uki"
-            className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
-          >
-            {copy.buy}
-            <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
-          </a>
+          {network.swapUrl ? (
+            <a
+              href="#comprar-uki"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-gold)] transition hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
+            >
+              {copy.buy}
+              <ArrowRight className="h-4 w-4" strokeWidth={1.8} />
+            </a>
+          ) : (
+            <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[var(--uki-muted)]" aria-disabled="true">
+              {copy.buyUnavailable}
+              <CircleAlert className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+          )}
         </ScrollReveal>
 
         <ScrollReveal animation="right" duration={900} className="uki-hero-overview-wrap w-full">
@@ -127,22 +136,22 @@ function HeroSection() {
   );
 }
 
-function LaunchStatusStrip() {
+function LaunchStatusStrip({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].hero;
-  const items = [
-    [copy.pool, 'PancakeSwap V2'],
-    [copy.staking, copy.network],
-    [copy.lock, copy.lockValue],
+  const items: Array<[string, string, boolean]> = [
+    [copy.pool, network.liquidityPairAddress ? 'PancakeSwap V2' : copy.unavailable, Boolean(network.liquidityPairAddress)],
+    [copy.staking, network.stakingAddress ? copy.network : copy.unavailable, Boolean(network.stakingAddress)],
+    [copy.lock, network.liquidityLockerAddress ? network.liquidityUnlockLabel ?? copy.lockValue : copy.unavailable, Boolean(network.liquidityLockerAddress)],
   ];
 
   return (
     <section aria-label={copy.live} className="uki-container uki-facts-section">
       <ScrollReveal animation="fade" duration={700}>
-        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-cyan-border)] bg-[#0d0b24]/82 sm:grid-cols-3">
-          {items.map(([label, value]) => (
+        <div className="grid overflow-hidden rounded-[12px] border border-[var(--uki-lilac-border)] bg-[#0d0b24]/82 sm:grid-cols-3">
+          {items.map(([label, value, active]) => (
             <article key={label} className="flex items-center gap-3 border-b border-white/10 px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#65e2a2] shadow-[0_0_14px_rgba(101,226,162,0.55)]" />
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${active ? 'bg-[#65e2a2] shadow-[0_0_14px_rgba(101,226,162,0.55)]' : 'bg-white/25'}`} />
               <div>
                 <p className="uki-label">{label}</p>
                 <p className="mt-1 text-sm font-black text-[var(--uki-cream)]">{value}</p>
@@ -155,10 +164,10 @@ function LaunchStatusStrip() {
   );
 }
 
-function ParticipationFlow() {
+function ParticipationFlow({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].flow;
-  const steps = participationStepsByLocale[locale];
+  const steps = getParticipationSteps(locale, network);
 
   return (
     <section id="comprar" className="uki-container uki-home-section">
@@ -167,7 +176,7 @@ function ParticipationFlow() {
           eyebrow={copy.eyebrow}
           title={copy.title}
           subtitle={copy.subtitle}
-          tone="cyan"
+          tone="lilac"
           withRule
         />
       </ScrollReveal>
@@ -175,10 +184,10 @@ function ParticipationFlow() {
       <div className="mt-7 grid gap-4 lg:grid-cols-3">
         {steps.map(({ icon: Icon, ...step }, index) => (
           <ScrollReveal key={step.number} animation="up" delay={index * 120} className="h-full">
-            <article className="group flex h-full min-h-[19rem] flex-col overflow-hidden rounded-[14px] border border-white/10 bg-[#0c0b20]/88 p-5 transition duration-300 hover:-translate-y-1 hover:border-[var(--uki-cyan-border)] sm:p-6">
+            <article className="group flex h-full min-h-[19rem] flex-col overflow-hidden rounded-[14px] border border-white/10 bg-[#0c0b20]/88 p-5 transition duration-300 hover:-translate-y-1 hover:border-[var(--uki-lilac-border)] sm:p-6">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-black tracking-[0.2em] text-[var(--uki-muted)]">{step.number}</span>
-                <Icon className="h-10 w-10 rounded-[10px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 p-2.5 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+                <Icon className="h-10 w-10 rounded-[10px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/10 p-2.5 text-[var(--uki-lilac)]" strokeWidth={1.8} />
               </div>
               <h3 className="mt-8 max-w-[13ch] text-balance font-headline text-3xl font-black leading-none text-[var(--uki-cream)]">
                 {step.title}
@@ -186,15 +195,22 @@ function ParticipationFlow() {
               <p className="mt-4 max-w-[34rem] text-sm font-semibold leading-relaxed text-[var(--uki-muted)]">
                 {step.text}
               </p>
-              <a
-                href={step.href}
-                target={step.external ? '_blank' : undefined}
-                rel={step.external ? 'noreferrer' : undefined}
-                className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-gold)] transition group-hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
-              >
-                {step.action}
-                {step.external ? <ExternalLink className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-              </a>
+              {step.href ? (
+                <a
+                  href={step.href}
+                  target={step.external ? '_blank' : undefined}
+                  rel={step.external ? 'noreferrer' : undefined}
+                  className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-gold)] transition group-hover:text-[var(--uki-cream)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
+                >
+                  {step.action}
+                  {step.external ? <ExternalLink className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                </a>
+              ) : (
+                <span className="mt-auto inline-flex items-center gap-2 pt-7 text-sm font-black text-[var(--uki-muted)]" aria-disabled="true">
+                  {step.action}
+                  <CircleAlert className="h-4 w-4" />
+                </span>
+              )}
             </article>
           </ScrollReveal>
         ))}
@@ -223,12 +239,14 @@ function CompetitionSpotlight() {
   const isPersonalStatusLoading = isConnected && isLoading;
   const maxAttempts = campaign?.topAttemptsPerWallet ?? 10;
   const phase = status?.phase ?? 'unconfigured';
+  const isClosed = phase === 'closed';
   const prizePool = leaderboardMeta?.poolUkiRaw
     ? formatTreasureHuntUkiRaw(leaderboardMeta.poolUkiRaw, 1)
     : copy.loading;
   const attempts = eligibility
     ? eligibility.attemptsRemaining.toLocaleString(locale === 'es' ? 'es-ES' : 'en-GB')
     : copy.connect;
+  const attemptsLabel = phase === 'closed' ? copy.historicalAttempts : copy.attempts;
   const counted = eligibility
     ? `${eligibility.disqualified ? 0 : eligibility.topAttemptsCount}/${maxAttempts}`
     : `—/${maxAttempts}`;
@@ -236,7 +254,7 @@ function CompetitionSpotlight() {
   return (
     <section id="torneo" className="uki-container uki-home-section">
       <ScrollReveal animation="up" duration={900}>
-        <div className="relative overflow-hidden rounded-[18px] border border-[var(--uki-cyan-border)] bg-[#071312]">
+        <div className="relative overflow-hidden rounded-[18px] border border-[var(--uki-lilac-border)] bg-[#0d0914]">
           <Image
             src="/brand/generated/uki-treasure-hunt-cukie-scene-v1.png"
             alt=""
@@ -258,7 +276,7 @@ function CompetitionSpotlight() {
                 {copy.title}
               </h2>
               <p className="mt-5 max-w-[38rem] text-base font-semibold leading-relaxed text-[var(--uki-text)]">
-                {copy.text}
+                {isClosed ? copy.closedText : copy.text}
               </p>
               <CompetitionCountdown locale={locale} phase={phase} campaign={campaign} />
 
@@ -275,7 +293,7 @@ function CompetitionSpotlight() {
               ) : null}
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <LandingButton href="/games/treasure-hunt">{copy.play}</LandingButton>
+                <LandingButton href="/games/treasure-hunt">{isClosed ? copy.closedPlay : copy.play}</LandingButton>
                 <LandingButton href="/games/treasure-hunt/rankings" variant="secondary">
                   {copy.rankings}
                 </LandingButton>
@@ -285,12 +303,12 @@ function CompetitionSpotlight() {
             <dl className="grid gap-px overflow-hidden rounded-[12px] border border-white/15 bg-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.32)]">
               {[
                 [copy.prize, isLoading && !leaderboardMeta ? copy.loading : prizePool],
-                [copy.attempts, isPersonalStatusLoading ? copy.loading : attempts],
+                [attemptsLabel, isPersonalStatusLoading ? copy.loading : attempts],
                 [copy.counted, isPersonalStatusLoading ? copy.loading : counted],
               ].map(([label, value]) => (
                 <div key={label} className="bg-[#081614]/95 px-5 py-5 sm:px-6">
                   <dt className="uki-label">{label}</dt>
-                  <dd className="mt-2 truncate font-mono text-xl font-black text-[var(--uki-cyan)] sm:text-2xl" title={value}>
+                  <dd className="mt-2 truncate font-mono text-xl font-black text-[var(--uki-lilac)] sm:text-2xl" title={value}>
                     {value}
                   </dd>
                 </div>
@@ -367,7 +385,7 @@ function UtilitySection() {
           eyebrow={copy.eyebrow}
           title={copy.title}
           subtitle={copy.subtitle}
-          tone="cyan"
+          tone="lilac"
           withRule
         />
       </ScrollReveal>
@@ -432,50 +450,6 @@ function StakingSection() {
             </div>
             <p className="mt-4 text-xs font-semibold text-[var(--uki-muted)]">{copy.helper}</p>
           </div>
-        </div>
-      </ScrollReveal>
-    </section>
-  );
-}
-
-function AmbassadorSection() {
-  const { locale } = usePublicLocale();
-  const copy = landingCopyByLocale[locale].ambassadors;
-
-  return (
-    <section id="embajadores" className="uki-container uki-home-section">
-      <ScrollReveal animation="up">
-        <div className="grid overflow-hidden rounded-[18px] border border-[var(--uki-lilac)]/30 bg-[#130b1d]/88 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-          <div className="flex flex-col justify-center p-5 sm:p-8 lg:p-10">
-            <p className="uki-launch-badge inline-flex w-fit items-center gap-2">
-              <Handshake className="h-4 w-4" strokeWidth={1.8} />
-              {copy.badge}
-            </p>
-            <h2 className="mt-5 max-w-[17ch] text-balance font-headline text-4xl font-black leading-[1.02] text-[var(--uki-cream)] sm:text-5xl">
-              {copy.title}
-            </h2>
-            <p className="mt-5 max-w-2xl text-base font-semibold leading-relaxed text-[var(--uki-text)]">
-              {copy.text}
-            </p>
-            <p className="mt-5 flex items-start gap-2 text-sm font-bold leading-relaxed text-[var(--uki-lilac)]">
-              <Check className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
-              {copy.presale}
-            </p>
-            <div className="mt-7">
-              <LandingButton href="/embajadores">{copy.action}</LandingButton>
-            </div>
-          </div>
-
-          <dl className="grid border-t border-white/10 bg-[var(--uki-lilac)]/[0.055] sm:grid-cols-2 lg:grid-cols-1 lg:border-l lg:border-t-0">
-            <div className="flex flex-col justify-center border-b border-white/10 p-6 sm:border-b-0 sm:border-r lg:border-b lg:border-r-0 lg:p-8">
-              <dt className="uki-label">{copy.commissionLabel}</dt>
-              <dd className="mt-3 font-headline text-6xl font-black tracking-[-0.05em] text-[var(--uki-lilac)]">{copy.commission}</dd>
-            </div>
-            <div className="flex flex-col justify-center p-6 lg:p-8">
-              <dt className="uki-label">{copy.relationLabel}</dt>
-              <dd className="mt-3 font-headline text-4xl font-black tracking-[-0.04em] text-[var(--uki-cream)]">{copy.relation}</dd>
-            </div>
-          </dl>
         </div>
       </ScrollReveal>
     </section>
@@ -558,10 +532,10 @@ function PresaleParticipants() {
   );
 }
 
-function TransparencySection() {
+function TransparencySection({ network }: { network: LandingNetworkConfig }) {
   const { locale } = usePublicLocale();
   const copy = landingCopyByLocale[locale].transparency;
-  const items = transparencyItemsByLocale[locale];
+  const items = getTransparencyItems(locale, network);
 
   return (
     <section id="transparencia" className="uki-container uki-home-section">
@@ -570,7 +544,7 @@ function TransparencySection() {
           eyebrow={copy.eyebrow}
           title={copy.title}
           subtitle={copy.subtitle}
-          tone="cyan"
+          tone="lilac"
           withRule
         />
       </ScrollReveal>
@@ -581,10 +555,10 @@ function TransparencySection() {
               href={item.href}
               target="_blank"
               rel="noreferrer"
-              className="group grid min-h-[9rem] grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[12px] border border-white/10 bg-[#0b0a1c]/82 p-5 transition duration-300 hover:border-[var(--uki-cyan-border)] hover:bg-[#100e29] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-cyan)]"
+              className="group grid min-h-[9rem] grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[12px] border border-white/10 bg-[#0b0a1c]/82 p-5 transition duration-300 hover:border-[var(--uki-lilac-border)] hover:bg-[#100e29] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uki-lilac)]"
               aria-label={`${item.label}: ${copy.open}`}
             >
-              <Icon className="h-10 w-10 rounded-[9px] border border-[var(--uki-cyan-border)] bg-[var(--uki-cyan)]/10 p-2.5 text-[var(--uki-cyan)]" strokeWidth={1.8} />
+              <Icon className="h-10 w-10 rounded-[9px] border border-[var(--uki-lilac-border)] bg-[var(--uki-lilac)]/10 p-2.5 text-[var(--uki-lilac)]" strokeWidth={1.8} />
               <div className="min-w-0">
                 <p className="uki-label">{item.label}</p>
                 <p className="mt-2 truncate font-mono text-sm font-black text-[var(--uki-cream)] sm:text-base" title={item.value}>
@@ -597,6 +571,11 @@ function TransparencySection() {
           </ScrollReveal>
         ))}
       </div>
+      {items.length === 0 ? (
+        <p className="mt-7 rounded-[10px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm font-semibold text-[var(--uki-muted)]">
+          {copy.empty}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -609,7 +588,7 @@ function FaqAndCta() {
   return (
     <section id="faq" className="uki-container uki-home-section">
       <ScrollReveal animation="fade">
-        <SectionHeading eyebrow={copy.eyebrow} title={copy.title} tone="cyan" withRule />
+        <SectionHeading eyebrow={copy.eyebrow} title={copy.title} tone="lilac" withRule />
       </ScrollReveal>
       <div className="mt-7 grid gap-4 md:grid-cols-2">
         {faqs.map((faq, index) => (
@@ -625,7 +604,7 @@ function FaqAndCta() {
       </div>
 
       <ScrollReveal animation="up" delay={100}>
-        <div className="mt-5 grid gap-6 overflow-hidden rounded-[16px] border border-[var(--uki-cyan-border)] bg-[radial-gradient(circle_at_80%_20%,rgba(56,239,226,0.12),transparent_34%),#0c0b20] p-5 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center lg:p-10">
+        <div className="mt-5 grid gap-6 overflow-hidden rounded-[16px] border border-[var(--uki-lilac-border)] bg-[radial-gradient(circle_at_80%_20%,rgba(228, 92, 255,0.12),transparent_34%),#0c0b20] p-5 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center lg:p-10">
           <div>
             <h2 className="max-w-[18ch] text-balance font-headline text-3xl font-black leading-tight text-[var(--uki-cream)] sm:text-4xl">
               {copy.ctaTitle}

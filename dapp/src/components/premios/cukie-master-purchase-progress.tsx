@@ -69,7 +69,7 @@ const slotClassByState: Record<CukieMasterPurchaseSlotState, string> = {
 };
 
 const dotClassByState: Record<CukieMasterPurchaseSlotState, string> = {
-  achieved: 'bg-[var(--uki-cyan)]',
+  achieved: 'bg-[var(--uki-lilac)]',
   next: 'bg-[var(--uki-gold)]',
   locked: 'bg-white/15',
 };
@@ -140,7 +140,7 @@ export function CukieMasterPurchaseProgress({
     <section className="mt-4 border-t border-white/[0.08] pt-4" aria-labelledby="cukie-master-progress-title">
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[var(--uki-cyan)]">
+          <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-[var(--uki-lilac)]">
             {copy.eyebrow}
           </p>
           <h3

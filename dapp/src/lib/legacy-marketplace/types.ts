@@ -26,6 +26,8 @@ export type LegacyCukiSkills = {
 export type LegacyMarketplaceCukiReference = {
   id: string;
   tokenId: string;
+  chainId?: number | null;
+  collectionAddress?: string | null;
   cukiNumber: number | null;
   network: LegacyCukiNetwork | string | null;
   birthNetwork: string | null;
@@ -50,8 +52,16 @@ export type LegacyMarketplaceCukiHistoryEntry = {
 export type LegacyMarketplaceCukiItem = {
   id: string;
   tokenId: string;
+  chainId: number | null;
+  collectionAddress: string | null;
   cukiNumber: number | null;
   owner: string | null;
+  ownerNormalized?: string | null;
+  identityVerified?: boolean;
+  ownershipVerified?: boolean;
+  ownershipSource?: 'legacy-ownerOf';
+  eligibilityVerified?: boolean;
+  eligibilitySource?: 'legacy-getNumBreedsByCukie';
   network: LegacyCukiNetwork | string;
   origin: string | null;
   birthNetwork: string | null;
@@ -68,6 +78,7 @@ export type LegacyMarketplaceCukiItem = {
   children: LegacyMarketplaceCukiReference[];
   history: LegacyMarketplaceCukiHistoryEntry[];
   timestamp: number | null;
+  catalogOffset?: number;
 };
 
 export type LegacyMarketplaceFacet = {
@@ -99,12 +110,19 @@ export type LegacyMarketplaceListParams = {
   type?: string;
   generation?: string;
   owner?: string;
+  chainId?: number | string;
+  collection?: string;
   sort?: string;
+  marketplaceOnly?: boolean;
+  includeFacets?: boolean;
+  hydrateRelations?: boolean;
 };
 
 export type LegacyBreedingCandidatesParams = {
   owner?: string;
   network?: string;
+  chainId?: number | string;
+  collection?: string;
   maxBreeds?: number;
   limit?: number;
 };
@@ -114,12 +132,17 @@ export type LegacyBreedingCandidatesResponse = {
   items: LegacyMarketplaceCukiItem[];
   total: number;
   maxBreeds: number | null;
+  status?: LegacyBreedingReadStatus;
   error?: string;
 };
+
+export type LegacyBreedingReadStatus = 'verified' | 'partial' | 'unknown';
 
 export type LegacyCompletedBreedsParams = {
   wallets?: string[];
   network?: string;
+  chainId?: number | string;
+  collection?: string;
   limit?: number;
   offset?: number;
 };
@@ -130,12 +153,15 @@ export type LegacyCompletedBreedsResponse = {
   total: number;
   offset: number;
   limit: number;
+  status?: LegacyBreedingReadStatus;
   error?: string;
 };
 
 export type LegacyCukiePointsParams = {
   wallets?: string[];
   network?: string;
+  chainId?: number | string;
+  collection?: string;
   type?: string;
   limit?: number;
   offset?: number;
@@ -163,17 +189,12 @@ export type LegacyCukiePointsSummary = {
 };
 
 export type LegacyCukiePointsResponse = {
-  source: 'mongo' | 'empty';
+  source: 'mongo' | 'legacy' | 'empty';
   items: LegacyCukiePointsTransaction[];
   total: number;
   offset: number;
   limit: number;
   summary: LegacyCukiePointsSummary;
-  /**
-   * The legacy collection is a historical read model. Keep that fact in the
-   * response so public consumers do not mistake indexed rows for a complete
-   * current on-chain projection.
-   */
   status?: 'verified' | 'partial' | 'unknown';
   coverage?: 'current' | 'legacy-historical' | 'unavailable';
   error?: string;
