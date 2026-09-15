@@ -177,6 +177,7 @@ class FakeDestination implements BscBridgeDestination {
   owner: Address | null = null;
   blockNumber = 0;
   inspection: SubmissionInspection = { state: 'pending' };
+  inspectionError: Error | null = null;
   submitCount = 0;
   submitFailures = 0;
 
@@ -199,6 +200,7 @@ class FakeDestination implements BscBridgeDestination {
   }
 
   async inspect() {
+    if (this.inspectionError) throw this.inspectionError;
     return this.inspection;
   }
 
@@ -276,6 +278,30 @@ describe('BridgeRelayerEngine', () => {
     );
     assert.equal(destination.submitCount, 1);
     assert.match(store.jobs.get(request().transferId)?.lastError ?? '', /ambigua/);
+  });
+
+  it('pasa un error RPC al inspeccionar un submitted a revision manual sin reintentar', async () => {
+    const { store, destination, engine } = fixture();
+    const now = new Date('2026-08-30T12:00:00.000Z');
+    await store.upsertRequests([request()], now);
+    assert.equal((await engine.processNext(now))?.outcome, 'submitted');
+    assert.equal(destination.submitCount, 1);
+
+    // The destination may already have mined the mint when receipt lookup
+    // fails; resubmitting would risk a duplicate legacy jumpOutBridge call.
+    destination.tokenExistsState = true;
+    destination.inspectionError = new Error('receipt RPC transport failure');
+
+    assert.equal(
+      (await engine.processNext(new Date(now.getTime() + 1_000)))?.outcome,
+      'manual_review',
+    );
+    assert.equal(destination.submitCount, 1);
+    assert.equal(store.jobs.get(request().transferId)?.status, 'manual_review');
+    assert.match(
+      store.jobs.get(request().transferId)?.lastError ?? '',
+      /inspeccionar.*revision manual/i,
+    );
   });
 
   it('retries definite transient failures with backoff and respects maxAttempts', async () => {

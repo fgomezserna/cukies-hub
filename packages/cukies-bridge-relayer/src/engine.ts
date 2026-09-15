@@ -135,10 +135,20 @@ export class BridgeRelayerEngine {
       throw new ManualReviewBridgeError('Job submitted sin txHash o submittedAt.');
     }
 
-    const inspection = await this.destination.inspect(
-      job.destinationTxHash,
-      job.request,
-    );
+    let inspection: SubmissionInspection;
+    try {
+      inspection = await this.destination.inspect(
+        job.destinationTxHash,
+        job.request,
+      );
+    } catch (error) {
+      // A receipt/RPC failure cannot prove whether the destination mint was
+      // mined. Never turn an ambiguous submitted job into retry, because the
+      // retry path would call jumpOutBridge again.
+      throw new ManualReviewBridgeError(
+        `No se pudo inspeccionar la transaccion BSC; requiere revision manual: ${message(error)}`,
+      );
+    }
     if (inspection.state === 'pending') {
       if (now.getTime() - job.submittedAt.getTime() >= this.config.submittedTimeoutMs) {
         throw new ManualReviewBridgeError(

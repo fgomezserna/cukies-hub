@@ -199,15 +199,16 @@ export function buildBridgeRelayerConfig(
   const env = envSchema.parse(environment);
   if (!enabled(env.CUKIES_BRIDGE_RELAYER_ENABLED)) return { enabled: false };
 
-  // El Dockerfile compartido declara NEXT_PUBLIC_APP_ENV para todos los
-  // servicios. En el relayer puede existir vacio si no se paso el build arg;
-  // ese valor no debe ocultar el APP_ENV de runtime.
-  const appEnv = env.NEXT_PUBLIC_APP_ENV?.trim() || env.APP_ENV?.trim();
+  const appEnv = env.APP_ENV?.trim();
+  const publicAppEnv = env.NEXT_PUBLIC_APP_ENV?.trim();
   if (appEnv !== 'production') {
     throw new Error('El relayer legacy exige APP_ENV=production.');
   }
-  if (enabled(env.STAGING_ONLY_GUARD ?? 'false')) {
-    throw new Error('El relayer legacy exige STAGING_ONLY_GUARD=false.');
+  if (publicAppEnv && publicAppEnv !== appEnv) {
+    throw new Error('APP_ENV y NEXT_PUBLIC_APP_ENV deben coincidir.');
+  }
+  if (env.STAGING_ONLY_GUARD !== 'false') {
+    throw new Error('El relayer legacy exige STAGING_ONLY_GUARD=false exacto.');
   }
   if (env.CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM !== EXECUTION_CONFIRM) {
     throw new Error('Falta la confirmacion exacta de ejecucion del relayer mainnet legacy.');

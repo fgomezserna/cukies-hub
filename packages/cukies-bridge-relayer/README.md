@@ -32,8 +32,11 @@ no se pueden sustituir por configuración.
 
 La consulta `ownerOf(tokenId)` se usa como sonda de existencia porque el NFT
 legacy no expone un `exists()` público. El revert conocido de token inexistente
-se interpreta como ausencia; cualquier fallo RPC o de transporte es
-indeterminado, se reintenta y nunca habilita un mint a ciegas.
+se interpreta como ausencia; un fallo RPC o de transporte en esa sonda deja el
+trabajo reintentable, pero nunca habilita un mint a ciegas. Si el trabajo ya
+está `submitted`, cualquier error al inspeccionar el receipt se marca como
+`manual_review`: el relayer no reintenta ni vuelve a llamar a `jumpOutBridge`
+cuando no puede probar si la primera transacción llegó a minarse.
 
 Los trabajos tienen leases atómicos, backoff, DLQ y revisión manual. Una
 transacción BSC cuyo receipt sea ambiguo no se reenvía automáticamente.
@@ -53,9 +56,18 @@ aprobado; no se debe automatizar en CI.
 ## Configuración de producción
 
 El servicio está en el profile Docker `bridge-relayer` y permanece apagado
-salvo que se habilite explícitamente. La configuración activa exige:
+salvo que se habilite explícitamente. El Compose oficial mantiene
+`CUKIES_BRIDGE_RELAYER_ENABLED=false` por defecto y sus valores de seguridad
+para Stage (`TRON Nile` y `BSC 97`); esos defaults no pueden activar este
+relayer mainnet: la configuración los rechaza antes de abrir Mongo o RPC.
+El relayer no forma parte del runtime Stage (incluido el overlay híbrido). La
+única ejecución de producción prevista es el contenedor dedicado `CT2050`,
+fuera del Compose Stage, con una release y secretos de producción revisados.
+
+La configuración activa exige:
 
 - `APP_ENV=production` y `STAGING_ONLY_GUARD=false`;
+- si se inyecta `NEXT_PUBLIC_APP_ENV`, debe ser también `production`;
 - `CUKIES_BRIDGE_RELAYER_ENABLED=true`;
 - `CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM=ENABLE_TRON_MAINNET_TO_BSC_MAINNET_LEGACY_RELAYER`;
 - Mongo privado con base `cukieshub-new`;

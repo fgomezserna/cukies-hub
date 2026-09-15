@@ -55,6 +55,35 @@ describe('buildBridgeRelayerConfig', () => {
     assert.equal(config.tronStartTimestampMs, 1_788_000_000_000);
   });
 
+  it('exige APP_ENV de runtime y rechaza el conflicto con NEXT_PUBLIC_APP_ENV', () => {
+    assert.throws(
+      () => buildBridgeRelayerConfig({
+        ...validEnvironment(),
+        APP_ENV: 'staging',
+      }),
+      /APP_ENV=production/,
+    );
+    assert.throws(
+      () => buildBridgeRelayerConfig({
+        ...validEnvironment(),
+        NEXT_PUBLIC_APP_ENV: 'staging',
+      }),
+      /APP_ENV y NEXT_PUBLIC_APP_ENV deben coincidir/,
+    );
+  });
+
+  it('exige STAGING_ONLY_GUARD exactamente false y rechaza valores ambiguos', () => {
+    for (const value of [undefined, '', 'true', '0', 'FALSE', 'false ']) {
+      assert.throws(
+        () => buildBridgeRelayerConfig({
+          ...validEnvironment(),
+          STAGING_ONLY_GUARD: value,
+        }),
+        /STAGING_ONLY_GUARD=false exacto/,
+      );
+    }
+  });
+
   it('rechaza testnet, base incorrecta y ausencia de confirmacion explicita', () => {
     assert.throws(
       () => buildBridgeRelayerConfig({
