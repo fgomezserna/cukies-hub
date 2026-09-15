@@ -1,6 +1,6 @@
 import { isAddress, type Address } from 'viem';
 
-export type CukiesBridgeMode = 'disabled' | 'testnet' | 'legacy-readonly';
+export type CukiesBridgeMode = 'disabled' | 'testnet' | 'mainnet';
 export type CukiesBridgeEnvironment = Partial<Record<
   | 'APP_ENV'
   | 'NEXT_PUBLIC_APP_ENV'
@@ -12,7 +12,8 @@ export type CukiesBridgeEnvironment = Partial<Record<
   | 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK'
   | 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL'
   | 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS'
-  | 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS',
+  | 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS'
+  | 'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID',
   string | undefined
 >>;
 
@@ -20,7 +21,6 @@ export type CukiesBridgeRuntimeConfig = Readonly<{
   appEnv: 'staging' | 'production' | 'unknown';
   mode: CukiesBridgeMode;
   enabled: boolean;
-  operationsEnabled: boolean;
   bsc: Readonly<{
     chainId: 56 | 97 | null;
     networkLabel: string;
@@ -44,9 +44,29 @@ const BSC_TESTNET_EVENT_FIXTURE = '0x6e29448282bcc1c568ec9450bef50a01d67845c2';
 const TRON_MAINNET_COLLECTION = 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe';
 const TRON_MAINNET_ENDPOINT = 'TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ';
 const TRON_ADDRESS_PATTERN = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
+const TRON_CANONICAL_IDENTITY_BLOCKER =
+  'Bridge Testnet desactivado hasta materializar _id y coleccion canonicos para Cukies TRON';
 
 function value(environment: CukiesBridgeEnvironment, key: keyof CukiesBridgeEnvironment) {
   return environment[key]?.trim() || null;
+}
+
+function agreedValue(
+  environment: CukiesBridgeEnvironment,
+  keys: readonly (keyof CukiesBridgeEnvironment)[],
+) {
+  const declarations = keys
+    .map((key) => value(environment, key))
+    .filter((declaration): declaration is string => declaration !== null);
+
+  if (
+    declarations.length === 0
+    || !declarations.every((declaration) => declaration === declarations[0])
+  ) {
+    return null;
+  }
+
+  return declarations[0];
 }
 
 function evmAddress(
@@ -100,82 +120,106 @@ export function buildCukiesBridgeRuntimeConfig(
   environment: CukiesBridgeEnvironment,
 ): CukiesBridgeRuntimeConfig {
   const issues: string[] = [];
-  const rawAppEnv = value(environment, 'NEXT_PUBLIC_APP_ENV') ?? value(environment, 'APP_ENV');
+  const appEnvDeclaration = value(environment, 'APP_ENV');
+  const publicAppEnvDeclaration = value(environment, 'NEXT_PUBLIC_APP_ENV');
+  const rawAppEnv = agreedValue(environment, ['APP_ENV', 'NEXT_PUBLIC_APP_ENV']);
   const appEnv = rawAppEnv === 'staging' || rawAppEnv === 'production'
     ? rawAppEnv
     : 'unknown';
-  const rawMode = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_MODE')
-    ?? (appEnv === 'staging' ? 'legacy-readonly' : 'disabled');
-  const mode: CukiesBridgeMode = rawMode === 'testnet' || rawMode === 'legacy-readonly'
+  const rawMode = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_MODE') ?? 'disabled';
+  const mode: CukiesBridgeMode = rawMode === 'testnet' || rawMode === 'mainnet'
     ? rawMode
     : 'disabled';
-  if (!['disabled', 'testnet', 'legacy-readonly'].includes(rawMode)) {
-    issues.push(
-      'NEXT_PUBLIC_CUKIES_BRIDGE_MODE debe ser disabled, testnet o legacy-readonly',
-    );
+  if (!['disabled', 'testnet', 'mainnet'].includes(rawMode)) {
+    issues.push('NEXT_PUBLIC_CUKIES_BRIDGE_MODE debe ser disabled, testnet o mainnet');
   }
 
-  const rawChainId = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID')
-    ?? (mode === 'legacy-readonly'
-      ? '56'
-      : value(environment, 'NEXT_PUBLIC_UKI_CHAIN_ID'));
+  const bridgeChainDeclaration = value(
+    environment,
+    'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID',
+  );
+  const publicChainDeclaration = value(environment, 'NEXT_PUBLIC_UKI_CHAIN_ID');
+  const indexerChainDeclaration = value(
+    environment,
+    'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID',
+  );
+  const rawChainId = agreedValue(environment, [
+    'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID',
+    'NEXT_PUBLIC_UKI_CHAIN_ID',
+    'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID',
+  ]);
   const parsedChainId = rawChainId && /^\d+$/.test(rawChainId) ? Number(rawChainId) : null;
   const chainId = parsedChainId === 56 || parsedChainId === 97 ? parsedChainId : null;
-  const rawTronNetwork = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK')
-    ?? (mode === 'legacy-readonly' ? 'mainnet' : null);
+  const rawTronNetwork = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK');
   const tronNetwork = rawTronNetwork === 'nile' || rawTronNetwork === 'mainnet'
     ? rawTronNetwork
     : null;
 
-  const configuredCollectionAddress = evmAddress(
+  const collectionAddress = evmAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS',
     issues,
   );
-  const configuredEndpointAddress = evmAddress(
+  const endpointAddress = evmAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS',
     issues,
   );
-  const configuredTronCollectionAddress = tronAddress(
+  const tronCollectionAddress = tronAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS',
     issues,
   );
-  const configuredTronEndpointAddress = tronAddress(
+  const tronEndpointAddress = tronAddress(
     environment,
     'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS',
     issues,
   );
 
   const expectedTestnet = mode === 'testnet';
-  const expectedLegacyReadonly = mode === 'legacy-readonly';
-  const collectionAddress = configuredCollectionAddress
-    ?? (expectedLegacyReadonly ? BSC_MAINNET_COLLECTION as Address : null);
-  const endpointAddress = configuredEndpointAddress
-    ?? (expectedLegacyReadonly ? BSC_MAINNET_ENDPOINT as Address : null);
-  const tronCollectionAddress = configuredTronCollectionAddress
-    ?? (expectedLegacyReadonly ? TRON_MAINNET_COLLECTION : null);
-  const tronEndpointAddress = configuredTronEndpointAddress
-    ?? (expectedLegacyReadonly ? TRON_MAINNET_ENDPOINT : null);
-  const expectedTronOrigin = expectedTestnet
-    ? 'https://nile.trongrid.io'
-    : expectedLegacyReadonly
-      ? 'https://api.trongrid.io'
+  const expectedMainnet = mode === 'mainnet';
+  const expectedTronOrigin = expectedMainnet
+    ? 'https://api.trongrid.io'
+    : expectedTestnet
+      ? 'https://nile.trongrid.io'
       : null;
-  const configuredTronRpc = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL')
-    ?? expectedTronOrigin;
+  const configuredTronRpc = value(environment, 'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL');
   const tronRpcUrl = expectedTronOrigin
     ? exactHttpsOrigin(configuredTronRpc, expectedTronOrigin)
     : null;
 
-  if (expectedTestnet) {
-    const expectedAppEnv = 'staging';
-    const expectedChainId = 97;
-    const expectedTronNetwork = 'nile';
+  if (mode !== 'disabled') {
+    const expectedAppEnv = expectedMainnet ? 'production' : 'staging';
+    const expectedChainId = expectedMainnet ? 56 : 97;
+    const expectedTronNetwork = expectedMainnet ? 'mainnet' : 'nile';
 
+    if (
+      appEnvDeclaration
+      && publicAppEnvDeclaration
+      && appEnvDeclaration !== publicAppEnvDeclaration
+    ) {
+      issues.push('APP_ENV y NEXT_PUBLIC_APP_ENV deben coincidir');
+    }
     if (appEnv !== expectedAppEnv) {
       issues.push(`${mode} requiere APP_ENV=${expectedAppEnv}`);
+    }
+    if (
+      bridgeChainDeclaration
+      && publicChainDeclaration
+      && bridgeChainDeclaration !== publicChainDeclaration
+    ) {
+      issues.push(
+        'NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID y NEXT_PUBLIC_UKI_CHAIN_ID deben coincidir',
+      );
+    }
+    if (
+      indexerChainDeclaration
+      && [bridgeChainDeclaration, publicChainDeclaration]
+        .some((declaration) => declaration && declaration !== indexerChainDeclaration)
+    ) {
+      issues.push(
+        'CHAIN_INDEXER_BSC_EXPECTED_CHAIN_ID debe coincidir con la chain del bridge y la dapp',
+      );
     }
     if (chainId !== expectedChainId) {
       issues.push(`${mode} requiere BSC chain ${expectedChainId}`);
@@ -188,46 +232,17 @@ export function buildCukiesBridgeRuntimeConfig(
         `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL debe ser ${expectedTronOrigin}`,
       );
     }
-    if (!configuredCollectionAddress) {
+    if (!collectionAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS');
     }
-    if (!configuredEndpointAddress) {
+    if (!endpointAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS');
     }
-    if (!configuredTronCollectionAddress) {
+    if (!tronCollectionAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS');
     }
-    if (!configuredTronEndpointAddress) {
+    if (!tronEndpointAddress) {
       issues.push('Falta NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS');
-    }
-  }
-
-  if (expectedLegacyReadonly) {
-    if (appEnv !== 'staging' && appEnv !== 'production') {
-      issues.push('legacy-readonly requiere APP_ENV=staging o production');
-    }
-    if (chainId !== 56) {
-      issues.push('legacy-readonly requiere BSC chain 56');
-    }
-    if (tronNetwork !== 'mainnet') {
-      issues.push('legacy-readonly requiere TRON mainnet');
-    }
-    if (!tronRpcUrl) {
-      issues.push(
-        `NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL debe ser ${expectedTronOrigin}`,
-      );
-    }
-    if (collectionAddress?.toLowerCase() !== BSC_MAINNET_COLLECTION) {
-      issues.push('legacy-readonly requiere la coleccion Legacy BSC mainnet');
-    }
-    if (endpointAddress?.toLowerCase() !== BSC_MAINNET_ENDPOINT) {
-      issues.push('legacy-readonly requiere el bridge Legacy BSC mainnet');
-    }
-    if (tronCollectionAddress !== TRON_MAINNET_COLLECTION) {
-      issues.push('legacy-readonly requiere la coleccion Legacy TRON mainnet');
-    }
-    if (tronEndpointAddress !== TRON_MAINNET_ENDPOINT) {
-      issues.push('legacy-readonly requiere el bridge Legacy TRON mainnet');
     }
   }
 
@@ -243,6 +258,9 @@ export function buildCukiesBridgeRuntimeConfig(
   }
 
   if (expectedTestnet) {
+    // El proyector actual conserva `_id === tokenId` en TRON. Sin una identidad
+    // compuesta acreditada no es seguro ejecutar el contrato configurado por tokenId.
+    issues.push(TRON_CANONICAL_IDENTITY_BLOCKER);
     const normalizedBscCollection = collectionAddress?.toLowerCase();
     const normalizedBscEndpoint = endpointAddress?.toLowerCase();
     if (normalizedBscCollection === BSC_MAINNET_COLLECTION) {
@@ -262,20 +280,48 @@ export function buildCukiesBridgeRuntimeConfig(
     }
   }
 
+  if (expectedMainnet) {
+    // Production is deliberately pinned to the deployed legacy contracts. A
+    // typo or a testnet fixture must disable the bridge rather than silently
+    // sending an NFT to a different endpoint.
+    if (
+      collectionAddress
+      && collectionAddress.toLowerCase() !== BSC_MAINNET_COLLECTION
+    ) {
+      issues.push('Produccion exige la coleccion Cukies legacy de BSC mainnet');
+    }
+    if (
+      endpointAddress
+      && endpointAddress.toLowerCase() !== BSC_MAINNET_ENDPOINT
+    ) {
+      issues.push('Produccion exige el bridge Cukies legacy de BSC mainnet');
+    }
+    if (
+      tronCollectionAddress
+      && tronCollectionAddress !== TRON_MAINNET_COLLECTION
+    ) {
+      issues.push('Produccion exige la coleccion Cukies legacy de TRON mainnet');
+    }
+    if (
+      tronEndpointAddress
+      && tronEndpointAddress !== TRON_MAINNET_ENDPOINT
+    ) {
+      issues.push('Produccion exige el bridge Cukies legacy de TRON mainnet');
+    }
+  }
+
   const enabled = mode !== 'disabled' && issues.length === 0;
-  const operationsEnabled = mode === 'testnet' && enabled;
 
   return Object.freeze({
     appEnv,
     mode,
     enabled,
-    operationsEnabled,
     bsc: Object.freeze({
       chainId,
       networkLabel: chainId === 97
         ? 'BSC Testnet'
         : chainId === 56
-          ? 'BNB Smart Chain'
+          ? 'BNB Smart Chain Mainnet'
           : 'BSC sin configurar',
       collectionAddress,
       endpointAddress,
@@ -299,24 +345,3 @@ export function buildCukiesBridgeRuntimeConfig(
     issues: Object.freeze(issues),
   });
 }
-
-export const cukiesBridgeRuntimeConfig = buildCukiesBridgeRuntimeConfig({
-  NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
-  APP_ENV: process.env.APP_ENV,
-  NEXT_PUBLIC_UKI_CHAIN_ID: process.env.NEXT_PUBLIC_UKI_CHAIN_ID,
-  NEXT_PUBLIC_CUKIES_BRIDGE_MODE: process.env.NEXT_PUBLIC_CUKIES_BRIDGE_MODE,
-  NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID:
-    process.env.NEXT_PUBLIC_CUKIES_BRIDGE_BSC_CHAIN_ID,
-  NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS:
-    process.env.NEXT_PUBLIC_CUKIES_BRIDGE_BSC_COLLECTION_ADDRESS,
-  NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS:
-    process.env.NEXT_PUBLIC_CUKIES_BRIDGE_BSC_ENDPOINT_ADDRESS,
-  NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK:
-    process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_NETWORK,
-  NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL:
-    process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL,
-  NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS:
-    process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_COLLECTION_ADDRESS,
-  NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS:
-    process.env.NEXT_PUBLIC_CUKIES_BRIDGE_TRON_ENDPOINT_ADDRESS,
-});

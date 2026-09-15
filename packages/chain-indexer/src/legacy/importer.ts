@@ -5,6 +5,11 @@ import { resolveMongoDatabaseNameFromUrl } from '../config/env.js';
 import { normalizeDomainEvent } from '../normalize.js';
 import type { ChainEvent, ChainName, EventName } from '../types.js';
 import type { IndexerStore } from '../storage/index.js';
+import { runtimeScopedStorageId } from '../storage/runtime-scope.js';
+import {
+  normalizeLegacyNetwork,
+  tryLegacyCukieIdentity,
+} from './identity.js';
 import {
   normalizeTronArgs,
   now,
@@ -62,7 +67,7 @@ type LegacyProcessedEvent = {
 };
 
 type LegacyCukiDocument = {
-  _id: string;
+  _id: string | number;
   img?: unknown;
   type?: unknown;
   cukiNumber?: unknown;
@@ -82,11 +87,10 @@ type LegacyCukiDocument = {
   timeStamp?: unknown;
 };
 
+const legacyMetadataNetworks = ['BSC', 'TRON', 'bsc', 'tron'] as const;
+
 function asChain(value: unknown): ChainName | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.toUpperCase();
-  if (normalized === 'BSC' || normalized === 'TRON') return normalized;
-  return null;
+  return normalizeLegacyNetwork(value);
 }
 
 function asEventName(value: unknown): EventName | null {
@@ -116,7 +120,7 @@ function parseLogIndex(document: LegacyProcessedEvent) {
   return 0;
 }
 
-function convertLegacyEvent(document: LegacyProcessedEvent): ChainEvent | null {
+export function convertLegacyEvent(document: LegacyProcessedEvent): ChainEvent | null {
   const chain = asChain(document.network);
   const eventName = asEventName(document.eventName);
   const contractAddress = document.contractAddress;
@@ -135,7 +139,10 @@ function convertLegacyEvent(document: LegacyProcessedEvent): ChainEvent | null {
   const createdAt = now();
 
   return {
-    _id: `${chain}:${contractAlias}:${eventName}:${txHash}:${logIndex}`,
+    _id: runtimeScopedStorageId(
+      'legacy',
+      `${chain}:${contractAlias}:${eventName}:${txHash}:${logIndex}`,
+    ),
     chain,
     contractAlias,
     contractAddress,
@@ -143,6 +150,7 @@ function convertLegacyEvent(document: LegacyProcessedEvent): ChainEvent | null {
     txHash,
     logIndex,
     blockNumber: Number(document.blockNumber ?? 0),
+    ...(chain === 'BSC' ? { chainId: 56 as const } : {}),
     timestampMs,
     args,
     normalized: normalizeDomainEvent(chain, eventName, contractAlias, argsRaw),
@@ -151,6 +159,7 @@ function convertLegacyEvent(document: LegacyProcessedEvent): ChainEvent | null {
       legacyId: String(document._id),
       ...document,
     }),
+    runtimeScope: 'legacy',
     status: 'ingested',
     attempts: 0,
     schemaVersion: 1,
@@ -238,50 +247,94 @@ function relationIds(value: unknown) {
   return ids.length > 0 ? ids : undefined;
 }
 
-function metadataSet(document: LegacyCukiDocument) {
+function metadataSet(document: LegacyCukiDocument, identity: NonNullable<ReturnType<typeof tryLegacyCukieIdentity>>) {
   return Object.fromEntries(
     Object.entries({
-      tokenId: String(document._id),
+      chain: identity.chain,
+      ...(identity.chainId === undefined ? {} : { chainId: identity.chainId }),
+      network: identity.network,
+      collectionAddress: identity.collectionAddress,
+      collectionAddressNormalized: identity.collectionAddressNormalized,
+      tokenId: identity.tokenId,
       img: document.img,
       type: document.type,
       cukiNumber: document.cukiNumber,
       skills: document.skills,
-      parents: relationIds(document.parents),
-      children: relationIds(document.children),
       numChildren: document.numChildren,
       numChildrenTron: document.numChildrenTron,
       numChildrenBsc: document.numChildrenBsc,
-      origin: document.origin,
-      birthNetwork: document.birthNetwork,
       needsMetadata: false,
       metadataSource: 'legacy.cukies',
-      metadataImportedAt: now(),
-      updatedAt: now(),
+      legacyProjectionKind: 'canonical',
     }).filter(([, value]) => value !== undefined),
   );
 }
 
-function normalizeLegacyOwner(network: unknown, owner: unknown) {
-  if (typeof owner !== 'string' || owner.length === 0) return undefined;
-  if (typeof network === 'string' && network.toUpperCase() === 'BSC') return owner.toLowerCase();
-  return owner.toUpperCase();
-}
-
-function legacyStateSet(document: LegacyCukiDocument) {
-  const owner = document.user;
-
+function metadataInsertSet(document: LegacyCukiDocument) {
   return Object.fromEntries(
     Object.entries({
-      user: owner,
-      owner,
-      ownerNormalized: normalizeLegacyOwner(document.network, owner),
-      network: document.network,
-      state: document.state,
-      price: document.price,
-      priceOriginal: document.priceOriginal,
-      timeStamp: document.timeStamp,
+      // These are source metadata defaults only. $setOnInsert is deliberate:
+      // a runtime event projection owns them once the canonical document exists.
+      parents: relationIds(document.parents),
+      children: relationIds(document.children),
+      origin: document.origin,
+      birthNetwork: document.birthNetwork,
     }).filter(([, value]) => value !== undefined),
   );
+}
+
+export type LegacyCukieMetadataUpdate = {
+  updateOne: {
+    filter: { _id: string };
+    update: {
+      $set: Record<string, unknown>;
+      $setOnInsert: Record<string, unknown>;
+    };
+    upsert: true;
+  };
+};
+
+/**
+ * Build the destination upsert for one validated numeric legacy source row.
+ * Ownership/state/event fields intentionally never occur in either update
+ * operator; callers can safely replay this operation against a projected NFT.
+ */
+export function buildLegacyCukieMetadataUpdate(
+  document: LegacyCukiDocument,
+  importedAt = now(),
+): LegacyCukieMetadataUpdate | null {
+  const identity = tryLegacyCukieIdentity(document.network, document._id);
+  if (!identity) return null;
+
+  return {
+    updateOne: {
+      filter: { _id: identity.documentId },
+      update: {
+        $set: metadataSet(document, identity),
+        $setOnInsert: {
+          _id: identity.documentId,
+          createdAt: importedAt,
+          metadataImportedAt: importedAt,
+          ...metadataInsertSet(document),
+        },
+      },
+      upsert: true,
+    },
+  };
+}
+
+export function legacyMetadataSourceFilter(): Document {
+  return {
+    network: { $in: legacyMetadataNetworks },
+    // The unified database contains destination documents with compound ids.
+    // Only numeric source snapshots are eligible, so a same-DB run cannot
+    // feed its own `${chain}:${network}:${collection}:${tokenId}` documents
+    // back into the importer.
+    $or: [
+      { _id: { $type: 'number' } },
+      { _id: { $type: 'string', $regex: /^\d+$/ } },
+    ],
+  };
 }
 
 export async function importLegacyCukiesMetadata(
@@ -299,7 +352,7 @@ export async function importLegacyCukiesMetadata(
     const legacyDb = client.db(legacyDbName);
     const cursor = legacyDb
       .collection<LegacyCukiDocument & Document>('cukies')
-      .find({})
+      .find(legacyMetadataSourceFilter())
       .sort({ _id: 1 })
       .limit(limit);
 
@@ -307,36 +360,14 @@ export async function importLegacyCukiesMetadata(
     let matched = 0;
     let modified = 0;
     let upserted = 0;
-    let batch: Array<LegacyCukiDocument & Document> = [];
+    let skipped = 0;
+    let batch: Array<LegacyCukieMetadataUpdate> = [];
 
     async function flush() {
       if (batch.length === 0) return;
 
       const result = await store.db.collection<{ _id: string }>('cukies').bulkWrite(
-        batch.flatMap((document) => [
-          {
-            updateOne: {
-              filter: { _id: String(document._id) },
-              update: {
-                $set: metadataSet(document),
-                $setOnInsert: {
-                  _id: String(document._id),
-                  createdAt: now(),
-                  ...legacyStateSet(document),
-                },
-              },
-              upsert: true,
-            },
-          },
-          {
-            updateOne: {
-              filter: { _id: String(document._id), lastEventId: { $exists: false } },
-              update: {
-                $set: legacyStateSet(document),
-              },
-            },
-          },
-        ]),
+        batch,
         { ordered: true },
       );
 
@@ -348,7 +379,12 @@ export async function importLegacyCukiesMetadata(
 
     for await (const document of cursor) {
       scanned += 1;
-      batch.push(document);
+      const update = buildLegacyCukieMetadataUpdate(document);
+      if (!update) {
+        skipped += 1;
+        continue;
+      }
+      batch.push(update);
 
       if (batch.length >= 1000) {
         await flush();
@@ -357,7 +393,7 @@ export async function importLegacyCukiesMetadata(
 
     await flush();
 
-    return { scanned, matched, modified, upserted };
+    return { scanned, matched, modified, upserted, skipped };
   } finally {
     await client.close();
   }

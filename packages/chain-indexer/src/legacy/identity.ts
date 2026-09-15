@@ -1,6 +1,98 @@
 import { LEGACY_CONTRACTS, legacyContractAddress, type LegacyContractAlias } from './contracts.js';
 import type { ChainEvent, ChainName } from '../types.js';
 
+export type LegacyCukieIdentity = {
+  /** Canonical chain label persisted on the materialized document. */
+  chain: ChainName;
+  /** BSC legacy is chain 56; TRON has no EVM chainId. */
+  chainId?: 56;
+  /** Canonical legacy network label persisted on the materialized document. */
+  network: ChainName;
+  /** Runtime identity segment (`56` for BSC or `mainnet` for TRON). */
+  networkKey: '56' | 'mainnet';
+  collectionAddress: string;
+  collectionAddressNormalized: string;
+  tokenId: string;
+  documentId: string;
+};
+
+/**
+ * Normalize a legacy network label without accepting testnet or arbitrary
+ * values. Legacy metadata is sourced from BSC mainnet (chain 56) and TRON
+ * mainnet only; the persisted `network` label remains BSC/TRON for consumers.
+ */
+export function normalizeLegacyNetwork(value: unknown): ChainName | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  return normalized === 'BSC' || normalized === 'TRON' ? normalized : null;
+}
+
+/**
+ * Return a canonical non-negative decimal token id. Numeric BSON ids are
+ * accepted when they are safe integers; strings with leading zeroes are
+ * canonicalized so they cannot create a second materialized document.
+ */
+export function normalizeLegacyTokenId(value: unknown): string | null {
+  if (typeof value === 'bigint') {
+    return value >= 0n ? value.toString(10) : null;
+  }
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) && value >= 0 ? String(value) : null;
+  }
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  try {
+    return BigInt(trimmed).toString(10);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the one canonical identity shared by legacy metadata import and
+ * runtime legacy NFT projections. `null` is returned for malformed source
+ * rows so an importer can skip them without creating an unsafe destination.
+ */
+export function tryLegacyCukieIdentity(
+  network: unknown,
+  tokenId: unknown,
+): LegacyCukieIdentity | null {
+  const chain = normalizeLegacyNetwork(network);
+  const normalizedTokenId = normalizeLegacyTokenId(tokenId);
+  if (!chain || !normalizedTokenId) return null;
+
+  const collectionAddress = LEGACY_CONTRACTS[chain].TOKEN;
+  if (!collectionAddress) return null;
+  const networkKey = chain === 'BSC' ? '56' : 'mainnet';
+  const collectionAddressNormalized = chain === 'BSC'
+    ? collectionAddress.toLowerCase()
+    : collectionAddress;
+
+  return {
+    chain,
+    ...(chain === 'BSC' ? { chainId: 56 as const } : {}),
+    network: chain,
+    networkKey,
+    collectionAddress,
+    collectionAddressNormalized,
+    tokenId: normalizedTokenId,
+    documentId: `${chain}:${networkKey}:${collectionAddressNormalized}:${normalizedTokenId}`,
+  };
+}
+
+/** Strict form for callers that are projecting an already validated event. */
+export function legacyCukieIdentity(network: unknown, tokenId: unknown): LegacyCukieIdentity {
+  const identity = tryLegacyCukieIdentity(network, tokenId);
+  if (!identity) {
+    throw new Error(`Identidad Cukie legacy invalida: network=${String(network)} tokenId=${String(tokenId)}.`);
+  }
+  return identity;
+}
+
+// Descriptive alias for importers and external callers that deal in metadata.
+export const legacyMetadataIdentity = legacyCukieIdentity;
+
 export function isLegacyEvent(event: Pick<ChainEvent, 'runtimeScope'>) {
   return event.runtimeScope === 'legacy';
 }
@@ -20,16 +112,16 @@ export function legacyCollectionAddress(event: Pick<ChainEvent, 'chain' | 'contr
 }
 
 export function legacyNftIdentity(event: Pick<ChainEvent, 'chain' | 'chainId' | 'contractAlias' | 'contractAddress' | 'normalized' | 'args'>, tokenId: string) {
-  const collection = legacyCollectionAddress(event);
-  const network = event.chain === 'BSC' ? String(event.chainId ?? 56) : 'mainnet';
-  return {
-    chain: event.chain,
-    chainId: event.chain === 'BSC' ? Number(event.chainId ?? 56) : undefined,
-    collectionAddress: collection,
-    collectionAddressNormalized: event.chain === 'BSC' ? collection.toLowerCase() : collection,
-    tokenId,
-    documentId: `${event.chain}:${network}:${event.chain === 'BSC' ? collection.toLowerCase() : collection}:${tokenId}`,
-  };
+  if (event.chain === 'BSC' && event.chainId !== undefined && event.chainId !== 56) {
+    throw new Error(`Identidad Cukie legacy BSC exige chainId 56, recibido ${String(event.chainId)}.`);
+  }
+  if (event.chain === 'TRON' && event.chainId !== undefined) {
+    throw new Error('Identidad Cukie legacy TRON no admite chainId EVM.');
+  }
+  // Validate an explicitly supplied collection while deriving the materialized
+  // address from the canonical TOKEN manifest, not from event casing.
+  legacyCollectionAddress(event);
+  return legacyCukieIdentity(event.chain, tokenId);
 }
 
 export function legacyNftDocumentId(event: Pick<ChainEvent, 'chain' | 'chainId' | 'contractAlias' | 'contractAddress' | 'normalized' | 'args'>, tokenId: string) {
@@ -42,7 +134,7 @@ export function legacyListingIdentity(event: Pick<ChainEvent, 'chain' | 'chainId
     chain: identity.chain,
     ...(identity.chainId === undefined ? {} : { chainId: identity.chainId }),
     collectionAddressNormalized: identity.collectionAddressNormalized,
-    tokenId,
+    tokenId: identity.tokenId,
   };
 }
 

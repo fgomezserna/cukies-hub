@@ -15,6 +15,20 @@ function assertEnabled(
   }
 }
 
+async function withStore<T>(
+  config: BridgeRelayerConfig,
+  task: (
+    store: MongoBridgeRelayerStore,
+  ) => Promise<T>,
+) {
+  const store = await new MongoBridgeRelayerStore(config).connect();
+  try {
+    return await task(store);
+  } finally {
+    await store.close();
+  }
+}
+
 async function withRuntime<T>(
   config: BridgeRelayerConfig,
   task: (
@@ -23,29 +37,28 @@ async function withRuntime<T>(
     source: TronGridBridgeRequestSource,
   ) => Promise<T>,
 ) {
-  const store = await new MongoBridgeRelayerStore(config).connect();
-  const source = new TronGridBridgeRequestSource(config);
-  const destination = new ViemBscBridgeDestination(config);
-  const engine = new BridgeRelayerEngine(store, store, destination, {
-    workerId: config.workerId,
-    leaseMs: config.leaseMs,
-    retryBaseMs: config.retryBaseMs,
-    retryMaxMs: config.retryMaxMs,
-    maxAttempts: config.maxAttempts,
-    submittedTimeoutMs: config.submittedTimeoutMs,
+  return withStore(config, async (store) => {
+    const source = new TronGridBridgeRequestSource(config);
+    const destination = new ViemBscBridgeDestination(config);
+    const engine = new BridgeRelayerEngine(store, store, destination, {
+      workerId: config.workerId,
+      leaseMs: config.leaseMs,
+      retryBaseMs: config.retryBaseMs,
+      retryMaxMs: config.retryMaxMs,
+      maxAttempts: config.maxAttempts,
+      submittedTimeoutMs: config.submittedTimeoutMs,
+    });
+    return task(store, engine, source);
   });
-  try {
-    return await task(store, engine, source);
-  } finally {
-    await store.close();
-  }
 }
 
 export async function setupBridgeRelayer(configInput = getBridgeRelayerConfig()) {
   assertEnabled(configInput);
-  return withRuntime(configInput, async (store) => {
+  // Setup only needs Mongo indexes. Creating the Viem/Tron transports here
+  // leaves open sockets and can prevent docker-start.sh from reaching `start`.
+  return withStore(configInput, async (store) => {
     await store.ensureIndexes();
-    return { ok: true, dbName: configInput.dbName, direction: 'TRON_NILE_TO_BSC_TESTNET' };
+    return { ok: true, dbName: configInput.dbName, direction: 'TRON_MAINNET_TO_BSC_MAINNET_LEGACY' };
   });
 }
 
@@ -68,7 +81,7 @@ export async function runBridgeRelayerOnce(configInput = getBridgeRelayerConfig(
       invalidEvents: poll.invalidEvents.length,
       processing,
       sourceCursor: poll.nextCursor,
-      direction: 'TRON_NILE_TO_BSC_TESTNET',
+      direction: 'TRON_MAINNET_TO_BSC_MAINNET_LEGACY',
     });
     return {
       inserted,

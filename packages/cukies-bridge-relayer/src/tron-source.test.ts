@@ -9,32 +9,30 @@ import {
 
 function bridgeEvent(overrides: Record<string, unknown> = {}) {
   return {
-    event_name: 'BridgeRequested',
-    transaction_id: 'tron-tx-1',
+    event_name: 'JumpInBridge',
+    transaction_id: 'aa'.repeat(32),
     block_number: 123,
     block_timestamp: 1_788_000_000_000,
     event_index: 2,
     result: {
-      transferId: '11'.repeat(32),
       tokenId: '1000000002279',
-      sourceOwner: 'TSource1111111111111111111111111111',
-      destinationOwner: '0'.repeat(24) + '22'.repeat(20),
-      sourceNetwork: '0',
-      destinationNetwork: '1',
-      nonce: '4',
-      metadataHash: '33'.repeat(32),
+      originOwner: '41' + '11'.repeat(20),
+      destOwner: '0x' + '0'.repeat(24) + '22'.repeat(20),
+      network: '1',
     },
     ...overrides,
   };
 }
 
 describe('parseConfirmedBridgeRequest', () => {
-  it('normaliza bytes32, bytes20 y evidencia confirmada de Nile', () => {
+  it('normaliza el evento JumpInBridge confirmado de TRON mainnet', () => {
     const request = parseConfirmedBridgeRequest(bridgeEvent());
 
-    assert.equal(request.transferId, `0x${'11'.repeat(32)}`);
+    assert.match(request.transferId, /^0x[0-9a-f]{64}$/);
     assert.equal(request.destinationOwner, `0x${'22'.repeat(20)}`);
-    assert.equal(request.metadataHash, `0x${'33'.repeat(32)}`);
+    assert.equal(request.sourceOwner, '41' + '11'.repeat(20));
+    assert.equal(request.sourceTxHash, 'aa'.repeat(32));
+    assert.equal(request.tokenId, '1000000002279');
     assert.equal(request.sourceNetwork, 0);
     assert.equal(request.destinationNetwork, 1);
   });
@@ -51,9 +49,9 @@ describe('parseConfirmedBridgeRequest', () => {
         data: [
           bridgeEvent(),
           bridgeEvent({
-            transaction_id: 'tron-tx-bad',
+            transaction_id: 'bb'.repeat(32),
             block_timestamp: 1_788_000_000_100,
-            result: { metadataHash: '0'.repeat(64) },
+            result: { tokenId: '' },
           }),
         ],
       }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -66,50 +64,40 @@ describe('parseConfirmedBridgeRequest', () => {
 
     const parsedUrl = new URL(requestedUrl);
     assert.equal(parsedUrl.searchParams.get('only_confirmed'), 'true');
-    assert.equal(parsedUrl.searchParams.get('event_name'), 'BridgeRequested');
+    assert.equal(parsedUrl.searchParams.get('event_name'), 'JumpInBridge');
     assert.equal(result.requests.length, 1);
     assert.equal(result.invalidEvents.length, 1);
-    assert.equal(result.invalidEvents[0]?.sourceTxHash, 'tron-tx-bad');
+    assert.equal(result.invalidEvents[0]?.sourceTxHash, 'bb'.repeat(32));
     assert.equal(result.nextCursor.nextTimestampMs, 1_788_000_000_101);
   });
 
-  it('rechaza metadata vacia, direccion cero y cualquier direccion de vuelta', () => {
+  it('rechaza un destino cero y cualquier red distinta de BSC mainnet', () => {
     const base = {
-      event_name: 'BridgeRequested',
-      transaction_id: 'tron-tx-1',
+      event_name: 'JumpInBridge',
+      transaction_id: 'aa'.repeat(32),
       block_number: 123,
       block_timestamp: 1_788_000_000_000,
+      event_index: 2,
       result: {
-        transferId: '11'.repeat(32),
         tokenId: '1000000002279',
-        sourceOwner: 'TSource1111111111111111111111111111',
-        destinationOwner: '22'.repeat(20),
-        sourceNetwork: '0',
-        destinationNetwork: '1',
-        nonce: '4',
-        metadataHash: '33'.repeat(32),
+        originOwner: '41' + '11'.repeat(20),
+        destOwner: '0x' + '0'.repeat(24) + '22'.repeat(20),
+        network: '1',
       },
     };
     assert.throws(
       () => parseConfirmedBridgeRequest({
         ...base,
-        result: { ...base.result, metadataHash: '0'.repeat(64) },
+        result: { ...base.result, destOwner: '0x' + '0'.repeat(64) },
       }),
-      /metadataHash cero/,
+      /destOwner invalido/,
     );
     assert.throws(
       () => parseConfirmedBridgeRequest({
         ...base,
-        result: { ...base.result, destinationOwner: '0'.repeat(40) },
+        result: { ...base.result, network: '0' },
       }),
-      /destinationOwner invalido/,
-    );
-    assert.throws(
-      () => parseConfirmedBridgeRequest({
-        ...base,
-        result: { ...base.result, sourceNetwork: '1', destinationNetwork: '0' },
-      }),
-      /TRON Nile -> BSC Testnet/,
+      /BSC mainnet/,
     );
   });
 });

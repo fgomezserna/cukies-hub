@@ -153,6 +153,10 @@ export type ChainCursor = {
    */
   adaptiveRange?: number;
   adaptiveSuccesses?: number;
+  legacyBootstrapSourceCursorId?: string;
+  legacyBootstrapSourceCursorUpdatedAt?: Date;
+  legacyBootstrapImportedAt?: Date;
+  legacyBootstrapEventCount?: number;
   updatedAt: Date;
 };
 

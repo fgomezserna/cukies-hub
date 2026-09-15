@@ -190,6 +190,32 @@ test('deduplicates a TronGrid page and replays it after cursor persistence fails
   }
 });
 
+test('namespaces events emitted by the legacy TRON runtime', async () => {
+  const originalFetch = globalThis.fetch;
+  const fixture = cursorStore();
+  globalThis.fetch = (async () => new Response(JSON.stringify({
+    data: [event('legacy-tx', 2_000)],
+    meta: {},
+  }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })) as typeof fetch;
+
+  try {
+    const result = await ingestTronOnce(fixture.store as never, {
+      ...config,
+      runtimeScope: 'legacy',
+      tronApiBaseUrl: 'https://api.trongrid.io/v1',
+    });
+    assert.ok(result.errors.every(({ cursorId }) => cursorId.startsWith('legacy:TRON:')));
+    const eventIds = fixture.events.flat().map((item) => (item as { _id: string })._id);
+    assert.ok(eventIds.length > 0);
+    assert.ok(eventIds.every((eventId) => eventId.startsWith('legacy:TRON:')));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('restarts the same timestamp safely when TronGrid rejects a stored fingerprint', async () => {
   const originalFetch = globalThis.fetch;
   const fixture = cursorStore();

@@ -88,11 +88,17 @@ parametros y gates de activacion se mantienen en
 [`docs/legacy-marketplace/README.md`](../../docs/legacy-marketplace/README.md#activacion-stage-y-criterios-de-reconciliacion).
 
 Comandos del servicio: `legacy:setup` verifica las fuentes y crea indices;
+`legacy:bootstrap` copia primero la metadata inmutable y despues reencola, con
+IDs `legacy:*`, los eventos historicos ya durables antes de copiar su cursor;
 `legacy:ingest` ejecuta una pasada; `legacy:project` materializa un lote;
 `legacy:status` consulta estado; `legacy:run:dev` inicia el bucle local y
 `legacy:run` ejecuta el build de produccion. La configuracion dedicada no usa
 los defaults del indexer anterior: un inicio legacy explicito `0` representa
-historia completa. `legacy:test` valida configuracion e identidades.
+historia completa. Eventos y cursores del worker usan identidades separadas del
+runtime normal, por lo que un evento antes ignorado puede reproyectarse sin que
+ambos workers se reclamen trabajo entre si. El bootstrap es idempotente y solo
+mueve cada cursor despues de insertar correctamente todos los eventos de su
+snapshot. `legacy:test` valida configuracion e identidades.
 
 En `legacy:run`, BSC y TRON se leen en paralelo y BSC puede procesar un numero
 acotado de ventanas contiguas por ciclo (`CUKIES_LEGACY_BSC_WINDOWS_PER_CYCLE`,
