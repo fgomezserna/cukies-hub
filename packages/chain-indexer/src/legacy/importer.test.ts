@@ -26,6 +26,7 @@ test('legacy event import fixes the legacy runtime boundary', () => {
     `legacy:BSC:TOKEN:Transfer:0x${'1'.repeat(64)}:7`,
   );
   assert.equal(event?.chain, 'BSC');
+  assert.equal(event?.chainId, 56);
   assert.equal(event?.logIndex, 7);
 });
 

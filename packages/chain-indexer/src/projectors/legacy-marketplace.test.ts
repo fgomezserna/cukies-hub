@@ -5,6 +5,9 @@ import { normalizeDomainEvent } from '../normalize.js';
 import type { ChainEvent, ContractAlias, EventName } from '../types.js';
 import { markLegacyCanonicalProjection, projectEvent } from './index.js';
 import { legacyNftIdentity } from '../legacy/identity.js';
+import { legacyContractProof } from '../legacy/contracts.js';
+import { convertLegacyEvent } from '../legacy/importer.js';
+import { runtimeScopedStorageId } from '../storage/runtime-scope.js';
 import {
   buildNftOwnershipEvidence,
   decideNftOwnershipProjection,
@@ -35,6 +38,7 @@ function matches(document: Document, filter: Record<string, any>): boolean {
       if ('$exists' in expected) return (actual !== undefined) === expected.$exists;
       if ('$in' in expected) return expected.$in.includes(actual);
       if ('$lt' in expected) return typeof actual === 'number' && actual < expected.$lt;
+      if ('$type' in expected && expected.$type === 'date') return actual instanceof Date;
     }
     return actual === expected;
   });
@@ -122,7 +126,7 @@ class MemoryCollection {
   }
 }
 
-function memoryStore() {
+function memoryStore(runtimeScope?: 'legacy') {
   const collections = new Map<string, MemoryCollection>();
   const getCollection = (name: string) => {
     const existing = collections.get(name);
@@ -139,11 +143,19 @@ function memoryStore() {
   return {
     collections,
     store: {
+      runtimeScope,
+      legacySourcesVerified: runtimeScope === 'legacy',
       db: {
         client: { startSession: () => session },
         collection: getCollection,
       },
       cursors: () => getCollection('chain_cursors'),
+      cursorId: (config: Pick<ChainEvent, 'chain' | 'contractAlias' | 'eventName'>) => (
+        runtimeScopedStorageId(
+          runtimeScope,
+          `${config.chain}:${config.contractAlias}:${config.eventName}`,
+        )
+      ),
     },
   };
 }
@@ -265,6 +277,64 @@ function listingEvent(tokenId: string, blockNumber: number) {
 }
 
 describe('legacy marketplace Stage projectors', () => {
+  it('materializes a converted BSC legacy transfer and repairs a missing chainId on an existing row', async () => {
+    const context = memoryStore('legacy');
+    const converted = convertLegacyEvent({
+      _id: 'legacy-transfer_0',
+      network: 'BSC',
+      eventName: 'Transfer',
+      contractAddress: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
+      transactionId: `0x${'4'.repeat(64)}`,
+      blockNumber: 120,
+      timeStamp: 1_700_000_000,
+      data: {
+        tokenId: '42',
+        from: seller,
+        to: buyer,
+      },
+    });
+    assert.ok(converted);
+    assert.equal(converted.chainId, 56);
+
+    const identity = legacyNftIdentity(converted, '42');
+    const proof = legacyContractProof('BSC', 'TOKEN');
+    context.store.db.collection('legacy_source_proofs').documents.set('BSC:56:TOKEN', {
+      _id: 'BSC:56:TOKEN',
+      runtimeScope: 'legacy',
+      chain: 'BSC',
+      chainId: 56,
+      alias: 'TOKEN',
+      network: 'mainnet',
+      address: converted.contractAddress,
+      expectedRuntimeHash: proof.runtimeHash,
+      observedRuntimeHash: proof.runtimeHash,
+      observedAt: new Date(),
+      observedAtBlock: 120,
+      verification: 'live-rpc-runtime-keccak256',
+      proofSource: proof.evidence,
+    });
+
+    // Keep a pre-existing canonical row without chainId to exercise the repair
+    // path through the real legacy boundary and compound document identity.
+    const canonical = context.store.db.collection('cukies');
+    canonical.documents.set(identity.documentId, {
+      _id: identity.documentId,
+      chain: 'BSC',
+      network: 'BSC',
+      collectionAddress: identity.collectionAddress,
+      collectionAddressNormalized: identity.collectionAddressNormalized,
+      owner: seller,
+      ownerNormalized: seller.toLowerCase(),
+      tokenId: '42',
+    });
+
+    assert.equal(await projectEvent(context.store as never, converted), null);
+    assert.equal(canonical.documents.get(identity.documentId)?.chainId, 56);
+    assert.equal(canonical.documents.get(identity.documentId)?.owner, buyer);
+    assert.ok(context.store.cursors().documents.has('legacy:BSC:TOKEN:Transfer'));
+    assert.equal(context.store.cursors().documents.has('BSC:TOKEN:Transfer'), false);
+  });
+
   it('marks only the compound canonical document after a legacy NFT projection', async () => {
     const context = memoryStore();
     const event = {

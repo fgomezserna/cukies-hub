@@ -15,6 +15,13 @@ const config: ContractEventConfig = {
   eventName: 'Transfer',
 };
 
+const tronConfig: ContractEventConfig = {
+  chain: 'TRON',
+  contractAlias: 'TOKEN',
+  contractAddress: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
+  eventName: 'Transfer',
+};
+
 function historicalEvent(): ChainEvent {
   return {
     _id: `BSC:TOKEN:Transfer:0x${'1'.repeat(64)}:7`,
@@ -58,14 +65,12 @@ test('historical event clone replays through an isolated, idempotent legacy iden
   assert.deepEqual(replay, cloned);
 });
 
-test('historical event filter cannot read legacy rows or events beyond its cursor snapshot', () => {
-  const cursorUpdatedAt = new Date('2026-09-15T09:00:00.000Z');
+test('BSC historical filter uses block progress, not mutable ingestion createdAt', () => {
   const filter = historicalDefaultEventFilter(config, {
     nextBlock: 500,
-    updatedAt: cursorUpdatedAt,
   }) as { $and: Array<Record<string, unknown>> };
 
-  assert.equal(filter.$and.length, 4);
+  assert.equal(filter.$and.length, 3);
   assert.deepEqual(filter.$and[1], {
     $or: [
       { runtimeScope: { $exists: false } },
@@ -73,12 +78,25 @@ test('historical event filter cannot read legacy rows or events beyond its curso
     ],
   });
   assert.deepEqual(filter.$and[2], { blockNumber: { $lt: 500 } });
-  assert.deepEqual(filter.$and[3], {
-    $or: [
-      { createdAt: { $lte: cursorUpdatedAt } },
-      { createdAt: { $exists: false } },
-    ],
-  });
+  assert.equal(JSON.stringify(filter).includes('createdAt'), false);
+
+  // A historical event may have arrived in Mongo after the cursor was saved;
+  // its block is still before the durable frontier and must be imported.
+  const beforeCursor = { blockNumber: 499, createdAt: new Date('2026-09-15T10:00:00.000Z') };
+  const afterCursor = { blockNumber: 500, createdAt: new Date('2026-09-14T00:00:00.000Z') };
+  assert.equal(beforeCursor.blockNumber < 500, true);
+  assert.equal(afterCursor.blockNumber < 500, false);
+});
+
+test('TRON historical filter uses an exclusive timestamp frontier and never createdAt', () => {
+  const filter = historicalDefaultEventFilter(tronConfig, {
+    nextTimestampMs: 5_000,
+    fingerprint: 'opaque-page-token',
+  }) as { $and: Array<Record<string, unknown>> };
+
+  assert.equal(filter.$and.length, 3);
+  assert.deepEqual(filter.$and[2], { timestampMs: { $lt: 5_000 } });
+  assert.equal(JSON.stringify(filter).includes('createdAt'), false);
 });
 
 test('legacy cursor bootstrap preserves exact progress only after validating source identity', () => {
@@ -109,4 +127,27 @@ test('legacy cursor bootstrap preserves exact progress only after validating sou
     }, importedAt, 0),
     /Cursor historico incompatible/,
   );
+});
+
+test('legacy TRON bootstrap restarts an opaque fingerprint at its timestamp frontier', () => {
+  const importedAt = new Date('2026-09-15T10:00:00.000Z');
+  const source: ChainCursor = {
+    _id: 'TRON:TOKEN:Transfer',
+    chain: 'TRON',
+    contractAlias: 'TOKEN',
+    contractAddress: tronConfig.contractAddress,
+    eventName: 'Transfer',
+    nextTimestampMs: 5_000,
+    fingerprint: 'opaque-page-token',
+    updatedAt: new Date('2026-06-11T11:41:25.408Z'),
+  };
+
+  assert.deepEqual(legacyBootstrapCursorFields(tronConfig, source, importedAt, 7), {
+    nextTimestampMs: 5_000,
+    fingerprint: null,
+    legacyBootstrapSourceCursorId: 'TRON:TOKEN:Transfer',
+    legacyBootstrapSourceCursorUpdatedAt: source.updatedAt,
+    legacyBootstrapImportedAt: importedAt,
+    legacyBootstrapEventCount: 7,
+  });
 });

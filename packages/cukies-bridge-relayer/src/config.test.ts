@@ -55,6 +55,23 @@ describe('buildBridgeRelayerConfig', () => {
     assert.equal(config.tronStartTimestampMs, 1_788_000_000_000);
   });
 
+  it('trata aliases vacios materializados por Compose como ausentes antes del fallback', () => {
+    const config = buildBridgeRelayerConfig({
+      ...validEnvironment(),
+      CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS: '',
+      CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS: LEGACY_MAINNET.tronBridgeAddress,
+      CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS: '   ',
+      CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS: LEGACY_MAINNET.bscBridgeAddress,
+      CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS: '',
+      CUKIES_BRIDGE_RELAYER_EXPECTED_SIGNER_ADDRESS: bscExpectedSignerAddress,
+    });
+    assert.equal(config.enabled, true);
+    if (!config.enabled) return;
+    assert.equal(config.tronBridgeAddress, LEGACY_MAINNET.tronBridgeAddress);
+    assert.equal(config.bscBridgeAddress.toLowerCase(), LEGACY_MAINNET.bscBridgeAddress.toLowerCase());
+    assert.equal(config.bscExpectedSignerAddress.toLowerCase(), bscExpectedSignerAddress.toLowerCase());
+  });
+
   it('exige APP_ENV de runtime y rechaza el conflicto con NEXT_PUBLIC_APP_ENV', () => {
     assert.throws(
       () => buildBridgeRelayerConfig({

@@ -57,6 +57,7 @@
     "start:indexer": "pnpm --filter @cukies/chain-indexer run start",
     "legacy:indexer:setup": "node scripts/assert-legacy-indexer.mjs && pnpm --filter @cukies/chain-indexer run legacy:setup",
     "legacy:indexer:bootstrap": "node scripts/assert-legacy-indexer.mjs && pnpm --filter @cukies/chain-indexer run legacy:bootstrap",
+    "legacy:indexer:bootstrap:prod": "node scripts/assert-legacy-indexer.mjs && pnpm --filter @cukies/chain-indexer run legacy:bootstrap:prod",
     "legacy:indexer:ingest": "node scripts/assert-legacy-indexer.mjs && pnpm --filter @cukies/chain-indexer run legacy:ingest",
     "legacy:indexer:project": "node scripts/assert-legacy-indexer.mjs && pnpm --filter @cukies/chain-indexer run legacy:project",
     "legacy:indexer:status": "pnpm --filter @cukies/chain-indexer run legacy:status",

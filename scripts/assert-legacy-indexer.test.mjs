@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { validateLegacyIndexerEnvironment } from './assert-legacy-indexer.mjs';
 import { validateProductionEnvironment } from './assert-production.mjs';
@@ -153,5 +156,16 @@ test('rejects retired eventlog variables in the legacy perimeter', () => {
       NX_TRON_DB: 'eventlog',
     }), 'production'),
     /NX_TRON_DB is retired/,
+  );
+});
+
+test('publishes a production-safe legacy bootstrap command for the image', async () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const packageJson = JSON.parse(await readFile(path.join(root, 'packages/chain-indexer/package.json'), 'utf8'));
+  const rootPackageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+  assert.equal(packageJson.scripts['legacy:bootstrap:prod'], 'node dist/legacy/cli.js bootstrap');
+  assert.equal(
+    rootPackageJson.scripts['legacy:indexer:bootstrap:prod'],
+    'node scripts/assert-legacy-indexer.mjs && pnpm --filter @cukies/chain-indexer run legacy:bootstrap:prod',
   );
 });

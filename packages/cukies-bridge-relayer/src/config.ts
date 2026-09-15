@@ -136,6 +136,12 @@ function required(value: string | undefined, label: string) {
   return normalized;
 }
 
+/** Compose materializes optional aliases as empty strings. Treat whitespace
+ * the same as an unset value before selecting the compatibility fallback. */
+function firstNonBlank(...values: Array<string | undefined>) {
+  return values.find((value) => typeof value === 'string' && value.trim() !== '')?.trim();
+}
+
 function exactUrl(value: string, expected: string, label: string) {
   let parsed: URL;
   try {
@@ -241,8 +247,10 @@ export function buildBridgeRelayerConfig(
   );
   const tronBridgeAddress = exactAddress(
     required(
-      env.CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS
-        ?? env.CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS,
+      firstNonBlank(
+        env.CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS,
+        env.CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS,
+      ),
       'CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS',
     ),
     LEGACY_MAINNET.tronBridgeAddress,
@@ -265,8 +273,10 @@ export function buildBridgeRelayerConfig(
   );
   const bscBridgeAddress = exactAddress(
     required(
-      env.CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS
-        ?? env.CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS,
+      firstNonBlank(
+        env.CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS,
+        env.CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS,
+      ),
       'CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS',
     ),
     LEGACY_MAINNET.bscBridgeAddress,
@@ -294,8 +304,10 @@ export function buildBridgeRelayerConfig(
     throw new Error('La private key del relayer BSC no es valida.');
   }
   const expectedSignerAddress = required(
-    env.CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS
-      ?? env.CUKIES_BRIDGE_RELAYER_EXPECTED_SIGNER_ADDRESS,
+    firstNonBlank(
+      env.CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS,
+      env.CUKIES_BRIDGE_RELAYER_EXPECTED_SIGNER_ADDRESS,
+    ),
     'CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS',
   );
   if (!isAddress(expectedSignerAddress) || /^0x0{40}$/i.test(expectedSignerAddress)) {

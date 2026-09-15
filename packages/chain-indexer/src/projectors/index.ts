@@ -1738,8 +1738,14 @@ async function verifiedContractCursor(
         && (!Number.isSafeInteger(observed.observedAtBlock) || observed.observedAtBlock < 0))) {
       throw new Error(`${legacyAlias} legacy no tiene prueba RPC viva persistida.`);
     }
+    const scopedCursorId = store.cursorId({
+      chain: event.chain,
+      contractAlias: alias,
+      contractAddress: event.contractAddress,
+      eventName: event.eventName,
+    });
     await store.cursors().updateOne(
-      { _id: `${event.chain}:${alias}:${event.eventName}` },
+      { _id: scopedCursorId },
       {
         $set: {
           chain: event.chain,
@@ -1753,7 +1759,7 @@ async function verifiedContractCursor(
           legacyProofEvidence: proof.evidence,
           legacyProofVerification: observed.verification,
         },
-        $setOnInsert: { _id: `${event.chain}:${alias}:${event.eventName}` },
+        $setOnInsert: { _id: scopedCursorId },
       },
       { upsert: true },
     );

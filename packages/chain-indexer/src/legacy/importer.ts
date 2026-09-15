@@ -150,6 +150,7 @@ export function convertLegacyEvent(document: LegacyProcessedEvent): ChainEvent |
     txHash,
     logIndex,
     blockNumber: Number(document.blockNumber ?? 0),
+    ...(chain === 'BSC' ? { chainId: 56 as const } : {}),
     timestampMs,
     args,
     normalized: normalizeDomainEvent(chain, eventName, contractAlias, argsRaw),

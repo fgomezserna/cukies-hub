@@ -176,7 +176,10 @@ test('World Docker refinement allows the initial append and a later World-only e
   assert.equal(isWorldDockerfileOnlyChange(before, after), true);
   assert.equal(isWorldDockerfileOnlyChange(before, after.replace('FROM base AS world-deps', 'FROM deps AS world-deps')), false);
   assert.equal(isWorldDockerfileOnlyChange(after, after.replace('EXPOSE 3010', 'EXPOSE 3010\n# World-only stage edit')), true);
-  assert.equal(isWorldDockerfileOnlyChange(after, after.replace('FROM base AS dapp', 'FROM deps AS dapp')), false);
+  assert.equal(isWorldDockerfileOnlyChange(
+    after,
+    after.replace('FROM node:22-bookworm-slim AS dapp', 'FROM deps AS dapp'),
+  ), false);
 });
 
 test('a subsequent World-only Docker stage edit refines to both World images', async () => {

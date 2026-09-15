@@ -38,19 +38,19 @@ function safeInteger(value: unknown): value is number {
 
 export function historicalDefaultEventFilter(
   config: ContractEventConfig,
-  sourceCursor?: Pick<ChainCursor, 'nextBlock' | 'updatedAt'> | null,
+  sourceCursor?: Pick<ChainCursor, 'nextBlock' | 'nextTimestampMs' | 'fingerprint'> | null,
 ): Filter<ChainEvent> {
   const boundaries: Document[] = [];
   if (config.chain === 'BSC' && safeInteger(sourceCursor?.nextBlock)) {
     boundaries.push({ blockNumber: { $lt: sourceCursor.nextBlock } });
   }
-  if (sourceCursor?.updatedAt instanceof Date) {
-    boundaries.push({
-      $or: [
-        { createdAt: { $lte: sourceCursor.updatedAt } },
-        { createdAt: { $exists: false } },
-      ],
-    });
+  if (config.chain === 'TRON' && safeInteger(sourceCursor?.nextTimestampMs)) {
+    // TronGrid's fingerprint is an opaque continuation token, not a durable
+    // event identity.  The bootstrap therefore copies only rows strictly
+    // before the timestamp frontier and restarts the legacy cursor at that
+    // timestamp when a fingerprint is present.  That replay is idempotent and
+    // covers every event within the frontier without relying on createdAt.
+    boundaries.push({ timestampMs: { $lt: sourceCursor.nextTimestampMs } });
   }
 
   return {
@@ -161,9 +161,10 @@ export function legacyBootstrapCursorFields(
       throw new Error(`Cursor historico ${expectedId} sin nextTimestampMs TRON valido.`);
     }
     progress.nextTimestampMs = source.nextTimestampMs;
-    if (typeof source.fingerprint === 'string' || source.fingerprint === null) {
-      progress.fingerprint = source.fingerprint;
-    }
+    // A TRON fingerprint cannot be mapped to a row in the historical
+    // chain_events collection.  Replaying from the timestamp frontier is the
+    // only durable boundary that preserves events at that timestamp.
+    progress.fingerprint = null;
   }
 
   return {
