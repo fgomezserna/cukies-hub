@@ -18,6 +18,7 @@ import type {
 } from '../types.js';
 import { now, toJsonRecord } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
+import { runtimeScopedStorageId } from '../storage/runtime-scope.js';
 
 type BscClient = ReturnType<typeof createPublicClient>;
 export type BscRpcClient = {
@@ -763,7 +764,10 @@ export async function ingestBscOnce(
     let successfulQueries = 0;
     let queryFromBlock = fromBlock;
     let logsRpc = latestBlockRpc;
-    const cursorId = `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`;
+    const cursorId = runtimeScopedStorageId(
+      config.runtimeScope,
+      `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+    );
     const recordRpcFailures = (
       failures: BscRpcFailure[],
       warningContext: Pick<BscRpcWarning, 'fromBlock' | 'toBlock' | 'range' | 'retries'>,
@@ -841,7 +845,10 @@ export async function ingestBscOnce(
           const logIndex = Number(log.logIndex ?? 0);
           const createdAt = now();
           const event: ChainEvent = {
-            _id: `BSC:${contractEvent.contractAlias}:${contractEvent.eventName}:${log.transactionHash}:${logIndex}`,
+            _id: runtimeScopedStorageId(
+              config.runtimeScope,
+              `BSC:${contractEvent.contractAlias}:${contractEvent.eventName}:${log.transactionHash}:${logIndex}`,
+            ),
             runtimeScope: config.runtimeScope ?? 'default',
             chain: 'BSC',
             chainId: config.bscExpectedChainId,
@@ -970,7 +977,10 @@ export async function ingestBscOnce(
     }
     })().catch((error) => {
       errors.push({
-        cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+        cursorId: runtimeScopedStorageId(
+          config.runtimeScope,
+          `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+        ),
         chain: 'BSC',
         contractAlias: contractEvent.contractAlias,
         eventName: contractEvent.eventName,

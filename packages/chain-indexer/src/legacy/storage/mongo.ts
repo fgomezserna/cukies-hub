@@ -44,8 +44,8 @@ export const LEGACY_INDEX_DEFINITIONS: LegacyIndexDefinition[] = [
   { collection: 'chain_events', index: { runtimeScope: 1, chain: 1, contractAddress: 1, eventName: 1 } },
   {
     collection: 'chain_cursors',
-    index: { chain: 1, contractAlias: 1, eventName: 1 },
-    options: { unique: true, name: 'legacy_chain_cursor_identity_unique' },
+    index: { runtimeScope: 1, chain: 1, contractAlias: 1, eventName: 1 },
+    options: { unique: true, name: 'legacy_runtime_chain_cursor_identity_unique' },
   },
   { collection: 'tx_nfts', index: { eventId: 1 }, options: { unique: true, sparse: true } },
   { collection: 'tx_nfts', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1, timestampMs: -1 } },

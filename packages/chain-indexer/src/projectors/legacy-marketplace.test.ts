@@ -3,7 +3,8 @@ import { describe, it } from 'node:test';
 
 import { normalizeDomainEvent } from '../normalize.js';
 import type { ChainEvent, ContractAlias, EventName } from '../types.js';
-import { projectEvent } from './index.js';
+import { markLegacyCanonicalProjection, projectEvent } from './index.js';
+import { legacyNftIdentity } from '../legacy/identity.js';
 import {
   buildNftOwnershipEvidence,
   decideNftOwnershipProjection,
@@ -264,6 +265,35 @@ function listingEvent(tokenId: string, blockNumber: number) {
 }
 
 describe('legacy marketplace Stage projectors', () => {
+  it('marks only the compound canonical document after a legacy NFT projection', async () => {
+    const context = memoryStore();
+    const event = {
+      ...stageEvent({
+        eventName: 'Transfer',
+        alias: 'TOKEN',
+        blockNumber: 1,
+        args: { tokenId: 12n, from: seller, to: buyer },
+      }),
+      chainId: 56,
+      contractAddress: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
+      runtimeScope: 'legacy' as const,
+    };
+    const identity = legacyNftIdentity(event, '12');
+    const canonical = context.store.db.collection('cukies');
+    canonical.documents.set(identity.documentId, {
+      _id: identity.documentId,
+      owner: buyer,
+      lastEventId: event._id,
+    });
+    canonical.documents.set('12', { _id: '12', owner: 'legacy-snapshot' });
+
+    assert.equal(await markLegacyCanonicalProjection(context.store as never, event), 1);
+    assert.equal(canonical.documents.get(identity.documentId)!.legacyProjectionKind, 'canonical');
+    assert.equal('legacyProjectionKind' in canonical.documents.get('12')!, false);
+    assert.equal(canonical.documents.get(identity.documentId)!.owner, buyer);
+    assert.equal(canonical.documents.get(identity.documentId)!.lastEventId, event._id);
+  });
+
   it('keeps BSC ownership identity network-aware', () => {
     const bscResult = buildNftOwnershipEvidence(stageEvent({
       eventName: 'Transfer',

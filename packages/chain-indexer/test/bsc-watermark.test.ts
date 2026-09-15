@@ -348,8 +348,18 @@ test('records safe head as explicit coverage origin for a new start-block zero c
 
 test('legacy start block zero is historical and never falls back to safe head', async () => {
   const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
-  const client = rpc({ host: 'mainnet.test', logCalls });
-  const { store, updates } = fakeStore();
+  const client = rpc({
+    host: 'mainnet.test',
+    logCalls,
+    logs: [{
+      args: { from: PLAYER, to: TOKEN_ADDRESS, tokenId: 42n },
+      blockNumber: 0n,
+      blockHash: `0x${'3'.repeat(64)}`,
+      transactionHash: `0x${'4'.repeat(64)}`,
+      logIndex: 7,
+    }],
+  });
+  const { store, updates, eventBatches } = fakeStore();
 
   await ingestBscOnce(store, config({
     runtimeScope: 'legacy',
@@ -364,6 +374,9 @@ test('legacy start block zero is historical and never falls back to safe head', 
   assert.equal(logCalls[0]?.fromBlock, 0n);
   assert.equal(logCalls[0]?.toBlock, 0n);
   assert.equal(updates[0]?.update.processedFromBlock, 0);
+  const eventIds = eventBatches.flat().map((event) => (event as { _id: string })._id);
+  assert.ok(eventIds.length > 0);
+  assert.ok(eventIds.every((eventId) => eventId.startsWith('legacy:BSC:')));
 });
 
 test('legacy ingestion rejects a missing per-alias start block instead of using safe head', async () => {

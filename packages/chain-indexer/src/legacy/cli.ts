@@ -5,6 +5,7 @@ import { projectOnce } from '../projectors/index.js';
 import { LegacyIndexerStore } from './storage/mongo.js';
 import { verifyLegacySources } from './verify.js';
 import { now } from '../utils/json.js';
+import { bootstrapLegacyProjectionSources } from './bootstrap.js';
 
 function log(message: string, context?: Record<string, unknown>) {
   console.log(`[legacy-chain-indexer] ${message}${context ? ` ${JSON.stringify(context)}` : ''}`);
@@ -140,6 +141,26 @@ async function setup() {
   });
 }
 
+async function bootstrap() {
+  await withStore(async (store, config) => {
+    assertLegacyIndexerEnabled(config);
+    await store.ensureIndexes();
+    await verifyLegacySources(config, store);
+    const startedAt = now();
+    const result = await bootstrapLegacyProjectionSources(store, config);
+    const endedAt = now();
+    await store.recordRun({
+      type: 'legacy-bootstrap',
+      runtimeScope: 'legacy',
+      startedAt,
+      endedAt,
+      durationMs: endedAt.getTime() - startedAt.getTime(),
+      ...result,
+    });
+    log('bootstrap ok', result);
+  });
+}
+
 async function ingestOnce() {
   await withStore(async (store, config) => {
     assertLegacyIndexerEnabled(config);
@@ -240,6 +261,7 @@ async function runForever() {
 
 export async function runLegacyCli(command = process.argv[2] ?? 'status') {
   if (command === 'setup') return setup();
+  if (command === 'bootstrap') return bootstrap();
   if (command === 'ingest' || command === 'ingest-once') return ingestOnce();
   if (command === 'project' || command === 'project-once') return project();
   if (command === 'run') return runForever();

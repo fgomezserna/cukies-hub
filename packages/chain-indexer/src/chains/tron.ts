@@ -4,6 +4,7 @@ import { normalizeDomainEvent } from '../normalize.js';
 import type { ChainEvent, ContractEventConfig, IndexerConfig, JsonRecord } from '../types.js';
 import { normalizeTronArgs, now, toJsonRecord } from '../utils/json.js';
 import type { IndexerStore } from '../storage/index.js';
+import { runtimeScopedStorageId } from '../storage/runtime-scope.js';
 
 type TronGridEvent = {
   block_number: number;
@@ -196,7 +197,10 @@ function eventToChainEvent(config: IndexerConfig, contractEvent: ContractEventCo
   const createdAt = now();
 
   return {
-    _id: `TRON:${contractEvent.contractAlias}:${contractEvent.eventName}:${event.transaction_id}:${eventIndex}`,
+    _id: runtimeScopedStorageId(
+      config.runtimeScope,
+      `TRON:${contractEvent.contractAlias}:${contractEvent.eventName}:${event.transaction_id}:${eventIndex}`,
+    ),
     runtimeScope: config.runtimeScope ?? 'default',
     chain: 'TRON',
     contractAlias: contractEvent.contractAlias,
@@ -283,14 +287,20 @@ export async function ingestTronOnce(store: IndexerStore, config: IndexerConfig)
       if (isRateLimitError(error)) {
         rateLimited = true;
         errors.push({
-          cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+          cursorId: runtimeScopedStorageId(
+            config.runtimeScope,
+            `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+          ),
           error: `${errorMessage(error)} tras agotar reintentos; cursor conservado`,
         });
         break;
       }
 
       errors.push({
-        cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+        cursorId: runtimeScopedStorageId(
+          config.runtimeScope,
+          `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+        ),
         error: errorMessage(error),
       });
     }

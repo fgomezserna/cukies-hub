@@ -26,6 +26,7 @@ import {
   legacyNftIdentity,
   legacyNftDocumentId,
   legacyPointsIdentity,
+  normalizeLegacyTokenId,
 } from '../legacy/identity.js';
 import { LEGACY_CONTRACT_ALIASES, legacyContractAddress, legacyContractProof } from '../legacy/contracts.js';
 import { classifyLegacyAdminEvent, projectLegacyAdminAudit } from './legacy-admin-audit.js';
@@ -99,6 +100,49 @@ function bigintField(event: ChainEvent, key: string) {
 
 function tokenId(event: ChainEvent) {
   return stringField(event, 'tokenId');
+}
+
+const legacyCanonicalTokenFields = [
+  'tokenId',
+  'childId',
+  'child',
+  'parent1',
+  'parent2',
+  'cukiId',
+] as const;
+
+/**
+ * Add a stable marker only to canonical compound legacy documents that were
+ * actually materialized by a successful event projection. This is deliberately
+ * a post-projection step: it avoids touching numeric legacy snapshots and does
+ * not own any user/owner/event fields.
+ */
+export async function markLegacyCanonicalProjection(store: IndexerStore, event: ChainEvent) {
+  if (event.runtimeScope !== 'legacy') return 0;
+
+  const tokenIds = new Set<string>();
+  for (const fieldName of legacyCanonicalTokenFields) {
+    const normalized = normalizeLegacyTokenId(stringField(event, fieldName));
+    if (normalized) tokenIds.add(normalized);
+  }
+
+  let marked = 0;
+  for (const id of tokenIds) {
+    let documentId: string;
+    try {
+      documentId = legacyNftIdentity(event, id).documentId;
+    } catch {
+      // The projector already owns validation/error reporting for malformed
+      // event identities; the marker must never create a second failure.
+      continue;
+    }
+    const result = await collection(store, 'cukies').updateOne(
+      { _id: documentId },
+      { $set: { legacyProjectionKind: 'canonical' } },
+    );
+    marked += result.matchedCount;
+  }
+  return marked;
 }
 
 function bscNftMaterializationIdentity(event: ChainEvent) {
@@ -2285,12 +2329,19 @@ export async function projectOnce(store: IndexerStore, batchSize: number) {
     if (!event) break;
 
     try {
-      const ignoreReason = await projectEvent(store, event);
+      // Legacy stores enforce the boundary inside projectEvent. Keep the
+      // scoped value here as well so the post-projection marker also applies
+      // to events imported before runtimeScope was persisted on the row.
+      const scopedEvent = store.runtimeScope === 'legacy'
+        ? { ...event, runtimeScope: 'legacy' as const }
+        : event;
+      const ignoreReason = await projectEvent(store, scopedEvent);
 
       if (ignoreReason) {
         await store.markIgnored(event._id, ignoreReason);
         ignored += 1;
       } else {
+        await markLegacyCanonicalProjection(store, scopedEvent);
         await store.markProjected(event._id);
         projected += 1;
       }

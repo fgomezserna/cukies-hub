@@ -26,18 +26,24 @@ const config: IndexerConfig = {
   bscWindowsPerCycle: 3,
 };
 
-const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 test('legacy cycle keeps bounded BSC catch-up running while TRON is rate-limited', async () => {
   let bscRuns = 0;
-  let bscFinishedAt = 0;
-  let tronFinishedAt = 0;
+  const tronStarted = deferred();
+  const bscFinished = deferred();
 
   const result = await ingestLegacyChainsOnce({} as never, config, {
     ingestBsc: async () => {
       bscRuns += 1;
-      await pause(1);
-      bscFinishedAt = Date.now();
+      if (bscRuns === 1) await tronStarted.promise;
+      if (bscRuns === 3) bscFinished.resolve();
       return {
         outcome: 'complete' as const,
         inserted: 0,
@@ -61,8 +67,10 @@ test('legacy cycle keeps bounded BSC catch-up running while TRON is rate-limited
       };
     },
     ingestTron: async () => {
-      await pause(25); // represents a shared Retry-After/slow page
-      tronFinishedAt = Date.now();
+      tronStarted.resolve();
+      // Represents a shared Retry-After/slow page. BSC must consume all of its
+      // bounded windows while this promise remains pending.
+      await bscFinished.promise;
       return { inserted: 0, pages: 0, rateLimited: true, errors: [] };
     },
   });
@@ -72,7 +80,6 @@ test('legacy cycle keeps bounded BSC catch-up running while TRON is rate-limited
   assert.equal(result.bsc.rpcWarnings?.length, 3);
   assert.equal(result.tron.rateLimited, true);
   assert.equal(isLegacyCycleIncomplete(result.bsc, result.tron), true);
-  assert.ok(bscFinishedAt < tronFinishedAt);
 });
 
 test('legacy cycle only reports complete when neither chain is degraded', () => {

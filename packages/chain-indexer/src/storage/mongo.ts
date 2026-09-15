@@ -22,6 +22,20 @@ import {
   migrateEconomySchemaV2ToV3,
   verifyEconomyTransactionSupport,
 } from './economy-schema.js';
+import { runtimeScopedStorageId } from './runtime-scope.js';
+
+export function runtimeScopedEventFilter(runtimeScope: RuntimeScope) {
+  if (runtimeScope === 'legacy') return { runtimeScope: 'legacy' as const };
+
+  // Events written before runtimeScope existed belong to the default worker.
+  // The default worker must never claim rows owned by the legacy runtime.
+  return {
+    $or: [
+      { runtimeScope: { $exists: false } },
+      { runtimeScope: 'default' as const },
+    ],
+  };
+}
 
 export class IndexerStore {
   private client: MongoClient;
@@ -248,7 +262,10 @@ export class IndexerStore {
   }
 
   cursorId(config: ContractEventConfig) {
-    return `${config.chain}:${config.contractAlias}:${config.eventName}`;
+    return runtimeScopedStorageId(
+      this.runtimeScope,
+      `${config.chain}:${config.contractAlias}:${config.eventName}`,
+    );
   }
 
   async getCursor(config: ContractEventConfig) {
@@ -555,10 +572,15 @@ export class IndexerStore {
 
     const result = await this.events().findOneAndUpdate(
       {
-        $or: [
-          { status: 'ingested' },
-          { status: 'failed', attempts: { $lt: 5 } },
-          { status: 'projecting', lockedAt: { $lt: staleLock } },
+        $and: [
+          runtimeScopedEventFilter(this.runtimeScope),
+          {
+            $or: [
+              { status: 'ingested' as const },
+              { status: 'failed' as const, attempts: { $lt: 5 } },
+              { status: 'projecting' as const, lockedAt: { $lt: staleLock } },
+            ],
+          },
         ],
       },
       {
