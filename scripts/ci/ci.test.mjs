@@ -247,6 +247,10 @@ test('generated image compose removes builds and Mongo while preserving card sha
   assert.doesNotMatch(generated, /staging-mongo|staging-mongo-data|staging-mongo-config/);
   assert.match(generated, /CUKIES_IMAGE_DAPP.*digest reference/);
   assert.match(generated, /cuki-card-worker-legacy:/);
+  assert.match(
+    generated,
+    /legacy-chain-indexer:[\s\S]*?exec sh scripts\/docker-start\.sh/,
+  );
   const cardBlocks = generated.match(/^    image: "\$\{CUKIES_IMAGE_CUKI_CARD_WORKER/gm) ?? [];
   assert.equal(cardBlocks.length, 2);
   assert.match(generated, /coolify:\n    external: true/);

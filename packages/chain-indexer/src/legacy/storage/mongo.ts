@@ -31,6 +31,37 @@ const LIVE_PROOF_VERIFICATIONS = new Set([
   'trongrid-runtimecode-keccak256',
 ]);
 
+type LegacyIndexDefinition = {
+  collection: string;
+  index: IndexDescription['key'];
+  options?: Record<string, unknown>;
+};
+
+export const LEGACY_INDEX_DEFINITIONS: LegacyIndexDefinition[] = [
+  { collection: 'chain_events', index: { chain: 1, contractAlias: 1, contractAddress: 1, eventName: 1, blockNumber: 1 } },
+  { collection: 'chain_events', index: { status: 1, timestampMs: 1, blockNumber: 1, logIndex: 1 } },
+  { collection: 'chain_events', index: { txHash: 1 } },
+  { collection: 'chain_events', index: { runtimeScope: 1, chain: 1, contractAddress: 1, eventName: 1 } },
+  {
+    collection: 'chain_cursors',
+    index: { chain: 1, contractAlias: 1, eventName: 1 },
+    options: { unique: true, name: 'legacy_chain_cursor_identity_unique' },
+  },
+  { collection: 'tx_nfts', index: { eventId: 1 }, options: { unique: true, sparse: true } },
+  { collection: 'tx_nfts', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1, timestampMs: -1 } },
+  { collection: 'point_transactions', index: { eventId: 1 }, options: { unique: true, sparse: true } },
+  { collection: 'point_transactions', index: { chain: 1, pointsContractAddressNormalized: 1, walletNormalized: 1, timestampMs: -1 } },
+  { collection: 'point_balances', index: { chain: 1, pointsContractAddressNormalized: 1, walletNormalized: 1 }, options: { unique: true } },
+  { collection: 'marketplace_listings', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1 }, options: { unique: true, name: 'legacy_listing_identity' } },
+  { collection: 'marketplace_listings', index: { status: 1, chain: 1, updatedAt: -1 } },
+  { collection: 'cukies', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1 }, options: { unique: true, name: 'legacy_nft_identity' } },
+  { collection: 'cukies', index: { chain: 1, ownerNormalized: 1, updatedAt: -1 } },
+  { collection: 'bridge_transfers', index: { eventId: 1 }, options: { unique: true } },
+  { collection: 'chain_dead_letters', index: { eventId: 1 }, options: { unique: true } },
+  { collection: 'chain_indexer_runs', index: { startedAt: -1 } },
+  { collection: 'legacy_source_proofs', index: { chain: 1, alias: 1 }, options: { unique: true } },
+];
+
 function proofId(chain: ChainName, alias: LegacyContractAlias) {
   return `${chain}:${chain === 'BSC' ? '56' : 'mainnet'}:${alias}`;
 }
@@ -108,27 +139,7 @@ export class LegacyIndexerStore extends IndexerStore {
   }
 
   override async ensureIndexes() {
-    const indexes: Array<{ collection: string; index: IndexDescription['key']; options?: IndexDescription['name'] extends never ? never : Record<string, unknown> }> = [
-      { collection: 'chain_events', index: { chain: 1, contractAlias: 1, contractAddress: 1, eventName: 1, blockNumber: 1 } },
-      { collection: 'chain_events', index: { status: 1, timestampMs: 1, blockNumber: 1, logIndex: 1 } },
-      { collection: 'chain_events', index: { txHash: 1 } },
-      { collection: 'chain_events', index: { runtimeScope: 1, chain: 1, contractAddress: 1, eventName: 1 } },
-      { collection: 'chain_cursors', index: { chain: 1, contractAlias: 1, eventName: 1 }, options: { unique: true } },
-      { collection: 'tx_nfts', index: { eventId: 1 }, options: { unique: true, sparse: true } },
-      { collection: 'tx_nfts', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1, timestampMs: -1 } },
-      { collection: 'point_transactions', index: { eventId: 1 }, options: { unique: true, sparse: true } },
-      { collection: 'point_transactions', index: { chain: 1, pointsContractAddressNormalized: 1, walletNormalized: 1, timestampMs: -1 } },
-      { collection: 'point_balances', index: { chain: 1, pointsContractAddressNormalized: 1, walletNormalized: 1 }, options: { unique: true } },
-      { collection: 'marketplace_listings', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1 }, options: { unique: true, name: 'legacy_listing_identity' } },
-      { collection: 'marketplace_listings', index: { status: 1, chain: 1, updatedAt: -1 } },
-      { collection: 'cukies', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1 }, options: { unique: true, name: 'legacy_nft_identity' } },
-      { collection: 'cukies', index: { chain: 1, ownerNormalized: 1, updatedAt: -1 } },
-      { collection: 'bridge_transfers', index: { eventId: 1 }, options: { unique: true } },
-      { collection: 'chain_dead_letters', index: { eventId: 1 }, options: { unique: true } },
-      { collection: 'chain_indexer_runs', index: { startedAt: -1 } },
-      { collection: 'legacy_source_proofs', index: { chain: 1, alias: 1 }, options: { unique: true } },
-    ];
-    await Promise.all(indexes.map(({ collection, index, options }) => (
+    await Promise.all(LEGACY_INDEX_DEFINITIONS.map(({ collection, index, options }) => (
       this.db.collection(collection).createIndex(index, options)
     )));
   }
