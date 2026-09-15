@@ -22,7 +22,21 @@ test('los caches Next no se montan dentro de outputs que Nx puede restaurar', as
     assert.match(body, new RegExp(`mkdir -p ${projectRoot.replaceAll('/', '\\/')}\\/.next`));
     assert.match(body, new RegExp(`rm -rf ${projectRoot.replaceAll('/', '\\/')}\\/.next/cache`));
     assert.match(body, new RegExp(`ln -s ${cacheDir.replaceAll('/', '\\/')} ${projectRoot.replaceAll('/', '\\/')}\\/.next/cache`));
-    assert.match(body, /--mount=type=cache,id=cukies-nx-state,target=\/app\/\.nx,sharing=locked/);
+    assert.match(body, /--mount=type=cache,id=cukies-nx-state,target=\/app\/\.nx\/cache,sharing=locked/);
+    assert.doesNotMatch(body, /--mount=type=cache,id=cukies-nx-state,target=\/app\/\.nx,sharing=locked/);
     assert.match(body, /NX_CACHE_DIRECTORY=\/app\/\.nx\/cache NX_WORKSPACE_DATA_DIRECTORY=\/app\/\.nx\/workspace-data NX_DAEMON=false/);
   }
+});
+
+test('BuildKit persiste solo el cache de tareas Nx, no su base de invocaciones', async () => {
+  const source = await readFile(dockerfilePath, 'utf8');
+  const nxMounts = [...source.matchAll(
+    /--mount=type=cache,id=[^,\s]*nx-state,target=([^,\s\\]+)/g,
+  )];
+
+  assert.ok(nxMounts.length >= 8, 'faltan stages Nx bajo el contrato de cache');
+  for (const match of nxMounts) {
+    assert.equal(match[1], '/app/.nx/cache');
+  }
+  assert.doesNotMatch(source, /target=\/app\/\.nx,sharing=locked/);
 });

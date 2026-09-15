@@ -161,7 +161,7 @@ ENV CUKIES_STANDALONE=true \
 
 COPY . .
 
-RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx/cache,sharing=locked \
     --mount=type=cache,id=cukies-next-cache-dapp,target=/var/cache/cukies-next-dapp,sharing=locked \
     mkdir -p /app/dapp/.next \
  && rm -rf /app/dapp/.next/cache \
@@ -193,7 +193,7 @@ ENV CUKIES_BUILD_ENV_HASH=$CUKIES_BUILD_ENV_HASH \
 
 COPY . .
 
-RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx/cache,sharing=locked \
     --mount=type=cache,id=cukies-next-cache-treasure-hunt,target=/var/cache/cukies-next-treasure-hunt,sharing=locked \
     mkdir -p /app/games/sybil-slayer/.next \
  && rm -rf /app/games/sybil-slayer/.next/cache \
@@ -204,7 +204,7 @@ FROM deps AS chain-indexer-build
 
 COPY . .
 
-RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx/cache,sharing=locked \
     NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run chain-indexer:build
 
 RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
@@ -214,7 +214,7 @@ FROM deps AS cuki-card-worker-build
 
 COPY . .
 
-RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx/cache,sharing=locked \
     NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run cuki-card-worker:build
 
 RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
@@ -224,7 +224,7 @@ FROM deps AS cukies-bridge-relayer-build
 
 COPY . .
 
-RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx/cache,sharing=locked \
     NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run cukies-bridge-relayer:build
 
 RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
@@ -234,7 +234,7 @@ FROM deps AS schedulers-build
 
 COPY . .
 
-RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx,sharing=locked \
+RUN --mount=type=cache,id=cukies-nx-state,target=/app/.nx/cache,sharing=locked \
     NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false pnpm exec nx run schedulers:build
 
 RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
@@ -412,7 +412,7 @@ COPY packages/world-api packages/world-api
 COPY packages/world-shared packages/world-shared
 
 RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
-    --mount=type=cache,id=cukies-world-nx-state,target=/app/.nx,sharing=locked \
+    --mount=type=cache,id=cukies-world-nx-state,target=/app/.nx/cache,sharing=locked \
     NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false \
     pnpm exec nx run @cukies/world-api:build \
  && rm -rf /out \
@@ -425,7 +425,7 @@ COPY packages/world-matchmaking packages/world-matchmaking
 COPY packages/world-shared packages/world-shared
 
 RUN --mount=type=cache,id=cukies-pnpm-store,target=/pnpm/store,sharing=locked \
-    --mount=type=cache,id=cukies-world-nx-state,target=/app/.nx,sharing=locked \
+    --mount=type=cache,id=cukies-world-nx-state,target=/app/.nx/cache,sharing=locked \
     NX_CACHE_DIRECTORY=/app/.nx/cache NX_WORKSPACE_DATA_DIRECTORY=/app/.nx/workspace-data NX_DAEMON=false \
     pnpm exec nx run @cukies/world-matchmaking:build \
  && rm -rf /out \
