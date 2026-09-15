@@ -7,21 +7,48 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { z } from 'zod';
 import { TronWeb } from 'tronweb';
 
+/**
+ * Public identities of the contracts used by the legacy bridge.  These are
+ * deliberately fixed: this worker must never be pointed at a testnet or at
+ * the newer CukiesBridgeEndpoint protocol by configuration accident.
+ */
+export const LEGACY_MAINNET = Object.freeze({
+  bscChainId: 56,
+  tronNetwork: 'mainnet',
+  tronRpcUrl: 'https://api.trongrid.io',
+  tronApiBaseUrl: 'https://api.trongrid.io/v1',
+  tronCollectionAddress: 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe',
+  tronBridgeAddress: 'TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ',
+  bscCollectionAddress: '0x0dbDeBCC62f11005BF434ABFad74564E896aC861',
+  bscBridgeAddress: '0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E',
+} as const);
+
+/** Explicit acknowledgement required before an execution-enabled process starts. */
+export const EXECUTION_CONFIRM =
+  'ENABLE_TRON_MAINNET_TO_BSC_MAINNET_LEGACY_RELAYER';
+
 export type BridgeRelayerConfig = Readonly<{
   enabled: boolean;
+  appEnv: 'production';
   mongoUrl: string;
-  dbName: 'cukieshub-new-staging';
-  tronRpcUrl: 'https://nile.trongrid.io';
-  tronApiBaseUrl: 'https://nile.trongrid.io/v1';
+  dbName: 'cukieshub-new';
+  tronNetwork: 'mainnet';
+  tronRpcUrl: 'https://api.trongrid.io';
+  tronApiBaseUrl: 'https://api.trongrid.io/v1';
   tronApiKey: string | null;
   tronCollectionAddress: string;
+  /** Legacy bridge contract on TRON (kept as endpoint alias for callers). */
+  tronBridgeAddress: string;
   tronEndpointAddress: string;
   tronStartTimestampMs: number;
-  bscChainId: 97;
+  bscChainId: 56;
   bscRpcUrls: string[];
   bscCollectionAddress: Address;
+  /** Legacy bridge contract on BSC (kept as endpoint alias for callers). */
+  bscBridgeAddress: Address;
   bscEndpointAddress: Address;
   bscRelayerPrivateKey: Hex;
+  bscExpectedSignerAddress: Address;
   bscConfirmations: number;
   pollIntervalMs: number;
   leaseMs: number;
@@ -32,12 +59,6 @@ export type BridgeRelayerConfig = Readonly<{
   workerId: string;
 }>;
 
-const MAINNET_BSC_ENDPOINT = '0xb775ec58411f0460716cc7fa6fbbe2c38afd2a6e';
-const MAINNET_BSC_COLLECTION = '0x0dbdebcc62f11005bf434abfad74564e896ac861';
-const MAINNET_TRON_COLLECTION = 'TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe';
-const MAINNET_TRON_ENDPOINT = 'TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ';
-const EXECUTION_CONFIRM = 'ENABLE_TRON_NILE_TO_BSC_TESTNET_RELAYER';
-
 const envSchema = z.object({
   APP_ENV: z.string().optional(),
   NEXT_PUBLIC_APP_ENV: z.string().optional(),
@@ -47,27 +68,40 @@ const envSchema = z.object({
   CUKIES_BRIDGE_RELAYER_MONGO_URL: z.string().optional(),
   CHAIN_INDEXER_MONGO_URL: z.string().optional(),
   DATABASE_URL: z.string().optional(),
-  CUKIES_BRIDGE_RELAYER_DB_NAME: z.string().default('cukieshub-new-staging'),
-  CUKIES_BRIDGE_RELAYER_TRON_NETWORK: z.string().default('nile'),
-  CUKIES_BRIDGE_RELAYER_TRON_RPC_URL: z.string().default('https://nile.trongrid.io'),
-  CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL: z.string().default('https://nile.trongrid.io/v1'),
+  CUKIES_BRIDGE_RELAYER_DB_NAME: z.string().default('cukieshub-new'),
+  CUKIES_BRIDGE_RELAYER_TRON_NETWORK: z.string().default('mainnet'),
+  CUKIES_BRIDGE_RELAYER_TRON_RPC_URL: z.string().default(LEGACY_MAINNET.tronRpcUrl),
+  CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL:
+    z.string().default(LEGACY_MAINNET.tronApiBaseUrl),
   CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS: z.string().optional(),
   CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS: z.string().optional(),
-  CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS: z.coerce.number().int().min(1).optional(),
+  CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS: z.string().optional(),
+  CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS:
+    z.coerce.number().int().min(1).optional(),
   TRON_API_KEY: z.string().optional(),
   TRONGRID_API_KEY: z.string().optional(),
-  CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: z.coerce.number().int().default(97),
+  CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID: z.coerce.number().int().default(56),
   CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS: z.string().optional(),
   CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS: z.string().optional(),
   CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS: z.string().optional(),
+  CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS: z.string().optional(),
   CUKIES_BRIDGE_RELAYER_BSC_PRIVATE_KEY: z.string().optional(),
-  CUKIES_BRIDGE_RELAYER_BSC_CONFIRMATIONS: z.coerce.number().int().min(1).max(30).default(3),
-  CUKIES_BRIDGE_RELAYER_POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).default(10_000),
-  CUKIES_BRIDGE_RELAYER_LEASE_MS: z.coerce.number().int().min(10_000).default(60_000),
-  CUKIES_BRIDGE_RELAYER_RETRY_BASE_MS: z.coerce.number().int().min(1_000).default(5_000),
-  CUKIES_BRIDGE_RELAYER_RETRY_MAX_MS: z.coerce.number().int().min(1_000).default(300_000),
-  CUKIES_BRIDGE_RELAYER_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
-  CUKIES_BRIDGE_RELAYER_SUBMITTED_TIMEOUT_MS: z.coerce.number().int().min(60_000).default(900_000),
+  CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS: z.string().optional(),
+  CUKIES_BRIDGE_RELAYER_EXPECTED_SIGNER_ADDRESS: z.string().optional(),
+  CUKIES_BRIDGE_RELAYER_BSC_CONFIRMATIONS:
+    z.coerce.number().int().min(1).max(100).default(12),
+  CUKIES_BRIDGE_RELAYER_POLL_INTERVAL_MS:
+    z.coerce.number().int().min(1_000).default(10_000),
+  CUKIES_BRIDGE_RELAYER_LEASE_MS:
+    z.coerce.number().int().min(10_000).default(60_000),
+  CUKIES_BRIDGE_RELAYER_RETRY_BASE_MS:
+    z.coerce.number().int().min(1_000).default(5_000),
+  CUKIES_BRIDGE_RELAYER_RETRY_MAX_MS:
+    z.coerce.number().int().min(1_000).default(300_000),
+  CUKIES_BRIDGE_RELAYER_MAX_ATTEMPTS:
+    z.coerce.number().int().min(1).max(20).default(5),
+  CUKIES_BRIDGE_RELAYER_SUBMITTED_TIMEOUT_MS:
+    z.coerce.number().int().min(60_000).default(900_000),
   CUKIES_BRIDGE_RELAYER_WORKER_ID: z.string().optional(),
 });
 
@@ -116,9 +150,47 @@ function exactUrl(value: string, expected: string, label: string) {
 }
 
 function databaseNameFromUrl(url: string) {
-  const match = url.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]+)/i);
-  if (!match?.[1]) throw new Error('La URL Mongo debe incluir la base de datos de Stage.');
-  return decodeURIComponent(match[1]);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('La URL Mongo no es valida.');
+  }
+  if (parsed.protocol !== 'mongodb:' && parsed.protocol !== 'mongodb+srv:') {
+    throw new Error('La URL Mongo debe usar mongodb:// o mongodb+srv://.');
+  }
+  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, '')).trim();
+  if (!databaseName) throw new Error('La URL Mongo debe incluir cukieshub-new.');
+  return databaseName;
+}
+
+function exactAddress(value: string, expected: string, label: string) {
+  if (value.toLowerCase() !== expected.toLowerCase()) {
+    throw new Error(`${label} debe ser la address legacy mainnet aprobada.`);
+  }
+  return value;
+}
+
+function assertHttpsMainnetRpcUrls(raw: string | undefined) {
+  const urls = (raw ?? '').split(',').map((value) => value.trim()).filter(Boolean);
+  if (urls.length === 0) {
+    throw new Error('El relayer exige al menos un RPC HTTPS de BSC mainnet.');
+  }
+  for (const value of urls) {
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new Error('CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS contiene una URL invalida.');
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new Error('Los RPC del relayer deben usar HTTPS.');
+    }
+    if (/prebsc|testnet|test\.bsc|nile|shasta|localhost|127\.0\.0\.1/i.test(parsed.hostname)) {
+      throw new Error('El relayer rechaza RPC de testnet o locales.');
+    }
+  }
+  return urls;
 }
 
 export function buildBridgeRelayerConfig(
@@ -127,67 +199,84 @@ export function buildBridgeRelayerConfig(
   const env = envSchema.parse(environment);
   if (!enabled(env.CUKIES_BRIDGE_RELAYER_ENABLED)) return { enabled: false };
 
-  const appEnv = env.NEXT_PUBLIC_APP_ENV ?? env.APP_ENV;
-  if (appEnv !== 'staging') throw new Error('El relayer exige APP_ENV=staging.');
-  if (!enabled(env.STAGING_ONLY_GUARD ?? 'false')) {
-    throw new Error('El relayer exige STAGING_ONLY_GUARD=true.');
+  // El Dockerfile compartido declara NEXT_PUBLIC_APP_ENV para todos los
+  // servicios. En el relayer puede existir vacio si no se paso el build arg;
+  // ese valor no debe ocultar el APP_ENV de runtime.
+  const appEnv = env.NEXT_PUBLIC_APP_ENV?.trim() || env.APP_ENV?.trim();
+  if (appEnv !== 'production') {
+    throw new Error('El relayer legacy exige APP_ENV=production.');
+  }
+  if (enabled(env.STAGING_ONLY_GUARD ?? 'false')) {
+    throw new Error('El relayer legacy exige STAGING_ONLY_GUARD=false.');
   }
   if (env.CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM !== EXECUTION_CONFIRM) {
-    throw new Error('Falta la confirmacion exacta de ejecucion del relayer Testnet.');
+    throw new Error('Falta la confirmacion exacta de ejecucion del relayer mainnet legacy.');
   }
-  if (env.CUKIES_BRIDGE_RELAYER_TRON_NETWORK !== 'nile') {
-    throw new Error('El relayer solo admite TRON Nile.');
+  if (env.CUKIES_BRIDGE_RELAYER_TRON_NETWORK !== LEGACY_MAINNET.tronNetwork) {
+    throw new Error('El relayer legacy solo admite TRON mainnet.');
   }
-  if (env.CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID !== 97) {
-    throw new Error('El relayer solo admite BSC Testnet chain 97.');
+  if (env.CUKIES_BRIDGE_RELAYER_BSC_CHAIN_ID !== LEGACY_MAINNET.bscChainId) {
+    throw new Error('El relayer legacy solo admite BSC mainnet chain 56.');
   }
 
   const mongoUrl = required(
-    env.CUKIES_BRIDGE_RELAYER_MONGO_URL ?? env.CHAIN_INDEXER_MONGO_URL ?? env.DATABASE_URL,
+    env.CUKIES_BRIDGE_RELAYER_MONGO_URL,
     'CUKIES_BRIDGE_RELAYER_MONGO_URL',
   );
   if (
-    env.CUKIES_BRIDGE_RELAYER_DB_NAME !== 'cukieshub-new-staging'
-    || databaseNameFromUrl(mongoUrl) !== 'cukieshub-new-staging'
+    env.CUKIES_BRIDGE_RELAYER_DB_NAME !== 'cukieshub-new'
+    || databaseNameFromUrl(mongoUrl) !== 'cukieshub-new'
   ) {
-    throw new Error('El relayer solo puede usar cukieshub-new-staging.');
+    throw new Error('El relayer legacy solo puede usar la base cukieshub-new.');
   }
 
-  const tronCollectionAddress = required(
-    env.CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS,
+  const tronCollectionAddress = exactAddress(
+    required(
+      env.CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS,
+      'CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS',
+    ),
+    LEGACY_MAINNET.tronCollectionAddress,
     'CUKIES_BRIDGE_RELAYER_TRON_COLLECTION_ADDRESS',
   );
-  const tronEndpointAddress = required(
-    env.CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS,
-    'CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS',
+  const tronBridgeAddress = exactAddress(
+    required(
+      env.CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS
+        ?? env.CUKIES_BRIDGE_RELAYER_TRON_ENDPOINT_ADDRESS,
+      'CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS',
+    ),
+    LEGACY_MAINNET.tronBridgeAddress,
+    'CUKIES_BRIDGE_RELAYER_TRON_BRIDGE_ADDRESS',
   );
-  if (!TronWeb.isAddress(tronCollectionAddress) || !TronWeb.isAddress(tronEndpointAddress)) {
-    throw new Error('Las addresses Nile no son TRON base58 validas.');
+  if (!TronWeb.isAddress(tronCollectionAddress) || !TronWeb.isAddress(tronBridgeAddress)) {
+    throw new Error('Las addresses legacy mainnet de TRON no son validas.');
   }
-  if (
-    tronCollectionAddress === MAINNET_TRON_COLLECTION
-    || tronEndpointAddress === MAINNET_TRON_ENDPOINT
-    || tronCollectionAddress === tronEndpointAddress
-  ) {
-    throw new Error('El relayer Stage rechaza contratos TRON mainnet o duplicados.');
+  if (tronCollectionAddress === tronBridgeAddress) {
+    throw new Error('La coleccion y el bridge TRON no pueden coincidir.');
   }
 
-  const bscCollectionAddress = required(
-    env.CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS,
+  const bscCollectionAddress = exactAddress(
+    required(
+      env.CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS,
+      'CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS',
+    ),
+    LEGACY_MAINNET.bscCollectionAddress,
     'CUKIES_BRIDGE_RELAYER_BSC_COLLECTION_ADDRESS',
   );
-  const bscEndpointAddress = required(
-    env.CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS,
-    'CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS',
+  const bscBridgeAddress = exactAddress(
+    required(
+      env.CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS
+        ?? env.CUKIES_BRIDGE_RELAYER_BSC_ENDPOINT_ADDRESS,
+      'CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS',
+    ),
+    LEGACY_MAINNET.bscBridgeAddress,
+    'CUKIES_BRIDGE_RELAYER_BSC_BRIDGE_ADDRESS',
   );
   if (
     !isAddress(bscCollectionAddress)
-    || !isAddress(bscEndpointAddress)
-    || bscCollectionAddress.toLowerCase() === MAINNET_BSC_COLLECTION
-    || bscEndpointAddress.toLowerCase() === MAINNET_BSC_ENDPOINT
-    || bscCollectionAddress.toLowerCase() === bscEndpointAddress.toLowerCase()
+    || !isAddress(bscBridgeAddress)
+    || bscCollectionAddress.toLowerCase() === bscBridgeAddress.toLowerCase()
   ) {
-    throw new Error('Las addresses BSC Testnet no son validas, son duplicadas o apuntan a mainnet.');
+    throw new Error('Las addresses legacy mainnet de BSC no son validas.');
   }
 
   const bscRelayerPrivateKey = required(
@@ -197,45 +286,57 @@ export function buildBridgeRelayerConfig(
   if (!/^0x[0-9a-f]{64}$/i.test(bscRelayerPrivateKey)) {
     throw new Error('La private key del relayer BSC no tiene el formato esperado.');
   }
+  let account: ReturnType<typeof privateKeyToAccount>;
   try {
-    privateKeyToAccount(bscRelayerPrivateKey as Hex);
+    account = privateKeyToAccount(bscRelayerPrivateKey as Hex);
   } catch {
     throw new Error('La private key del relayer BSC no es valida.');
   }
-  const bscRpcUrls = (env.CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (bscRpcUrls.length === 0 || bscRpcUrls.some((value) => !value.startsWith('https://'))) {
-    throw new Error('El relayer exige al menos un RPC HTTPS de BSC Testnet.');
+  const expectedSignerAddress = required(
+    env.CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS
+      ?? env.CUKIES_BRIDGE_RELAYER_EXPECTED_SIGNER_ADDRESS,
+    'CUKIES_BRIDGE_RELAYER_BSC_EXPECTED_SIGNER_ADDRESS',
+  );
+  if (!isAddress(expectedSignerAddress) || /^0x0{40}$/i.test(expectedSignerAddress)) {
+    throw new Error('La address signer esperada no es valida.');
   }
+  if (account.address.toLowerCase() !== expectedSignerAddress.toLowerCase()) {
+    throw new Error('La private key del relayer no corresponde a la address signer esperada.');
+  }
+
+  const bscRpcUrls = assertHttpsMainnetRpcUrls(env.CUKIES_BRIDGE_RELAYER_BSC_RPC_URLS);
   if (env.CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS === undefined) {
     throw new Error('Falta CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS.');
   }
 
   return {
     enabled: true,
+    appEnv: 'production',
     mongoUrl,
-    dbName: 'cukieshub-new-staging',
+    dbName: 'cukieshub-new',
+    tronNetwork: 'mainnet',
     tronRpcUrl: exactUrl(
       env.CUKIES_BRIDGE_RELAYER_TRON_RPC_URL,
-      'https://nile.trongrid.io',
+      LEGACY_MAINNET.tronRpcUrl,
       'CUKIES_BRIDGE_RELAYER_TRON_RPC_URL',
-    ) as 'https://nile.trongrid.io',
+    ) as 'https://api.trongrid.io',
     tronApiBaseUrl: exactUrl(
       env.CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL,
-      'https://nile.trongrid.io/v1',
+      LEGACY_MAINNET.tronApiBaseUrl,
       'CUKIES_BRIDGE_RELAYER_TRON_API_BASE_URL',
-    ) as 'https://nile.trongrid.io/v1',
+    ) as 'https://api.trongrid.io/v1',
     tronApiKey: env.TRON_API_KEY ?? env.TRONGRID_API_KEY ?? null,
     tronCollectionAddress,
-    tronEndpointAddress,
+    tronBridgeAddress,
+    tronEndpointAddress: tronBridgeAddress,
     tronStartTimestampMs: env.CUKIES_BRIDGE_RELAYER_TRON_START_TIMESTAMP_MS,
-    bscChainId: 97,
+    bscChainId: 56,
     bscRpcUrls,
     bscCollectionAddress: bscCollectionAddress as Address,
-    bscEndpointAddress: bscEndpointAddress as Address,
+    bscBridgeAddress: bscBridgeAddress as Address,
+    bscEndpointAddress: bscBridgeAddress as Address,
     bscRelayerPrivateKey: bscRelayerPrivateKey as Hex,
+    bscExpectedSignerAddress: expectedSignerAddress as Address,
     bscConfirmations: env.CUKIES_BRIDGE_RELAYER_BSC_CONFIRMATIONS,
     pollIntervalMs: env.CUKIES_BRIDGE_RELAYER_POLL_INTERVAL_MS,
     leaseMs: env.CUKIES_BRIDGE_RELAYER_LEASE_MS,
@@ -243,7 +344,7 @@ export function buildBridgeRelayerConfig(
     retryMaxMs: env.CUKIES_BRIDGE_RELAYER_RETRY_MAX_MS,
     maxAttempts: env.CUKIES_BRIDGE_RELAYER_MAX_ATTEMPTS,
     submittedTimeoutMs: env.CUKIES_BRIDGE_RELAYER_SUBMITTED_TIMEOUT_MS,
-    workerId: env.CUKIES_BRIDGE_RELAYER_WORKER_ID ?? `bridge-relayer-${process.pid}`,
+    workerId: env.CUKIES_BRIDGE_RELAYER_WORKER_ID ?? `legacy-mainnet-relayer-${process.pid}`,
   };
 }
 

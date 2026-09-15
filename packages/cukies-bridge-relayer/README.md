@@ -1,48 +1,79 @@
 # Cukies bridge relayer
 
-Worker Stage-only para la migracion unidireccional `TRON Nile -> BSC Testnet`.
-Permanece desactivado por defecto y no soporta mainnet ni el camino de vuelta.
+Worker de producción para el bridge unidireccional `TRON mainnet -> BSC
+mainnet`, reutilizando los contratos legacy desplegados. No existe canal de
+vuelta y este worker no crea contratos ni ejecuta burns.
+
+## Contratos aprobados
+
+- TRON NFT: `TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe`.
+- TRON bridge: `TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ`.
+- BSC NFT: `0x0dbDeBCC62f11005BF434ABFad74564E896aC861`.
+- BSC bridge: `0xb775ec58411F0460716CC7FA6FbbE2c38AfD2A6E`.
+
+El bridge TRON tiene el rol minter habilitado y el bridge BSC es owner y
+minter del NFT de destino. Las direcciones están fijadas en `src/config.ts` y
+no se pueden sustituir por configuración.
 
 ## Flujo
 
-1. Lee exclusivamente `BridgeRequested` confirmados desde TronGrid Nile.
-2. Deduplica por `transferId` en `cukies_bridge_relayer_jobs`.
-3. Comprueba que el NFT original sigue en custodia del endpoint Nile.
-4. Carga la metadata completa desde la copia aislada `cukieshub-new-staging` y
-   exige que coincida con el hash on-chain.
-5. Simula y envia `completeBridge` al endpoint BSC Testnet allowlisted.
-6. Espera el numero configurado de confirmaciones y reconcilia simultaneamente:
-   original custodiado en Nile, `processedTransfers=true` y owner BSC correcto.
-7. Registra la evidencia de que existe una sola representacion circulante.
+1. Lee únicamente eventos `JumpInBridge` confirmados desde TronGrid mainnet.
+2. Deduplica por `sourceTxHash + sourceEventIndex` en
+   `cukies_bridge_relayer_jobs`.
+3. Comprueba que el NFT original sigue custodiado por el bridge TRON.
+4. Consulta la metadata actual del NFT en TRON.
+5. Antes de enviar ninguna transacción, consulta si el `tokenId` ya existe en
+   BSC. Si existe, no llama a `jumpOutBridge` y deja el trabajo en revisión
+   manual.
+6. Solo cuando BSC confirma que el token no existe, simula y envía el
+   `jumpOutBridge` legacy de siete argumentos.
+7. Espera confirmaciones, exige el evento `JumpOutBridge` y verifica el owner
+   final como comprobación posterior, no como criterio anti-replay.
 
-Los fallos definidos se reintentan con backoff. Una transaccion enviada cuyo
-receipt queda ambiguo nunca se reenvia automaticamente: termina en DLQ para evitar
-doble ejecucion. Los eventos malformed tambien se conservan en DLQ sin bloquear el
-cursor completo.
+La consulta `ownerOf(tokenId)` se usa como sonda de existencia porque el NFT
+legacy no expone un `exists()` público. El revert conocido de token inexistente
+se interpreta como ausencia; cualquier fallo RPC o de transporte es
+indeterminado, se reintenta y nunca habilita un mint a ciegas.
 
-## Verificacion local sin firmas
+Los trabajos tienen leases atómicos, backoff, DLQ y revisión manual. Una
+transacción BSC cuyo receipt sea ambiguo no se reenvía automáticamente.
+
+## Verificación local
 
 ```bash
-pnpm --filter @cukies/cukies-bridge-relayer test
 pnpm --filter @cukies/cukies-bridge-relayer typecheck
-pnpm staging:bridge:verify-local
+pnpm --filter @cukies/cukies-bridge-relayer test
+pnpm --filter @cukies/cukies-bridge-relayer build
 ```
 
-Estas comprobaciones usan fakes/in-memory y no necesitan RPC, Mongo ni private key.
+Las pruebas locales no firman ni emiten transacciones. El E2E firmado está
+bloqueado deliberadamente en `src/e2e-real.ts` y requiere un runbook manual
+aprobado; no se debe automatizar en CI.
 
-## Activacion Testnet
+## Configuración de producción
 
-El servicio Docker usa el profile `bridge-relayer`. Ademas del profile, exige:
+El servicio está en el profile Docker `bridge-relayer` y permanece apagado
+salvo que se habilite explícitamente. La configuración activa exige:
 
-- `APP_ENV=staging`, `STAGING_ONLY_GUARD=true` y la identidad Coolify de app 28;
+- `APP_ENV=production` y `STAGING_ONLY_GUARD=false`;
 - `CUKIES_BRIDGE_RELAYER_ENABLED=true`;
-- `CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM=ENABLE_TRON_NILE_TO_BSC_TESTNET_RELAYER`;
-- Mongo y DB exactamente `cukieshub-new-staging`;
-- TRON `nile`, `https://nile.trongrid.io` y endpoints Nile propios;
-- BSC chain `97`, endpoints BSC Testnet propios y RPC que responda chain `97`;
-- private key BSC de un relayer efimero/operativo ya allowlisted.
+- `CUKIES_BRIDGE_RELAYER_EXECUTION_CONFIRM=ENABLE_TRON_MAINNET_TO_BSC_MAINNET_LEGACY_RELAYER`;
+- Mongo privado con base `cukieshub-new`;
+- timestamp de inicio aprobado inmediatamente antes de la activación;
+- RPC HTTPS de BSC mainnet, wallet BSC autorizada y su address esperada.
 
-No guardar la private key en Git ni en archivos generados. Configurarla solo como
-secreto de Coolify. Antes de activar hay que desplegar y verificar ambos endpoints,
-transferir la capacidad de mint correcta, fijar el bloque/timestamp inicial y
-realizar el E2E manual con un NFT fixture.
+Las claves privadas solo se inyectan como secretos de Coolify. No guardar
+claves, URLs Mongo ni `.env` generados en Git.
+
+## Activación segura
+
+1. Desplegar la revisión con el profile presente pero el relayer desactivado.
+2. Comprobar `/api/health`, SHA servido y logs del contenedor.
+3. Fijar el timestamp de inicio aprobado y validar que el cursor no reprocese
+   histórico no autorizado.
+4. Habilitar el worker y realizar una única transferencia controlada.
+5. Verificar evento TRON, job Mongo, `JumpOutBridge`, owner final y ausencia de
+   una segunda representación.
+
+Si una comprobación on-chain o RPC es ambigua, desactivar el worker y pasar el
+job a revisión manual; nunca repetir el mint por suposición.
