@@ -5,6 +5,7 @@ import type { Address, Hash } from 'viem';
 
 import { BridgeRelayerEngine } from './engine.js';
 import { hashBridgeMetadata } from './metadata.js';
+import { AmbiguousBridgeSubmissionError } from './types.js';
 import type {
   BridgeEvidenceProvider,
   BridgeMetadata,
@@ -29,6 +30,7 @@ function request(overrides: Partial<ConfirmedBridgeRequest> = {}): ConfirmedBrid
   return {
     transferId: `0x${'11'.repeat(32)}`,
     tokenId: '1000000002279',
+    network: 1,
     sourceNetwork: 0,
     destinationNetwork: 1,
     sourceOwner: 'TSource1111111111111111111111111111',
@@ -138,6 +140,17 @@ class MemoryStore implements BridgeRelayerStore {
     });
   }
 
+  async markManualReview(job: BridgeRelayerJob, error: string, now: Date) {
+    Object.assign(this.current(job), {
+      status: 'manual_review',
+      manualReviewAt: now,
+      lastError: error,
+      lockedBy: undefined,
+      lockedUntil: undefined,
+      updatedAt: now,
+    });
+  }
+
   private current(job: BridgeRelayerJob) {
     const current = this.jobs.get(job._id);
     if (!current) throw new Error('missing job');
@@ -159,24 +172,31 @@ class FakeEvidence implements BridgeEvidenceProvider {
 }
 
 class FakeDestination implements BscBridgeDestination {
-  chainId = 97;
-  processed = false;
+  chainId = 56;
+  tokenExistsState = false;
+  tokenExistsError: Error | null = null;
   owner: Address | null = null;
   blockNumber = 0;
   inspection: SubmissionInspection = { state: 'pending' };
+  inspectionError: Error | null = null;
   submitCount = 0;
   submitFailures = 0;
+  ambiguousSubmit = false;
 
-  async assertTestnet() {
-    if (this.chainId !== 97) throw new Error('wrong chain');
+  async assertMainnet() {
+    if (this.chainId !== 56) throw new Error('wrong chain');
   }
 
-  async isProcessed() {
-    return this.processed;
+  async tokenExists() {
+    if (this.tokenExistsError) throw this.tokenExistsError;
+    return this.tokenExistsState;
   }
 
   async submit() {
     this.submitCount += 1;
+    if (this.ambiguousSubmit) {
+      throw new AmbiguousBridgeSubmissionError('broadcast response lost');
+    }
     if (this.submitFailures > 0) {
       this.submitFailures -= 1;
       throw new Error('temporary RPC failure');
@@ -185,12 +205,13 @@ class FakeDestination implements BscBridgeDestination {
   }
 
   async inspect() {
+    if (this.inspectionError) throw this.inspectionError;
     return this.inspection;
   }
 
   async reconcile() {
     return {
-      processed: this.processed,
+      processed: this.tokenExistsState,
       destinationOwner: this.owner,
       blockNumber: this.blockNumber,
     };
@@ -223,12 +244,12 @@ describe('BridgeRelayerEngine', () => {
     assert.equal(destination.submitCount, 1);
     assert.equal(store.jobs.get(request().transferId)?.attempts, 1);
 
-    destination.processed = true;
+    destination.tokenExistsState = true;
     destination.owner = destinationOwner;
     destination.blockNumber = 456;
     destination.inspection = {
       state: 'confirmed',
-      processed: true,
+      jumpOutObserved: true,
       destinationOwner,
       blockNumber: 456,
     };
@@ -239,6 +260,7 @@ describe('BridgeRelayerEngine', () => {
     assert.deepEqual(store.jobs.get(request().transferId)?.completionEvidence, {
       sourceCustodied: true,
       destinationOwner,
+      jumpOutObserved: true,
       circulatingRepresentations: 1,
       destinationBlockNumber: 456,
     });
@@ -257,10 +279,34 @@ describe('BridgeRelayerEngine', () => {
     assert.equal(destination.submitCount, 1);
     assert.equal(
       (await engine.processNext(new Date(now.getTime() + 11_000)))?.outcome,
-      'dead_letter',
+      'manual_review',
     );
     assert.equal(destination.submitCount, 1);
     assert.match(store.jobs.get(request().transferId)?.lastError ?? '', /ambigua/);
+  });
+
+  it('pasa un error RPC al inspeccionar un submitted a revision manual sin reintentar', async () => {
+    const { store, destination, engine } = fixture();
+    const now = new Date('2026-08-30T12:00:00.000Z');
+    await store.upsertRequests([request()], now);
+    assert.equal((await engine.processNext(now))?.outcome, 'submitted');
+    assert.equal(destination.submitCount, 1);
+
+    // The destination may already have mined the mint when receipt lookup
+    // fails; resubmitting would risk a duplicate legacy jumpOutBridge call.
+    destination.tokenExistsState = true;
+    destination.inspectionError = new Error('receipt RPC transport failure');
+
+    assert.equal(
+      (await engine.processNext(new Date(now.getTime() + 1_000)))?.outcome,
+      'manual_review',
+    );
+    assert.equal(destination.submitCount, 1);
+    assert.equal(store.jobs.get(request().transferId)?.status, 'manual_review');
+    assert.match(
+      store.jobs.get(request().transferId)?.lastError ?? '',
+      /inspeccionar.*revision manual/i,
+    );
   });
 
   it('retries definite transient failures with backoff and respects maxAttempts', async () => {
@@ -283,27 +329,68 @@ describe('BridgeRelayerEngine', () => {
     assert.equal(destination.submitCount, 3);
   });
 
+  it('manda a revision manual un broadcast cuyo hash se pierde y nunca reintenta', async () => {
+    const { store, destination, engine } = fixture();
+    const now = new Date('2026-08-30T12:00:00.000Z');
+    destination.ambiguousSubmit = true;
+    await store.upsertRequests([request()], now);
+
+    assert.equal((await engine.processNext(now))?.outcome, 'manual_review');
+    assert.equal(destination.submitCount, 1);
+    assert.equal(store.jobs.get(request().transferId)?.status, 'manual_review');
+    assert.equal(
+      await engine.processNext(new Date(now.getTime() + 10_000)),
+      null,
+    );
+    assert.equal(destination.submitCount, 1);
+  });
+
+  it('manda a revision manual si falla guardar el hash ya emitido', async () => {
+    const { store, destination, engine } = fixture();
+    const now = new Date('2026-08-30T12:00:00.000Z');
+    store.markSubmitted = async () => {
+      throw new Error('Mongo write timeout');
+    };
+    await store.upsertRequests([request()], now);
+
+    assert.equal((await engine.processNext(now))?.outcome, 'manual_review');
+    assert.equal(destination.submitCount, 1);
+    assert.equal(store.jobs.get(request().transferId)?.status, 'manual_review');
+  });
+
   it('dead-letters metadata drift before any destination transaction', async () => {
     const { store, evidence, destination, engine } = fixture();
     const now = new Date('2026-08-30T12:00:00.000Z');
-    evidence.metadata = { ...metadata, energy: 89n };
+    evidence.metadata = { ...metadata, energy: 256n };
     await store.upsertRequests([request()], now);
 
     assert.equal((await engine.processNext(now))?.outcome, 'dead_letter');
     assert.equal(destination.submitCount, 0);
-    assert.match(store.jobs.get(request().transferId)?.lastError ?? '', /metadataHash/);
+    assert.match(store.jobs.get(request().transferId)?.lastError ?? '', /uint8/);
   });
 
-  it('recovers idempotently when destination was already processed', async () => {
+  it('does not mint when the token id already exists on BSC', async () => {
     const { store, destination, engine } = fixture();
     const now = new Date('2026-08-30T12:00:00.000Z');
-    destination.processed = true;
+    destination.tokenExistsState = true;
     destination.owner = destinationOwner;
     destination.blockNumber = 444;
     await store.upsertRequests([request()], now);
 
-    assert.equal((await engine.processNext(now))?.outcome, 'completed');
+    assert.equal((await engine.processNext(now))?.outcome, 'manual_review');
     assert.equal(destination.submitCount, 0);
-    assert.equal(store.jobs.get(request().transferId)?.status, 'completed');
+    assert.equal(store.jobs.get(request().transferId)?.status, 'manual_review');
+    assert.match(store.jobs.get(request().transferId)?.lastError ?? '', /tokenId BSC ya existe/);
+  });
+
+  it('does not mint when the existence check is indeterminate', async () => {
+    const { store, destination, engine } = fixture();
+    const now = new Date('2026-08-30T12:00:00.000Z');
+    destination.tokenExistsError = new Error('temporary RPC failure');
+    await store.upsertRequests([request()], now);
+
+    assert.equal((await engine.processNext(now))?.outcome, 'retry');
+    assert.equal(destination.submitCount, 0);
+    assert.equal(store.jobs.get(request().transferId)?.status, 'retry');
   });
 });
