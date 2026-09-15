@@ -3,6 +3,7 @@ import 'server-only';
 import { Collection, Filter, Sort } from 'mongodb';
 
 import { cukiesDb } from '@/lib/mongodb-cukies';
+import { buildCanonicalCukieReadFilter } from '@/lib/cukies-data/canonical-projection';
 
 import {
   fetchLegacyMarketplaceGraphQL,
@@ -51,6 +52,9 @@ import {
 
 type LegacyCukiDocument = {
   _id: string;
+  tokenId?: unknown;
+  metadataSource?: unknown;
+  legacyProjectionKind?: unknown;
   user?: unknown;
   network?: unknown;
   chain?: unknown;
@@ -122,6 +126,9 @@ const DEFAULT_LIMIT = 24;
 
 const cukiProjection = {
   _id: 1,
+  tokenId: 1,
+  metadataSource: 1,
+  legacyProjectionKind: 1,
   user: 1,
   network: 1,
   chain: 1,
@@ -198,7 +205,7 @@ function normalizeRelation(value: unknown): LegacyMarketplaceCukiReference | nul
 
   const document = value as LegacyCukiDocument;
   if (!isLegacyMarketplaceDocument(document)) return null;
-  const id = toStringOrNull(document._id);
+  const id = toStringOrNull(document.tokenId) ?? toStringOrNull(document._id);
   if (!id) return null;
 
   const identity = getLegacyMarketplaceDocumentIdentity(document);
@@ -431,7 +438,7 @@ function normalizeFacet(rows: Array<{ _id: unknown; count: number }>) {
 }
 
 function normalizeCuki(document: LegacyCukiDocument): LegacyMarketplaceCukiItem {
-  const id = toStringOrNull(document._id) ?? '';
+  const id = toStringOrNull(document.tokenId) ?? toStringOrNull(document._id) ?? '';
   const identity = getLegacyMarketplaceDocumentIdentity(document);
   if (!identity) {
     throw new Error(`Legacy Cukie ${id || '(sin id)'} tiene una identidad de red/colección incompatible.`);
@@ -510,7 +517,8 @@ export async function reconcileLegacyMarketplaceCuki(
   const document = await collection.findOne(
     {
       $and: [
-        { _id: tokenId },
+        buildCanonicalCukieReadFilter<LegacyCukiDocument>(),
+        { tokenId },
         buildLegacyMarketplaceIdentityFilter(expectedNetwork) as unknown as Filter<LegacyCukiDocument>,
       ],
     },
@@ -525,6 +533,7 @@ export async function reconcileLegacyMarketplaceCuki(
     collection,
     reconciliation,
     {
+      documentId: document._id,
       tokenId,
       network: document.network,
       owner: document.user,
@@ -541,7 +550,9 @@ async function hydrateCukiRelations(
   collection: Collection<LegacyCukiDocument>,
 ) {
   const relationId = (value: unknown) => toStringOrNull(
-    value && typeof value === 'object' ? (value as LegacyCukiDocument)._id : value,
+    value && typeof value === 'object'
+      ? (value as LegacyCukiDocument).tokenId ?? (value as LegacyCukiDocument)._id
+      : value,
   );
   const relationIds = documents.flatMap((document) => [
     ...(Array.isArray(document.parents) ? document.parents : []),
@@ -555,26 +566,44 @@ async function hydrateCukiRelations(
   const relationDocuments = await collection
     .find({
       $and: [
-        { _id: { $in: [...new Set(relationIds)] } },
+        buildCanonicalCukieReadFilter<LegacyCukiDocument>(),
+        {
+          $or: [
+            { tokenId: { $in: [...new Set(relationIds)] } },
+            { _id: { $in: [...new Set(relationIds)] } },
+          ],
+        },
         buildLegacyMarketplaceIdentityFilter() as unknown as Filter<LegacyCukiDocument>,
       ],
     }, { projection: cukiProjection })
     .toArray();
-  const relationById = new Map(relationDocuments.map((item) => [item._id, item]));
+  const relationById = new Map<string, LegacyCukiDocument[]>();
+  for (const item of relationDocuments) {
+    const id = toStringOrNull(item.tokenId) ?? toStringOrNull(item._id);
+    if (!id) continue;
+    relationById.set(id, [...(relationById.get(id) ?? []), item]);
+  }
+  const resolveRelation = (parent: LegacyCukiDocument, value: unknown) => {
+    const id = relationId(value);
+    if (!id) return value;
+    const candidates = relationById.get(id) ?? [];
+    const parentNetwork = normalizeLegacyMarketplaceNetwork(parent.network);
+    const sameNetwork = parentNetwork
+      ? candidates.filter((candidate) => (
+          normalizeLegacyMarketplaceNetwork(candidate.network) === parentNetwork
+        ))
+      : [];
+    if (sameNetwork.length === 1) return sameNetwork[0];
+    return candidates.length === 1 ? candidates[0] : value;
+  };
 
   return documents.map((document) => ({
     ...document,
     parents: Array.isArray(document.parents)
-      ? document.parents.map((value) => {
-          const id = relationId(value);
-          return id ? relationById.get(id) ?? value : value;
-        })
+      ? document.parents.map((value) => resolveRelation(document, value))
       : document.parents,
     children: Array.isArray(document.children)
-      ? document.children.map((value) => {
-          const id = relationId(value);
-          return id ? relationById.get(id) ?? value : value;
-        })
+      ? document.children.map((value) => resolveRelation(document, value))
       : document.children,
   }));
 }
@@ -707,7 +736,10 @@ export function buildLegacyMarketplaceMongoFilter(
     collection: params.collection,
   });
   const filter: Filter<LegacyCukiDocument> = {
-    $and: [identityFilter as Filter<LegacyCukiDocument>],
+    $and: [
+      buildCanonicalCukieReadFilter<LegacyCukiDocument>(),
+      identityFilter as Filter<LegacyCukiDocument>,
+    ],
   };
   const addClause = (clause: Filter<LegacyCukiDocument>) => {
     filter.$and?.push(clause);
@@ -768,6 +800,7 @@ export function buildLegacyMarketplaceMongoFilter(
     addClause({
       $or: [
         { _id: search },
+        { tokenId: search },
         ...(Number.isFinite(numericSearch)
           ? [{ cukiNumber: numericSearch }, { type: numericSearch }]
           : []),
@@ -797,7 +830,12 @@ function buildMongoSort(sort?: string): Sort {
 
 async function getFacets() {
   const collection = await getCukiesCollection();
-  const identityFilter = buildLegacyMarketplaceIdentityFilter();
+  const identityFilter = {
+    $and: [
+      buildCanonicalCukieReadFilter<LegacyCukiDocument>(),
+      buildLegacyMarketplaceIdentityFilter(),
+    ],
+  } as Filter<LegacyCukiDocument>;
   const [states, networks, types, generations] = await Promise.all([
     collection
       .aggregate<{ _id: unknown; count: number }>([
@@ -994,15 +1032,15 @@ export async function getLegacyMarketplaceCuki(
 
   try {
     const collection = await getCukiesCollection();
-    const document = await collection.findOne(
-      {
-        $and: [
-          { _id: tokenId },
-         buildLegacyMarketplaceIdentityFilter(normalizedIdentity) as unknown as Filter<LegacyCukiDocument>,
-        ],
-      },
-      { projection: cukiProjection },
-    );
+    const cursor = collection.find({
+      $and: [
+        buildCanonicalCukieReadFilter<LegacyCukiDocument>(),
+        { tokenId },
+        buildLegacyMarketplaceIdentityFilter(normalizedIdentity) as unknown as Filter<LegacyCukiDocument>,
+      ],
+    }, { projection: cukiProjection }).limit(2);
+    const documents = await cursor.toArray();
+    const document = documents.length === 1 ? documents[0] : null;
 
     if (!document) return null;
 

@@ -9,6 +9,7 @@ export type LegacyMarketplaceReconciliation = {
 };
 
 export type LegacyMarketplaceReconciliationSnapshot = {
+  documentId?: string;
   tokenId: string;
   network: unknown;
   owner: unknown;
@@ -25,7 +26,7 @@ export function buildLegacyMarketplaceReconciliationCasFilter(
   snapshot: LegacyMarketplaceReconciliationSnapshot,
 ) {
   return {
-    _id: snapshot.tokenId,
+    _id: snapshot.documentId ?? snapshot.tokenId,
     network: exactSnapshotValue(snapshot.network),
     user: exactSnapshotValue(snapshot.owner),
     state: exactSnapshotValue(snapshot.state),
