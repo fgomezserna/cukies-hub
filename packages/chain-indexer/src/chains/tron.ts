@@ -25,6 +25,22 @@ type TronGridResponse = {
   };
 };
 
+type TronHttpError = Error & {
+  status: number;
+  retryAfterMs?: number;
+};
+
+type TronRequestState = {
+  /** Earliest time at which any subsequent TronGrid request may start. */
+  nextAllowedAt: number;
+};
+
+const TRON_MAX_TRANSIENT_RETRIES = 3;
+const TRON_RETRY_BACKOFF_MS = 250;
+// One indexer process has one TronGrid quota window. Keep Retry-After across
+// ingest cycles so an exhausted 429 cannot be forgotten by the next poll.
+const sharedTronRequestState: TronRequestState = { nextAllowedAt: 0 };
+
 function extractFingerprint(response: TronGridResponse) {
   if (response.meta?.fingerprint) return response.meta.fingerprint;
 
@@ -40,11 +56,29 @@ function extractFingerprint(response: TronGridResponse) {
 }
 
 function isRateLimitError(error: unknown) {
-  return error instanceof Error && error.message.includes('TronGrid 429');
+  return error instanceof Error
+    && ((error as Partial<TronHttpError>).status === 429 || error.message.includes('TronGrid 429'));
 }
 
 function isBadRequestError(error: unknown) {
-  return error instanceof Error && error.message.includes('TronGrid 400');
+  return error instanceof Error
+    && ((error as Partial<TronHttpError>).status === 400 || error.message.includes('TronGrid 400'));
+}
+
+function isAuthError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const status = (error as Partial<TronHttpError>).status;
+  return status === 401 || status === 403
+    || /TronGrid (?:401|403)\b|unauthori[sz]ed|forbidden/i.test(error.message);
+}
+
+function parseRetryAfterMs(value: string | null) {
+  if (!value) return undefined;
+  const seconds = Number(value.trim());
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1_000);
+  const date = Date.parse(value);
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  return undefined;
 }
 
 function errorMessage(error: unknown) {
@@ -54,6 +88,11 @@ function errorMessage(error: unknown) {
 async function delay(ms: number) {
   if (ms <= 0) return;
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForSharedRetryWindow(state: TronRequestState) {
+  const remaining = state.nextAllowedAt - Date.now();
+  if (remaining > 0) await delay(remaining);
 }
 
 function eventsBaseUrl(config: IndexerConfig) {
@@ -95,6 +134,7 @@ async function fetchTronEvents(
   contractEvent: ContractEventConfig,
   minTimestampMs: number,
   fingerprint?: string | null,
+  state: TronRequestState = { nextAllowedAt: 0 },
 ) {
   const url = buildTronUrl(config, contractEvent, minTimestampMs, fingerprint);
   const headers: Record<string, string> = {};
@@ -103,13 +143,44 @@ async function fetchTronEvents(
     headers['TRON-PRO-API-KEY'] = config.tronApiKey;
   }
 
-  const response = await fetch(url, { headers });
+  for (let attempt = 0; ; attempt += 1) {
+    await waitForSharedRetryWindow(state);
+    let response: Response;
+    try {
+      response = await fetch(url, { headers });
+    } catch (error) {
+      const backoffMs = TRON_RETRY_BACKOFF_MS * (2 ** attempt);
+      state.nextAllowedAt = Math.max(state.nextAllowedAt, Date.now() + backoffMs);
+      if (attempt >= TRON_MAX_TRANSIENT_RETRIES) throw error;
+      await waitForSharedRetryWindow(state);
+      continue;
+    }
 
-  if (!response.ok) {
-    throw new Error(`TronGrid ${response.status} ${response.statusText}`);
+    if (response.ok) {
+      return (await response.json()) as TronGridResponse;
+    }
+
+    const retryAfterMs = parseRetryAfterMs(response.headers?.get('retry-after') ?? null);
+    const httpError = new Error(
+      `TronGrid ${response.status} ${response.statusText}`,
+    ) as TronHttpError;
+    httpError.status = response.status;
+    if (retryAfterMs !== undefined) httpError.retryAfterMs = retryAfterMs;
+
+    // 401/403 are configuration/credential failures and must remain visible;
+    // retrying them only delays diagnosis. 429 and 5xx may be transient and
+    // share the Retry-After window across contract/event cursors.
+    const retryable = !isAuthError(httpError)
+      && (response.status === 429 || (response.status >= 500 && response.status <= 599));
+    if (!retryable) throw httpError;
+
+    const backoffMs = retryAfterMs ?? TRON_RETRY_BACKOFF_MS * (2 ** attempt);
+    // Preserve even the final Retry-After before surfacing exhaustion. The
+    // following ingest cycle will respect this shared deadline.
+    state.nextAllowedAt = Math.max(state.nextAllowedAt, Date.now() + backoffMs);
+    if (attempt >= TRON_MAX_TRANSIENT_RETRIES) throw httpError;
+    await waitForSharedRetryWindow(state);
   }
-
-  return (await response.json()) as TronGridResponse;
 }
 
 function eventToChainEvent(config: IndexerConfig, contractEvent: ContractEventConfig, event: TronGridEvent): ChainEvent {
@@ -155,6 +226,7 @@ export async function ingestTronOnce(store: IndexerStore, config: IndexerConfig)
   let inserted = 0;
   let pages = 0;
   let rateLimited = false;
+  const requestState = sharedTronRequestState;
   const errors: Array<{ cursorId: string; error: string }> = [];
 
   for (const contractEvent of contractEvents) {
@@ -169,14 +241,30 @@ export async function ingestTronOnce(store: IndexerStore, config: IndexerConfig)
           contractEvent,
           minTimestampMs,
           cursor?.fingerprint,
+          requestState,
         );
       } catch (error) {
         if (!cursor?.fingerprint || !isBadRequestError(error)) throw error;
 
-        response = await fetchTronEvents(config, contractEvent, minTimestampMs, null);
+        response = await fetchTronEvents(
+          config,
+          contractEvent,
+          minTimestampMs,
+          null,
+          requestState,
+        );
       }
 
-      const events = (response.data ?? []).map((event) => eventToChainEvent(config, contractEvent, event));
+      const eventById = new Map<string, ChainEvent>();
+      for (const rawEvent of response.data ?? []) {
+        const event = eventToChainEvent(config, contractEvent, rawEvent);
+        eventById.set(event._id, event);
+      }
+      const events = [...eventById.values()].sort((left, right) =>
+        left.timestampMs - right.timestampMs
+        || left.blockNumber - right.blockNumber
+        || left.logIndex - right.logIndex
+        || left._id.localeCompare(right._id));
       const result = await store.upsertEvents(events);
       const nextFingerprint = extractFingerprint(response);
       const lastTimestamp = events.at(-1)?.timestampMs;
@@ -194,6 +282,10 @@ export async function ingestTronOnce(store: IndexerStore, config: IndexerConfig)
     } catch (error) {
       if (isRateLimitError(error)) {
         rateLimited = true;
+        errors.push({
+          cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+          error: `${errorMessage(error)} tras agotar reintentos; cursor conservado`,
+        });
         break;
       }
 

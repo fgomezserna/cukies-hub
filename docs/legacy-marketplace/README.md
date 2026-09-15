@@ -226,8 +226,14 @@ base y su usuario dedicado se provisionan para este worker. Esta lectura de
 | `CUKIES_LEGACY_TRON_NETWORK` / `CUKIES_LEGACY_TRON_API_BASE_URL` | `mainnet` / API mainnet con eventos historicos; credencial opcional exclusiva |
 | `CUKIES_LEGACY_BSC_START_BLOCK` | Inicio explicito; `0` significa historia completa en el worker dedicado, no empezar desde el head |
 | `CUKIES_LEGACY_TRON_START_TIMESTAMP_MS` | Inicio explicito; `0` evita asumir una fecha de despliegue no acreditada |
+| `CUKIES_LEGACY_MAX_BLOCK_RANGE` | Ventana lógica BSC; `5001` por defecto y como máximo. Solo avanza cuando todos sus subrangos se han procesado |
+| `CUKIES_LEGACY_MIN_BLOCK_RANGE` | `1` por defecto; mínimo validado para el rango adaptativo BSC (también `CUKIES_LEGACY_BSC_MIN_BLOCK_RANGE`) |
+| `CUKIES_LEGACY_BSC_WINDOWS_PER_CYCLE` | `3` por defecto (1-20): ventanas BSC contiguas por ciclo. Se puede usar el alias compatible `CUKIES_LEGACY_BSC_BATCHES_PER_CYCLE`; nunca mueve el cursor sin una ingesta correcta |
 | `CUKIES_LEGACY_TRON_REQUEST_DELAY_MS` | `2000`: pasada de los 40 eventos configurados completada sin API key ni 429 en 87,309 s |
 
+El worker lanza BSC y TRON en paralelo. El límite de ventanas BSC permite
+recuperar backlog sin que una página lenta o un 429 de TronGrid bloquee el
+avance BSC; el fingerprint TRON solo se persiste tras una página confirmada.
 El inicio completo es conservador y no garantiza terminar antes del 15. Se debe
 medir el avance real por contrato/evento, limites RPC y errores 429, ajustar rango
 y frecuencia de lectura, y registrar una estimacion de duracion observada. No se

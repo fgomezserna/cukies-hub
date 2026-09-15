@@ -24,7 +24,11 @@ const legacyEnvironmentSchema = z.object({
   CUKIES_LEGACY_TRON_NETWORK: z.string().min(1),
   CUKIES_LEGACY_TRON_START_TIMESTAMP_MS: z.coerce.number().int().nonnegative(),
   CUKIES_LEGACY_BSC_CONFIRMATIONS: z.coerce.number().int().nonnegative().default(12),
-  CUKIES_LEGACY_MAX_BLOCK_RANGE: z.coerce.number().int().positive().default(5_000),
+  CUKIES_LEGACY_MAX_BLOCK_RANGE: z.coerce.number().int().min(1).max(5_001).default(5_001),
+  CUKIES_LEGACY_MIN_BLOCK_RANGE: z.coerce.number().int().min(1).max(5_001).optional(),
+  CUKIES_LEGACY_BSC_MIN_BLOCK_RANGE: z.coerce.number().int().min(1).max(5_001).optional(),
+  CUKIES_LEGACY_BSC_WINDOWS_PER_CYCLE: z.coerce.number().int().min(1).max(20).optional(),
+  CUKIES_LEGACY_BSC_BATCHES_PER_CYCLE: z.coerce.number().int().min(1).max(20).optional(),
   CUKIES_LEGACY_TRON_PAGE_LIMIT: z.coerce.number().int().positive().default(200),
   CUKIES_LEGACY_TRON_REQUEST_DELAY_MS: z.coerce.number().int().nonnegative().default(2_000),
   CUKIES_LEGACY_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
@@ -156,6 +160,14 @@ export function getLegacyIndexerConfig(environment: NodeJS.ProcessEnv = process.
   assertSameMongoRuntime(env, env.CUKIES_LEGACY_INDEXER_MONGO_URL);
   const aliases = validateAliases(env.CUKIES_LEGACY_CONTRACT_ALIASES);
   const bscRpcUrls = rpcUrls(env.CUKIES_LEGACY_BSC_RPC_URLS);
+  const minBlockRange = env.CUKIES_LEGACY_BSC_MIN_BLOCK_RANGE
+    ?? env.CUKIES_LEGACY_MIN_BLOCK_RANGE
+    ?? 1;
+  if (minBlockRange > env.CUKIES_LEGACY_MAX_BLOCK_RANGE) {
+    throw new Error(
+      'CUKIES_LEGACY_MIN_BLOCK_RANGE no puede superar CUKIES_LEGACY_MAX_BLOCK_RANGE.',
+    );
+  }
   // El manifiesto compartido conserva aliases de economía; el runtime legacy
   // obtiene solo los contratos canónicos y filtra el resultado sin aceptar
   // addresses ni aliases inyectados desde el entorno.
@@ -181,6 +193,12 @@ export function getLegacyIndexerConfig(environment: NodeJS.ProcessEnv = process.
     tronStartTimestampMs: env.CUKIES_LEGACY_TRON_START_TIMESTAMP_MS,
     bscConfirmations: env.CUKIES_LEGACY_BSC_CONFIRMATIONS,
     maxBlockRange: env.CUKIES_LEGACY_MAX_BLOCK_RANGE,
+    minBlockRange,
+    // The explicit BSC name is canonical; retain the batches spelling for
+    // operators that already use it in worker environment templates.
+    bscWindowsPerCycle: env.CUKIES_LEGACY_BSC_WINDOWS_PER_CYCLE
+      ?? env.CUKIES_LEGACY_BSC_BATCHES_PER_CYCLE
+      ?? 3,
     tronPageLimit: env.CUKIES_LEGACY_TRON_PAGE_LIMIT,
     tronRequestDelayMs: env.CUKIES_LEGACY_TRON_REQUEST_DELAY_MS,
     pollIntervalMs: env.CUKIES_LEGACY_POLL_INTERVAL_MS,

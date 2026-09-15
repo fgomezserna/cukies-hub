@@ -147,6 +147,12 @@ export type ChainCursor = {
   legacySourceVerifiedAt?: Date;
   legacyProofEvidence?: string;
   poolPeriodDurationSeconds?: number;
+  /**
+   * Last successful BSC range selected for this cursor.  These fields are
+   * optional so cursors written by older indexer versions remain valid.
+   */
+  adaptiveRange?: number;
+  adaptiveSuccesses?: number;
   updatedAt: Date;
 };
 
@@ -216,6 +222,13 @@ export type IndexerConfig = {
   tronStartTimestampMs: number;
   bscConfirmations: number;
   maxBlockRange: number;
+  /** Minimum adaptive BSC range. Runtime configuration always resolves this
+   * value, while keeping it optional preserves compatibility for test/config
+   * callers that construct the pre-adaptive shape directly. */
+  minBlockRange?: number;
+  /** Legacy runner may process a bounded number of contiguous BSC windows
+   * while TRON pagination is in flight. */
+  bscWindowsPerCycle?: number;
   tronPageLimit: number;
   tronRequestDelayMs: number;
   pollIntervalMs: number;
