@@ -125,7 +125,7 @@ nunca como secreto vigente.
 | --- | --- | --- | --- |
 | `producer/{bsc,tron}` listeners y Bull | `packages/chain-indexer/src/chains`, `normalize`, `projectors` | Código portado parcial | Comparar todos los eventos/senders, cursors y efectos antes de parar producer |
 | `consumer` + `senders-manager` | projectors transaccionales, `storage/mongo`, dead letters | Código portado parcial | No existe colección `completedEvents` equivalente; reconciliar estados |
-| `sync/getter`, `setter`, handlers | `chain-indexer` ingest/import/project | Importador parcial | Eventos no reconocidos y estado `processing` no quedan equivalentes; replay idempotente pendiente |
+| `sync/getter`, `setter`, handlers | `chain-indexer` ingest/import/project | Entry points getter/setter retirados en `cukiesworld-stack` PR #19 (`d52916fc`); handlers conservados como referencia | Activar el indexer como único writer y cerrar paridad; no reactivar `processedEvents` como fallback |
 | `cards`/`sync/cards.js` Bull | `packages/cuki-card-worker` con locks Mongo y objetos content-addressed | Código portado; contenedor Hub observado live | Verificar jobs, assets y paridad de imágenes; `running` no demuestra despliegue funcional |
 | `auth` REST (`/login/*`) | NextAuth, challenge/wallet y `user-sync` | Código portado parcial | Migrar identidad mínima; excluir passwords, tokens, sesiones, blacklist y privilegios |
 | `data-graphql` | APIs Hub `legacy-marketplace` y lecturas locales | Referencia/parcial; GraphQL legacy sigue runtime | Cero consumidores GraphQL y reconciliación de home/detalle/puntos |
@@ -294,6 +294,13 @@ en recursos Stage, producción Hub y servicios legacy. El censo de servicios es:
 | Hub Stage | `dapp` (1), `chain-indexer` (1), `staging-mongo` (1), `cuki-card-worker` (1), `cukie-master-scheduler`, `competition-credit-scheduler`, `game-economy-scheduler`, `cukie-pool-scheduler`, `reward-accounting-scheduler`, `reward-batch-publisher`, `weekly-ranking-scheduler` | Desplegado observado; gates individuales siguen mandando. Stage chain 97, commit observado `d4bc3727b18aa9161f9da43cf0c543e02c2ee1e4`; no equivale a paridad legacy |
 | Hub producción | `dapp` (1), `chain-indexer` (1) | Desplegado observado en commit `fb2b19023e7edd824bc6eb86dc5409025cc3ee1e`; producción mantiene `CUKIES_DATABASE_URL` según configuración observada |
 | Legacy producción/staging | `mongodb` (1), `marketplace` (2), `auth-api` (2), `data-graphql-api` (2), `data-rest-api` (2), `data-rest-learn-api` (2), `data-rest-ludo-api` (2), `game-api` (2), `matchmaking-api` (1), `learn-bot-worker` (1), `getter-bsc-worker` (1), `getter-tron-worker` (1), `setter-worker` (1), `cards-worker` (1) | Live y `running` observado; sigue dentro del inventario y no se puede declarar retirado por estar portado el código |
+
+Actualización operativa del 15/09/2026: `getter-bsc-worker`,
+`getter-tron-worker` y `setter-worker` fueron retirados de las declaraciones y
+contenedores de CT2051/CT2050. La evidencia del 07/09 anterior se conserva como
+fotografía histórica; no describe el runtime vigente. El sustituto es
+`legacy-chain-indexer`, que todavía debe quedar activo y reconciliado antes de
+declarar resuelta la sincronización.
 
 Los gates Stage observados incluyen chain 97,
 `COMPETITION_CREDITS_RUNTIME_ENABLED=true`,
