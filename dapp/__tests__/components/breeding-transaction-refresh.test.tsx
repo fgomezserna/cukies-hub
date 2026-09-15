@@ -289,7 +289,7 @@ describe('Crías Legacy: confirmación y proyección sin repetir firma', () => {
     mockCompletedItems = [completedCuki('99')];
 
     render(<BreedingClient initialTab="active" />);
-    await screen.findByText('Breed #7');
+    await screen.findByText('Cría #7');
     fireEvent.click(screen.getByRole('button', { name: 'Abrir Cukie' }));
 
     await waitFor(() => expect(mockWriteContractAsync).toHaveBeenCalledTimes(1));

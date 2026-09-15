@@ -175,13 +175,13 @@ function CandidateCard({
       type="button"
       disabled={disabled}
       onClick={onSelect}
-      className={`group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] gap-3 rounded-[8px] border p-3 text-left transition ${
+      className={`group grid min-w-0 grid-cols-[84px_minmax(0,1fr)] gap-3 rounded-[12px] border p-3 text-left transition ${
         selected
-          ? 'border-lilac-300/70 bg-lilac-300/15'
-          : 'border-white/10 bg-white/[0.03] hover:border-lilac-300/35 hover:bg-lilac-300/10'
+          ? 'border-[var(--uki-lilac)] bg-[var(--uki-lilac-soft)]'
+          : 'border-white/10 bg-[#0d0914] hover:border-[var(--uki-lilac)]/40 hover:bg-[var(--uki-lilac-soft)]'
       } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
     >
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
+      <div className="relative aspect-square overflow-hidden rounded-[10px] bg-black/30">
         <CukiImage
           src={cuki.imageUrl}
           alt={getCukiDisplayName(cuki)}
@@ -191,22 +191,22 @@ function CandidateCard({
       </div>
       <div className="min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-headline text-lg font-bold text-white">
+          <p className="truncate font-headline text-lg font-black text-[var(--uki-cream)]">
             {getCukiDisplayName(cuki)}
           </p>
-          {selected && <Check className="h-4 w-4 shrink-0 text-lilac-100" />}
+          {selected && <Check className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" />}
         </div>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
           {getTypeLabel(cuki.type)} · {cuki.network}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
+          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-[var(--uki-text)]">
             Cría {cuki.skills.breeder ?? 0}
           </span>
-          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
+          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-[var(--uki-text)]">
             Vida {cuki.skills.life ?? 0}
           </span>
-          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
+          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-[var(--uki-text)]">
             Hijos {cuki.childrenCount ?? 0}
           </span>
         </div>
@@ -228,13 +228,13 @@ function BreedCard({
   const canOpen = progress >= 100 && !breed.completed;
 
   return (
-    <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-4">
+    <div className="rounded-[12px] border border-white/10 bg-[#0d0914] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-headline text-xl font-bold text-white">
-            Breed #{breed.id}
+          <p className="font-headline text-xl font-black text-[var(--uki-cream)]">
+            Cría #{breed.id}
           </p>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
             {breed.birthNetwork} · padres #{breed.parents[0]} y #
             {breed.parents[1]}
           </p>
@@ -245,17 +245,17 @@ function BreedCard({
       </div>
 
       <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-        <div className="rounded-[8px] border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-500">
+        <div className="rounded-[10px] border border-white/10 bg-black/25 p-3">
+          <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
             Inicio
           </p>
-          <p className="mt-1 font-semibold text-white">
+          <p className="mt-1 font-black text-[var(--uki-cream)]">
             {formatLegacyDate(breed.breedStart)}
           </p>
         </div>
-        <div className="rounded-[8px] border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Fin</p>
-          <p className="mt-1 font-semibold text-white">
+        <div className="rounded-[10px] border border-white/10 bg-black/25 p-3">
+          <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">Fin</p>
+          <p className="mt-1 font-black text-[var(--uki-cream)]">
             {formatLegacyDate(breed.breedFinish)}
           </p>
         </div>
@@ -270,14 +270,14 @@ function BreedCard({
             />
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
-            <p className="text-xs text-slate-400">
+            <p className="text-xs font-semibold text-[var(--uki-muted)]">
               {Math.round(progress)}% de progreso
             </p>
             {canOpen && onOpen && (
               <Button
                 onClick={() => onOpen(breed)}
                 disabled={disabled}
-                className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+                className="bg-[var(--uki-lilac)] font-black text-[#09060f] hover:brightness-110"
               >
                 <Baby className="mr-2 h-4 w-4" />
                 Abrir Cukie
@@ -294,9 +294,9 @@ function CompletedCukiCard({ cuki }: { cuki: LegacyMarketplaceCukiItem }) {
   return (
     <Link
       href={`/marketplace/${cuki.tokenId}`}
-      className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-lilac-300/35 hover:bg-lilac-300/10"
+      className="grid min-w-0 grid-cols-[96px_minmax(0,1fr)] gap-3 rounded-[12px] border border-white/10 bg-[#0d0914] p-3 transition hover:border-[var(--uki-lilac)]/40 hover:bg-[var(--uki-lilac-soft)]"
     >
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#0d0914]">
+      <div className="relative aspect-square overflow-hidden rounded-[10px] bg-black/30">
         <CukiImage
           src={cuki.imageUrl}
           alt={getCukiDisplayName(cuki)}
@@ -304,14 +304,14 @@ function CompletedCukiCard({ cuki }: { cuki: LegacyMarketplaceCukiItem }) {
         />
       </div>
       <div className="min-w-0">
-        <p className="truncate font-headline text-lg font-bold text-white">
+        <p className="truncate font-headline text-lg font-black text-[var(--uki-cream)]">
           {getCukiDisplayName(cuki)}
         </p>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
           {cuki.birthNetwork ?? cuki.network} · Gen{' '}
           {cuki.skills.generation ?? '-'}
         </p>
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs font-semibold text-[var(--uki-muted)]">
           Padres{' '}
           {cuki.parents.map((parent) => `#${parent.tokenId}`).join(' · ') ||
             '-'}
@@ -612,7 +612,7 @@ export function BreedingClient({
       if (resolvedStatus === 'unknown') {
         setStatus('No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.');
       } else if (resolvedStatus === 'partial') {
-        setStatus('Solo se muestran candidatos con identidad y elegibilidad Legacy verificables.');
+        setStatus('Solo mostramos Cukies cuya identidad y disponibilidad hemos podido verificar.');
       }
       return verifiedItems;
     } catch (error) {
@@ -678,7 +678,7 @@ export function BreedingClient({
       setCompletedCukies(verifiedItems);
       setCompletedReadStatus(resolvedStatus);
       if (resolvedStatus === 'partial') {
-        setStatus('Solo se muestran crías completadas con identidad Legacy verificable.');
+        setStatus('Solo mostramos las crías cuya identidad hemos podido verificar.');
       } else if (resolvedStatus === 'unknown') {
         setStatus('No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.');
       }
@@ -1146,7 +1146,7 @@ export function BreedingClient({
   function ensureBsc() {
     if (network !== 'BSC') return false;
     if (!operationsEnabled) {
-      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
+      setStatus('Las acciones de Crías todavía no están disponibles. Puedes seguir consultando tus datos.');
       return false;
     }
     const current = getAccount(wagmiConfig);
@@ -1163,7 +1163,7 @@ export function BreedingClient({
   async function ensureTron() {
     if (network !== 'TRON') return false;
     if (!operationsEnabled) {
-      setStatus('Crías Legacy en modo lectura; no se solicitan transacciones desde este entorno.');
+      setStatus('Las acciones de Crías todavía no están disponibles. Puedes seguir consultando tus datos.');
       return false;
     }
     if (!isTronInstalled) {
@@ -1756,26 +1756,26 @@ export function BreedingClient({
       {readEnabled && !operationsEnabled && (
         <div
           role="status"
-          className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100"
+          className="rounded-[12px] border border-amber-300/25 bg-[#120d13] p-4 text-sm font-semibold text-amber-100"
         >
-          Puedes consultar el estado de tus Crías Legacy. Las acciones para
-          aprobar, iniciar y abrir una cría estarán disponibles cuando finalice la revisión.
+          Puedes consultar tus crías, pero las acciones para aprobar, iniciar y
+          abrir estarán disponibles cuando termine la revisión del servicio.
         </div>
       )}
       {network === 'BSC' && readEnabled && (
         <div
           role="status"
-          className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-4 text-sm text-lilac-100"
+          className="rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac-soft)] p-4 text-sm font-semibold text-[var(--uki-cream)]"
         >
           {bscReadStatus === 'loading'
-            ? 'Verificando lectura Legacy BSC…'
+            ? 'Comprobando tus datos en BNB Smart Chain…'
             : bscReadStatus === 'verified'
-            ? 'Lectura Legacy BSC verificada. Puedes consultar estos datos aunque la wallet esté en otra red.'
-            : 'Lectura Legacy BSC no disponible ahora. Pulsa Actualizar para reintentar.'}
+            ? 'Tus datos de BNB Smart Chain están disponibles. Puedes consultarlos aunque la wallet esté en otra red.'
+            : 'No podemos consultar BNB Smart Chain ahora. Pulsa Actualizar para reintentar.'}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] border border-white/10 bg-black/30 p-3">
-        <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-white/10 bg-[#0d0914] p-3">
+        <div className="inline-flex rounded-[10px] border border-white/10 bg-black/25 p-1">
           {(['BSC', 'TRON'] as const).map((item) => (
             <button
               key={item}
@@ -1783,8 +1783,8 @@ export function BreedingClient({
               onClick={() => setNetwork(item)}
               className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
                 network === item
-                  ? 'bg-lilac-300 text-slate-950'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                  ? 'bg-[var(--uki-lilac)] text-[#09060f]'
+                  : 'text-[var(--uki-muted)] hover:bg-white/10 hover:text-[var(--uki-cream)]'
               }`}
             >
               {item}
@@ -1792,7 +1792,7 @@ export function BreedingClient({
           ))}
         </div>
 
-        <div className="inline-flex rounded-[8px] border border-white/10 bg-white/[0.03] p-1">
+        <div className="inline-flex rounded-[10px] border border-white/10 bg-black/25 p-1">
           {[
             ['start', 'Iniciar'],
             ['active', 'Activas'],
@@ -1804,8 +1804,8 @@ export function BreedingClient({
               onClick={() => setTab(key as BreedingTab)}
               className={`rounded-[7px] px-4 py-2 text-sm font-semibold transition ${
                 tab === key
-                  ? 'bg-white text-slate-950'
-                  : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                  ? 'bg-[var(--uki-cream)] text-[#09060f]'
+                  : 'text-[var(--uki-muted)] hover:bg-white/10 hover:text-[var(--uki-cream)]'
               }`}
             >
               {label}
@@ -1818,29 +1818,29 @@ export function BreedingClient({
         {summaryCards.map(({ label, value, Icon }) => (
           <div
             key={label}
-            className="rounded-[8px] border border-white/10 bg-black/30 p-4"
+            className="rounded-[12px] border border-white/10 bg-[#0d0914] p-4"
           >
             <Icon className="mb-3 h-4 w-4 text-lilac-200" />
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+            <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
               {label}
             </p>
-            <p className="mt-1 truncate font-semibold text-white">{value}</p>
+            <p className="mt-1 truncate font-black text-[var(--uki-cream)]">{value}</p>
           </div>
         ))}
       </div>
 
       {showConnectionWarning && (
-        <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
+        <div className="rounded-[12px] border border-amber-300/20 bg-[#120d13] p-4 text-sm font-semibold text-amber-100">
           {network === 'BSC' ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span>
                 {!isConnected
                   ? 'Conecta una wallet EVM para cargar tus padres.'
                   : bscReadStatus === 'verified'
-                  ? 'La lectura Legacy está verificada. Cambia la red de la wallet para operar.'
+                  ? 'Tus datos están disponibles. Cambia la red de la wallet para operar.'
                   : operationsEnabled && chainId !== 56
-                  ? 'Cambia la red de la wallet a BNB Smart Chain para operar. La lectura Legacy se puede reintentar desde aquí.'
-                  : 'La lectura Legacy BSC no está disponible ahora. Pulsa Actualizar para reintentar.'}
+                  ? 'Cambia la wallet a BNB Smart Chain para operar. Puedes volver a consultar los datos desde aquí.'
+                  : 'No podemos consultar BNB Smart Chain ahora. Pulsa Actualizar para reintentar.'}
               </span>
               {operationsEnabled && isConnected && chainId !== 56 && (
                 <Button onClick={() => void ensureBsc()}>
@@ -1868,11 +1868,11 @@ export function BreedingClient({
       )}
 
       {pendingOperation && (
-        <div className="grid gap-3 rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-3 text-sm text-amber-100">
+        <div className="grid gap-3 rounded-[12px] border border-amber-300/25 bg-[#120d13] p-3 text-sm font-semibold text-amber-100">
           <p>
             {pendingOperation.phase === 'source-pending'
               ? 'La operación está pendiente de confirmación. No firmes otra vez.'
-              : 'La operación está confirmada y el estado Legacy sigue sincronizándose. No repitas la operación.'}
+              : 'La operación está confirmada y tu colección sigue actualizándose. No repitas la operación.'}
           </p>
           <Button
             variant="outline"
@@ -1887,18 +1887,18 @@ export function BreedingClient({
 
       {tab === 'start' && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
+          <section className="rounded-[14px] border border-white/10 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="font-headline text-2xl font-bold text-white">
+                <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
                   Selecciona los padres
                 </h2>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
                   Elige dos Cukies disponibles de tu wallet.
                 </p>
                 {candidatesReadStatus === 'partial' && (
                   <p role="status" className="mt-2 text-xs text-amber-200">
-                    Solo se muestran candidatos con identidad y elegibilidad Legacy verificables.
+                    Solo mostramos Cukies cuya identidad y disponibilidad hemos podido verificar.
                   </p>
                 )}
               </div>
@@ -1932,52 +1932,52 @@ export function BreedingClient({
                   />
                 ))
               ) : (
-                <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
+                <div className="rounded-[12px] border border-dashed border-white/15 bg-black/20 p-5 text-sm font-semibold text-[var(--uki-muted)] lg:col-span-2">
                   {!owner
                     ? 'Conecta una wallet para cargar candidatos.'
                     : candidatesReadError
                     ? 'No se ha podido verificar la identidad de los candidatos. Pulsa Actualizar para reintentar.'
                     : network === 'BSC' && !bscReadVerified
-                    ? 'No se ha podido verificar la lectura Legacy BSC. Pulsa Actualizar para reintentar.'
+                    ? 'No podemos consultar BNB Smart Chain ahora. Pulsa Actualizar para reintentar.'
                     : network === 'TRON' && !candidateReadReady
                     ? 'La fuente de candidatos no está disponible hasta conectar la red seleccionada.'
                     : candidatesReadStatus === 'partial'
-                    ? 'No hay candidatos con identidad y elegibilidad Legacy verificables en esta wallet.'
+                    ? 'No hay Cukies disponibles que podamos verificar en esta wallet.'
                     : 'No hay Cukies disponibles para cría en esta wallet.'}
                 </div>
               )}
             </div>
           </section>
 
-          <aside className="grid content-start gap-4 rounded-[8px] border border-lilac-300/20 bg-black/35 p-5">
+          <aside className="grid content-start gap-4 rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
             <div>
-              <h2 className="font-headline text-2xl font-bold text-white">
+              <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
                 Resumen de cría
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Revisa padres, coste y confirma el breeding.
+              <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+                Revisa los padres y los puntos antes de confirmar.
               </p>
             </div>
 
             {[parent1, parent2].map((parent, index) => (
               <div
                 key={index}
-                className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3"
+                className="rounded-[10px] border border-white/10 bg-black/25 p-3"
               >
-                <p className="text-xs uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
                   Padre {index + 1}
                 </p>
-                <p className="mt-1 font-semibold text-white">
+                <p className="mt-1 font-black text-[var(--uki-cream)]">
                   {parent ? getCukiDisplayName(parent) : 'Sin seleccionar'}
                 </p>
               </div>
             ))}
 
-            <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">
+            <div className="rounded-[10px] border border-white/10 bg-black/25 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
                 Puntos necesarios
               </p>
-              <p className="mt-1 font-mono text-lg font-semibold text-white">
+              <p className="mt-1 font-mono text-lg font-black text-[var(--uki-cream)]">
                 {parentsSelected ? cost : '-'}
               </p>
             </div>
@@ -2011,7 +2011,7 @@ export function BreedingClient({
             <Button
               onClick={() => void startBreeding()}
               disabled={disabled || !ready || !parentsSelected || !approved}
-              className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+              className="bg-[var(--uki-lilac)] font-black text-[#09060f] hover:brightness-110"
             >
               <Heart className="mr-2 h-4 w-4" />
               Iniciar cría
@@ -2021,9 +2021,9 @@ export function BreedingClient({
       )}
 
       {tab === 'active' && (
-        <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
+        <section className="rounded-[14px] border border-white/10 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-headline text-2xl font-bold text-white">
+            <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
               Crías activas
             </h2>
             <Button
@@ -2051,11 +2051,11 @@ export function BreedingClient({
                 />
               ))
             ) : (
-              <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
+              <div className="rounded-[12px] border border-dashed border-white/15 bg-black/20 p-5 text-sm font-semibold text-[var(--uki-muted)] lg:col-span-2">
                 {network === 'BSC' && !address
                   ? 'Conecta una wallet para consultar tus crías activas.'
                   : network === 'BSC' && bscReadStatus !== 'verified'
-                  ? 'No se ha podido verificar la lectura Legacy BSC. Pulsa Actualizar para reintentar.'
+                  ? 'No podemos consultar BNB Smart Chain ahora. Pulsa Actualizar para reintentar.'
                   : 'No hay crías activas verificadas para esta wallet.'}
               </div>
             )}
@@ -2064,15 +2064,15 @@ export function BreedingClient({
       )}
 
       {tab === 'completed' && (
-        <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
+        <section className="rounded-[14px] border border-white/10 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-headline text-2xl font-bold text-white">
+              <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
                 Crías completadas
               </h2>
               {completedReadStatus === 'partial' && (
                 <p role="status" className="mt-2 text-xs text-amber-200">
-                  Solo se muestran crías con identidad Legacy verificable.
+                  Solo mostramos las crías cuya identidad hemos podido verificar.
                 </p>
               )}
             </div>
@@ -2091,11 +2091,11 @@ export function BreedingClient({
                 <CompletedCukiCard key={cuki.tokenId} cuki={cuki} />
               ))
             ) : (
-              <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
+              <div className="rounded-[12px] border border-dashed border-white/15 bg-black/20 p-5 text-sm font-semibold text-[var(--uki-muted)] lg:col-span-2">
                 {completedReadStatus === 'unknown'
                   ? 'No se ha podido verificar la identidad de las crías completadas. Pulsa Actualizar para reintentar.'
                   : completedReadStatus === 'partial'
-                  ? 'No hay crías completadas con identidad Legacy verificable en esta wallet.'
+                  ? 'No hay crías completadas que podamos verificar en esta wallet.'
                   : 'No hay crías completadas para esta wallet.'}
               </div>
             )}
@@ -2104,7 +2104,7 @@ export function BreedingClient({
       )}
 
       {status && (
-        <div className="rounded-[8px] border border-lilac-300/20 bg-lilac-300/10 p-3 text-sm text-lilac-100">
+        <div className="rounded-[12px] border border-[var(--uki-lilac)]/25 bg-[var(--uki-lilac-soft)] p-3 text-sm font-semibold text-[var(--uki-cream)]">
           {status}
         </div>
       )}

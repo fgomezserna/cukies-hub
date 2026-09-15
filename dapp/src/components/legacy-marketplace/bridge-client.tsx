@@ -313,7 +313,7 @@ function BridgeCukiCard({
 }) {
   const content = (
     <>
-      <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#071211]">
+      <div className="relative aspect-square overflow-hidden rounded-[10px] bg-[#0d0914]">
         <CukiImage
           src={cuki.imageUrl}
           alt={getCukiDisplayName(cuki)}
@@ -323,23 +323,23 @@ function BridgeCukiCard({
       </div>
       <div className="min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-headline text-lg font-bold text-white">
+          <p className="truncate font-headline text-lg font-black text-[var(--uki-cream)]">
             {getCukiDisplayName(cuki)}
           </p>
-          {selected && <Check className="h-4 w-4 shrink-0 text-cyan-100" />}
+          {selected && <Check className="h-4 w-4 shrink-0 text-[var(--uki-lilac)]" />}
         </div>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs font-semibold text-[var(--uki-muted)]">
           {getTypeLabel(cuki.type)} · {cuki.network} · Gen{' '}
           {cuki.skills.generation ?? '-'}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
+          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-[var(--uki-text)]">
             {getStateLabel(cuki.state)}
           </span>
-          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
+          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-[var(--uki-text)]">
             Life {cuki.skills.life ?? 0}
           </span>
-          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-slate-300">
+          <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 text-[var(--uki-text)]">
             Energy {cuki.skills.energy ?? 0}
           </span>
         </div>
@@ -351,7 +351,7 @@ function BridgeCukiCard({
     return (
       <Link
         href={`/marketplace/${encodeURIComponent(cuki.id)}`}
-        className="group grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[8px] border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-cyan-300/35 hover:bg-cyan-300/10"
+        className="group grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[12px] border border-white/10 bg-[#0d0914] p-3 text-left transition hover:border-[var(--uki-lilac)]/40 hover:bg-[var(--uki-lilac-soft)]"
       >
         {content}
       </Link>
@@ -363,10 +363,10 @@ function BridgeCukiCard({
       type="button"
       disabled={disabled}
       onClick={onSelect}
-      className={`group grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[8px] border p-3 text-left transition ${
+      className={`group grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-3 rounded-[12px] border p-3 text-left transition ${
         selected
-          ? 'border-cyan-300/70 bg-cyan-300/15'
-          : 'border-white/10 bg-white/[0.03] hover:border-cyan-300/35 hover:bg-cyan-300/10'
+          ? 'border-[var(--uki-lilac)] bg-[var(--uki-lilac-soft)]'
+          : 'border-white/10 bg-[#0d0914] hover:border-[var(--uki-lilac)]/40 hover:bg-[var(--uki-lilac-soft)]'
       } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
     >
       {content}
@@ -374,32 +374,23 @@ function BridgeCukiCard({
   );
 }
 
-function BridgeUnavailable({ config }: { config: CukiesBridgeRuntimeConfig }) {
-  const isStageMode = config.mode === 'testnet';
+function BridgeUnavailable({ config: _config }: { config: CukiesBridgeRuntimeConfig }) {
   return (
     <section
       role="status"
       data-testid="cukies-bridge-disabled"
-      className="rounded-[8px] border border-amber-300/25 bg-amber-300/10 p-5 text-amber-50"
+      className="rounded-[14px] border border-amber-300/25 bg-[#120d13] p-5 text-amber-50"
     >
       <div className="flex items-start gap-3">
         <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" />
         <div>
-          <h2 className="font-headline text-xl font-bold text-white">
-            {isStageMode
-              ? 'Bridge Testnet desactivado de forma segura'
-              : 'Bridge TRON → BSC no disponible'}
+          <h2 className="font-headline text-xl font-black text-[var(--uki-cream)]">
+            Bridge TRON → BSC no disponible
           </h2>
           <p className="mt-2 text-sm text-amber-100/90">
-            {isStageMode
-              ? 'Stage no usara los contratos legacy de mainnet. El bridge se habilitara solo con endpoints de custodia e identidad canonica verificable.'
-              : 'La operacion solo se habilita en produccion con los contratos legacy mainnet verificados de TRON y BSC.'}
+            Esta operación todavía no está disponible. Puedes seguir consultando
+            y gestionando tus Cukies desde el resto de la colección.
           </p>
-          {config.issues.length > 0 && (
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-amber-100/80">
-              {config.issues.map((issue) => <li key={issue}>{issue}</li>)}
-            </ul>
-          )}
         </div>
       </div>
     </section>
@@ -421,8 +412,8 @@ function statusTone(status: BridgeTransferStatus) {
   if (status === 'failed' || status === 'manual_review') {
     return 'border-amber-300/30 bg-amber-300/10 text-amber-100';
   }
-  if (status === 'minted') return 'border-emerald-300/30 bg-emerald-300/10 text-emerald-100';
-  return 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100';
+  if (status === 'minted') return 'border-[var(--uki-lilac)]/40 bg-[var(--uki-lilac-soft)] text-[var(--uki-cream)]';
+  return 'border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac-soft)] text-[var(--uki-cream)]';
 }
 
 function mapApiStatus(value: unknown): BridgeTransferStatus | null {
@@ -798,7 +789,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
     if (!(await ensureTron()) || !window.tronWeb) return;
 
     setIsSubmitting(true);
-    setStatus('Enviando Cukie al bridge legacy desde TRON...');
+    setStatus('Enviando tu Cukie desde TRON…');
     try {
       // This is the deployed legacy ABI/method. Do not replace it with the
       // newer BridgeEndpoint `requestBridge` interface.
@@ -933,19 +924,19 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
   return (
     <div className="grid gap-6">
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="rounded-[8px] border border-white/10 bg-black/30 p-4">
+        <div className="rounded-[14px] border border-white/10 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-headline text-2xl font-bold text-white">
-                Migracion TRON a BSC
+              <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
+                Tu recorrido
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Flujo de produccion unidireccional con contratos legacy mainnet.
+              <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+                Comprueba el origen, el destino y el estado antes de continuar.
               </p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-[8px] border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+            <div className="inline-flex items-center gap-2 rounded-[9px] border border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac-soft)] px-4 py-2 text-sm font-black text-[var(--uki-cream)]">
               <Wallet className="h-4 w-4" />
-              TRON Mainnet → BSC Mainnet
+              TRON → BNB Smart Chain
             </div>
           </div>
 
@@ -953,18 +944,18 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
             {[
               ['Origen', SOURCE_NETWORK, Wallet],
               ['Destino', DESTINATION_NETWORK, Route],
-              ['Bridge price', bridgePrice, ArrowRightLeft],
+              ['Tarifa', bridgePrice, ArrowRightLeft],
               ['Estado', bridgePaused ? 'Pausado' : 'Abierto', ShieldAlert],
             ].map(([label, value, Icon]) => (
               <div
                 key={String(label)}
-                className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3"
+                className="rounded-[10px] border border-white/10 bg-black/25 p-3"
               >
-                <Icon className="mb-3 h-4 w-4 text-cyan-200" />
-                <p className="text-xs uppercase tracking-wide text-slate-500">
+                <Icon className="mb-3 h-4 w-4 text-[var(--uki-lilac)]" />
+                <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
                   {label as string}
                 </p>
-                <p className="mt-1 truncate font-semibold text-white">
+                <p className="mt-1 truncate font-black text-[var(--uki-cream)]">
                   {String(value)}
                 </p>
               </div>
@@ -972,21 +963,21 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
           </div>
         </div>
 
-        <aside className="grid gap-3 rounded-[8px] border border-white/10 bg-black/30 p-4">
+        <aside className="grid gap-3 rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
           <div className="flex items-center gap-3">
-            <ArrowRight className="h-5 w-5 text-cyan-200" />
+            <ArrowRight className="h-5 w-5 text-[var(--uki-lilac)]" />
             <div>
-              <h2 className="font-headline text-xl font-bold text-white">
-                Wallet destino BSC
+              <h2 className="font-headline text-xl font-black text-[var(--uki-cream)]">
+                Wallet de destino
               </h2>
-              <p className="text-xs text-slate-400">
-                Se valida antes de firmar en TronLink.
+              <p className="text-xs font-semibold text-[var(--uki-muted)]">
+                La validamos antes de abrir TronLink.
               </p>
             </div>
           </div>
           <label className="grid gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Dirección EVM destino
+            <span className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
+              Dirección de BNB Smart Chain
             </span>
             <input
               value={destinationOwner}
@@ -997,44 +988,49 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               onBlur={() => setDestinationTouched(true)}
               placeholder="0x... wallet BSC"
               aria-invalid={destinationTouched && Boolean(destinationError)}
-              className="h-11 rounded-[8px] border border-white/10 bg-white/[0.04] px-3 font-mono text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/50"
+              className="h-11 rounded-[9px] border border-white/10 bg-black/25 px-3 font-mono text-sm text-[var(--uki-cream)] outline-none transition placeholder:text-[var(--uki-muted)] focus:border-[var(--uki-lilac)] focus:ring-2 focus:ring-[var(--uki-lilac)]/20"
             />
           </label>
           {destinationTouched && destinationError && (
             <p role="alert" className="text-xs text-amber-200">{destinationError}</p>
           )}
-          <p className="text-xs leading-5 text-slate-400">
-            Solo se admite una address EVM BSC válida; una address TRON no se
-            puede usar como destino de este flujo.
+          <p className="text-xs font-semibold leading-5 text-[var(--uki-muted)]">
+            Usa una dirección válida de BNB Smart Chain. Una dirección TRON no
+            puede recibir el Cukie en este paso.
           </p>
         </aside>
       </section>
 
       {!tronReady && (
-        <div className="rounded-[8px] border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
+        <div className="rounded-[12px] border border-amber-300/20 bg-[#120d13] p-4 text-sm text-amber-100">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span>Conecta TronLink en {tronNetworkLabel} para iniciar el bridge.</span>
-            <Button onClick={() => void ensureTron()}>Conectar TronLink</Button>
+            <Button
+              onClick={() => void ensureTron()}
+              className="bg-[var(--uki-lilac)] font-black text-[#09060f] hover:brightness-110"
+            >
+              Conectar TronLink
+            </Button>
           </div>
         </div>
       )}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="rounded-[8px] border border-white/10 bg-black/30 p-5">
+        <div className="rounded-[14px] border border-white/10 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-headline text-2xl font-bold text-white">
+              <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
                 Selecciona tu Cukie TRON
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Solo aparecen NFTs disponibles y custodiados por la wallet TRON conectada.
+              <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+                Verás solo los Cukies disponibles en la wallet TRON conectada.
               </p>
             </div>
             <Button
               variant="outline"
               disabled={isLoadingCandidates}
               onClick={() => void refreshCandidates()}
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac-soft)] text-[var(--uki-cream)] hover:bg-[var(--uki-lilac)]/20"
             >
               {isLoadingCandidates ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1057,7 +1053,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
                 />
               ))
             ) : (
-              <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
+              <div className="rounded-[12px] border border-dashed border-white/15 bg-black/20 p-5 text-sm font-semibold text-[var(--uki-muted)] lg:col-span-2">
                 {tronAddress
                   ? 'No hay Cukies disponibles para bridge en esta wallet TRON.'
                   : 'Conecta la wallet TRON origen para cargar candidatos.'}
@@ -1066,37 +1062,37 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
           </div>
         </div>
 
-        <aside className="grid content-start gap-4 rounded-[8px] border border-cyan-300/20 bg-black/35 p-5">
+        <aside className="grid content-start gap-4 rounded-[14px] border border-[var(--uki-lilac)]/25 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
           <div>
-            <h2 className="font-headline text-2xl font-bold text-white">
-              Bridge desk
+            <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
+              Antes de firmar
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Revisa destino, coste y el aviso irreversible antes de firmar.
+            <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+              Revisa el Cukie, la wallet y la tarifa con calma.
             </p>
           </div>
 
-          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-[10px] border border-white/10 bg-black/25 p-3">
+            <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
               Cukie seleccionado
             </p>
-            <p className="mt-1 font-semibold text-white">
+            <p className="mt-1 font-black text-[var(--uki-cream)]">
               {selectedCuki ? getCukiDisplayName(selectedCuki) : 'Ninguno'}
             </p>
           </div>
-          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-[10px] border border-white/10 bg-black/25 p-3">
+            <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
               Wallet BSC destino
             </p>
-            <p className="mt-1 break-all font-mono text-sm font-semibold text-white">
+            <p className="mt-1 break-all font-mono text-sm font-black text-[var(--uki-cream)]">
               {destinationOwner || '-'}
             </p>
           </div>
-          <div className="rounded-[8px] border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
+          <div className="rounded-[10px] border border-white/10 bg-black/25 p-3">
+            <p className="text-xs font-black uppercase tracking-[0.1em] text-[var(--uki-muted)]">
               Tarifa TRON
             </p>
-            <p className="mt-1 font-mono text-lg font-semibold text-white">
+            <p className="mt-1 font-mono text-lg font-black text-[var(--uki-cream)]">
               {bridgePrice}
             </p>
           </div>
@@ -1104,7 +1100,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
           <div
             role="alert"
             data-testid="bridge-irreversible-warning"
-            className="rounded-[8px] border border-amber-300/35 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100"
+            className="rounded-[10px] border border-amber-300/35 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100"
           >
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-200" />
@@ -1130,7 +1126,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               onClick={() => void approveBridge()}
               disabled={disabled || !tronReady || !selectedCuki}
               variant="outline"
-              className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+              className="border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac-soft)] text-[var(--uki-cream)] hover:bg-[var(--uki-lilac)]/20"
             >
               <Check className="mr-2 h-4 w-4" />
               Aprobar bridge en TRON
@@ -1149,7 +1145,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               || !burnAcknowledged
               || bridgePaused
             }
-            className="bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+            className="bg-[var(--uki-lilac)] font-black text-[#09060f] hover:brightness-110"
           >
             <ArrowRightLeft className="mr-2 h-4 w-4" />
             Iniciar TRON → BSC
@@ -1161,7 +1157,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
         <section
           aria-live="polite"
           data-testid="bridge-transfer-status"
-          className={`rounded-[8px] border p-5 ${statusTone(transfer.status)}`}
+          className={`rounded-[14px] border p-5 ${statusTone(transfer.status)}`}
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1186,7 +1182,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
                 variant="outline"
                 disabled={disabled || !tronReady}
                 onClick={() => void waitForSubmittedTransfer(transfer)}
-                className="border-cyan-300/30 text-cyan-50"
+                className="border-[var(--uki-lilac)]/30 text-[var(--uki-cream)]"
               >
                 Consultar receipt TRON
               </Button>
@@ -1200,21 +1196,21 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
         </section>
       )}
 
-      <section className="rounded-[8px] border border-white/10 bg-black/30 p-5">
+      <section className="rounded-[14px] border border-white/10 bg-[#0d0914] p-5 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-headline text-2xl font-bold text-white">
-              Bridges en curso
+            <h2 className="font-headline text-2xl font-black text-[var(--uki-cream)]">
+              Movimientos en curso
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Estado indexado de NFTs TRON que siguen en custodia del bridge.
+            <p className="mt-1 text-sm font-semibold text-[var(--uki-muted)]">
+              Sigue aquí los Cukies que todavía están completando el recorrido.
             </p>
           </div>
           <Button
             variant="outline"
             disabled={isLoadingBridging}
             onClick={() => void refreshBridgingCukies()}
-            className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 hover:bg-cyan-300/20"
+            className="border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac-soft)] text-[var(--uki-cream)] hover:bg-[var(--uki-lilac)]/20"
           >
             {isLoadingBridging ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1231,7 +1227,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
               <BridgeCukiCard key={cuki.id} cuki={cuki} />
             ))
           ) : (
-            <div className="rounded-[8px] border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400 lg:col-span-2">
+            <div className="rounded-[12px] border border-dashed border-white/15 bg-black/20 p-5 text-sm font-semibold text-[var(--uki-muted)] lg:col-span-2">
               No hay entradas de bridge para la wallet TRON conectada.
             </div>
           )}
@@ -1239,7 +1235,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
       </section>
 
       {status && (
-        <div className="rounded-[8px] border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-100">
+        <div className="rounded-[12px] border border-[var(--uki-lilac)]/30 bg-[var(--uki-lilac-soft)] p-3 text-sm font-semibold text-[var(--uki-cream)]">
           {status}
         </div>
       )}

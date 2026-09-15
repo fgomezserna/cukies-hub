@@ -212,7 +212,7 @@ describe('Cukies bridge client safety', () => {
 
     expect(screen.getByTestId('cukies-bridge-disabled')).toBeInTheDocument();
     expect(screen.getByText('Bridge TRON → BSC no disponible')).toBeInTheDocument();
-    expect(screen.getByText(/solo se habilita en produccion/i)).toBeInTheDocument();
+    expect(screen.getByText(/todavía no está disponible/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Iniciar TRON/i })).not.toBeInTheDocument();
     expect(mockUseAccount).not.toHaveBeenCalled();
     expect(mockUseReadContract).not.toHaveBeenCalled();
@@ -232,8 +232,7 @@ describe('Cukies bridge client safety', () => {
     render(<BridgeClient config={config} />);
 
     expect(screen.getByTestId('cukies-bridge-disabled')).toBeInTheDocument();
-    expect(screen.getByText(/materializar _id y coleccion canonicos/i))
-      .toBeInTheDocument();
+    expect(screen.getByText(/todavía no está disponible/i)).toBeInTheDocument();
     expect(mockUseAccount).not.toHaveBeenCalled();
     expect(mockUseReadContract).not.toHaveBeenCalled();
     expect(mockUseTronLink).not.toHaveBeenCalled();
@@ -352,7 +351,7 @@ describe('Cukies bridge client safety', () => {
     fireEvent.click(validCard);
 
     const destinationInput = screen.getByRole('textbox', {
-      name: 'Dirección EVM destino',
+      name: 'Dirección de BNB Smart Chain',
     });
     fireEvent.change(destinationInput, {
       target: { value: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
@@ -435,7 +434,7 @@ describe('Cukies bridge client safety', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Cukie #142/i }));
     const destinationInput = screen.getByRole('textbox', {
-      name: 'Dirección EVM destino',
+      name: 'Dirección de BNB Smart Chain',
     });
     fireEvent.change(destinationInput, {
       target: { value: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },

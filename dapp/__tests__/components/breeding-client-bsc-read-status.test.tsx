@@ -114,7 +114,7 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     render(<BreedingClient initialTab="start" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Lectura Legacy BSC verificada. Puedes consultar estos datos aunque la wallet esté en otra red.')).toBeInTheDocument();
+      expect(screen.getByText('Tus datos de BNB Smart Chain están disponibles. Puedes consultarlos aunque la wallet esté en otra red.')).toBeInTheDocument();
     });
     expect(screen.getByText('0')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
@@ -442,7 +442,7 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     mockReadLegacyBscContract.mockResolvedValue(['A']);
     render(<BreedingClient initialTab="active" />);
 
-    await waitFor(() => expect(screen.getByText('Breed #A')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Cría #A')).toBeInTheDocument());
     expect(mockReadLegacyBscContract).toHaveBeenCalledWith(
       'breedingPoints',
       'getAllBreedsOwner',
@@ -468,7 +468,7 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     });
     await waitFor(() => expect(refreshButton).not.toBeDisabled());
     fireEvent.click(refreshButton);
-    await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Cría #B')).toBeInTheDocument());
     expect(mockSwitchChain).not.toHaveBeenCalled();
     expect(mockWriteContract).not.toHaveBeenCalled();
   });
@@ -479,7 +479,7 @@ describe('Crías Legacy: lectura BSC separada de la red de firma', () => {
     render(<BreedingClient initialTab="start" />);
 
     await waitFor(() => {
-      expect(screen.getByText('Lectura Legacy BSC no disponible ahora. Pulsa Actualizar para reintentar.')).toBeInTheDocument();
+      expect(screen.getByText('No podemos consultar BNB Smart Chain ahora. Pulsa Actualizar para reintentar.')).toBeInTheDocument();
     });
     expect(screen.getByText('Puntos').parentElement).toHaveTextContent('-');
     expect(screen.getByText('Máximo de crías').parentElement).toHaveTextContent('-');
