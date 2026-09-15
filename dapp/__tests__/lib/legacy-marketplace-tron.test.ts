@@ -55,4 +55,21 @@ describe('waitForLegacyTronReceipt', () => {
     });
     expect(getTransactionInfo).toHaveBeenCalledTimes(2);
   });
+
+  it('conserva el contexto trx de TronWeb al consultar el receipt', async () => {
+    const trx = {
+      getTransactionInfo(this: unknown, _transactionId: string) {
+        expect(this).toBe(trx);
+        return Promise.resolve({ receipt: { result: 'SUCCESS' }, blockNumber: 1 });
+      },
+    };
+
+    await expect(
+      waitForLegacyTronReceipt(
+        { trx } as LegacyTronWebLike,
+        'c'.repeat(64),
+        { timeoutMs: 1_000, pollIntervalMs: 250 },
+      ),
+    ).resolves.toMatchObject({ transactionId: 'c'.repeat(64) });
+  });
 });

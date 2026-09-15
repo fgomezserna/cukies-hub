@@ -1,7 +1,8 @@
-import { isAddress } from 'viem';
+import { isAddress, type Hash } from 'viem';
 
 import { assertBridgeMetadata, PermanentBridgeError } from './metadata.js';
 import type {
+  AmbiguousBridgeSubmissionError,
   BridgeEvidenceProvider,
   BridgeRelayerJob,
   BridgeRelayerStore,
@@ -42,6 +43,13 @@ function isManualReview(error: unknown): error is ManualReviewBridgeError {
     && error !== null
     && 'manualReview' in error
     && error.manualReview === true;
+}
+
+function isAmbiguousSubmission(error: unknown): error is AmbiguousBridgeSubmissionError {
+  return typeof error === 'object'
+    && error !== null
+    && 'ambiguousBroadcast' in error
+    && error.ambiguousBroadcast === true;
 }
 
 function retryDelay(attempts: number, config: BridgeRelayerEngineConfig) {
@@ -125,8 +133,27 @@ export class BridgeRelayerEngine {
 
     // The only write in this worker is the legacy onlyOwner jumpOutBridge;
     // submit() always simulates the exact calldata first.
-    const txHash = await this.destination.submit(job.request, metadata);
-    await this.store.markSubmitted(job, txHash, now, metadata);
+    let txHash: Hash;
+    try {
+      txHash = await this.destination.submit(job.request, metadata);
+    } catch (error) {
+      if (isAmbiguousSubmission(error)) {
+        throw new ManualReviewBridgeError(message(error));
+      }
+      throw error;
+    }
+    try {
+      await this.store.markSubmitted(job, txHash, now, metadata);
+    } catch (error) {
+      // The mint hash proves that a write was handed to BSC. If persisting the
+      // submitted state fails afterwards, retrying this pending job could
+      // execute the legacy mint twice. Route it to manual review and include
+      // the hash so an operator can reconcile the chain independently.
+      throw new ManualReviewBridgeError(
+        `Mint BSC enviado (${txHash}) pero no se pudo persistir su estado; requiere revision manual.`,
+        { cause: error },
+      );
+    }
     return { jobId: job._id, outcome: 'submitted', txHash } as const;
   }
 

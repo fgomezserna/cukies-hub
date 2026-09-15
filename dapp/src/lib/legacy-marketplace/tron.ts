@@ -164,7 +164,9 @@ export async function waitForLegacyTronReceipt(
 
   while (Date.now() <= deadline) {
     try {
-      const value = await getTransactionInfo(transactionId);
+      // TronWeb's implementation reads `this.tronWeb`; preserve the `trx`
+      // receiver instead of detaching the method from the provider object.
+      const value = await getTransactionInfo.call(tronWeb.trx, transactionId);
       const info = record(value);
       if (info && isReceiptReady(info)) {
         const failure = receiptFailure(info);

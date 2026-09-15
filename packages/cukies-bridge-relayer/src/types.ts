@@ -1,5 +1,14 @@
 import type { Address, Hash } from 'viem';
 
+/**
+ * The wallet provider accepted/broadcast a write but did not return a hash.
+ * Retrying this request could mint the same legacy token twice, so callers
+ * must send it to manual review instead of the normal retry queue.
+ */
+export class AmbiguousBridgeSubmissionError extends Error {
+  readonly ambiguousBroadcast = true;
+}
+
 export type BridgeMetadata = Readonly<{
   typeId: bigint;
   generation: bigint;

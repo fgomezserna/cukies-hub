@@ -48,6 +48,23 @@ function stringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function publicError(value: unknown) {
+  const message = stringValue(value);
+  if (!message) return null;
+
+  // Relayer/provider errors may include RPC URLs, credentials, authorization
+  // headers or Mongo connection details. Never echo those through a public
+  // browser endpoint; retain short domain messages such as token-exists.
+  if (
+    /https?:\/\//i.test(message)
+    || /(?:rpc|mongodb|authorization|bearer|api[_-]?key|private[_-]?key|password|secret)/i.test(message)
+  ) {
+    return 'El relayer encontro un error interno; requiere revision manual.';
+  }
+
+  return message.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 500);
+}
+
 function integerValue(value: unknown) {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
   if (typeof value === 'string' && /^\d+$/.test(value)) {
@@ -113,7 +130,7 @@ function toStatusResponse(
     destinationTxHash: stringValue(job.destinationTxHash),
     transferId: stringValue(job.request?.transferId) ?? stringValue(job._id),
     updatedAt: isoDate(job.updatedAt),
-    error: stringValue(job.lastError),
+    error: publicError(job.lastError),
   };
 }
 

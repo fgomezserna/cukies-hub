@@ -324,7 +324,7 @@ describe('Cukies bridge client safety', () => {
     const wrongCollection = cuki(`TRON:${otherCollection}:42`, '42', 242);
     fetchMock.mockImplementation(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url === `/api/cukies/${encodeURIComponent(valid.id)}`) {
+      if (url.startsWith(`/api/cukies/${encodeURIComponent(valid.tokenId)}?`)) {
         return {
           ok: true,
           json: async () => ({ item: valid }),
@@ -373,7 +373,7 @@ describe('Cukies bridge client safety', () => {
       expect.objectContaining({ callValue: 0 }),
     ));
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/cukies/${encodeURIComponent(valid.id)}`,
+      `/api/cukies/${encodeURIComponent(valid.tokenId)}?network=TRON&collectionAddress=${encodeURIComponent(TRON_MAINNET_COLLECTION)}`,
       { cache: 'no-store' },
     );
   });
@@ -416,7 +416,7 @@ describe('Cukies bridge client safety', () => {
     const stale = { ...valid, ...change } as LegacyMarketplaceCukiItem;
     fetchMock.mockImplementation(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url === `/api/cukies/${encodeURIComponent(valid.id)}`) {
+      if (url.startsWith(`/api/cukies/${encodeURIComponent(valid.tokenId)}?`)) {
         return {
           ok: true,
           json: async () => ({ item: stale }),
@@ -450,7 +450,7 @@ describe('Cukies bridge client safety', () => {
     expect(await screen.findByText(/ya no coincide con la identidad, owner o estado/i))
       .toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/cukies/${encodeURIComponent(valid.id)}`,
+      `/api/cukies/${encodeURIComponent(valid.tokenId)}?network=TRON&collectionAddress=${encodeURIComponent(TRON_MAINNET_COLLECTION)}`,
       { cache: 'no-store' },
     );
     expect(mockSendTronContractAt).not.toHaveBeenCalled();
@@ -465,7 +465,7 @@ describe('Cukies bridge client safety', () => {
     };
     fetchMock.mockImplementation(async (input: string | URL | Request) => {
       const url = String(input);
-      if (url === `/api/cukies/${encodeURIComponent(valid.id)}`) {
+      if (url.startsWith(`/api/cukies/${encodeURIComponent(valid.tokenId)}?`)) {
         return {
           ok: true,
           json: async () => ({ item: stale }),

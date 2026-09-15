@@ -77,6 +77,12 @@ type CukiDocument = {
   marketplaceListingEventId?: unknown;
 };
 
+type LegacyCukiIdentityHint = {
+  network?: string;
+  collection?: string;
+  chainId?: number | string | null;
+};
+
 type HistoryDocument = {
   _id: string;
   transactionId?: unknown;
@@ -399,8 +405,25 @@ function normalizeChainHistoryEntry(
   };
 }
 
-function normalizeCuki(document: CukiDocument): LegacyMarketplaceCukiItem {
+function normalizeCuki(
+  document: CukiDocument,
+  identityHint?: LegacyCukiIdentityHint,
+): LegacyMarketplaceCukiItem {
   const id = toStringOrNull(document.tokenId) ?? toStringOrNull(document._id) ?? '';
+  const network = toStringOrNull(document.network) ?? 'TRON';
+  const explicitCollection =
+    toStringOrNull(document.collectionAddressNormalized)
+    ?? toStringOrNull(document.collectionAddress);
+  const hintedNetwork = identityHint?.network?.trim().toUpperCase();
+  const hintedCollection = identityHint?.collection?.trim() || null;
+  const collectionAddress = explicitCollection
+    ?? (hintedCollection && hintedNetwork === network.toUpperCase()
+      ? hintedCollection
+      : null);
+  const chainId = toNumberOrNull(document.chainId)
+    ?? (network.toUpperCase() === 'BSC' && identityHint?.chainId !== undefined
+      ? toNumberOrNull(identityHint.chainId)
+      : null);
   const skills =
     document.skills && typeof document.skills === 'object'
       ? (document.skills as LegacyMarketplaceCukiItem['skills'])
@@ -411,12 +434,12 @@ function normalizeCuki(document: CukiDocument): LegacyMarketplaceCukiItem {
   return {
     id,
     tokenId: id,
-    chainId: toNumberOrNull(document.chainId),
-    collectionAddress: toStringOrNull(document.collectionAddressNormalized),
+    chainId,
+    collectionAddress,
     cukiNumber: toNumberOrNull(document.cukiNumber),
     owner,
     ownerNormalized: toStringOrNull(document.ownerNormalized),
-    network: toStringOrNull(document.network) ?? 'TRON',
+    network,
     origin: toStringOrNull(document.origin),
     birthNetwork: toStringOrNull(document.birthNetwork),
     imageUrl: normalizeImageUrl(id, document.img),
@@ -547,6 +570,43 @@ export function buildCukiFilter(params: LegacyMarketplaceListParams) {
   if (isKnownNetwork(params.network)) filter.network = params.network;
   if (isKnownState(params.state)) filter.state = params.state;
 
+  if (params.collection?.trim()) {
+    const collection = params.collection.trim();
+    const network = isKnownNetwork(params.network) ? params.network : undefined;
+    const explicitCollectionClauses: Filter<CukiDocument>[] = network === 'BSC'
+      ? [
+        { collectionAddressNormalized: collection.toLowerCase() },
+        { collectionAddress: new RegExp(`^${escapeRegex(collection)}$`, 'i') },
+      ]
+      : [
+        { collectionAddressNormalized: collection },
+        { collectionAddress: new RegExp(`^${escapeRegex(collection)}$`) },
+      ];
+
+    // Older legacy rows predate the explicit collection fields. When the
+    // caller supplies a known network+collection, those rows can be treated
+    // as belonging to that configured legacy contract and annotated with the
+    // same hint in normalizeCuki. Rows carrying a different explicit
+    // collection never pass this fallback.
+    if (network) {
+      explicitCollectionClauses.push({
+        $and: [
+          { $or: [
+            { collectionAddressNormalized: { $exists: false } },
+            { collectionAddressNormalized: null },
+            { collectionAddressNormalized: '' },
+          ] },
+          { $or: [
+            { collectionAddress: { $exists: false } },
+            { collectionAddress: null },
+            { collectionAddress: '' },
+          ] },
+        ],
+      });
+    }
+    filter.$and = [...(filter.$and ?? []), { $or: explicitCollectionClauses }];
+  }
+
   if (params.marketplaceOnly || params.state === 'onSale') {
     filter.state = 'onSale';
     filter.marketplaceListingStatus = 'active';
@@ -637,7 +697,11 @@ export async function listCukies(
 
   return {
     source: 'mongo',
-    items: items.map(normalizeCuki),
+    items: items.map((item) => normalizeCuki(item, {
+      network: params.network,
+      collection: params.collection,
+      chainId: params.chainId === undefined ? null : params.chainId as number | string,
+    })),
     total,
     offset,
     limit,
@@ -645,14 +709,17 @@ export async function listCukies(
   };
 }
 
-export async function getCuki(tokenId: string) {
+export async function getCuki(
+  tokenId: string,
+  identityHint?: LegacyCukiIdentityHint,
+) {
   const collection = await getCukiesCollection();
   const document = await collection.findOne({ _id: tokenId });
 
   if (!document) return null;
 
   const hydrated = await hydrateCukiRelations(document, collection);
-  return hydrateCukiHistory(normalizeCuki(hydrated));
+  return hydrateCukiHistory(normalizeCuki(hydrated, identityHint));
 }
 
 export async function listBreedingCandidates(

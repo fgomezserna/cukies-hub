@@ -14,6 +14,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { bsc } from 'viem/chains';
 
 import type { BridgeRelayerConfig } from './config.js';
+import { AmbiguousBridgeSubmissionError } from './types.js';
 import type {
   BridgeMetadata,
   BridgeReconciliation,
@@ -231,7 +232,19 @@ export class ViemBscBridgeDestination implements BscBridgeDestination {
         BigInt(request.tokenId),
       ],
     });
-    return this.walletClient.writeContract(simulation.request);
+    try {
+      return await this.walletClient.writeContract(simulation.request);
+    } catch (error) {
+      // Once a write is handed to the wallet/RPC we cannot prove whether the
+      // node broadcast it before the response was lost. Never let the engine
+      // retry this request automatically and risk a duplicate mint.
+      throw new AmbiguousBridgeSubmissionError(
+        `No se pudo obtener el hash del mint BSC; requiere revision manual: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { cause: error },
+      );
+    }
   }
 
   async inspect(

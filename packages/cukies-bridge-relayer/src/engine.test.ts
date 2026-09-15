@@ -5,6 +5,7 @@ import type { Address, Hash } from 'viem';
 
 import { BridgeRelayerEngine } from './engine.js';
 import { hashBridgeMetadata } from './metadata.js';
+import { AmbiguousBridgeSubmissionError } from './types.js';
 import type {
   BridgeEvidenceProvider,
   BridgeMetadata,
@@ -180,6 +181,7 @@ class FakeDestination implements BscBridgeDestination {
   inspectionError: Error | null = null;
   submitCount = 0;
   submitFailures = 0;
+  ambiguousSubmit = false;
 
   async assertMainnet() {
     if (this.chainId !== 56) throw new Error('wrong chain');
@@ -192,6 +194,9 @@ class FakeDestination implements BscBridgeDestination {
 
   async submit() {
     this.submitCount += 1;
+    if (this.ambiguousSubmit) {
+      throw new AmbiguousBridgeSubmissionError('broadcast response lost');
+    }
     if (this.submitFailures > 0) {
       this.submitFailures -= 1;
       throw new Error('temporary RPC failure');
@@ -322,6 +327,35 @@ describe('BridgeRelayerEngine', () => {
     );
     assert.equal(store.jobs.get(request().transferId)?.status, 'dead_letter');
     assert.equal(destination.submitCount, 3);
+  });
+
+  it('manda a revision manual un broadcast cuyo hash se pierde y nunca reintenta', async () => {
+    const { store, destination, engine } = fixture();
+    const now = new Date('2026-08-30T12:00:00.000Z');
+    destination.ambiguousSubmit = true;
+    await store.upsertRequests([request()], now);
+
+    assert.equal((await engine.processNext(now))?.outcome, 'manual_review');
+    assert.equal(destination.submitCount, 1);
+    assert.equal(store.jobs.get(request().transferId)?.status, 'manual_review');
+    assert.equal(
+      await engine.processNext(new Date(now.getTime() + 10_000)),
+      null,
+    );
+    assert.equal(destination.submitCount, 1);
+  });
+
+  it('manda a revision manual si falla guardar el hash ya emitido', async () => {
+    const { store, destination, engine } = fixture();
+    const now = new Date('2026-08-30T12:00:00.000Z');
+    store.markSubmitted = async () => {
+      throw new Error('Mongo write timeout');
+    };
+    await store.upsertRequests([request()], now);
+
+    assert.equal((await engine.processNext(now))?.outcome, 'manual_review');
+    assert.equal(destination.submitCount, 1);
+    assert.equal(store.jobs.get(request().transferId)?.status, 'manual_review');
   });
 
   it('dead-letters metadata drift before any destination transaction', async () => {

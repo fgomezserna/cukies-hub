@@ -68,4 +68,25 @@ describe('GET /api/legacy-marketplace/bridge-status', () => {
       expect.objectContaining({ projection: expect.any(Object) }),
     );
   });
+
+  it('redacts provider URLs and credential markers from a public error', async () => {
+    const findOne = jest.fn().mockResolvedValue({
+      _id: 'tx:rpc',
+      status: 'manual_review',
+      updatedAt: new Date('2026-09-13T18:00:00.000Z'),
+      lastError: 'HttpRequestError: https://rpc.example.test/v1?api_key=DUMMY_RPC_SECRET',
+      request: { sourceTxHash: 'b'.repeat(64), sourceEventIndex: 0 },
+    });
+    getIndexerDbMock.mockResolvedValue({
+      collection: jest.fn(() => ({ findOne })),
+    } as never);
+
+    const sourceTxHash = 'b'.repeat(64);
+    const response = await GET(request(`sourceTxHash=${sourceTxHash}&sourceEventIndex=0`));
+    const payload = await response.json();
+
+    expect(payload.error).toBe('El relayer encontro un error interno; requiere revision manual.');
+    expect(JSON.stringify(payload)).not.toContain('DUMMY_RPC_SECRET');
+    expect(JSON.stringify(payload)).not.toContain('rpc.example.test');
+  });
 });

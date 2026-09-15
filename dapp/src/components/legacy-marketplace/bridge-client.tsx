@@ -156,16 +156,27 @@ function hasExpectedBridgeIdentity(
     return false;
   }
 
-  if (network === 'BSC') {
-    const expectedId = [
-      runtime.bscChainId,
-      runtime.bscTokenAddress.toLowerCase(),
-      cuki.tokenId,
-    ].join(':');
-    return cuki.id.toLowerCase() === expectedId;
-  }
+  const expectedCollection = network === 'BSC'
+    ? runtime.bscTokenAddress
+    : runtime.tronTokenAddress;
+  const actualCollection = cuki.collectionAddress?.trim();
+  if (!actualCollection) return false;
 
-  return cuki.id === `TRON:${runtime.tronTokenAddress}:${cuki.tokenId}`;
+  const collectionMatches = network === 'BSC'
+    ? actualCollection.toLowerCase() === expectedCollection.toLowerCase()
+    : actualCollection === expectedCollection;
+  if (!collectionMatches) return false;
+
+  // The current /api/cukies normalizer serves id === tokenId. Keep accepting
+  // the canonical identity used by newer indexers while retaining the
+  // tokenId URL contract used by the detail endpoint.
+  const canonicalId = network === 'BSC'
+    ? `${runtime.bscChainId}:${expectedCollection.toLowerCase()}:${cuki.tokenId}`
+    : `TRON:${expectedCollection}:${cuki.tokenId}`;
+  return cuki.id === cuki.tokenId
+    || (network === 'BSC'
+      ? cuki.id.toLowerCase() === canonicalId
+      : cuki.id === canonicalId);
 }
 
 function hasExpectedBridgeOwner(
@@ -675,7 +686,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
 
     try {
       const response = await fetch(
-        `/api/cukies/${encodeURIComponent(candidate.id)}`,
+        `/api/cukies/${encodeURIComponent(candidate.tokenId)}?network=${encodeURIComponent(SOURCE_NETWORK)}&collectionAddress=${encodeURIComponent(runtime.tronTokenAddress)}`,
         { cache: 'no-store' },
       );
       if (!response.ok) {
@@ -686,7 +697,7 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
       const current = payload.item;
       if (
         !current
-        || current.id !== candidate.id
+        || current.tokenId !== candidate.tokenId
         || !isExpectedBridgeCuki(
           current,
           SOURCE_NETWORK,
@@ -844,16 +855,32 @@ function BridgeOperationsClient({ runtime }: { runtime: EnabledBridgeRuntime }) 
 
       setTransfer((previous) => {
         if (!previous || previous.txHash !== current.txHash) return previous;
+        const destinationTxHash = typeof payload.destinationTxHash === 'string'
+          ? payload.destinationTxHash
+          : previous.destinationTxHash;
+        const sourceEventIndex = typeof payload.sourceEventIndex === 'number'
+          ? payload.sourceEventIndex
+          : previous.sourceEventIndex;
+        const error = typeof payload.error === 'string' ? payload.error : null;
+
+        // Keep the same object when a poll returns no state transition. This
+        // prevents the effect below from tearing down and immediately
+        // restarting its five-second timer after every response.
+        if (
+          previous.status === nextStatus
+          && previous.destinationTxHash === destinationTxHash
+          && previous.sourceEventIndex === sourceEventIndex
+          && previous.error === error
+        ) {
+          return previous;
+        }
+
         return {
           ...previous,
           status: nextStatus,
-          destinationTxHash: typeof payload.destinationTxHash === 'string'
-            ? payload.destinationTxHash
-            : previous.destinationTxHash,
-          sourceEventIndex: typeof payload.sourceEventIndex === 'number'
-            ? payload.sourceEventIndex
-            : previous.sourceEventIndex,
-          error: typeof payload.error === 'string' ? payload.error : null,
+          destinationTxHash,
+          sourceEventIndex,
+          error,
           updatedAt: Date.now(),
         };
       });
