@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { ChainCursor, ChainEvent, ContractEventConfig } from '../types.js';
+import type { LegacyIndexerConfig } from '../config/legacy-env.js';
 import {
+  bootstrapLegacyRuntimeFromDefault,
   cloneHistoricalEventForLegacy,
   historicalDefaultEventFilter,
   legacyBootstrapCursorFields,
 } from './bootstrap.js';
+import { LEGACY_CONTRACT_ALIASES } from './contracts.js';
+import type { LegacyIndexerStore } from './storage/mongo.js';
 
 const config: ContractEventConfig = {
   chain: 'BSC',
@@ -150,4 +154,25 @@ test('legacy TRON bootstrap restarts an opaque fingerprint at its timestamp fron
     legacyBootstrapImportedAt: importedAt,
     legacyBootstrapEventCount: 7,
   });
+});
+
+test('legacy bootstrap resolves canonical BSC and TRON sources without env addresses', async () => {
+  const seen: string[] = [];
+  const store = {
+    getCursor: async (event: ContractEventConfig) => {
+      seen.push(`${event.chain}:${event.contractAlias}:${event.eventName}`);
+      return { _id: `legacy:${event.chain}:${event.contractAlias}:${event.eventName}` };
+    },
+  } as unknown as LegacyIndexerStore;
+  const legacyConfig = {
+    legacyContractAliases: [...LEGACY_CONTRACT_ALIASES],
+  } as unknown as LegacyIndexerConfig;
+
+  const result = await bootstrapLegacyRuntimeFromDefault(store, legacyConfig);
+
+  assert.equal(result.contractEvents, seen.length);
+  assert.equal(result.existingCursorsPreserved, seen.length);
+  assert.equal(result.cursorsImported, 0);
+  assert.ok(seen.some((identity) => identity.startsWith('BSC:TOKEN:')));
+  assert.ok(seen.some((identity) => identity.startsWith('TRON:MINT:')));
 });
