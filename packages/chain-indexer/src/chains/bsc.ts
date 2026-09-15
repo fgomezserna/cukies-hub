@@ -39,6 +39,26 @@ export type BscIngestError = {
   error: string;
 };
 
+type BscRpcFailureKind =
+  | 'response-too-large'
+  | 'timeout'
+  | 'authentication'
+  | 'transient'
+  | 'contract-data'
+  | 'chain-mismatch'
+  | 'non-adaptive';
+
+export type BscRpcWarning = {
+  cursorId: string;
+  rpcHost: string;
+  reason: BscRpcFailureKind;
+  error: string;
+  fromBlock: number;
+  toBlock: number;
+  range: number;
+  retries: number;
+};
+
 type CanonicalBlockHeader = {
   number: bigint;
   hash: Hash | null;
@@ -188,32 +208,24 @@ function isTransientRpcError(error: unknown) {
   const status = errorStatus(error);
   if (status === 429 || (status !== undefined && status >= 500 && status <= 599)) return true;
   const message = bscErrorSearchText(error);
-  return /(?:\b429\b|too many requests|rate limit(?:ed)?|temporarily unavailable|service unavailable|bad gateway|gateway timeout|http\s+5\d\d|status(?: code)?\s+5\d\d)/i.test(message);
+  const transportCodes = bscErrorObjects(error)
+    .map((candidate) => candidate.code)
+    .filter((value): value is string => typeof value === 'string');
+  return /(?:\b429\b|too many requests|rate limit(?:ed)?|temporarily unavailable|service unavailable|bad gateway|gateway timeout|http\s+5\d\d|status(?: code)?\s+5\d\d|fetch failed|failed to fetch|network error|socket hang up|connection (?:reset|refused))/i.test(message)
+    || transportCodes.some((code) => /^(?:ECONNRESET|ECONNREFUSED|EPIPE|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|UND_ERR_SOCKET)$/i.test(code));
 }
 
-function classifyBscRangeAdjustment(error: unknown): BscRangeFailureReason | null {
-  if (isAuthOrForbiddenError(error)) return null;
-
-  const fallback = error as BscFallbackError;
-  if (Array.isArray(fallback.rpcFailures) && fallback.rpcFailures.length > 0) {
-    const classifications = fallback.rpcFailures.map(({ error: failure }) =>
-      classifyBscRangeAdjustment(failure));
-    // A fallback containing an auth/chain/data failure must stay visible and
-    // must never be reclassified as a range problem. Only all-range (or
-    // timeout/range mixed) failures may drive adaptive splitting.
-    if (classifications.some((value) => value === null)) return null;
-    const timeout = classifications.some((value) => value === 'timeout');
-    const responseTooLarge = classifications.some((value) => value === 'response-too-large');
-    return timeout ? 'timeout' : responseTooLarge ? 'response-too-large' : null;
-  }
-
+function classifyBscRpcFailure(error: unknown): BscRpcFailureKind {
+  if (isAuthOrForbiddenError(error)) return 'authentication';
   const message = bscErrorSearchText(error);
-  const status = errorStatus(error);
   // A provider can include generic words such as "limit" in a contract/data
   // failure. Keep those failures visible instead of shrinking a healthy
   // range. Explicit timeout text is handled below before transient statuses.
-  if (/(execution reverted|reverted|abi|decode|invalid argument|invalid params|contract function)/i.test(message)) {
-    return null;
+  if (/(execution reverted|reverted|abi|decode|invalid argument|invalid params|contract function|getter unavailable|period_duration)/i.test(message)) {
+    return 'contract-data';
+  }
+  if (/(?:unexpected|inesperado).*chain\s*id|chain\s*id.*(?:unexpected|inesperado|mismatch|no coincide)/i.test(message)) {
+    return 'chain-mismatch';
   }
   const errorCodes = bscErrorObjects(error)
     .map((candidate) => candidate.code)
@@ -228,7 +240,7 @@ function classifyBscRangeAdjustment(error: unknown): BscRangeFailureReason | nul
   if (explicitTimeout) return 'timeout';
   // HTTP 429/5xx are transient. They can be retried by the caller, but they
   // are not evidence that this range is too large.
-  if (status === 401 || status === 403 || isTransientRpcError(error)) return null;
+  if (isTransientRpcError(error)) return 'transient';
   if (
     message.includes('limit exceeded')
     || message.includes('request exceeds defined limit')
@@ -239,7 +251,53 @@ function classifyBscRangeAdjustment(error: unknown): BscRangeFailureReason | nul
     || message.includes('eth_getlogs') && message.includes('limit')
     || message.includes('exceeds the maximum')
   ) return 'response-too-large';
-  return null;
+  return 'non-adaptive';
+}
+
+function classifyBscRangeAdjustment(error: unknown): BscRangeFailureReason | null {
+  const fallback = error as BscFallbackError;
+  if (Array.isArray(fallback.rpcFailures) && fallback.rpcFailures.length > 0) {
+    const classifications = fallback.rpcFailures.map(({ error: failure }) =>
+      classifyBscRpcFailure(failure));
+    // An alternate RPC may require credentials for historical queries while
+    // another endpoint merely rejects the current span. Keep the former as a
+    // durable warning, but still shrink for the endpoint that can become
+    // usable. Contract/data/chain failures remain non-adaptive and stop the
+    // cursor when every configured endpoint fails.
+    if (classifications.some((classification) => (
+      classification === 'contract-data'
+      || classification === 'chain-mismatch'
+      || classification === 'non-adaptive'
+    ))) return null;
+    const timeout = classifications.includes('timeout');
+    const responseTooLarge = classifications.includes('response-too-large');
+    return timeout ? 'timeout' : responseTooLarge ? 'response-too-large' : null;
+  }
+
+  const classification = classifyBscRpcFailure(error);
+  return classification === 'timeout' || classification === 'response-too-large'
+    ? classification
+    : null;
+}
+
+function safeBscRpcError(error: unknown) {
+  const status = errorStatus(error);
+  const safeCode = bscErrorObjects(error)
+    .map((candidate) => candidate.code)
+    .find((value) => (
+      typeof value === 'number' && Number.isSafeInteger(value)
+    ) || (
+      typeof value === 'string'
+      && /^(?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNABORTED|ECONNRESET|ECONNREFUSED|EPIPE|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|UND_ERR_(?:CONNECT|HEADERS|BODY)_TIMEOUT|UND_ERR_SOCKET)$/i.test(value)
+    ));
+  // Provider text is intentionally excluded: some RPCs reflect API keys or
+  // authorization headers in `details`. Category, status, allow-listed code
+  // and rpcHost provide actionable diagnostics without persisting secrets.
+  return [
+    `reason=${classifyBscRpcFailure(error)}`,
+    ...(status !== undefined ? [`status=${status}`] : []),
+    ...(safeCode !== undefined ? [`code=${safeCode}`] : []),
+  ].join(' ');
 }
 
 function bscRangeBounds(config: IndexerConfig) {
@@ -300,6 +358,7 @@ async function withBscRpcFallback<T>(
       return {
         value: await operation(rpc),
         rpc,
+        failures,
       };
     } catch (error) {
       failures.push({ host: rpc.host, error });
@@ -308,7 +367,7 @@ async function withBscRpcFallback<T>(
 
   const aggregate = new Error(
     `Todos los RPC BSC fallaron: ${failures
-      .map(({ host, error }) => `${host}: ${errorMessage(error) || String(error)}`)
+      .map(({ host, error }) => `${host}: ${safeBscRpcError(error)}`)
       .join(' | ')}`,
   ) as BscFallbackError;
   aggregate.rpcFailures = failures;
@@ -483,6 +542,7 @@ export async function ingestBscOnce(
   let ranges = 0;
   let allCursorsCoverSafeBlock = true;
   const errors: BscIngestError[] = [];
+  const rpcWarnings = new Map<string, BscRpcWarning>();
   const failedContractAliases = new Set<string>();
   const markAllConfiguredAliasesFailed = () => {
     for (const contractEvent of contractEvents) {
@@ -703,6 +763,30 @@ export async function ingestBscOnce(
     let successfulQueries = 0;
     let queryFromBlock = fromBlock;
     let logsRpc = latestBlockRpc;
+    const cursorId = `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`;
+    const recordRpcFailures = (
+      failures: BscRpcFailure[],
+      warningContext: Pick<BscRpcWarning, 'fromBlock' | 'toBlock' | 'range' | 'retries'>,
+    ) => {
+      for (const failure of failures) {
+        const reason = classifyBscRpcFailure(failure.error);
+        // Size/timeout adjustments already have their own structured log with
+        // cursor, range and retry count. Keep this durable warning channel for
+        // the failures that must remain visible beside a successful fallback.
+        if (reason === 'response-too-large' || reason === 'timeout') continue;
+        const key = `${cursorId}:${failure.host}:${reason}`;
+        if (rpcWarnings.has(key)) continue;
+        const warning: BscRpcWarning = {
+          cursorId,
+          rpcHost: failure.host,
+          reason,
+          error: safeBscRpcError(failure.error),
+          ...warningContext,
+        };
+        rpcWarnings.set(key, warning);
+        console.warn('[chain-indexer] bsc rpc fallback warning', warning);
+      }
+    };
 
     // Query, decode and timestamp the complete logical window before touching
     // Mongo. If the provider rejects one query by size (or explicitly times
@@ -711,7 +795,7 @@ export async function ingestBscOnce(
     while (queryFromBlock <= toBlock) {
       const queryToBlock = Math.min(queryFromBlock + adaptiveRange - 1, toBlock);
       try {
-        const { value: logs, rpc } = await withBscRpcFallback(
+        const { value: logs, rpc, failures } = await withBscRpcFallback(
           rpcClients,
           config.bscExpectedChainId,
           (candidate) => getLogsWithFallback(
@@ -724,6 +808,12 @@ export async function ingestBscOnce(
             queryToBlock,
           ),
         );
+        recordRpcFailures(failures, {
+          fromBlock: queryFromBlock,
+          toBlock: queryToBlock,
+          range: adaptiveRange,
+          retries: rangeRetries,
+        });
         logsRpc = rpc;
 
         // Some RPCs have returned the same log more than once inside one
@@ -778,13 +868,19 @@ export async function ingestBscOnce(
         queryFromBlock = queryToBlock + 1;
       } catch (error) {
         const reason = classifyBscRangeAdjustment(error);
+        recordRpcFailures((error as BscFallbackError).rpcFailures ?? [], {
+          fromBlock: queryFromBlock,
+          toBlock: queryToBlock,
+          range: adaptiveRange,
+          retries: reason ? rangeRetries + 1 : rangeRetries,
+        });
         if (reason && adaptiveRange > minBlockRange) {
           const previousRange = adaptiveRange;
           adaptiveRange = Math.max(minBlockRange, Math.floor(adaptiveRange / 2));
           adaptiveSuccesses = 0;
           rangeRetries += 1;
           logBscRangeAdjustment({
-            cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+            cursorId,
             fromBlock: queryFromBlock,
             toBlock: queryToBlock,
             range: previousRange,
@@ -850,7 +946,7 @@ export async function ingestBscOnce(
     });
     if (adaptiveCursorEnabled) {
       logBscRangeAdjustment({
-        cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+        cursorId,
         fromBlock,
         toBlock,
         range: acceptedAdaptiveRange,
@@ -861,7 +957,7 @@ export async function ingestBscOnce(
       });
       if (grownRange !== null) {
         logBscRangeAdjustment({
-          cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+          cursorId,
           fromBlock,
           toBlock,
           range: acceptedAdaptiveRange,
@@ -938,5 +1034,6 @@ export async function ingestBscOnce(
     safeBlockHash,
     rpcHosts: rpcClients.map((rpc) => rpc.host),
     latestBlockRpcHost: latestBlockRpc.host,
+    rpcWarnings: [...rpcWarnings.values()],
   };
 }

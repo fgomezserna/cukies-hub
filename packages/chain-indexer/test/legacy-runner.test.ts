@@ -48,6 +48,16 @@ test('legacy cycle keeps bounded BSC catch-up running while TRON is rate-limited
         safeBlockHash: `0x${String(bscRuns).padStart(64, '0')}`,
         rpcHosts: [],
         latestBlockRpcHost: 'test',
+        rpcWarnings: [{
+          cursorId: `BSC:TOKEN:Transfer:${bscRuns}`,
+          rpcHost: 'fallback.test',
+          reason: 'transient' as const,
+          error: 'reason=transient code=ECONNRESET',
+          fromBlock: bscRuns,
+          toBlock: bscRuns,
+          range: 1,
+          retries: 0,
+        }],
       };
     },
     ingestTron: async () => {
@@ -59,6 +69,7 @@ test('legacy cycle keeps bounded BSC catch-up running while TRON is rate-limited
 
   assert.equal(bscRuns, 3);
   assert.equal(result.bsc.ranges, 3);
+  assert.equal(result.bsc.rpcWarnings?.length, 3);
   assert.equal(result.tron.rateLimited, true);
   assert.equal(isLegacyCycleIncomplete(result.bsc, result.tron), true);
   assert.ok(bscFinishedAt < tronFinishedAt);

@@ -1,4 +1,5 @@
 import { ingestBscOnce, ingestTronOnce } from '../chains/index.js';
+import type { BscRpcWarning } from '../chains/bsc.js';
 import { assertLegacyIndexerEnabled, getLegacyIndexerConfig } from '../config/legacy-env.js';
 import { projectOnce } from '../projectors/index.js';
 import { LegacyIndexerStore } from './storage/mongo.js';
@@ -27,6 +28,7 @@ type LegacyBscResult = {
   safeBlockHash?: string;
   rpcHosts?: string[];
   latestBlockRpcHost?: string;
+  rpcWarnings?: BscRpcWarning[];
   windows?: number;
 };
 type LegacyTronResult = {
@@ -61,6 +63,7 @@ function aggregateBscRuns(runs: LegacyBscResult[]): LegacyBscResult {
     ranges: runs.reduce((sum, run) => sum + run.ranges, 0),
     errors: runs.flatMap((run) => run.errors ?? []),
     failedContractAliases: [...new Set(runs.flatMap((run) => run.failedContractAliases ?? []))],
+    rpcWarnings: runs.flatMap((run) => run.rpcWarnings ?? []),
     windows: runs.length,
   };
 }
