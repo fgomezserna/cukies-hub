@@ -142,7 +142,12 @@ const envSchema = z.object({
   CHAIN_INDEXER_START_BSC_BLOCK: z.coerce.number().int().min(0).default(0),
   CHAIN_INDEXER_START_TRON_TIMESTAMP_MS: z.coerce.number().int().min(0).default(0),
   CHAIN_INDEXER_BSC_CONFIRMATIONS: z.coerce.number().int().min(0).default(12),
-  CHAIN_INDEXER_MAX_BLOCK_RANGE: z.coerce.number().int().min(1).max(100000).default(5000),
+  // Keep CHAIN_INDEXER_MAX_BLOCK_RANGE as the public/legacy name. The
+  // adaptive reader also accepts the explicit BSC-prefixed minimum so staged
+  // deployments can roll it out without changing existing environments.
+  CHAIN_INDEXER_MAX_BLOCK_RANGE: z.coerce.number().int().min(1).max(5001).default(5001),
+  CHAIN_INDEXER_MIN_BLOCK_RANGE: z.coerce.number().int().min(1).max(5001).optional(),
+  CHAIN_INDEXER_BSC_MIN_BLOCK_RANGE: z.coerce.number().int().min(1).max(5001).optional(),
   CHAIN_INDEXER_TRON_PAGE_LIMIT: z.coerce.number().int().min(1).max(200).default(200),
   CHAIN_INDEXER_TRON_REQUEST_DELAY_MS: z.coerce.number().int().min(0).default(500),
   CHAIN_INDEXER_POLL_INTERVAL_MS: z.coerce.number().int().min(1000).default(60000),
@@ -564,6 +569,15 @@ export function getIndexerConfig(): IndexerConfig {
     legacyRpcUrl: env.BSC_RPC_URL,
   });
 
+  const minBlockRange = env.CHAIN_INDEXER_BSC_MIN_BLOCK_RANGE
+    ?? env.CHAIN_INDEXER_MIN_BLOCK_RANGE
+    ?? 1;
+  if (minBlockRange > env.CHAIN_INDEXER_MAX_BLOCK_RANGE) {
+    throw new Error(
+      'CHAIN_INDEXER_MIN_BLOCK_RANGE no puede superar CHAIN_INDEXER_MAX_BLOCK_RANGE.',
+    );
+  }
+
   if (contractAliases?.includes('PRESALE') && !presaleAddress) {
     throw new Error('Falta CHAIN_INDEXER_PRESALE_ADDRESS o NEXT_PUBLIC_UKI_PRESALE_ADDRESS para indexar la preventa.');
   }
@@ -639,6 +653,7 @@ export function getIndexerConfig(): IndexerConfig {
     tronStartTimestampMs: env.CHAIN_INDEXER_START_TRON_TIMESTAMP_MS,
     bscConfirmations: env.CHAIN_INDEXER_BSC_CONFIRMATIONS,
     maxBlockRange: env.CHAIN_INDEXER_MAX_BLOCK_RANGE,
+    minBlockRange,
     tronPageLimit: env.CHAIN_INDEXER_TRON_PAGE_LIMIT,
     tronRequestDelayMs: env.CHAIN_INDEXER_TRON_REQUEST_DELAY_MS,
     pollIntervalMs: env.CHAIN_INDEXER_POLL_INTERVAL_MS,

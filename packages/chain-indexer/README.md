@@ -37,7 +37,18 @@ Variables principales:
 - `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_ADDRESS` y `CHAIN_INDEXER_REWARDS_DISTRIBUTOR_START_BSC_BLOCK`: address y bloque de despliegue obligatorios al activar `REWARDS_DISTRIBUTOR`.
 - `CHAIN_INDEXER_START_TRON_TIMESTAMP_MS`: timestamp inicial TRON. Default: `0`.
 - `CHAIN_INDEXER_BSC_CONFIRMATIONS`: confirmaciones antes de ingerir. Default: `12`.
-- `CHAIN_INDEXER_MAX_BLOCK_RANGE`: bloques BSC por pasada/evento. Default: `5000`.
+- `CHAIN_INDEXER_MAX_BLOCK_RANGE`: ventana lógica de bloques BSC por
+  pasada/evento. Mantiene el nombre histórico, su default y límite superior son
+  `5001`.
+- `CHAIN_INDEXER_MIN_BLOCK_RANGE` (o `CHAIN_INDEXER_BSC_MIN_BLOCK_RANGE`):
+  mínimo validado para el rango adaptativo BSC. Default: `1`; no puede superar
+  `CHAIN_INDEXER_MAX_BLOCK_RANGE`. Cada ventana lógica se consulta mediante
+  subrangos contiguos: el tamaño se reduce a la mitad ante límites de
+  `eth_getLogs`/respuesta o timeout explícito, conserva el mismo cursor hasta
+  completar la ventana y vuelve a crecer gradualmente después de tres ventanas
+  completas correctas.
+  `adaptiveRange` y `adaptiveSuccesses` se guardan opcionalmente en cada cursor
+  para que los cursores anteriores sigan siendo compatibles.
 - `CHAIN_INDEXER_TRON_PAGE_LIMIT`: eventos TRON por pagina. Default: `200`.
 - `CHAIN_INDEXER_TRON_REQUEST_DELAY_MS`: pausa entre requests TronGrid. Default: `500`.
 - `CHAIN_INDEXER_PROJECT_BATCH_SIZE`: eventos a proyectar por ciclo. Default: `100`.
@@ -82,6 +93,11 @@ Comandos del servicio: `legacy:setup` verifica las fuentes y crea indices;
 `legacy:run` ejecuta el build de produccion. La configuracion dedicada no usa
 los defaults del indexer anterior: un inicio legacy explicito `0` representa
 historia completa. `legacy:test` valida configuracion e identidades.
+
+En `legacy:run`, BSC y TRON se leen en paralelo y BSC puede procesar un numero
+acotado de ventanas contiguas por ciclo (`CUKIES_LEGACY_BSC_WINDOWS_PER_CYCLE`,
+default `3`; alias `CUKIES_LEGACY_BSC_BATCHES_PER_CYCLE`). Un 429 o una pagina
+lenta de TronGrid no mueve su fingerprint ni bloquea el catch-up BSC.
 
 Las lecturas no firman transacciones. La prueba de runtime `legacy-existing`
 acredita address/red/hash observado, sin inventar evidencia de despliegue.

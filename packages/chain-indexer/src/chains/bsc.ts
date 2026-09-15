@@ -125,9 +125,157 @@ function errorMessage(error: unknown) {
   return error.message;
 }
 
-function isRpcRangeLimitError(error: unknown) {
-  const message = errorMessage(error).toLowerCase();
-  return message.includes('limit exceeded') || message.includes('request exceeds defined limit');
+type BscRangeAdjustmentReason =
+  | 'response-too-large'
+  | 'timeout'
+  | 'success-hysteresis'
+  | 'query-success';
+type BscRangeFailureReason = 'response-too-large' | 'timeout';
+
+type BscRpcFailure = {
+  host: string;
+  error: unknown;
+};
+
+type BscFallbackError = Error & {
+  rpcFailures?: BscRpcFailure[];
+};
+
+function bscErrorObjects(error: unknown) {
+  const objects: Record<string, unknown>[] = [];
+  const pending: unknown[] = [error];
+  const seen = new Set<unknown>();
+  while (pending.length > 0 && objects.length < 8) {
+    const candidate = pending.shift();
+    if (!candidate || typeof candidate !== 'object' || seen.has(candidate)) continue;
+    seen.add(candidate);
+    const record = candidate as Record<string, unknown>;
+    objects.push(record);
+    pending.push(record.cause, record.error, record.data, record.response);
+  }
+  return objects;
+}
+
+function bscErrorSearchText(error: unknown) {
+  const values: string[] = [];
+  if (typeof error === 'string') values.push(error);
+  for (const candidate of bscErrorObjects(error)) {
+    for (const key of ['message', 'shortMessage', 'details'] as const) {
+      if (typeof candidate[key] === 'string') values.push(candidate[key] as string);
+    }
+  }
+  return values.join(' | ').toLowerCase();
+}
+
+function errorStatus(error: unknown) {
+  for (const candidate of bscErrorObjects(error)) {
+    for (const value of [candidate.status, candidate.statusCode]) {
+      if (typeof value === 'number' && Number.isInteger(value)) return value;
+      if (typeof value === 'string' && /^\d{3}$/.test(value)) return Number(value);
+    }
+  }
+  return undefined;
+}
+
+function isAuthOrForbiddenError(error: unknown) {
+  const status = errorStatus(error);
+  if (status === 401 || status === 403) return true;
+  const message = bscErrorSearchText(error);
+  return /(?:\b401\b|\b403\b|unauthori[sz]ed|forbidden|invalid api key|authentication)/i.test(message);
+}
+
+function isTransientRpcError(error: unknown) {
+  const status = errorStatus(error);
+  if (status === 429 || (status !== undefined && status >= 500 && status <= 599)) return true;
+  const message = bscErrorSearchText(error);
+  return /(?:\b429\b|too many requests|rate limit(?:ed)?|temporarily unavailable|service unavailable|bad gateway|gateway timeout|http\s+5\d\d|status(?: code)?\s+5\d\d)/i.test(message);
+}
+
+function classifyBscRangeAdjustment(error: unknown): BscRangeFailureReason | null {
+  if (isAuthOrForbiddenError(error)) return null;
+
+  const fallback = error as BscFallbackError;
+  if (Array.isArray(fallback.rpcFailures) && fallback.rpcFailures.length > 0) {
+    const classifications = fallback.rpcFailures.map(({ error: failure }) =>
+      classifyBscRangeAdjustment(failure));
+    // A fallback containing an auth/chain/data failure must stay visible and
+    // must never be reclassified as a range problem. Only all-range (or
+    // timeout/range mixed) failures may drive adaptive splitting.
+    if (classifications.some((value) => value === null)) return null;
+    const timeout = classifications.some((value) => value === 'timeout');
+    const responseTooLarge = classifications.some((value) => value === 'response-too-large');
+    return timeout ? 'timeout' : responseTooLarge ? 'response-too-large' : null;
+  }
+
+  const message = bscErrorSearchText(error);
+  const status = errorStatus(error);
+  // A provider can include generic words such as "limit" in a contract/data
+  // failure. Keep those failures visible instead of shrinking a healthy
+  // range. Explicit timeout text is handled below before transient statuses.
+  if (/(execution reverted|reverted|abi|decode|invalid argument|invalid params|contract function)/i.test(message)) {
+    return null;
+  }
+  const errorCodes = bscErrorObjects(error)
+    .map((candidate) => candidate.code)
+    .filter((value): value is string => typeof value === 'string');
+  const explicitTimeout = message.includes('timeout')
+    || message.includes('timed out')
+    || message.includes('etimedout')
+    || message.includes('request timed out')
+    || errorCodes.some((code) => /^(?:ETIMEDOUT|ESOCKETTIMEDOUT|ECONNABORTED|UND_ERR_(?:CONNECT|HEADERS|BODY)_TIMEOUT)$/i.test(code))
+    || (typeof (error as { name?: unknown })?.name === 'string'
+      && /timeout/i.test(String((error as { name?: unknown }).name)));
+  if (explicitTimeout) return 'timeout';
+  // HTTP 429/5xx are transient. They can be retried by the caller, but they
+  // are not evidence that this range is too large.
+  if (status === 401 || status === 403 || isTransientRpcError(error)) return null;
+  if (
+    message.includes('limit exceeded')
+    || message.includes('request exceeds defined limit')
+    || message.includes('response too large')
+    || message.includes('result set too large')
+    || message.includes('too many results')
+    || message.includes('block range too large')
+    || message.includes('eth_getlogs') && message.includes('limit')
+    || message.includes('exceeds the maximum')
+  ) return 'response-too-large';
+  return null;
+}
+
+function bscRangeBounds(config: IndexerConfig) {
+  const max = config.maxBlockRange;
+  const min = config.minBlockRange ?? 1;
+  if (!Number.isSafeInteger(max) || max < 1 || max > 5_001) {
+    throw new Error('CHAIN_INDEXER_MAX_BLOCK_RANGE debe estar entre 1 y 5001.');
+  }
+  if (!Number.isSafeInteger(min) || min < 1 || min > max) {
+    throw new Error(
+      'CHAIN_INDEXER_MIN_BLOCK_RANGE debe ser un entero positivo no mayor que CHAIN_INDEXER_MAX_BLOCK_RANGE.',
+    );
+  }
+  return { min, max };
+}
+
+function logBscRangeAdjustment(input: {
+  cursorId: string;
+  fromBlock: number;
+  toBlock: number;
+  range: number;
+  reason: BscRangeAdjustmentReason;
+  adjustment: string;
+  retries: number;
+  nextCursor?: number;
+}) {
+  console.log('[chain-indexer] bsc adaptive range', {
+    cursor: input.cursorId,
+    from: input.fromBlock,
+    to: input.toBlock,
+    range: input.range,
+    reason: input.reason,
+    adjustment: input.adjustment,
+    retries: input.retries,
+    ...(input.nextCursor !== undefined ? { nextCursor: input.nextCursor } : {}),
+  });
 }
 
 async function withBscRpcFallback<T>(
@@ -135,7 +283,7 @@ async function withBscRpcFallback<T>(
   expectedChainId: 56 | 97,
   operation: (rpc: BscRpcClient) => Promise<T>,
 ) {
-  const failures: string[] = [];
+  const failures: BscRpcFailure[] = [];
 
   for (const rpc of rpcClients) {
     try {
@@ -154,11 +302,17 @@ async function withBscRpcFallback<T>(
         rpc,
       };
     } catch (error) {
-      failures.push(`${rpc.host}: ${errorMessage(error) || String(error)}`);
+      failures.push({ host: rpc.host, error });
     }
   }
 
-  throw new Error(`Todos los RPC BSC fallaron: ${failures.join(' | ')}`);
+  const aggregate = new Error(
+    `Todos los RPC BSC fallaron: ${failures
+      .map(({ host, error }) => `${host}: ${errorMessage(error) || String(error)}`)
+      .join(' | ')}`,
+  ) as BscFallbackError;
+  aggregate.rpcFailures = failures;
+  throw aggregate;
 }
 
 function rpcClientsWithPreferredFirst(
@@ -262,23 +416,11 @@ async function getLogsWithFallback(
   fromBlock: number,
   toBlock: number,
 ): Promise<any[]> {
-  try {
-    return await client.getLogs({
-      ...params,
-      fromBlock: BigInt(fromBlock),
-      toBlock: BigInt(toBlock),
-    });
-  } catch (error) {
-    if (!isRpcRangeLimitError(error) || fromBlock >= toBlock) throw error;
-
-    const middleBlock = Math.floor((fromBlock + toBlock) / 2);
-    const [left, right] = await Promise.all([
-      getLogsWithFallback(client, params, fromBlock, middleBlock),
-      getLogsWithFallback(client, params, middleBlock + 1, toBlock),
-    ]);
-
-    return [...left, ...right];
-  }
+  return client.getLogs({
+    ...params,
+    fromBlock: BigInt(fromBlock),
+    toBlock: BigInt(toBlock),
+  });
 }
 
 export async function ingestBscOnce(
@@ -287,6 +429,8 @@ export async function ingestBscOnce(
   dependencies: BscIngestDependencies = {},
 ) {
   if (!config.chains.includes('BSC')) return { inserted: 0, ranges: 0 };
+
+  const { min: minBlockRange, max: maxBlockRange } = bscRangeBounds(config);
 
   const rpcClients = dependencies.rpcClients ?? createBscRpcClients(
     config.bscRpcUrls.length > 0 ? config.bscRpcUrls : [config.bscRpcUrl],
@@ -524,8 +668,22 @@ export async function ingestBscOnce(
       return;
     }
 
-    const toBlock = Math.min(fromBlock + config.maxBlockRange - 1, safeBlock);
-    if (toBlock < safeBlock) allCursorsCoverSafeBlock = false;
+    // Adaptive query range state is scoped to this exact cursor (contract +
+    // event). The logical window remains maxBlockRange blocks so all event
+    // cursors that start together also finish together. Oversized windows are
+    // consumed through contiguous smaller queries and only then committed.
+    // Older cursors have no fields and start at the configured maximum.
+    const adaptiveCursorEnabled = config.minBlockRange !== undefined
+      || cursor?.adaptiveRange !== undefined
+      || cursor?.adaptiveSuccesses !== undefined;
+    const storedAdaptiveRange = Number.isSafeInteger(cursor?.adaptiveRange)
+      ? Number(cursor?.adaptiveRange)
+      : maxBlockRange;
+    let adaptiveRange = Math.min(maxBlockRange, Math.max(minBlockRange, storedAdaptiveRange));
+    let adaptiveSuccesses = Number.isSafeInteger(cursor?.adaptiveSuccesses)
+      && Number(cursor?.adaptiveSuccesses) >= 0
+      ? Number(cursor?.adaptiveSuccesses)
+      : 0;
     const processedFromBlock = cursorHasCoverageOrigin
       ? Number(cursor?.processedFromBlock)
       : fromBlock;
@@ -538,72 +696,112 @@ export async function ingestBscOnce(
           expectedChainId: config.bscExpectedChainId,
           timestampCache,
         });
-    const { value: logs, rpc: logsRpc } = await withBscRpcFallback(
-      rpcClients,
-      config.bscExpectedChainId,
-      (rpc) => getLogsWithFallback(
-        rpc.client,
-        {
-          address: contractEvent.contractAddress as Address,
-          event: bscEventAbis[contractEvent.eventName],
-        },
-        fromBlock,
-        toBlock,
-      ),
-    );
+    const toBlock = Math.min(fromBlock + maxBlockRange - 1, safeBlock);
+    if (toBlock < safeBlock) allCursorsCoverSafeBlock = false;
+    const eventById = new Map<string, ChainEvent>();
+    let rangeRetries = 0;
+    let successfulQueries = 0;
+    let queryFromBlock = fromBlock;
+    let logsRpc = latestBlockRpc;
 
-    const events: ChainEvent[] = [];
+    // Query, decode and timestamp the complete logical window before touching
+    // Mongo. If the provider rejects one query by size (or explicitly times
+    // out), retry that exact subrange start with half the query span. A later
+    // failure therefore leaves both events and cursor unchanged.
+    while (queryFromBlock <= toBlock) {
+      const queryToBlock = Math.min(queryFromBlock + adaptiveRange - 1, toBlock);
+      try {
+        const { value: logs, rpc } = await withBscRpcFallback(
+          rpcClients,
+          config.bscExpectedChainId,
+          (candidate) => getLogsWithFallback(
+            candidate.client,
+            {
+              address: contractEvent.contractAddress as Address,
+              event: bscEventAbis[contractEvent.eventName],
+            },
+            queryFromBlock,
+            queryToBlock,
+          ),
+        );
+        logsRpc = rpc;
 
-    for (const log of logs) {
-      const logArgs =
-        log.args && !Array.isArray(log.args) ? (log.args as Record<string, unknown>) : {};
-      const blockNumber = Number(log.blockNumber);
-      const timestampMs = await getBlockTimestampMs({
-        blockNumber,
-        preferredRpc: logsRpc,
-        rpcClients,
-        expectedChainId: config.bscExpectedChainId,
-        timestampCache,
-      });
+        // Some RPCs have returned the same log more than once inside one
+        // response. Deduplicate before bulkWrite and sort by canonical event
+        // position so retries and provider ordering cannot alter projection.
+        for (const log of logs) {
+          const logArgs =
+            log.args && !Array.isArray(log.args) ? (log.args as Record<string, unknown>) : {};
+          const blockNumber = Number(log.blockNumber);
+          const timestampMs = await getBlockTimestampMs({
+            blockNumber,
+            preferredRpc: logsRpc,
+            rpcClients,
+            expectedChainId: config.bscExpectedChainId,
+            timestampCache,
+          });
 
-      const args = toJsonRecord(logArgs);
-      const normalized = normalizeDomainEvent(
-        'BSC',
-        contractEvent.eventName,
-        contractEvent.contractAlias,
-        logArgs,
-      );
-      const logIndex = Number(log.logIndex ?? 0);
-      const createdAt = now();
-
-      events.push({
-        _id: `BSC:${contractEvent.contractAlias}:${contractEvent.eventName}:${log.transactionHash}:${logIndex}`,
-        runtimeScope: config.runtimeScope ?? 'default',
-        chain: 'BSC',
-        chainId: config.bscExpectedChainId,
-        contractAlias: contractEvent.contractAlias,
-        contractAddress: contractEvent.contractAddress,
-        eventName: contractEvent.eventName,
-        txHash: log.transactionHash,
-        logIndex,
-        blockNumber,
-        blockHash: log.blockHash,
-        timestampMs,
-        args,
-        normalized,
-        raw: toJsonRecord(log),
-        status: 'ingested',
-        attempts: 0,
-        schemaVersion: 1,
-        createdAt,
-        updatedAt: createdAt,
-      });
+          const args = toJsonRecord(logArgs);
+          const normalized = normalizeDomainEvent(
+            'BSC',
+            contractEvent.eventName,
+            contractEvent.contractAlias,
+            logArgs,
+          );
+          const logIndex = Number(log.logIndex ?? 0);
+          const createdAt = now();
+          const event: ChainEvent = {
+            _id: `BSC:${contractEvent.contractAlias}:${contractEvent.eventName}:${log.transactionHash}:${logIndex}`,
+            runtimeScope: config.runtimeScope ?? 'default',
+            chain: 'BSC',
+            chainId: config.bscExpectedChainId,
+            contractAlias: contractEvent.contractAlias,
+            contractAddress: contractEvent.contractAddress,
+            eventName: contractEvent.eventName,
+            txHash: log.transactionHash,
+            logIndex,
+            blockNumber,
+            blockHash: log.blockHash,
+            timestampMs,
+            args,
+            normalized,
+            raw: toJsonRecord(log),
+            status: 'ingested',
+            attempts: 0,
+            schemaVersion: 1,
+            createdAt,
+            updatedAt: createdAt,
+          };
+          eventById.set(event._id, event);
+        }
+        successfulQueries += 1;
+        queryFromBlock = queryToBlock + 1;
+      } catch (error) {
+        const reason = classifyBscRangeAdjustment(error);
+        if (reason && adaptiveRange > minBlockRange) {
+          const previousRange = adaptiveRange;
+          adaptiveRange = Math.max(minBlockRange, Math.floor(adaptiveRange / 2));
+          adaptiveSuccesses = 0;
+          rangeRetries += 1;
+          logBscRangeAdjustment({
+            cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+            fromBlock: queryFromBlock,
+            toBlock: queryToBlock,
+            range: previousRange,
+            reason,
+            adjustment: `decrease:${previousRange}->${adaptiveRange}`,
+            retries: rangeRetries,
+          });
+          continue;
+        }
+        throw error;
+      }
     }
 
-    const result = await store.upsertEvents(events);
-    inserted += result.inserted;
-    ranges += 1;
-
+    const events = [...eventById.values()].sort((left, right) =>
+      left.blockNumber - right.blockNumber
+      || left.logIndex - right.logIndex
+      || left._id.localeCompare(right._id));
     const processedThroughTimestampMs = await getBlockTimestampMs({
       blockNumber: toBlock,
       preferredRpc: logsRpc,
@@ -611,6 +809,30 @@ export async function ingestBscOnce(
       expectedChainId: config.bscExpectedChainId,
       timestampCache,
     });
+    const result = await store.upsertEvents(events);
+    inserted += result.inserted;
+    ranges += 1;
+
+    // Grow only after three complete logical windows. A reduction resets this
+    // counter, so an isolated successful subquery cannot immediately push the
+    // reader back over a provider's hard response limit.
+    const acceptedAdaptiveRange = adaptiveRange;
+    adaptiveSuccesses += 1;
+    let persistedAdaptiveRange = adaptiveRange;
+    let grownRange: number | null = null;
+    if (adaptiveRange < maxBlockRange && adaptiveSuccesses >= 3) {
+      const candidateRange = Math.min(
+        maxBlockRange,
+        adaptiveRange + Math.max(1, Math.floor(adaptiveRange / 4)),
+      );
+      if (candidateRange > adaptiveRange) {
+        grownRange = candidateRange;
+        persistedAdaptiveRange = candidateRange;
+        adaptiveRange = candidateRange;
+      }
+      adaptiveSuccesses = 0;
+    }
+
     await store.updateCursor(contractEvent, {
       ...verifiedCursorFields,
       nextBlock: toBlock + 1,
@@ -619,7 +841,37 @@ export async function ingestBscOnce(
       processedFromTimestampMs,
       processedThroughBlock: toBlock,
       processedThroughTimestampMs,
+      ...(adaptiveCursorEnabled
+        ? {
+            adaptiveRange: persistedAdaptiveRange,
+            adaptiveSuccesses,
+          }
+        : {}),
     });
+    if (adaptiveCursorEnabled) {
+      logBscRangeAdjustment({
+        cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+        fromBlock,
+        toBlock,
+        range: acceptedAdaptiveRange,
+        reason: 'query-success',
+        adjustment: `accepted:${successfulQueries}-queries`,
+        retries: rangeRetries,
+        nextCursor: toBlock + 1,
+      });
+      if (grownRange !== null) {
+        logBscRangeAdjustment({
+          cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,
+          fromBlock,
+          toBlock,
+          range: acceptedAdaptiveRange,
+          reason: 'success-hysteresis',
+          adjustment: `increase:${acceptedAdaptiveRange}->${grownRange}`,
+          retries: rangeRetries,
+          nextCursor: toBlock + 1,
+        });
+      }
+    }
     })().catch((error) => {
       errors.push({
         cursorId: `${contractEvent.chain}:${contractEvent.contractAlias}:${contractEvent.eventName}`,

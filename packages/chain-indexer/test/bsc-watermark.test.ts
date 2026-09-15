@@ -39,7 +39,11 @@ function config(overrides: Partial<IndexerConfig> = {}): IndexerConfig {
 
 function fakeStore(
   cursor: Partial<ChainCursor> | null = null,
-  options: { failCursorUpdate?: boolean; failCutoffResolution?: boolean } = {},
+  options: {
+    failCursorUpdate?: boolean;
+    failEventUpsert?: boolean;
+    failCutoffResolution?: boolean;
+  } = {},
 ) {
   const updates: Array<{
     config: ContractEventConfig;
@@ -61,6 +65,7 @@ function fakeStore(
     },
     upsertEvents: async (events: unknown[]) => {
       eventBatches.push(events);
+      if (options.failEventUpsert) throw new Error('event upsert failed');
       return { inserted: events.length };
     },
     upsertBscCheckpoint: async (input: unknown) => {
@@ -694,4 +699,253 @@ test('requires a successful pool getter and never invents a default when RPC can
   assert.equal(fixture.contractReadCalls.length, 1);
   assert.deepEqual(fixture.updates, []);
   assert.deepEqual(fixture.checkpoints, []);
+});
+
+test('shrinks an oversized BSC range, retries the same cursor and persists adaptive state', async () => {
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const adjustmentLogs: unknown[] = [];
+  const originalConsoleLog = console.log;
+  console.log = (...args: unknown[]) => adjustmentLogs.push(args);
+  const client = rpc({
+    host: 'adaptive.test',
+    logCalls,
+    onGetLogs: ({ fromBlock, toBlock }) => {
+      if (toBlock - fromBlock + 1n > 2n) {
+        throw new Error('eth_getLogs response too large: limit exceeded (maximum 500 blocks)');
+      }
+      return [];
+    },
+  });
+  const { store, updates } = fakeStore();
+
+  let result;
+  try {
+    result = await ingestBscOnce(store, config({
+      maxBlockRange: 8,
+      minBlockRange: 2,
+      bscConfirmations: 10,
+    }), { rpcClients: [client] });
+  } finally {
+    console.log = originalConsoleLog;
+  }
+
+  assert.equal(result.outcome, 'complete');
+  assert.deepEqual(logCalls.slice(0, 6), [
+    { fromBlock: 100n, toBlock: 107n },
+    { fromBlock: 100n, toBlock: 103n },
+    { fromBlock: 100n, toBlock: 101n },
+    { fromBlock: 102n, toBlock: 103n },
+    { fromBlock: 104n, toBlock: 105n },
+    { fromBlock: 106n, toBlock: 107n },
+  ]);
+  assert.ok(updates.every(({ update }) => update.nextBlock === 108));
+  assert.ok(updates.every(({ update }) => update.adaptiveRange === 2));
+  assert.ok(updates.every(({ update }) => update.adaptiveSuccesses === 1));
+  assert.ok(adjustmentLogs.some((entry) => {
+    const [, context] = entry as [unknown, Record<string, unknown>];
+    return context?.cursor === 'BSC:PRESALE:Purchased'
+      && context?.reason === 'response-too-large'
+      && context?.retries === 1
+      && context?.from === 100;
+  }));
+  assert.ok(adjustmentLogs.some((entry) => {
+    const [, context] = entry as [unknown, Record<string, unknown>];
+    return context?.reason === 'query-success'
+      && context?.range === 2
+      && context?.nextCursor === 108
+      && context?.retries === 2;
+  }));
+});
+
+test('does not adapt a BSC range for auth failures and leaves the cursor unadvanced', async () => {
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({
+    host: 'auth.test',
+    logCalls,
+    onGetLogs: () => {
+      const cause = Object.assign(new Error('invalid api key'), { status: 401 });
+      throw Object.assign(new Error('HTTP request failed'), { cause });
+    },
+  });
+  const { store, updates } = fakeStore({ nextBlock: 100, adaptiveRange: 8 });
+
+  const result = await ingestBscOnce(store, config({
+    maxBlockRange: 8,
+    minBlockRange: 2,
+  }), { rpcClients: [client] });
+
+  assert.equal(result.outcome, 'incomplete');
+  assert.equal(logCalls.length, 10);
+  assert.deepEqual(logCalls[0], { fromBlock: 100n, toBlock: 107n });
+  assert.deepEqual(updates, []);
+  assert.match(result.errors[0]?.error ?? '', /HTTP request failed/);
+});
+
+test('halves explicit BSC timeouts and never changes the logical cursor window', async () => {
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({
+    host: 'timeout.test',
+    logCalls,
+    onGetLogs: ({ fromBlock, toBlock }) => {
+      if (toBlock - fromBlock + 1n > 4n) {
+        throw Object.assign(new Error('request timed out'), { code: 'ETIMEDOUT' });
+      }
+      return [];
+    },
+  });
+  const { store, updates } = fakeStore();
+
+  const originalConsoleLog = console.log;
+  console.log = () => {};
+  try {
+    const result = await ingestBscOnce(store, config({
+      maxBlockRange: 8,
+      minBlockRange: 2,
+    }), { rpcClients: [client] });
+    assert.equal(result.outcome, 'complete');
+  } finally {
+    console.log = originalConsoleLog;
+  }
+
+  assert.deepEqual(logCalls.slice(0, 3), [
+    { fromBlock: 100n, toBlock: 107n },
+    { fromBlock: 100n, toBlock: 103n },
+    { fromBlock: 104n, toBlock: 107n },
+  ]);
+  assert.ok(updates.every(({ update }) => update.nextBlock === 108));
+  assert.ok(updates.every(({ update }) => update.adaptiveRange === 4));
+});
+
+test('surfaces a size error at the configured minimum without advancing the cursor', async () => {
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({
+    host: 'minimum.test',
+    logCalls,
+    onGetLogs: () => {
+      throw new Error('eth_getLogs response too large');
+    },
+  });
+  const { store, updates, eventBatches } = fakeStore({
+    nextBlock: 100,
+    adaptiveRange: 4,
+  });
+
+  const originalConsoleLog = console.log;
+  console.log = () => {};
+  let result;
+  try {
+    result = await ingestBscOnce(store, config({
+      maxBlockRange: 4,
+      minBlockRange: 2,
+    }), { rpcClients: [client] });
+  } finally {
+    console.log = originalConsoleLog;
+  }
+
+  assert.equal(result.outcome, 'incomplete');
+  assert.deepEqual(logCalls.slice(0, 2), [
+    { fromBlock: 100n, toBlock: 103n },
+    { fromBlock: 100n, toBlock: 101n },
+  ]);
+  assert.deepEqual(eventBatches, []);
+  assert.deepEqual(updates, []);
+});
+
+test('grows only after three complete windows and never exceeds 5001', async () => {
+  const client = rpc({ host: 'recovery.test', latestBlock: 6_000n });
+  const { store, updates } = fakeStore({
+    nextBlock: 100,
+    adaptiveRange: 5_000,
+    adaptiveSuccesses: 2,
+  });
+
+  const originalConsoleLog = console.log;
+  console.log = () => {};
+  try {
+    const result = await ingestBscOnce(store, config({
+      maxBlockRange: 5_001,
+      minBlockRange: 1,
+      bscConfirmations: 0,
+    }), { rpcClients: [client] });
+    assert.equal(result.outcome, 'complete');
+  } finally {
+    console.log = originalConsoleLog;
+  }
+
+  assert.ok(updates.every(({ update }) => update.nextBlock === 5_101));
+  assert.ok(updates.every(({ update }) => update.adaptiveRange === 5_001));
+  assert.ok(updates.every(({ update }) => update.adaptiveSuccesses === 0));
+});
+
+test('rejects adaptive bounds outside the configured 1..5001 envelope', async () => {
+  const client = rpc({ host: 'bounds.test' });
+  const { store } = fakeStore();
+
+  await assert.rejects(
+    ingestBscOnce(store, config({ maxBlockRange: 5_002 }), { rpcClients: [client] }),
+    /entre 1 y 5001/,
+  );
+  await assert.rejects(
+    ingestBscOnce(store, config({ maxBlockRange: 4, minBlockRange: 5 }), { rpcClients: [client] }),
+    /no mayor/,
+  );
+});
+
+test('deduplicates logs and replays the exact range after persistence fails', async () => {
+  const duplicate = {
+    transactionHash: `0x${'a'.repeat(64)}`,
+    blockHash: `0x${'b'.repeat(64)}`,
+    blockNumber: 102n,
+    logIndex: 1,
+    args: {
+      buyer: PLAYER,
+      asmAmount: 1n,
+      ukiAmount: 2n,
+      totalBuyerAsm: 1n,
+      totalBuyerUki: 2n,
+    },
+  };
+  const second = {
+    ...duplicate,
+    transactionHash: `0x${'c'.repeat(64)}`,
+    blockNumber: 103n,
+    logIndex: 0,
+  };
+  const logCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const client = rpc({ host: 'replay.test', logs: [second, duplicate, duplicate], logCalls });
+  const failed = fakeStore({ nextBlock: 100 }, { failCursorUpdate: true });
+
+  const originalConsoleLog = console.log;
+  console.log = () => {};
+  try {
+    const first = await ingestBscOnce(failed.store, config({
+      maxBlockRange: 4,
+      minBlockRange: 1,
+    }), { rpcClients: [client] });
+    assert.equal(first.outcome, 'incomplete');
+  } finally {
+    console.log = originalConsoleLog;
+  }
+  assert.deepEqual(failed.updates, []);
+  assert.ok(failed.eventBatches.every((batch) => batch.length === 2));
+
+  const replayed = fakeStore({ nextBlock: 100 });
+  console.log = () => {};
+  try {
+    const secondRun = await ingestBscOnce(replayed.store, config({
+      maxBlockRange: 4,
+      minBlockRange: 1,
+    }), { rpcClients: [client] });
+    assert.equal(secondRun.outcome, 'complete');
+  } finally {
+    console.log = originalConsoleLog;
+  }
+
+  const firstIds = failed.eventBatches[0]?.map((event) => (event as { _id: string })._id);
+  const replayIds = replayed.eventBatches[0]?.map((event) => (event as { _id: string })._id);
+  assert.deepEqual(replayIds, firstIds);
+  assert.equal(new Set(replayIds).size, 2);
+  assert.ok(replayed.updates.every(({ update }) => update.nextBlock === 104));
+  assert.deepEqual(logCalls[0], { fromBlock: 100n, toBlock: 103n });
+  assert.deepEqual(logCalls[PRESALE_EVENT_COUNT], { fromBlock: 100n, toBlock: 103n });
 });
