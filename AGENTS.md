@@ -168,15 +168,33 @@ convierte un target de producción en una simulación ni rebaja sus guards.
 - DApp: `pnpm dapp dev`. Indexer normal: `pnpm indexer:dev`. Para cualquier
   runtime adicional usa solo el script real presente en el `package.json` de la
   rama activa; no inventes wrappers ni recuperes los workers antiguos.
+- `legacy-chain-indexer` local: con el entorno ya inyectado, ejecuta primero
+  `node scripts/assert-production.mjs --scope legacy-chain-indexer` para
+  producción o `node scripts/assert-staging-only.mjs --scope legacy-chain-indexer`
+  para Stage. Solo si el guard acredita el destino correcto, arranca el servicio
+  persistente con `pnpm --filter @cukies/chain-indexer legacy:run:dev`.
+  `legacy:ingest` procesa un único ciclo y termina; no equivale a levantar el
+  servicio. Ejecuta el loop desde el SHA revisado, conserva su PID y un log
+  filtrado, y confirma el mensaje `run started` y el primer `loop ok`.
 - Inyecta la configuración mediante un archivo temporal `0600`, elimínalo al
   terminar y no imprimas variables, URLs con credenciales ni entornos completos.
   El entorno exportado debe prevalecer sobre los `.env` del repositorio.
+- Para un RPC BSC autenticado, acepta una URL HTTPS completa o una API key
+  entregada por el usuario en un fichero `0600`; construye
+  `CUKIES_LEGACY_BSC_RPC_URLS` solo en memoria. Verifica `eth_chainId=56`, una
+  consulta histórica `eth_getLogs` y el bytecode del contrato antes de escribir.
+  No copies la credencial a logs, artefactos, comandos, Compose ni Git.
 - Antes de arrancar, valida destino, `chainId`, contratos y nombre de base.
   Stage usa BSC `97` y `cukieshub-new-staging`; producción usa BSC `56` y
   `cukieshub-new` y exige autorización explícita para escribir.
 - Debe existir un único writer por base, red y contrato. Inventaría procesos
   locales y contenedores antes de arrancar otro; nunca ejecutes en paralelo el
   mismo indexer desde local, Stage, producción o Coolify.
+- `legacy:run:dev` escribe ingesta, proyección, cursores, runs y dead letters.
+  Antes de arrancarlo sobre producción exige un SHA con tests y revisión cerrados,
+  la autorización del usuario y ausencia de otro writer. Si otra tarea ya posee
+  el lease, coordina con ella y no lances un segundo proceso. Para detenerlo usa
+  SIGINT/SIGTERM, espera su `shutdown` y vuelve a comprobar procesos y contenedores.
 - Los workers off-chain `getter-bsc`, `getter-tron` y `setter` del antiguo
   `cukies-world/apps/backend/sync` están retirados y no son fallback. El
   `legacy-chain-indexer` de este repositorio sí se conserva: indexa los contratos
