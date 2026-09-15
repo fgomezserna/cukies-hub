@@ -71,8 +71,9 @@ describe('identidad Legacy en la BD unificada', () => {
       network: 'all',
       marketplaceOnly: true,
     });
-    expect(filter.$and).toHaveLength(3);
-    const identity = filter.$and?.[0] as { $or?: unknown[] };
+    expect(filter.$and).toHaveLength(4);
+    expect(filter.$and?.[0]).toHaveProperty('$nor');
+    const identity = filter.$and?.[1] as { $or?: unknown[] };
     expect(identity.$or).toHaveLength(2);
 
     const bscFilter = buildLegacyMarketplaceIdentityFilter({ network: 'BSC' });

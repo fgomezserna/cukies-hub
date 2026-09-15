@@ -135,11 +135,10 @@ describe('AppLayout launch navigation', () => {
       'href',
       '/cukie-hodler#mi-cukie-pool',
     );
-    expect(screen.getByRole('link', { name: 'Mis Cukies' })).toHaveAttribute('href', '/cukies');
-    expect(screen.getByRole('link', { name: 'Marketplace' })).toHaveAttribute(
-      'href',
-      '/marketplace',
-    );
+    expect(screen.queryByRole('link', { name: 'Mis Cukies' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Marketplace' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Bridge' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Cukie Points' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Premios' })).toHaveAttribute(
       'href',
       '/premios',
@@ -149,7 +148,7 @@ describe('AppLayout launch navigation', () => {
     expect(screen.getByRole('link', { name: 'Inicio' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: 'Como jugar' })).toHaveAttribute('href', '/como-jugar');
 
-    for (const groupLabel of ['Acceso principal', 'Recursos', 'Colección', 'Cobros', 'Invitaciones', 'Cuenta y ayuda']) {
+    for (const groupLabel of ['Acceso principal', 'Recursos', 'Legacy', 'Cobros', 'Invitaciones', 'Cuenta y ayuda']) {
       expect(screen.getByText(groupLabel)).toBeInTheDocument();
     }
 
