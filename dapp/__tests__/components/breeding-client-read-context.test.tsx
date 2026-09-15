@@ -151,13 +151,13 @@ describe('Crías Legacy: ownership de lecturas activas', () => {
 
     const view = render(<BreedingClient initialTab="active" />);
     fireClickTron();
-    await waitFor(() => expect(screen.getByText('Breed #A')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Cría #A')).toBeInTheDocument());
 
     deferB = true;
     walletAddress = 'TB';
     setTronWallet(walletAddress);
     view.rerender(<BreedingClient initialTab="active" />);
-    await waitFor(() => expect(screen.queryByText('Breed #A')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Cría #A')).not.toBeInTheDocument());
     await waitFor(() => expect(pending.filter(({ address }) => address === 'TB')).toHaveLength(4));
     expect(screen.getByRole('button', { name: 'Actualizar' })).toBeDisabled();
 
@@ -170,7 +170,7 @@ describe('Crías Legacy: ownership de lecturas activas', () => {
       resolveBreedDetails('TB');
       await Promise.resolve();
     });
-    await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Cría #B')).toBeInTheDocument());
   });
 
   it('muestra B al resolver B primero y descarta la respuesta tardía de A', async () => {
@@ -184,12 +184,12 @@ describe('Crías Legacy: ownership de lecturas activas', () => {
       resolveBreedDetails('TB');
       await Promise.resolve();
     });
-    await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Cría #B')).toBeInTheDocument());
     await act(async () => {
       resolveSnapshotAndIds('TA');
       await Promise.resolve();
     });
-    expect(screen.getByText('Breed #B')).toBeInTheDocument();
+    expect(screen.getByText('Cría #B')).toBeInTheDocument();
   });
 
   it('mantiene B si la respuesta A termina con error después', async () => {
@@ -203,14 +203,14 @@ describe('Crías Legacy: ownership de lecturas activas', () => {
       resolveBreedDetails('TB');
       await Promise.resolve();
     });
-    await waitFor(() => expect(screen.getByText('Breed #B')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Cría #B')).toBeInTheDocument());
     await act(async () => {
       for (const request of pending.filter(({ address }) => address === 'TA')) {
         request.reject(new Error('respuesta antigua'));
       }
       await Promise.resolve();
     });
-    expect(screen.getByText('Breed #B')).toBeInTheDocument();
+    expect(screen.getByText('Cría #B')).toBeInTheDocument();
     expect(screen.queryByText('respuesta antigua')).not.toBeInTheDocument();
   });
 });
