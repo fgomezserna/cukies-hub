@@ -10,9 +10,16 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   const { tokenId } = await context.params;
-  const item = await getCuki(tokenId);
+  const searchParams = request.nextUrl.searchParams;
+  const item = await getCuki(tokenId, {
+    network: searchParams.get('network') ?? undefined,
+    collection: searchParams.get('collection')
+      ?? searchParams.get('collectionAddress')
+      ?? undefined,
+    chainId: searchParams.get('chainId'),
+  });
 
   if (!item) {
     return NextResponse.json(

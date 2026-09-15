@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
     type: searchParams.get('type') ?? undefined,
     generation: searchParams.get('generation') ?? undefined,
     owner: searchParams.get('owner') ?? undefined,
+    collection: searchParams.get('collection')
+      ?? searchParams.get('collectionAddress')
+      ?? undefined,
     sort: searchParams.get('sort') ?? undefined,
     marketplaceOnly: searchParams.get('scope') === 'marketplace',
   });

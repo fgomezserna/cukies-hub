@@ -5,7 +5,8 @@ import { buildCukiFilter } from '@/lib/cukies-data/data';
 
 describe('legacy marketplace public query', () => {
   it('requires active listing evidence bound to the current owner and network', () => {
-    expect(buildCukiFilter({ marketplaceOnly: true })).toEqual({
+    const filter = buildCukiFilter({ marketplaceOnly: true });
+    expect(filter).toMatchObject({
       state: 'onSale',
       marketplaceListingStatus: 'active',
       ownerNormalized: { $type: 'string', $ne: '' },
@@ -18,10 +19,16 @@ describe('legacy marketplace public query', () => {
         ],
       },
     });
+    expect(filter.$and).toContainEqual({
+      $nor: [{
+        metadataSource: 'legacy.cukies',
+        legacyProjectionKind: { $ne: 'canonical' },
+      }],
+    });
   });
 
   it('applies the same fail-closed evidence to any onSale inventory query', () => {
-    expect(buildCukiFilter({ state: 'onSale', network: 'BSC' })).toEqual({
+    expect(buildCukiFilter({ state: 'onSale', network: 'BSC' })).toMatchObject({
       network: 'BSC',
       state: 'onSale',
       marketplaceListingStatus: 'active',

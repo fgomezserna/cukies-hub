@@ -31,8 +31,14 @@ describe('imágenes de relaciones legacy en páginas del catálogo', () => {
     const result = await listLegacyMarketplaceCukies({limit: 24});
     expect(collection.find).toHaveBeenCalledTimes(2);
     const relationFilter = collection.find.mock.calls[1][0];
-    expect(relationFilter.$and?.[0]).toEqual({_id: {$in: ['1000000000000', 'missing', '4000000015494']}});
-    expect(relationFilter.$and?.[1]).toHaveProperty('$or');
+    expect(relationFilter.$and?.[0]).toHaveProperty('$nor');
+    expect(relationFilter.$and?.[1]).toEqual({
+      $or: [
+        {tokenId: {$in: ['1000000000000', 'missing', '4000000015494']}},
+        {_id: {$in: ['1000000000000', 'missing', '4000000015494']}},
+      ],
+    });
+    expect(relationFilter.$and?.[2]).toHaveProperty('$or');
     expect(result.items[0].children[0]).toMatchObject({id: '4000000015494', network: 'TRON', imageUrl: relations[0].img, generation: 2});
     expect(result.items[1].children[0].imageUrl).toBe(relations[0].img);
     expect(result.items[0].parents[0]).toMatchObject({id: '1000000000000', network: 'BSC', imageUrl: relations[1].img});

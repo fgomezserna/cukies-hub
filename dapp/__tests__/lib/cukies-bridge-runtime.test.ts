@@ -21,11 +21,13 @@ function validStageEnvironment() {
 }
 
 describe('Cukies bridge runtime safety', () => {
-  it('habilita exclusivamente BSC Testnet y TRON Nile en Stage', () => {
+  it('mantiene Testnet cerrado hasta que TRON materialice identidad canonica', () => {
     const config = buildCukiesBridgeRuntimeConfig(validStageEnvironment());
 
-    expect(config.issues).toEqual([]);
-    expect(config.enabled).toBe(true);
+    expect(config.issues).toContain(
+      'Bridge Testnet desactivado hasta materializar _id y coleccion canonicos para Cukies TRON',
+    );
+    expect(config.enabled).toBe(false);
     expect(config.mode).toBe('testnet');
     expect(config.bsc).toMatchObject({
       chainId: 97,
@@ -47,14 +49,13 @@ describe('Cukies bridge runtime safety', () => {
       NEXT_PUBLIC_UKI_CHAIN_ID: '97',
     });
 
-    expect(config.mode).toBe('legacy-readonly');
-    expect(config.enabled).toBe(true);
-    expect(config.operationsEnabled).toBe(false);
+    expect(config.mode).toBe('disabled');
+    expect(config.enabled).toBe(false);
     expect(config.issues).toEqual([]);
-    expect(config.bsc.collectionAddress).toBe('0x0dbdebcc62f11005bf434abfad74564e896ac861');
-    expect(config.bsc.endpointAddress).toBe('0xb775ec58411f0460716cc7fa6fbbe2c38afd2a6e');
-    expect(config.tron.collectionAddress).toBe('TVkQDrxQgX7ZQmeeXj2RbPQa93qJrYQYGe');
-    expect(config.tron.endpointAddress).toBe('TXVrcj6YuHMgZNvMXg8VymVt19PC18KrhQ');
+    expect(config.bsc.collectionAddress).toBeNull();
+    expect(config.bsc.endpointAddress).toBeNull();
+    expect(config.tron.collectionAddress).toBeNull();
+    expect(config.tron.endpointAddress).toBeNull();
   });
 
   it('rechaza cualquier intento de habilitar un modo live o mainnet', () => {
@@ -66,39 +67,7 @@ describe('Cukies bridge runtime safety', () => {
     expect(config.mode).toBe('disabled');
     expect(config.enabled).toBe(false);
     expect(config.issues).toContain(
-      'NEXT_PUBLIC_CUKIES_BRIDGE_MODE debe ser disabled, testnet o legacy-readonly',
-    );
-  });
-
-  it('usa las identidades Legacy mainnet en modo solo lectura desde Stage', () => {
-    const config = buildCukiesBridgeRuntimeConfig({ APP_ENV: 'staging' });
-
-    expect(config).toMatchObject({
-      mode: 'legacy-readonly',
-      enabled: true,
-      operationsEnabled: false,
-      bsc: {
-        chainId: 56,
-        networkLabel: 'BNB Smart Chain',
-      },
-      tron: {
-        network: 'mainnet',
-        rpcUrl: 'https://api.trongrid.io',
-      },
-    });
-    expect(config.issues).toEqual([]);
-  });
-
-  it('falla cerrado si legacy-readonly recibe un RPC TRON distinto', () => {
-    const config = buildCukiesBridgeRuntimeConfig({
-      APP_ENV: 'staging',
-      NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL: 'https://nile.trongrid.io',
-    });
-
-    expect(config.enabled).toBe(false);
-    expect(config.tron.rpcUrl).toBeNull();
-    expect(config.issues).toContain(
-      'NEXT_PUBLIC_CUKIES_BRIDGE_TRON_RPC_URL debe ser https://api.trongrid.io',
+      'NEXT_PUBLIC_CUKIES_BRIDGE_MODE debe ser disabled, testnet o mainnet',
     );
   });
 

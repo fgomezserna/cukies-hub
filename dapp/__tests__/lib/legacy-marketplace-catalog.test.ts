@@ -22,11 +22,19 @@ describe('catálogo e identidad del marketplace Legacy', () => {
     const filter = buildLegacyMarketplaceMongoFilter({ marketplaceOnly: true });
     expect(filter.$and).toEqual(expect.arrayContaining([
       {
+        $nor: [{
+          metadataSource: 'legacy.cukies',
+          legacyProjectionKind: { $ne: 'canonical' },
+        }],
+      },
+      {
         state: 'onSale',
         priceOriginal: { $type: 'string', $regex: /^[1-9]\d*$/ },
       },
     ]));
-    expect(filter.$and?.[0]).toHaveProperty('$or');
+    expect(filter.$and).toEqual(expect.arrayContaining([
+      expect.objectContaining({ $or: expect.any(Array) }),
+    ]));
   });
 
   it('acepta los valores canonicos de tipo y generacion compartidos con V2', () => {
