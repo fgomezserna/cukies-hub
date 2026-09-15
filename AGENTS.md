@@ -157,6 +157,38 @@ Required environment variables in `dapp/.env.local`:
 - `IFTTT_WEBHOOK_SECRET` - Webhook integration
 - `GAME_SYBILSLASH` - Game URL configuration
 
+## Bucle local de DApp e indexadores
+
+Durante investigación e iteración, ejecuta la DApp y los indexadores en modo
+desarrollo desde un worktree limpio; no construyas una imagen por cada cambio.
+El proceso local puede apuntar a Stage o, únicamente con autorización explícita,
+a mainnet y Mongo de producción para una prueba real. Ejecutarse en local no
+convierte un target de producción en una simulación ni rebaja sus guards.
+
+- DApp: `pnpm dapp dev`. Indexer normal: `pnpm indexer:dev`. Para cualquier
+  runtime adicional usa solo el script real presente en el `package.json` de la
+  rama activa; no inventes wrappers ni recuperes los workers antiguos.
+- Inyecta la configuración mediante un archivo temporal `0600`, elimínalo al
+  terminar y no imprimas variables, URLs con credenciales ni entornos completos.
+  El entorno exportado debe prevalecer sobre los `.env` del repositorio.
+- Antes de arrancar, valida destino, `chainId`, contratos y nombre de base.
+  Stage usa BSC `97` y `cukieshub-new-staging`; producción usa BSC `56` y
+  `cukieshub-new` y exige autorización explícita para escribir.
+- Debe existir un único writer por base, red y contrato. Inventaría procesos
+  locales y contenedores antes de arrancar otro; nunca ejecutes en paralelo el
+  mismo indexer desde local, Stage, producción o Coolify.
+- Los workers off-chain `getter-bsc`, `getter-tron` y `setter` del antiguo
+  `cukies-world/apps/backend/sync` están retirados y no son fallback. El
+  `legacy-chain-indexer` de este repositorio sí se conserva: indexa los contratos
+  históricos BSC/TRON, pero no sustituye al relayer ni ejecuta bridge.
+- Monitoriza logs, cursores, `chain_indexer_runs` y `chain_dead_letters`; conserva
+  el cursor cuando falle un rango y detén el proceso con SIGINT/SIGTERM. No
+  siembres Mongo, no repitas rotaciones y no uses `db push`, migraciones o
+  backfills manuales para hacer coincidir la API.
+- Tras validar localmente, la entrega sigue siendo reproducible: commit, imagen
+  limpia e inmutable, digest, `release.env`, Compose oficial y comprobación del
+  runtime servido. El proceso local no sustituye esa entrega final.
+
 ## Coolify Deployment
 
 Rolling delivery is active in staging (failure/rollback rehearsal remains tracked in the transition evidence): app32 (`rwwsc4kkwc0ck84cgk40s8kk`) is the dedicated Docker Image web resource; app28 retains workers. Follow [the transition procedure](docs/deployment-rolling-transition.md) and verify the live delivery mode before acting. Production is not enabled until its own resource, configuration and rehearsal are complete.
