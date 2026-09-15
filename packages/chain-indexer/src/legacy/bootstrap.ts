@@ -253,10 +253,11 @@ export async function bootstrapLegacyRuntimeFromDefault(
   config: LegacyIndexerConfig,
 ) {
   const importedAt = now();
-  const contractEvents = getContractEventConfigs(
-    ['BSC', 'TRON'],
-    { contractAliases: [...LEGACY_CONTRACT_ALIASES] },
-  ).filter((event) => config.legacyContractAliases.includes(event.contractAlias as LegacyContractAlias));
+  // Legacy identities come from the immutable BSC/TRON maps. Passing them as
+  // configurable aliases would require env-provided BSC addresses and reject
+  // the canonical TOKEN, MARKETPLACE and BRIDGE sources during bootstrap.
+  const contractEvents = getContractEventConfigs(['BSC', 'TRON'])
+    .filter((event) => config.legacyContractAliases.includes(event.contractAlias as LegacyContractAlias));
   const results = [];
 
   for (const contractEvent of contractEvents) {
