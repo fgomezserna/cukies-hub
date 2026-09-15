@@ -51,7 +51,19 @@ export const LEGACY_INDEX_DEFINITIONS: LegacyIndexDefinition[] = [
   { collection: 'tx_nfts', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1, timestampMs: -1 } },
   { collection: 'point_transactions', index: { eventId: 1 }, options: { unique: true, sparse: true } },
   { collection: 'point_transactions', index: { chain: 1, pointsContractAddressNormalized: 1, walletNormalized: 1, timestampMs: -1 } },
-  { collection: 'point_balances', index: { chain: 1, pointsContractAddressNormalized: 1, walletNormalized: 1 }, options: { unique: true } },
+  {
+    collection: 'point_balances',
+    index: { chain: 1, pointsContractAddressNormalized: 1, walletNormalized: 1 },
+    options: {
+      unique: true,
+      name: 'legacy_point_balance_identity',
+      partialFilterExpression: {
+        chain: { $type: 'string' },
+        pointsContractAddressNormalized: { $type: 'string' },
+        walletNormalized: { $type: 'string' },
+      },
+    },
+  },
   { collection: 'marketplace_listings', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1 }, options: { unique: true, name: 'legacy_listing_identity' } },
   { collection: 'marketplace_listings', index: { status: 1, chain: 1, updatedAt: -1 } },
   { collection: 'cukies', index: { chain: 1, collectionAddressNormalized: 1, tokenId: 1 }, options: { unique: true, name: 'legacy_nft_identity' } },
