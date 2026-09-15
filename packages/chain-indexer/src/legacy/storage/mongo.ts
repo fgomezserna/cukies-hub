@@ -1,6 +1,7 @@
 import type { IndexDescription } from 'mongodb';
 
 import { IndexerStore } from '../../storage/mongo.js';
+import { ensurePointBalanceAddressIndex } from '../../storage/point-balance-index.js';
 import type { LegacyIndexerConfig } from '../../config/legacy-env.js';
 import {
   LEGACY_CONTRACT_ALIASES,
@@ -151,6 +152,7 @@ export class LegacyIndexerStore extends IndexerStore {
   }
 
   override async ensureIndexes() {
+    await ensurePointBalanceAddressIndex(this.db);
     await Promise.all(LEGACY_INDEX_DEFINITIONS.map(({ collection, index, options }) => (
       this.db.collection(collection).createIndex(index, options)
     )));
