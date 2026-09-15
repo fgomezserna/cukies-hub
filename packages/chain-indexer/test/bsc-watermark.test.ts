@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { keccak256 } from 'viem';
+import { HttpRequestError, keccak256 } from 'viem';
 
 import { ingestBscOnce } from '../src/chains/bsc.js';
 import type { IndexerStore } from '../src/storage/index.js';
@@ -695,7 +695,7 @@ test('requires a successful pool getter and never invents a default when RPC can
   const fixture = poolVaultFixture(97);
   const result = await ingestBscOnce(fixture.store, fixture.settings, { rpcClients: [fixture.client] });
   assert.equal(result.outcome, 'incomplete');
-  assert.match(result.errors[0]?.error ?? '', /PERIOD_DURATION getter unavailable/);
+  assert.match(result.errors[0]?.error ?? '', /reason=contract-data/);
   assert.equal(fixture.contractReadCalls.length, 1);
   assert.deepEqual(fixture.updates, []);
   assert.deepEqual(fixture.checkpoints, []);
@@ -778,7 +778,199 @@ test('does not adapt a BSC range for auth failures and leaves the cursor unadvan
   assert.equal(logCalls.length, 10);
   assert.deepEqual(logCalls[0], { fromBlock: 100n, toBlock: 107n });
   assert.deepEqual(updates, []);
-  assert.match(result.errors[0]?.error ?? '', /HTTP request failed/);
+  assert.match(result.errors[0]?.error ?? '', /reason=authentication status=401/);
+});
+
+test('shrinks a mixed fallback while surfacing authentication failures durably', async () => {
+  const syntheticSecret = 'SYNTHETIC_ECHO_TOKEN';
+  const rangeCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const authCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const rangeLimited = rpc({
+    host: 'range-limited.test',
+    logCalls: rangeCalls,
+    onGetLogs: ({ fromBlock, toBlock }) => {
+      if (toBlock - fromBlock + 1n > 2n) {
+        throw Object.assign(new Error('Request exceeds defined limit.'), { code: -32005 });
+      }
+      return [];
+    },
+  });
+  const authenticatedArchive = rpc({
+    host: 'archive-auth.test',
+    logCalls: authCalls,
+    onGetLogs: () => {
+      throw new HttpRequestError({
+        url: `https://archive-auth.test/v1?apiKey=${syntheticSecret}`,
+        status: 403,
+        details: `Invalid API key ${syntheticSecret}`,
+      });
+    },
+  });
+  const { store, updates } = fakeStore({ nextBlock: 100, adaptiveRange: 8 });
+
+  const originalConsoleLog = console.log;
+  const originalConsoleWarn = console.warn;
+  const warningLogs: unknown[] = [];
+  console.log = () => {};
+  console.warn = (...args: unknown[]) => warningLogs.push(args);
+  let result;
+  try {
+    result = await ingestBscOnce(store, config({
+      maxBlockRange: 8,
+      minBlockRange: 2,
+    }), { rpcClients: [rangeLimited, authenticatedArchive] });
+  } finally {
+    console.log = originalConsoleLog;
+    console.warn = originalConsoleWarn;
+  }
+
+  assert.equal(result.outcome, 'complete');
+  assert.deepEqual(rangeCalls.slice(0, 3), [
+    { fromBlock: 100n, toBlock: 107n },
+    { fromBlock: 100n, toBlock: 103n },
+    { fromBlock: 100n, toBlock: 101n },
+  ]);
+  assert.ok(authCalls.length >= 2);
+  assert.ok(updates.every(({ update }) => update.nextBlock === 108));
+  assert.ok(updates.every(({ update }) => update.adaptiveRange === 2));
+  assert.ok(result.rpcWarnings.some((warning) => (
+    warning.cursorId === 'BSC:PRESALE:Purchased'
+    && warning.rpcHost === 'archive-auth.test'
+    && warning.reason === 'authentication'
+    && warning.error === 'reason=authentication status=403'
+    && warning.retries === 1
+  )));
+  assert.doesNotMatch(JSON.stringify({ result, warningLogs }), new RegExp(syntheticSecret));
+});
+
+test('shrinks a mixed fallback when the alternate RPC has a transport failure', async () => {
+  const rangeCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const transportCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const rangeLimited = rpc({
+    host: 'range-limited.test',
+    logCalls: rangeCalls,
+    onGetLogs: ({ fromBlock, toBlock }) => {
+      if (toBlock - fromBlock + 1n > 2n) {
+        throw Object.assign(new Error('Request exceeds defined limit.'), { code: -32005 });
+      }
+      return [];
+    },
+  });
+  const disconnected = rpc({
+    host: 'transport.test',
+    logCalls: transportCalls,
+    onGetLogs: () => {
+      const cause = Object.assign(new Error('socket closed'), { code: 'ECONNRESET' });
+      throw Object.assign(new Error('fetch failed'), { cause });
+    },
+  });
+  const { store, updates } = fakeStore({ nextBlock: 100, adaptiveRange: 8 });
+
+  const originalConsoleLog = console.log;
+  const originalConsoleWarn = console.warn;
+  console.log = () => {};
+  console.warn = () => {};
+  let result;
+  try {
+    result = await ingestBscOnce(store, config({
+      maxBlockRange: 8,
+      minBlockRange: 2,
+    }), { rpcClients: [rangeLimited, disconnected] });
+  } finally {
+    console.log = originalConsoleLog;
+    console.warn = originalConsoleWarn;
+  }
+
+  assert.equal(result.outcome, 'complete');
+  assert.deepEqual(rangeCalls.slice(0, 3), [
+    { fromBlock: 100n, toBlock: 107n },
+    { fromBlock: 100n, toBlock: 103n },
+    { fromBlock: 100n, toBlock: 101n },
+  ]);
+  assert.equal(transportCalls.length, PRESALE_EVENT_COUNT * 2);
+  assert.ok(updates.every(({ update }) => update.nextBlock === 108));
+  assert.ok(updates.every(({ update }) => update.adaptiveRange === 2));
+  assert.ok(result.rpcWarnings.some((warning) => (
+    warning.rpcHost === 'transport.test'
+    && warning.reason === 'transient'
+    && warning.error === 'reason=transient code=ECONNRESET'
+  )));
+});
+
+test('does not hide a contract/data failure behind a range adjustment', async () => {
+  const rangeCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const fatalCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const rangeLimited = rpc({
+    host: 'range-limited.test',
+    logCalls: rangeCalls,
+    onGetLogs: () => {
+      throw new Error('eth_getLogs response too large');
+    },
+  });
+  const invalidContract = rpc({
+    host: 'invalid-contract.test',
+    logCalls: fatalCalls,
+    onGetLogs: () => {
+      throw new Error('execution reverted while decoding contract event');
+    },
+  });
+  const { store, updates } = fakeStore({ nextBlock: 100, adaptiveRange: 8 });
+
+  const originalConsoleWarn = console.warn;
+  console.warn = () => {};
+  let result;
+  try {
+    result = await ingestBscOnce(store, config({
+      maxBlockRange: 8,
+      minBlockRange: 2,
+    }), { rpcClients: [rangeLimited, invalidContract] });
+  } finally {
+    console.warn = originalConsoleWarn;
+  }
+
+  assert.equal(result.outcome, 'incomplete');
+  assert.equal(rangeCalls.length, PRESALE_EVENT_COUNT);
+  assert.equal(fatalCalls.length, PRESALE_EVENT_COUNT);
+  assert.deepEqual(updates, []);
+  assert.match(result.errors[0]?.error ?? '', /reason=contract-data/);
+});
+
+test('does not hide a chain mismatch behind a range adjustment', async () => {
+  const rangeCalls: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+  const rangeLimited = rpc({
+    host: 'range-limited.test',
+    logCalls: rangeCalls,
+    onGetLogs: () => {
+      throw new Error('eth_getLogs response too large');
+    },
+  });
+  const wrongChain = rpc({
+    host: 'wrong-chain.test',
+    chainId: 97,
+  });
+  const { store, updates } = fakeStore({ nextBlock: 100, adaptiveRange: 8 });
+
+  const originalConsoleWarn = console.warn;
+  console.warn = () => {};
+  let result;
+  try {
+    result = await ingestBscOnce(store, config({
+      maxBlockRange: 8,
+      minBlockRange: 2,
+    }), { rpcClients: [rangeLimited, wrongChain] });
+  } finally {
+    console.warn = originalConsoleWarn;
+  }
+
+  assert.equal(result.outcome, 'incomplete');
+  assert.equal(rangeCalls.length, PRESALE_EVENT_COUNT);
+  assert.deepEqual(updates, []);
+  assert.match(result.errors[0]?.error ?? '', /reason=chain-mismatch/);
+  assert.ok(result.rpcWarnings.some((warning) => (
+    warning.rpcHost === 'wrong-chain.test'
+    && warning.reason === 'chain-mismatch'
+    && warning.error === 'reason=chain-mismatch'
+  )));
 });
 
 test('halves explicit BSC timeouts and never changes the logical cursor window', async () => {
