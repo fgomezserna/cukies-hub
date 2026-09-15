@@ -23,6 +23,7 @@ import {
   verifyEconomyTransactionSupport,
 } from './economy-schema.js';
 import { runtimeScopedStorageId } from './runtime-scope.js';
+import { ensurePointBalanceAddressIndex } from './point-balance-index.js';
 
 export function runtimeScopedEventFilter(runtimeScope: RuntimeScope) {
   if (runtimeScope === 'legacy') return { runtimeScope: 'legacy' as const };
@@ -93,6 +94,7 @@ export class IndexerStore {
   }
 
   async ensureIndexes() {
+    await ensurePointBalanceAddressIndex(this.db);
     await Promise.all([
       this.events().createIndex({
         chain: 1,
@@ -142,7 +144,6 @@ export class IndexerStore {
       this.db
         .collection('point_transactions')
         .createIndex({ eventId: 1 }, { unique: true, sparse: true }),
-      this.db.collection('point_balances').createIndex({ addressNormalized: 1 }, { unique: true }),
       this.db.collection('marketplace_listings').createIndex({ tokenId: 1 }, { unique: true }),
       this.db.collection('uki_marketplace_orders').createIndex(
         { chainId: 1, marketplaceAddressNormalized: 1, orderId: 1 },
